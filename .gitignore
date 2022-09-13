@@ -4,4 +4,6 @@ src/data/
 src/logs/
 venv/
 pyvenv.cfg
+src/config.json
 .~lock*
+.SynologyWorkingDirectory
