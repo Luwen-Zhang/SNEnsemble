@@ -98,7 +98,7 @@ class Extractor():
             if 'Scatter' in scatter_name:
                 data = pd.concat([data, tmp_df], axis=0, ignore_index=True)
 
-                data.reset_index(drop=True)
+                data.reset_index(drop=True, inplace=True)
             else:
                 tmp = row[1].copy()
                 tmp.pop('Scatter')
