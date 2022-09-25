@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib
 import scipy.stats as st
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Subset
 
 sns.reset_defaults()
 
@@ -14,6 +16,41 @@ plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Times New Roman"
 plt.rcParams["figure.autolayout"] = True
 # plt.rcParams["legend.frameon"] = False
+
+def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test, validation):
+    def mat_lay_index(chosen_mat_lay, mat_lay):
+        index = []
+        for material in chosen_mat_lay:
+            where_material = np.where(mat_lay == material)[0]
+            index += list(where_material)
+        return np.array(index)
+
+    if validation:
+        train_mat_lay, test_mat_lay = train_test_split(mat_lay_set, test_size=train_val_test[2], random_state=0)
+        train_mat_lay, val_mat_lay = train_test_split(train_mat_lay,
+                                                      test_size=train_val_test[1] / np.sum(train_val_test[0:2]), random_state=0)
+        train_dataset = Subset(dataset,mat_lay_index(train_mat_lay, mat_lay))
+        val_dataset = Subset(dataset,mat_lay_index(val_mat_lay, mat_lay))
+        test_dataset = Subset(dataset,mat_lay_index(test_mat_lay, mat_lay))
+
+
+        df = pd.concat([pd.DataFrame({'train material': train_mat_lay}),
+                        pd.DataFrame({'val material': val_mat_lay}),
+                        pd.DataFrame({'test material': test_mat_lay})], axis=1)
+
+        df.to_excel('../output/material_split.xlsx', engine='openpyxl', index=False)
+        return train_dataset, val_dataset, test_dataset
+    else:
+        train_mat_lay, test_mat_lay = train_test_split(mat_lay_set, test_size=train_val_test[1], random_state=0)
+
+        train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
+        test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
+
+        df = pd.concat([pd.DataFrame({'train material': train_mat_lay}),
+                        pd.DataFrame({'test material': test_mat_lay})], axis=1)
+        df.to_excel('../output/material_split.xlsx', engine='openpyxl', index=False)
+        return train_dataset, test_dataset
+
 
 
 def replace_column_name(df, name_mapping):
