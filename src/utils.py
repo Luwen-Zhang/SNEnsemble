@@ -1,68 +1,28 @@
+###############################################
+# Xueling Luo @ Shanghai Jiao Tong University #
+###############################################
+
 import numpy as np
 import torch
+from torch import nn
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib
 import scipy.stats as st
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.metrics import r2_score
+from sklearn.ensemble import RandomForestRegressor
+from sklearn import svm
 from torch.utils.data import Subset
-
-sns.reset_defaults()
-
-matplotlib.rc("text", usetex=True)
-
-plt.rcParams["font.family"] = "serif"
-plt.rcParams["font.serif"] = "Times New Roman"
-plt.rcParams["figure.autolayout"] = True
-# plt.rcParams["legend.frameon"] = False
-
-def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test, validation):
-    def mat_lay_index(chosen_mat_lay, mat_lay):
-        index = []
-        for material in chosen_mat_lay:
-            where_material = np.where(mat_lay == material)[0]
-            index += list(where_material)
-        return np.array(index)
-
-    if validation:
-        train_mat_lay, test_mat_lay = train_test_split(mat_lay_set, test_size=train_val_test[2], random_state=0)
-        train_mat_lay, val_mat_lay = train_test_split(train_mat_lay,
-                                                      test_size=train_val_test[1] / np.sum(train_val_test[0:2]), random_state=0)
-        train_dataset = Subset(dataset,mat_lay_index(train_mat_lay, mat_lay))
-        val_dataset = Subset(dataset,mat_lay_index(val_mat_lay, mat_lay))
-        test_dataset = Subset(dataset,mat_lay_index(test_mat_lay, mat_lay))
+import torch.utils.data as Data
+from skopt.plots import plot_convergence
+import skopt
+from skopt import gp_minimize
 
 
-        df = pd.concat([pd.DataFrame({'train material': train_mat_lay}),
-                        pd.DataFrame({'val material': val_mat_lay}),
-                        pd.DataFrame({'test material': test_mat_lay})], axis=1)
-
-        df.to_excel('../output/material_split.xlsx', engine='openpyxl', index=False)
-        return train_dataset, val_dataset, test_dataset
-    else:
-        train_mat_lay, test_mat_lay = train_test_split(mat_lay_set, test_size=train_val_test[1], random_state=0)
-
-        train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
-        test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
-
-        df = pd.concat([pd.DataFrame({'train material': train_mat_lay}),
-                        pd.DataFrame({'test material': test_mat_lay})], axis=1)
-        df.to_excel('../output/material_split.xlsx', engine='openpyxl', index=False)
-        return train_dataset, test_dataset
-
-
-
-def replace_column_name(df, name_mapping):
-    columns = list(df.columns)
-    for idx in range(len(columns)):
-        try:
-            columns[idx] = name_mapping[columns[idx]]
-        except:
-            pass
-    df_tmp = df.copy()
-    df_tmp.columns = columns
-    return df_tmp
+clr = sns.color_palette("deep")
 
 
 def is_notebook() -> bool:
@@ -76,6 +36,356 @@ def is_notebook() -> bool:
             return False  # Other type (?)
     except NameError:
         return False  # Probably standard Python interpreter
+
+
+if is_notebook():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
+
+sns.reset_defaults()
+
+matplotlib.rc("text", usetex=True)
+
+plt.rcParams["font.family"] = "serif"
+plt.rcParams["font.serif"] = "Times New Roman"
+plt.rcParams["figure.autolayout"] = True
+# plt.rcParams["legend.frameon"] = False
+
+
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.kaiming_normal_(m.weight)
+
+
+class NN(nn.Module):
+    def __init__(self, n_inputs, n_outputs, layers):
+        super(NN, self).__init__()
+        num_inputs = n_inputs
+        num_hiddens1 = layers[0]
+        num_hiddens2 = layers[1]
+        num_hiddens3 = layers[2]
+        num_outputs = n_outputs
+        self.net = nn.Sequential()
+        self.net.add_module("input", nn.Linear(num_inputs, layers[0]))
+        self.net.add_module("ReLU", nn.ReLU())
+        for idx in range(len(layers) - 1):
+            self.net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
+            self.net.add_module("ReLU" + str(idx), nn.ReLU())
+        self.net.add_module("output", nn.Linear(layers[-1], num_outputs))
+
+        self.net.apply(init_weights)
+
+    def forward(self, x):
+        x = self.net(x)
+        return x
+
+
+def train(model, train_loader, optimizer, loss_fn):
+    model.train()
+    avg_loss = 0
+    for idx, (data, yhat) in enumerate(train_loader):
+        optimizer.zero_grad()
+        y = model(data)
+        loss = loss_fn(yhat, y)
+        loss.backward()
+        optimizer.step()
+        avg_loss += loss.item() * len(y)
+
+    avg_loss /= len(train_loader.dataset)
+    return avg_loss
+
+
+def test(model, test_loader, loss_fn):
+    model.eval()
+    pred = []
+    truth = []
+    with torch.no_grad():
+        # print(test_dataset)
+        avg_loss = 0
+        for idx, (data, yhat) in enumerate(test_loader):
+            y = model(data)
+            loss = loss_fn(yhat, y)
+            avg_loss += loss.item() * len(y)
+            pred += list(y.cpu().detach().numpy())
+            truth += list(yhat.cpu().detach().numpy())
+        avg_loss /= len(test_loader.dataset)
+    return np.array(pred), np.array(truth), avg_loss
+
+
+def test_tensor(test_tensor, test_label_tensor, model, loss_fn):
+    model.eval()
+    pred = []
+    truth = []
+    with torch.no_grad():
+        y = model(test_tensor)
+        loss = loss_fn(test_label_tensor, y)
+    return (
+        y.cpu().detach().numpy(),
+        test_label_tensor.cpu().detach().numpy(),
+        loss.item(),
+    )
+
+
+def model_train(
+    train_dataset,
+    test_dataset,
+    val_dataset,
+    layers,
+    validation,
+    loss_fn,
+    ckp_path,
+    device,
+    model=None,
+    verbose=True,
+    return_loss_list=True,
+    verbose_per_epoch=100,
+    **params,
+):
+    # print(params)
+    if model is None:
+        model = NN(
+            train_dataset.dataset.tensors[0].shape[1],
+            train_dataset.dataset.tensors[1].shape[1],
+            layers,
+        ).to(device)
+
+    train_loader = Data.DataLoader(
+        train_dataset,
+        batch_size=int(params["batch_size"]),
+        generator=torch.Generator().manual_seed(0),
+    )
+    if validation:
+        val_loader = Data.DataLoader(
+            val_dataset,
+            batch_size=len(val_dataset),
+            generator=torch.Generator().manual_seed(0),
+        )
+    else:
+        val_loader = None
+    test_loader = Data.DataLoader(
+        test_dataset,
+        batch_size=len(test_dataset),
+        generator=torch.Generator().manual_seed(0),
+    )
+
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"]
+    )
+
+    train_ls = []
+    val_ls = []
+    stop_epoch = params["epoch"]
+
+    early_stopping = EarlyStopping(
+        patience=params["patience"], verbose=False, path=ckp_path
+    )
+
+    for epoch in range(params["epoch"]):
+        train_loss = train(model, train_loader, optimizer, loss_fn)
+        train_ls.append(train_loss)
+        if validation:
+            _, _, val_loss = test(model, val_loader, loss_fn)
+            val_ls.append(val_loss)
+
+        if verbose and ((epoch + 1) % verbose_per_epoch == 0 or epoch == 0):
+            if validation:
+                print(
+                    f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}"
+                )
+            else:
+                print(f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}")
+
+        if validation:
+            early_stopping(val_loss, model)
+
+            if early_stopping.early_stop:
+                if verbose:
+                    idx = val_ls.index(min(val_ls))
+                    print(
+                        f"Early stopping at epoch {epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}, Val loss: {val_ls[idx]:.4f}"
+                    )
+                stop_epoch = epoch + 1
+                break
+        else:
+            early_stopping(train_loss, model)
+
+            if early_stopping.early_stop:
+                if verbose:
+                    idx = train_ls.index(min(train_ls))
+                    print(
+                        f"Early stopping at epoch {epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}"
+                    )
+                stop_epoch = epoch + 1
+                break
+    if validation:
+        idx = val_ls.index(min(val_ls))
+        min_loss = val_ls[idx]
+    else:
+        min_loss = train_ls[-1]
+
+    if return_loss_list:
+        return min_loss, train_ls, val_ls
+    else:
+        return min_loss
+
+
+class PI_MSELoss(nn.Module):
+    def __init__(self, eps=1e-8):
+        super().__init__()
+        self.mse = nn.MSELoss()
+        self.eps = eps
+
+    def forward(self, yhat, y):
+        loss = (
+            self.mse(yhat, y)
+            + self.eps
+            + torch.sum(F.relu(-y)) / len(y)
+            + torch.sum(F.relu(y - 5)) / len(y)
+        )
+        return loss
+
+
+def split_dataset(data, feature_names, label_name, device, validation, split_by):
+    tmp_data = (
+        data[feature_names + label_name + ["Material", "Lay-up"]].copy().dropna(axis=0)
+    )
+
+    material_names = tmp_data["Material"].copy()
+    lay_up = tmp_data["Lay-up"].copy()
+    mat_lay = np.array([x + y for x, y in zip(material_names, lay_up)], dtype=str)
+    mat_lay_set = list(sorted(set(mat_lay)))
+
+    data = data[feature_names + label_name].dropna(axis=0)
+    feature_data = data[feature_names]
+    label_data = np.log10(data[label_name])
+
+    X = torch.tensor(feature_data.values, dtype=torch.float32).to(device)
+    y = torch.tensor(label_data.values, dtype=torch.float32).to(device)
+    dataset = Data.TensorDataset(X, y)
+
+    if validation:
+        train_val_test = np.array([0.6, 0.2, 0.2])
+        if split_by == "random":
+            train_size = np.floor(len(label_data) * train_val_test[0]).astype(int)
+            val_size = np.floor(len(label_data) * train_val_test[1]).astype(int)
+            test_size = len(label_data) - train_size - val_size
+            train_dataset, val_dataset, test_dataset = Data.random_split(
+                dataset,
+                [train_size, val_size, test_size],
+                generator=torch.Generator().manual_seed(0),
+            )
+        elif split_by == "material":
+            train_dataset, val_dataset, test_dataset = split_by_material(
+                dataset, mat_lay, mat_lay_set, train_val_test, validation
+            )
+        else:
+            raise Exception("Split type not implemented")
+
+        print("Dataset size:", len(train_dataset), len(val_dataset), len(test_dataset))
+    else:
+        train_test = np.array([0.8, 0.2])
+        if split_by == "random":
+            train_size = np.floor(len(label_data) * train_test[0]).astype(int)
+            test_size = len(label_data) - train_size
+            train_dataset, test_dataset = Data.random_split(
+                dataset,
+                [train_size, test_size],
+                generator=torch.Generator().manual_seed(0),
+            )
+        elif split_by == "material":
+            train_dataset, test_dataset = split_by_material(
+                dataset, mat_lay, mat_lay_set, train_test, validation
+            )
+        else:
+            raise Exception("Split type not implemented")
+        val_dataset = None
+        print("Dataset size:", len(train_dataset), len(test_dataset))
+
+    scaler = StandardScaler()
+    # scaler = MinMaxScaler()
+    scaler.fit(train_dataset.dataset.tensors[0].cpu().numpy()[train_dataset.indices, :])
+    # torch.data.Dataset.Subset share the same memory, so only transform once.
+    transformed = scaler.transform(train_dataset.dataset.tensors[0].cpu().numpy())
+    train_dataset.dataset.tensors = (
+        torch.tensor(transformed, dtype=torch.float32).to(device),
+        train_dataset.dataset.tensors[1],
+    )
+    X = torch.tensor(scaler.transform(X.cpu().numpy()), dtype=torch.float32).to(device)
+
+    return (
+        feature_data,
+        label_data,
+        X,
+        y,
+        train_dataset,
+        val_dataset,
+        test_dataset,
+        scaler,
+    )
+
+
+def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test, validation):
+    def mat_lay_index(chosen_mat_lay, mat_lay):
+        index = []
+        for material in chosen_mat_lay:
+            where_material = np.where(mat_lay == material)[0]
+            index += list(where_material)
+        return np.array(index)
+
+    if validation:
+        train_mat_lay, test_mat_lay = train_test_split(
+            mat_lay_set, test_size=train_val_test[2], shuffle=False
+        )
+        train_mat_lay, val_mat_lay = train_test_split(
+            train_mat_lay,
+            test_size=train_val_test[1] / np.sum(train_val_test[0:2]),
+            shuffle=False,
+        )
+        train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
+        val_dataset = Subset(dataset, mat_lay_index(val_mat_lay, mat_lay))
+        test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
+
+        df = pd.concat(
+            [
+                pd.DataFrame({"train material": train_mat_lay}),
+                pd.DataFrame({"val material": val_mat_lay}),
+                pd.DataFrame({"test material": test_mat_lay}),
+            ],
+            axis=1,
+        )
+
+        df.to_excel("../output/material_split.xlsx", engine="openpyxl", index=False)
+        return train_dataset, val_dataset, test_dataset
+    else:
+        train_mat_lay, test_mat_lay = train_test_split(
+            mat_lay_set, test_size=train_val_test[1], shuffle=False
+        )
+
+        train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
+        test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
+
+        df = pd.concat(
+            [
+                pd.DataFrame({"train material": train_mat_lay}),
+                pd.DataFrame({"test material": test_mat_lay}),
+            ],
+            axis=1,
+        )
+        df.to_excel("../output/material_split.xlsx", engine="openpyxl", index=False)
+        return train_dataset, test_dataset
+
+
+def replace_column_name(df, name_mapping):
+    columns = list(df.columns)
+    for idx in range(len(columns)):
+        try:
+            columns[idx] = name_mapping[columns[idx]]
+        except:
+            pass
+    df_tmp = df.copy()
+    df_tmp.columns = columns
+    return df_tmp
 
 
 def plot_truth_pred(ax, ground_truth, prediction, **kargs):
@@ -163,6 +473,234 @@ def calculate_pdp(model, feature_data, feature_idx, grid_size=100):
     model_predictions = np.array(model_predictions)
 
     return x_values, model_predictions
+
+
+def plot_loss(train_ls, val_ls, ax):
+
+    ax.plot(
+        np.arange(len(train_ls)),
+        train_ls,
+        label="Train loss",
+        linewidth=2,
+        color=clr[0],
+    )
+    if len(val_ls) > 0:
+        ax.plot(
+            np.arange(len(val_ls)),
+            val_ls,
+            label="Validation loss",
+            linewidth=2,
+            color=clr[1],
+        )
+    # minposs = val_ls.index(min(val_ls))+1
+    # ax.axvline(minposs, linestyle='--', color='r',label='Early Stopping Checkpoint')
+    ax.legend()
+    ax.set_ylabel("MSE Loss")
+    ax.set_xlabel("Epoch")
+
+
+def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn, ax):
+    train_loader = Data.DataLoader(
+        train_dataset,
+        batch_size=len(train_dataset),
+        generator=torch.Generator().manual_seed(0),
+    )
+    if val_dataset is not None:
+        val_loader = Data.DataLoader(
+            val_dataset,
+            batch_size=len(val_dataset),
+            generator=torch.Generator().manual_seed(0),
+        )
+    test_loader = Data.DataLoader(
+        test_dataset,
+        batch_size=len(test_dataset),
+        generator=torch.Generator().manual_seed(0),
+    )
+
+    prediction, ground_truth, loss = test(model, train_loader, loss_fn)
+    r2 = r2_score(ground_truth, prediction)
+    print(f"Train MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+    plot_truth_pred(
+        ax,
+        10**ground_truth,
+        10**prediction,
+        s=20,
+        color=clr[0],
+        label=f"Train dataset ($R^2$={r2:.3f})",
+        linewidth=0.4,
+        edgecolors="k",
+    )
+
+    if val_dataset is not None:
+        prediction, ground_truth, loss = test(model, val_loader, loss_fn)
+        r2 = r2_score(ground_truth, prediction)
+        print(f"Validation MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+        plot_truth_pred(
+            ax,
+            10**ground_truth,
+            10**prediction,
+            s=20,
+            color=clr[2],
+            label=f"Val dataset ($R^2$={r2:.3f})",
+            linewidth=0.4,
+            edgecolors="k",
+        )
+
+    prediction, ground_truth, loss = test(model, test_loader, loss_fn)
+    r2 = r2_score(ground_truth, prediction)
+    print(f"Test MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+    plot_truth_pred(
+        ax,
+        10**ground_truth,
+        10**prediction,
+        s=20,
+        color=clr[1],
+        label=f"Test dataset ($R^2$={r2:.3f})",
+        linewidth=0.4,
+        edgecolors="k",
+    )
+
+    set_truth_pred(ax)
+
+
+def plot_truth_pred_sklearn(
+    feature_data, label_data, train_indices, test_indices, ax, model, split_by="random"
+):
+    train_x = feature_data.values[np.array(train_indices), :]
+    train_y = label_data.values[np.array(train_indices), :]
+
+    test_x = feature_data.values[np.array(test_indices), :]
+    test_y = label_data.values[np.array(test_indices), :]
+
+    if train_y.shape[1] == 1:
+        train_y = train_y[:, 0]
+        test_y = test_y[:, 0]
+
+    model.fit(train_x, train_y)
+
+    pred_y = model.predict(train_x)
+    r2 = r2_score(train_y, pred_y)
+    loss = np.mean((train_y - pred_y) ** 2)
+    print(f"Train MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+    plot_truth_pred(
+        ax,
+        10**train_y,
+        10**pred_y,
+        s=20,
+        color=clr[0],
+        label=f"Train dataset ($R^2$={r2:.3f})",
+        linewidth=0.4,
+        edgecolors="k",
+    )
+
+    pred_y = model.predict(test_x)
+    r2 = r2_score(test_y, pred_y)
+    loss = np.mean((test_y - pred_y) ** 2)
+    print(f"Test MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+    plot_truth_pred(
+        ax,
+        10**test_y,
+        10**pred_y,
+        s=20,
+        color=clr[1],
+        label=f"Test dataset ($R^2$={r2:.3f})",
+        linewidth=0.4,
+        edgecolors="k",
+    )
+
+    set_truth_pred(ax)
+
+
+def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices):
+    max_col = 4
+    if len(feature_names) > max_col:
+        width = max_col
+        if len(feature_names) % max_col == 0:
+            height = len(feature_names) // max_col
+        else:
+            height = len(feature_names) // max_col + 1
+        figsize = (14, 3 * height)
+    else:
+        figsize = (3 * len(feature_names), 2.5)
+        width = len(feature_names)
+        height = 1
+    print(figsize, width, height)
+
+    fig = plt.figure(figsize=figsize)
+
+    for idx, focus_feature in enumerate(feature_names):
+        ax = plt.subplot(height, width, idx + 1)
+        # ax.plot(x_values_list[idx], mean_pdp_list[idx], color = clr_map[focus_feature], linewidth = 0.5)
+        ax.plot(x_values_list[idx], 10 ** mean_pdp_list[idx], color="k", linewidth=0.7)
+
+        ax.set_title(focus_feature, {"fontsize": 12})
+        ax.set_xlim([0, 1])
+        ax.set_yscale("log")
+        ax.set_ylim([10**2, 10**7])
+        locmin = matplotlib.ticker.LogLocator(
+            base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
+        )
+        ax.xaxis.set_minor_locator(locmin)
+        ax.yaxis.set_minor_locator(locmin)
+        ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+        ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+
+        ax2 = ax.twinx()
+
+        chosen_data = X[hist_indices, idx].cpu().detach().numpy()
+        ax2.hist(
+            chosen_data,
+            bins=x_values_list[idx],
+            density=True,
+            color=[0, 0, 0],
+            alpha=0.2,
+            rwidth=0.8,
+        )
+        # sns.rugplot(data=chosen_data, height=0.05, ax=ax2, color='k')
+        # ax2.set_ylim([0,1])
+        ax2.set_xlim([np.min(x_values_list[idx]), np.max(x_values_list[idx])])
+        ax2.set_yticks([])
+
+    ax = fig.add_subplot(111, frameon=False)
+    plt.tick_params(
+        labelcolor="none",
+        which="both",
+        top=False,
+        bottom=False,
+        left=False,
+        right=False,
+    )
+    plt.ylabel("Predicted fatigue life")
+    plt.xlabel("Value of predictors (standard scaled, $10\%$-$90\%$ percentile)")
+
+    return fig
+
+
+def set_truth_pred(ax):
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+
+    ax.plot(
+        np.linspace(0, 10**8, 100),
+        np.linspace(0, 10**8, 100),
+        "--",
+        c="grey",
+        alpha=0.2,
+    )
+    ax.set_aspect("equal", "box")
+    locmin = matplotlib.ticker.LogLocator(
+        base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
+    )
+
+    # ax.set(xlim=[10, 10 ** 6], ylim=[10, 10 ** 6])
+    ax.xaxis.set_minor_locator(locmin)
+    ax.yaxis.set_minor_locator(locmin)
+    ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    # data_range = [
+    #     np.floor(np.min([np.min(ground_truth), np.min(prediction)])),
+    #     np.ceil(np.max([np.max(ground_truth), np.max(prediction)]))
+    # ]
 
 
 # https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
