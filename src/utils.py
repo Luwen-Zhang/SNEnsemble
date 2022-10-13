@@ -153,13 +153,13 @@ def model_train(
     train_loader = Data.DataLoader(
         train_dataset,
         batch_size=int(params["batch_size"]),
-        generator=torch.Generator().manual_seed(0),
+        generator=torch.Generator().manual_seed(0)
     )
     if validation:
         val_loader = Data.DataLoader(
             val_dataset,
             batch_size=len(val_dataset),
-            generator=torch.Generator().manual_seed(0),
+            generator=torch.Generator().manual_seed(0)
         )
     else:
         val_loader = None
@@ -408,10 +408,11 @@ def plot_absence_ratio(ax, df_presence, **kargs):
     ax.set_xlabel("Data absence ratio")
 
 
-def plot_importance(ax, features, attr, **kargs):
-    df = pd.DataFrame(columns=["feature", "attr"])
+def plot_importance(ax, features, attr, pal,clr_map, **kargs):
+    df = pd.DataFrame(columns=["feature", "attr", "clr"])
     df["feature"] = features
     df["attr"] = np.abs(attr) / np.sum(np.abs(attr))
+    df["pal"] = pal
     df.sort_values(by="attr", inplace=True, ascending=False)
     df.reset_index(drop=True, inplace=True)
 
@@ -419,13 +420,23 @@ def plot_importance(ax, features, attr, **kargs):
     x = df["feature"].values
     y = df["attr"].values
 
+    palette = df['pal']
+
     # ax.set_facecolor((0.97,0.97,0.97))
     # plt.grid(axis='x')
     plt.grid(axis="x", linewidth=0.2)
     # plt.barh(x,y, color= [clr_map[name] for name in x])
-    sns.barplot(y, x, **kargs)
+    sns.barplot(y, x, palette = palette, **kargs)
     # ax.set_xlim([0, 1])
     ax.set_xlabel("Permutation feature importance")
+
+    from matplotlib.patches import Patch, Rectangle
+
+    legend = ax.legend(handles=[Rectangle((0, 0), 1, 1, color=value, ec='k', label=key) for key, value in zip(clr_map.keys(), clr_map.values())],
+                       loc='lower right', handleheight=2, fancybox=False, frameon=False)
+
+    legend.get_frame().set_alpha(None)
+    legend.get_frame().set_facecolor([1, 1, 1, .4])
 
 
 def calculate_absence_ratio(df_tmp):
