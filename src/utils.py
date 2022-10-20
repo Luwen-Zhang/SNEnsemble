@@ -248,12 +248,10 @@ class PI_MSELoss(nn.Module):
 
 def split_dataset(data, feature_names, label_name, device, validation, split_by):
     tmp_data = (
-        data[feature_names + label_name + ["Material", "Lay-up"]].copy().dropna(axis=0)
+        data[feature_names + label_name + ["Material_Code"]].copy().dropna(axis=0)
     )
 
-    material_names = tmp_data["Material"].copy()
-    lay_up = tmp_data["Lay-up"].copy()
-    mat_lay = np.array([x + y for x, y in zip(material_names, lay_up)], dtype=str)
+    mat_lay = tmp_data['Material_Code'].copy()
     mat_lay_set = list(sorted(set(mat_lay)))
 
     data = data[feature_names + label_name].dropna(axis=0)
