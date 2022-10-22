@@ -1,6 +1,13 @@
+'''
+All utilities used in the project.
+'''
+
 ###############################################
 # Xueling Luo @ Shanghai Jiao Tong University #
 ###############################################
+import warnings
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import numpy as np
 import torch
@@ -9,20 +16,53 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib
-import scipy.stats as st
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import r2_score
-from sklearn.ensemble import RandomForestRegressor
-from sklearn import svm
 from torch.utils.data import Subset
 import torch.utils.data as Data
-from skopt.plots import plot_convergence
-import skopt
-from skopt import gp_minimize
-
+from torch.nn import functional as F
+from importlib import import_module
+from skopt.space import Real, Integer, Categorical
 
 clr = sns.color_palette("deep")
+
+
+def load_config(path):
+    data = import_module(path).config.data
+
+    tmp_static_params = {}
+    for key in data['static_params']:
+        tmp_static_params[key] = data[key]
+    data['static_params'] = tmp_static_params
+
+    tmp_chosen_params = {}
+    for key in data['chosen_params']:
+        tmp_chosen_params[key] = data[key]
+    data['chosen_params'] = tmp_chosen_params
+
+    key_chosen = list(data['chosen_params'].keys())
+    key_space = list(data['SPACEs'].keys())
+    for a, b in zip(key_chosen, key_space):
+        if a != b:
+            raise Exception('Variables in \'chosen_params\' and \'SPACEs\' should be in the same order.')
+
+    SPACE = []
+    for var in key_space:
+        setting = data['SPACEs'][var]
+        type = setting['type']
+        setting.pop('type')
+        if type == 'Real':
+            SPACE.append(Real(**setting))
+        elif type == 'Categorical':
+            SPACE.append(Categorical(**setting))
+        elif type == 'Integer':
+            SPACE.append(Integer(**setting))
+        else:
+            raise Exception('Invalid type of skopt space.')
+    data['SPACE'] = SPACE
+
+    return data
 
 
 def is_notebook() -> bool:
@@ -46,12 +86,12 @@ else:
 sns.reset_defaults()
 
 matplotlib.rc("text", usetex=True)
-
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Times New Roman"
 plt.rcParams["figure.autolayout"] = True
-# plt.rcParams["legend.frameon"] = False
 
+
+# plt.rcParams["legend.frameon"] = False
 
 def init_weights(m):
     if isinstance(m, nn.Linear):
@@ -128,19 +168,19 @@ def test_tensor(test_tensor, test_label_tensor, model, loss_fn):
 
 
 def model_train(
-    train_dataset,
-    test_dataset,
-    val_dataset,
-    layers,
-    validation,
-    loss_fn,
-    ckp_path,
-    device,
-    model=None,
-    verbose=True,
-    return_loss_list=True,
-    verbose_per_epoch=100,
-    **params,
+        train_dataset,
+        test_dataset,
+        val_dataset,
+        layers,
+        validation,
+        loss_fn,
+        ckp_path,
+        device,
+        model=None,
+        verbose=True,
+        return_loss_list=True,
+        verbose_per_epoch=100,
+        **params,
 ):
     # print(params)
     if model is None:
@@ -238,10 +278,10 @@ class PI_MSELoss(nn.Module):
 
     def forward(self, yhat, y):
         loss = (
-            self.mse(yhat, y)
-            + self.eps
-            + torch.sum(F.relu(-y)) / len(y)
-            + torch.sum(F.relu(y - 5)) / len(y)
+                self.mse(yhat, y)
+                + self.eps
+                + torch.sum(F.relu(-y)) / len(y)
+                + torch.sum(F.relu(y - 5)) / len(y)
         )
         return loss
 
@@ -406,7 +446,7 @@ def plot_absence_ratio(ax, df_presence, **kargs):
     ax.set_xlabel("Data absence ratio")
 
 
-def plot_importance(ax, features, attr, pal,clr_map, **kargs):
+def plot_importance(ax, features, attr, pal, clr_map, **kargs):
     df = pd.DataFrame(columns=["feature", "attr", "clr"])
     df["feature"] = features
     df["attr"] = np.abs(attr) / np.sum(np.abs(attr))
@@ -424,13 +464,14 @@ def plot_importance(ax, features, attr, pal,clr_map, **kargs):
     # plt.grid(axis='x')
     plt.grid(axis="x", linewidth=0.2)
     # plt.barh(x,y, color= [clr_map[name] for name in x])
-    sns.barplot(y, x, palette = palette, **kargs)
+    sns.barplot(y, x, palette=palette, **kargs)
     # ax.set_xlim([0, 1])
     ax.set_xlabel("Permutation feature importance")
 
     from matplotlib.patches import Patch, Rectangle
 
-    legend = ax.legend(handles=[Rectangle((0, 0), 1, 1, color=value, ec='k', label=key) for key, value in zip(clr_map.keys(), clr_map.values())],
+    legend = ax.legend(handles=[Rectangle((0, 0), 1, 1, color=value, ec='k', label=key) for key, value in
+                                zip(clr_map.keys(), clr_map.values())],
                        loc='lower right', handleheight=2, fancybox=False, frameon=False)
 
     legend.get_frame().set_alpha(None)
@@ -485,7 +526,6 @@ def calculate_pdp(model, feature_data, feature_idx, grid_size=100):
 
 
 def plot_loss(train_ls, val_ls, ax):
-
     ax.plot(
         np.arange(len(train_ls)),
         train_ls,
@@ -531,8 +571,8 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
     print(f"Train MSE Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,
-        10**ground_truth,
-        10**prediction,
+        10 ** ground_truth,
+        10 ** prediction,
         s=20,
         color=clr[0],
         label=f"Train dataset ($R^2$={r2:.3f})",
@@ -546,8 +586,8 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
         print(f"Validation MSE Loss: {loss:.4f}, R2: {r2:.4f}")
         plot_truth_pred(
             ax,
-            10**ground_truth,
-            10**prediction,
+            10 ** ground_truth,
+            10 ** prediction,
             s=20,
             color=clr[2],
             label=f"Val dataset ($R^2$={r2:.3f})",
@@ -560,8 +600,8 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
     print(f"Test MSE Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,
-        10**ground_truth,
-        10**prediction,
+        10 ** ground_truth,
+        10 ** prediction,
         s=20,
         color=clr[1],
         label=f"Test dataset ($R^2$={r2:.3f})",
@@ -573,7 +613,7 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
 
 
 def plot_truth_pred_sklearn(
-    feature_data, label_data, train_indices, test_indices, ax, model, split_by="random"
+        feature_data, label_data, train_indices, test_indices, ax, model, split_by="random"
 ):
     train_x = feature_data.values[np.array(train_indices), :]
     train_y = label_data.values[np.array(train_indices), :]
@@ -593,8 +633,8 @@ def plot_truth_pred_sklearn(
     print(f"Train MSE Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,
-        10**train_y,
-        10**pred_y,
+        10 ** train_y,
+        10 ** pred_y,
         s=20,
         color=clr[0],
         label=f"Train dataset ($R^2$={r2:.3f})",
@@ -608,8 +648,8 @@ def plot_truth_pred_sklearn(
     print(f"Test MSE Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,
-        10**test_y,
-        10**pred_y,
+        10 ** test_y,
+        10 ** pred_y,
         s=20,
         color=clr[1],
         label=f"Test dataset ($R^2$={r2:.3f})",
@@ -645,7 +685,7 @@ def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices):
         ax.set_title(focus_feature, {"fontsize": 12})
         ax.set_xlim([0, 1])
         ax.set_yscale("log")
-        ax.set_ylim([10**2, 10**7])
+        ax.set_ylim([10 ** 2, 10 ** 7])
         locmin = matplotlib.ticker.LogLocator(
             base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
         )
@@ -690,8 +730,8 @@ def set_truth_pred(ax):
     ax.set_yscale("log")
 
     ax.plot(
-        np.linspace(0, 10**8, 100),
-        np.linspace(0, 10**8, 100),
+        np.linspace(0, 10 ** 8, 100),
+        np.linspace(0, 10 ** 8, 100),
         "--",
         c="grey",
         alpha=0.2,
@@ -717,7 +757,7 @@ class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
     def __init__(
-        self, patience=7, verbose=False, delta=0, path="checkpoint.pt", trace_func=print
+            self, patience=7, verbose=False, delta=0, path="checkpoint.pt", trace_func=print
     ):
         """
         Args:
