@@ -1,6 +1,6 @@
-'''
+"""
 All utilities used in the project.
-'''
+"""
 
 ###############################################
 # Xueling Luo @ Shanghai Jiao Tong University #
@@ -22,47 +22,8 @@ from sklearn.metrics import r2_score
 from torch.utils.data import Subset
 import torch.utils.data as Data
 from torch.nn import functional as F
-from importlib import import_module
-from skopt.space import Real, Integer, Categorical
 
 clr = sns.color_palette("deep")
-
-
-def load_config(path):
-    data = import_module(path).config.data
-
-    tmp_static_params = {}
-    for key in data['static_params']:
-        tmp_static_params[key] = data[key]
-    data['static_params'] = tmp_static_params
-
-    tmp_chosen_params = {}
-    for key in data['chosen_params']:
-        tmp_chosen_params[key] = data[key]
-    data['chosen_params'] = tmp_chosen_params
-
-    key_chosen = list(data['chosen_params'].keys())
-    key_space = list(data['SPACEs'].keys())
-    for a, b in zip(key_chosen, key_space):
-        if a != b:
-            raise Exception('Variables in \'chosen_params\' and \'SPACEs\' should be in the same order.')
-
-    SPACE = []
-    for var in key_space:
-        setting = data['SPACEs'][var]
-        type = setting['type']
-        setting.pop('type')
-        if type == 'Real':
-            SPACE.append(Real(**setting))
-        elif type == 'Categorical':
-            SPACE.append(Categorical(**setting))
-        elif type == 'Integer':
-            SPACE.append(Integer(**setting))
-        else:
-            raise Exception('Invalid type of skopt space.')
-    data['SPACE'] = SPACE
-
-    return data
 
 
 def is_notebook() -> bool:
@@ -295,11 +256,12 @@ def split_dataset(data, feature_names, label_name, device, validation, split_by)
     mat_lay_set = list(sorted(set(mat_lay)))
 
     data = data[feature_names + label_name].dropna(axis=0)
+    data.reset_index(drop=True, inplace=True)
     feature_data = data[feature_names]
     label_data = np.log10(data[label_name])
 
-    X = torch.tensor(feature_data.values, dtype=torch.float32).to(device)
-    y = torch.tensor(label_data.values, dtype=torch.float32).to(device)
+    X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(device)
+    y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(device)
     dataset = Data.TensorDataset(X, y)
 
     if validation:
@@ -673,7 +635,7 @@ def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices):
         figsize = (3 * len(feature_names), 2.5)
         width = len(feature_names)
         height = 1
-    print(figsize, width, height)
+    # print(figsize, width, height)
 
     fig = plt.figure(figsize=figsize)
 
@@ -724,6 +686,67 @@ def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices):
 
     return fig
 
+
+def plot_partial_err(feature_data, truth, pred, thres = 0.8):
+    feature_names = list(feature_data.columns)
+    max_col = 4
+    if len(feature_names) > max_col:
+        width = max_col
+        if len(feature_names) % max_col == 0:
+            height = len(feature_names) // max_col
+        else:
+            height = len(feature_names) // max_col + 1
+        figsize = (14, 3 * height)
+    else:
+        figsize = (3 * len(feature_names), 2.5)
+        width = len(feature_names)
+        height = 1
+    # print(figsize, width, height)
+
+    fig = plt.figure(figsize=figsize)
+
+    err = np.abs(truth-pred)
+    high_err_data = feature_data.loc[np.where(err > thres)[0], :]
+    high_err = err[np.where(err > thres)[0]]
+    low_err_data = feature_data.loc[np.where(err <= thres)[0], :]
+    low_err = err[np.where(err <= thres)[0]]
+    for idx, focus_feature in enumerate(feature_names):
+        ax = plt.subplot(height, width, idx + 1)
+        # ax.plot(x_values_list[idx], mean_pdp_list[idx], color = clr_map[focus_feature], linewidth = 0.5)
+        ax.scatter(high_err_data[focus_feature].values, high_err, s=1, color=clr[0], marker='s')
+        ax.scatter(low_err_data[focus_feature].values, low_err, s=1, color=clr[1], marker='^')
+
+        ax.set_title(focus_feature, {"fontsize": 12})
+
+        ax.set_ylim([0, np.max(err)*1.1])
+        ax2 = ax.twinx()
+
+        ax2.hist(
+            [high_err_data[focus_feature].values, low_err_data[focus_feature].values],
+            bins=np.linspace(np.min(feature_data[focus_feature].values), np.max(feature_data[focus_feature].values), 20),
+            density=True,
+            color=clr[:2],
+            alpha=0.2,
+            rwidth=0.8,
+        )
+        # sns.rugplot(data=chosen_data, height=0.05, ax=ax2, color='k')
+        # ax2.set_ylim([0,1])
+        # ax2.set_xlim([np.min(x_values_list[idx]), np.max(x_values_list[idx])])
+        ax2.set_yticks([])
+
+    ax = fig.add_subplot(111, frameon=False)
+    plt.tick_params(
+        labelcolor="none",
+        which="both",
+        top=False,
+        bottom=False,
+        left=False,
+        right=False,
+    )
+    plt.ylabel("Prediction absolute error")
+    plt.xlabel("Value of predictors (standard scaled)")
+
+    return fig
 
 def set_truth_pred(ax):
     ax.set_xscale("log")
