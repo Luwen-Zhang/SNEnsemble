@@ -30,7 +30,6 @@ class Trainer():
     def __init__(self, device):
         self.device = device
 
-
     def load_config(self, default_configfile):
         if is_notebook():
             self.configfile = default_configfile
@@ -103,7 +102,9 @@ class Trainer():
 
         self.params = self.chosen_params
 
-    def load_data(self, data_path = None):
+        self.use_sequence = self.args['sequence']
+
+    def load_data(self, data_path=None):
         if data_path is None:
             self.df = pd.read_excel(self.data_path, engine='openpyxl')
         else:
@@ -122,6 +123,14 @@ class Trainer():
             self.device,
             self.validation,
             self.split_by)
+
+        if self.use_sequence:
+            self._all_sequence = np.array(
+                [np.array([int(y) if y != 'nan' else np.nan for y in str(x).split('/')]) for x in
+                 self.df['Sequence'].values], dtype=object)
+            self.train_sequence = self._all_sequence[self.train_dataset.indices]
+            self.val_sequence = self._all_sequence[self.val_dataset.indices] if self.val_dataset is not None else None
+            self.test_sequence = self._all_sequence[self.test_dataset.indices]
 
     def bayes(self):
         if not self.bayes_opt:
@@ -295,11 +304,10 @@ class Trainer():
         prediction, ground_truth, loss = test_tensor(self.X[self.test_dataset.indices, :],
                                                      self.y[self.test_dataset.indices, :], self.model,
                                                      self.loss_fn)
-        plot_partial_err(self.feature_data.loc[np.array(self.test_dataset.indices), :].reset_index(drop=True), ground_truth, prediction)
+        plot_partial_err(self.feature_data.loc[np.array(self.test_dataset.indices), :].reset_index(drop=True),
+                         ground_truth, prediction)
 
         plt.savefig(f'../output/{self.project}/partial_err.svg')
         if is_notebook():
             plt.show()
         plt.close()
-
-
