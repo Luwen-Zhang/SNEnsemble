@@ -22,7 +22,6 @@ from sklearn.metrics import r2_score
 from torch.utils.data import Subset
 import torch.utils.data as Data
 from torch.nn import functional as F
-import re
 
 clr = sns.color_palette("deep")
 
@@ -61,13 +60,12 @@ def init_weights(m):
 
 
 class NN(nn.Module):
-    def __init__(self, n_inputs, n_outputs, layers):
+    def __init__(self, n_inputs, n_outputs, layers, use_sequence):
         super(NN, self).__init__()
         num_inputs = n_inputs
-        num_hiddens1 = layers[0]
-        num_hiddens2 = layers[1]
-        num_hiddens3 = layers[2]
         num_outputs = n_outputs
+        self.use_sequence = use_sequence
+
         self.net = nn.Sequential()
         self.net.add_module("input", nn.Linear(num_inputs, layers[0]))
         self.net.add_module("ReLU", nn.ReLU())
@@ -75,20 +73,40 @@ class NN(nn.Module):
             self.net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
             self.net.add_module("ReLU" + str(idx), nn.ReLU())
         self.net.add_module("output", nn.Linear(layers[-1], num_outputs))
-
         self.net.apply(init_weights)
 
-    def forward(self, x):
+        if self.use_sequence:
+            self.net_layers = nn.Sequential()
+            self.net_layers.add_module("input", nn.Linear(4, layers[0]))
+            self.net_layers.add_module("ReLU", nn.ReLU())
+            for idx in range(len(layers) - 1):
+                self.net_layers.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
+                self.net_layers.add_module("ReLU" + str(idx), nn.ReLU())
+            self.net_layers.add_module("output", nn.Linear(layers[-1], num_outputs))
+
+            self.net_post = nn.Sequential()
+            self.net_post.add_module('input', nn.Linear(num_outputs * 2, num_outputs))
+
+    def forward(self, x, additional_tensors):
         x = self.net(x)
-        return x
+        if self.use_sequence and len(additional_tensors) == 1:
+            y = self.net_layers(additional_tensors[0])
+            output = self.net_post(torch.concat([x, y], dim=1))
+        else:
+            output = x
+
+        return output
 
 
 def train(model, train_loader, optimizer, loss_fn):
     model.train()
     avg_loss = 0
-    for idx, (data, yhat) in enumerate(train_loader):
+    for idx, tensors in enumerate(train_loader):
         optimizer.zero_grad()
-        y = model(data)
+        yhat = tensors[-1]
+        data = tensors[0]
+        additional_tensors = tensors[1:len(tensors) - 1]
+        y = model(data, additional_tensors)
         loss = loss_fn(yhat, y)
         loss.backward()
         optimizer.step()
@@ -105,8 +123,11 @@ def test(model, test_loader, loss_fn):
     with torch.no_grad():
         # print(test_dataset)
         avg_loss = 0
-        for idx, (data, yhat) in enumerate(test_loader):
-            y = model(data)
+        for idx, tensors in enumerate(test_loader):
+            yhat = tensors[-1]
+            data = tensors[0]
+            additional_tensors = tensors[1:len(tensors) - 1]
+            y = model(data, additional_tensors)
             loss = loss_fn(yhat, y)
             avg_loss += loss.item() * len(y)
             pred += list(y.cpu().detach().numpy())
@@ -115,12 +136,12 @@ def test(model, test_loader, loss_fn):
     return np.array(pred), np.array(truth), avg_loss
 
 
-def test_tensor(test_tensor, test_label_tensor, model, loss_fn):
+def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_fn):
     model.eval()
     pred = []
     truth = []
     with torch.no_grad():
-        y = model(test_tensor)
+        y = model(test_tensor, additional_tensors)
         loss = loss_fn(test_label_tensor, y)
     return (
         y.cpu().detach().numpy(),
@@ -131,27 +152,16 @@ def test_tensor(test_tensor, test_label_tensor, model, loss_fn):
 
 def model_train(
         train_dataset,
-        test_dataset,
         val_dataset,
-        layers,
         validation,
         loss_fn,
         ckp_path,
-        device,
-        model=None,
+        model,
         verbose=True,
         return_loss_list=True,
         verbose_per_epoch=100,
         **params,
 ):
-    # print(params)
-    if model is None:
-        model = NN(
-            train_dataset.dataset.tensors[0].shape[1],
-            train_dataset.dataset.tensors[1].shape[1],
-            layers,
-        ).to(device)
-
     train_loader = Data.DataLoader(
         train_dataset,
         batch_size=int(params["batch_size"]),
@@ -165,11 +175,6 @@ def model_train(
         )
     else:
         val_loader = None
-    test_loader = Data.DataLoader(
-        test_dataset,
-        batch_size=len(test_dataset),
-        generator=torch.Generator().manual_seed(0),
-    )
 
     optimizer = torch.optim.Adam(
         model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"]
@@ -248,7 +253,7 @@ class PI_MSELoss(nn.Module):
         return loss
 
 
-def split_dataset(data, feature_names, label_name, device, validation, split_by):
+def split_dataset(data, deg_layers, feature_names, label_name, device, validation, split_by):
     tmp_data = (
         data[feature_names + label_name + ["Material_Code"]].copy().dropna(axis=0)
     )
@@ -257,13 +262,19 @@ def split_dataset(data, feature_names, label_name, device, validation, split_by)
     mat_lay_set = list(sorted(set(mat_lay)))
 
     data = data[feature_names + label_name].dropna(axis=0)
+    drop_na_index = data.index
     data.reset_index(drop=True, inplace=True)
     feature_data = data[feature_names]
     label_data = np.log10(data[label_name])
 
     X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(device)
     y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(device)
-    dataset = Data.TensorDataset(X, y)
+    if deg_layers is not None:
+        D = torch.tensor(deg_layers[drop_na_index, :], dtype=torch.float32).to(device)
+        dataset = Data.TensorDataset(X, D, y)
+    else:
+        D = None
+        dataset = Data.TensorDataset(X, y)
 
     if validation:
         train_val_test = np.array([0.6, 0.2, 0.2])
@@ -308,17 +319,16 @@ def split_dataset(data, feature_names, label_name, device, validation, split_by)
     scaler.fit(train_dataset.dataset.tensors[0].cpu().numpy()[train_dataset.indices, :])
     # torch.data.Dataset.Subset share the same memory, so only transform once.
     transformed = scaler.transform(train_dataset.dataset.tensors[0].cpu().numpy())
-    train_dataset.dataset.tensors = (
-        torch.tensor(transformed, dtype=torch.float32).to(device),
-        train_dataset.dataset.tensors[1],
+    train_dataset.dataset.tensors = tuple(
+        [torch.tensor(transformed, dtype=torch.float32).to(device)] +
+        list(train_dataset.dataset.tensors[1:])
     )
     X = torch.tensor(scaler.transform(X.cpu().numpy()), dtype=torch.float32).to(device)
 
     return (
         feature_data,
         label_data,
-        X,
-        y,
+        (X, D, y),
         train_dataset,
         val_dataset,
         test_dataset,
@@ -377,174 +387,10 @@ def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test, validation)
         return train_dataset, test_dataset
 
 
-def replace_column_name(df, name_mapping):
-    columns = list(df.columns)
-    for idx in range(len(columns)):
-        try:
-            columns[idx] = name_mapping[columns[idx]]
-        except:
-            pass
-    df_tmp = df.copy()
-    df_tmp.columns = columns
-    return df_tmp
-
-def code2seq(layer_original):
-    pattern = re.compile(r'\d+(\(\d+\))')
-
-    def bracket(layer):
-        if '±' in layer:
-            pm_indexes = []
-            for x in range(len(layer)):
-                if layer[x] == '±':
-                    pm_indexes.append(x)
-            for pm_idx in pm_indexes[::-1]:
-                pm_value = layer[pm_idx + 1:].split('/')[0].split(']')[0]
-                len_value = len(pm_value)
-                pm_s = pm_value + '/' + '-' + pm_value
-                layer = layer[:pm_idx] + pm_s + layer[pm_idx + len_value + 1:]
-
-        if '[' not in layer and ']' not in layer:
-            return layer
-
-        queue = []
-        for idx in range(len(layer)):
-            if layer[idx] == '[':
-                queue.append((1, idx))
-            elif layer[idx] == ']':
-                queue.append((2, idx))
-
-        pairs = []  # pairs of brackets in the outer loop
-        while len(queue) != 0 and queue[0][0] != 2:  # redundent right bracket left in the queue
-            t1, first_idx = queue.pop(0)
-            current_idx = first_idx
-            cnt_left_bracket = 1
-            while cnt_left_bracket != 0:
-                t, current_idx = queue.pop(0)
-                if t == 1:
-                    cnt_left_bracket += 1
-                else:
-                    cnt_left_bracket -= 1
-            if first_idx == current_idx:
-                raise Exception('Not recognized.')
-            pairs.append((first_idx, current_idx))
-
-        if len(queue) == 1 and queue[0][0] == 2:
-            # print('Warning', layer)
-            if queue[0][1] == len(layer) - 1:
-                layer = layer[:-1]
-            else:
-                layer = layer[:queue[0][1]] + layer[queue[0][1] + 1:]
-
-        expanded = []
-        for pair_idx, (left_bracket, right_bracket) in enumerate(pairs):
-            q = bracket(layer[left_bracket + 1:right_bracket])
-            if right_bracket != len(layer) - 1:
-                postfix = layer[right_bracket + 1:].split('/')[0]
-                # if the bracket is followed by 'S'
-                inv = False
-                if len(postfix) > 0 and (postfix[-1] == 's' or postfix[-1] == 'S'):
-                    inv = True
-                    postfix = postfix[:-1]
-                try:
-                    l = len(postfix)
-                    n = round(float(postfix))
-                    q = q.split('/') * n
-                except:
-                    l = 0
-                    q = q.split('/')
-
-                if inv:
-                    q = q + q[::-1]
-
-                last_place = right_bracket + 1 + l + int(inv)
-
-                expanded.append('/'.join(q))
-                if last_place == len(layer):
-                    pairs[pair_idx] = (left_bracket, None)
-                else:
-                    pairs[pair_idx] = (left_bracket, last_place)
-            else:
-                expanded.append(q)
-                pairs[pair_idx] = (left_bracket, None)
-
-        for s, pair in zip(expanded[::-1], pairs[::-1]):
-            left, right = pair
-            if right is None:
-                layer = layer[:left] + s
-            else:
-                layer = layer[:left] + s + layer[right:]
-
-        return layer.strip(']').strip('[')
-
-    layer = str(layer_original)
-
-    # for FACT dataset
-    layer = layer.replace('SB', '')
-    layer = layer.replace('WR', '')
-    layer = layer.replace('FW', '')
-    layer = layer.replace('K', '')
-    layer = layer.replace('()', '')
-    layer = layer.replace('100CSM', '0')
-
-    for match_str in re.findall(pattern, layer):
-        layer = layer.replace(match_str, '')
-
-    layer = layer.replace('s', 'S')
-    layer = layer.replace('(', '[')
-    layer = layer.replace(')', ']')
-    layer = layer.replace('/FOAM/', ' | ')
-
-    # for upwind dataset
-    if (' - ' in layer and '/' in layer) or (' | ' in layer and '/' in layer):
-        layer_tmp = layer.split(' - ') if ' - ' in layer else layer.split(' | ')
-        layer_tmp = [x.split('/')[0] if x[-1] != ']' and x[-1] != 'S' else x.split('/')[0] + x[x.index(']'):] for x in
-                     layer_tmp]
-        layer = '/'.join(layer_tmp)
-
-    layer = layer.replace(' - ', '/')  # for upwind dataset
-    layer = layer.replace('|', '/')
-    layer = layer.replace(',', '/')
-    layer = layer.replace(';', '/')
-    layer = layer.replace(' ', '')
-    layer = layer.replace('\'', '')
-    layer = layer.replace('°', '')
-    layer = layer.replace('*', '')  # for upwind dataset
-    layer = layer.replace('+/-', '±')
-    layer = layer.replace('+-', '±')
-    layer = layer.replace('RM', '0')  # RM and FOAM are treated as 0 for simplicity
-    layer = layer.replace('C', '')  # C and G are for materials in SNL dataset
-    layer = layer.replace('G', '')
-    layer = layer.replace('M', '0')
-    layer = layer.replace('N', '')
-    layer = layer.replace('][', ']/[')
-    # print(layer, end=' ' * (40 - len(layer)))
-    q = bracket(layer)
-
-    try:
-        q = [int(x) for x in q.split('/')]
-        return q
-    except:
-        return []  # Can not recognize the code
-
-
 def plot_truth_pred(ax, ground_truth, prediction, **kargs):
     ax.scatter(ground_truth, prediction, **kargs)
     ax.set_xlabel("Ground truth")
     ax.set_ylabel("Prediction")
-
-
-def plot_absence_ratio(ax, df_presence, **kargs):
-    ax.set_axisbelow(True)
-    x = df_presence["feature"].values
-    y = df_presence["ratio"].values
-
-    # ax.set_facecolor((0.97,0.97,0.97))
-    # plt.grid(axis='x')
-    plt.grid(axis="x", linewidth=0.2)
-    # plt.barh(x,y, color= [clr_map[name] for name in x])
-    sns.barplot(y, x, **kargs)
-    ax.set_xlim([0, 1])
-    ax.set_xlabel("Data absence ratio")
 
 
 def plot_importance(ax, features, attr, pal, clr_map, **kargs):
@@ -579,34 +425,7 @@ def plot_importance(ax, features, attr, pal, clr_map, **kargs):
     legend.get_frame().set_facecolor([1, 1, 1, .4])
 
 
-def calculate_absence_ratio(df_tmp):
-    df_presence = pd.DataFrame(columns=["feature", "ratio"])
-
-    for column in df_tmp.columns:
-        presence = len(np.where(df_tmp[column].notna())[0])
-        # print(f'{column},\t\t {presence}/{len(df_all[column])}, {presence/len(df_all[column]):.3f}')
-
-        df_presence = pd.concat(
-            [
-                df_presence,
-                pd.DataFrame(
-                    {"feature": column, "ratio": 1 - presence / len(df_tmp[column])},
-                    index=[0],
-                ),
-            ],
-            axis=0,
-            ignore_index=True,
-        )
-
-    df_presence.sort_values(by="ratio", inplace=True, ascending=False)
-    df_presence.reset_index(drop=True, inplace=True)
-
-    # df_presence.drop([0, 1, 2, 5, 9, 10, 11, 13, 14, 15, 19, 23, ])
-
-    return df_presence
-
-
-def calculate_pdp(model, feature_data, feature_idx, grid_size=100):
+def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_size=100):
     x_values = np.linspace(
         np.percentile(feature_data[:, feature_idx].cpu().numpy(), 10),
         np.percentile(feature_data[:, feature_idx].cpu().numpy(), 90),
@@ -619,7 +438,7 @@ def calculate_pdp(model, feature_data, feature_idx, grid_size=100):
         X_pdp = feature_data.clone().detach()
         # X_pdp = resample(X_pdp)
         X_pdp[:, feature_idx] = n
-        model_predictions.append(np.mean(model(X_pdp).cpu().detach().numpy()))
+        model_predictions.append(np.mean(model(X_pdp, additional_tensors).cpu().detach().numpy()))
 
     model_predictions = np.array(model_predictions)
 
@@ -826,7 +645,7 @@ def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices):
     return fig
 
 
-def plot_partial_err(feature_data, truth, pred, thres = 0.8):
+def plot_partial_err(feature_data, truth, pred, thres=0.8):
     feature_names = list(feature_data.columns)
     max_col = 4
     if len(feature_names) > max_col:
@@ -844,7 +663,7 @@ def plot_partial_err(feature_data, truth, pred, thres = 0.8):
 
     fig = plt.figure(figsize=figsize)
 
-    err = np.abs(truth-pred)
+    err = np.abs(truth - pred)
     high_err_data = feature_data.loc[np.where(err > thres)[0], :]
     high_err = err[np.where(err > thres)[0]]
     low_err_data = feature_data.loc[np.where(err <= thres)[0], :]
@@ -857,12 +676,13 @@ def plot_partial_err(feature_data, truth, pred, thres = 0.8):
 
         ax.set_title(focus_feature, {"fontsize": 12})
 
-        ax.set_ylim([0, np.max(err)*1.1])
+        ax.set_ylim([0, np.max(err) * 1.1])
         ax2 = ax.twinx()
 
         ax2.hist(
             [high_err_data[focus_feature].values, low_err_data[focus_feature].values],
-            bins=np.linspace(np.min(feature_data[focus_feature].values), np.max(feature_data[focus_feature].values), 20),
+            bins=np.linspace(np.min(feature_data[focus_feature].values), np.max(feature_data[focus_feature].values),
+                             20),
             density=True,
             color=clr[:2],
             alpha=0.2,
@@ -886,6 +706,7 @@ def plot_partial_err(feature_data, truth, pred, thres = 0.8):
     plt.xlabel("Value of predictors")
 
     return fig
+
 
 def set_truth_pred(ax):
     ax.set_xscale("log")

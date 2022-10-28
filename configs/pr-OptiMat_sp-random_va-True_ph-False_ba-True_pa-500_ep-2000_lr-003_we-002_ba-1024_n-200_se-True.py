@@ -1,54 +1,74 @@
-class config:
-    def __init__(self):
-        pass
+"""
+This is a config file generator. Running the script directly will copy the script itself to the configs folder with
+formatted name. This script itself could also be the input of the main script.
+"""
+import sys
 
-    data = {
-        'project': 'OptiMat',
-        'split_by': 'random',
-        'validation': True,
-        'physics_informed': False,
-        'bayes_opt': True,
-        'patience': 500,
-        'epoch': 2000,
-        'lr': 0.003,
-        'weight_decay': 0.002,
-        'batch_size': 1024,
-        'static_params': ['patience', 'epoch'],
-        'chosen_params': ['lr', 'weight_decay', 'batch_size'],
-        'layers': [16, 64, 128, 128, 64, 16],
-        'n_calls': 200,
-        'sequence': True,
-        'SPACEs': {
-            'lr': {'type': 'Real', 'low': 1e-3, 'high': 0.05, 'prior': 'log-uniform'},
-            'weight_decay': {'type': 'Real', 'low': 1e-5, 'high': 0.05, 'prior': 'log-uniform'},
-            'batch_size': {'type': 'Categorical', 'categories': [32, 64, 128, 256, 512, 1024, 2048, 4096]}
-        },
-        'feature_names_type': {
-            'Width': 1,
-            'Area': 1,
-            'Percentage of Fibre in 45-deg Direction': 1,
-            # 'Percentage of Fibre in 90-deg Direction': 1,
-            'Percentage of Fibre in 0-deg Direction': 1,
-            'Length(nominal)': 1,
-            'Absolute Maximum Stress': 0,
-            'Absolute Peak-to-peak Stress': 0,
-            'Thickness': 1,
-            # 'Frequency': 0,
-            # 'Load Length': 1,
-            # 'Fibre Volumn Fraction': 1,
+sys.path.append('../configs/')
+from base_config import BaseConfig
 
-        },
-        'feature_types': ['Fatigue loading', 'Material'],
-        'label_name': ['Cycles to Failure'],
 
-    }
+class config(BaseConfig):
+    def __init__(self, do_super=True):
+        if do_super:
+            super(config, self).__init__()
+
+        cfg = {
+            'project': 'OptiMat',
+            'split_by': 'random',
+            'validation': True,
+            'physics_informed': False,
+            'bayes_opt': True,
+            'patience': 500,
+            'epoch': 2000,
+            'lr': 0.003,
+            'weight_decay': 0.002,
+            'batch_size': 1024,
+            'static_params': ['patience', 'epoch'],
+            'chosen_params': ['lr', 'weight_decay', 'batch_size'],
+            'layers': [16, 64, 128, 128, 64, 16],
+            'n_calls': 200,
+            'sequence': True,
+            'SPACEs': {
+                'lr': {'type': 'Real', 'low': 1e-3, 'high': 0.05, 'prior': 'log-uniform'},
+                'weight_decay': {'type': 'Real', 'low': 1e-5, 'high': 0.05, 'prior': 'log-uniform'},
+                'batch_size': {'type': 'Categorical', 'categories': [32, 64, 128, 256, 512, 1024, 2048, 4096]}
+            },
+            'feature_names_type': {
+                'Width': 1,
+                'Area': 1,
+                'Percentage of Fibre in 45-deg Direction': 1,
+                # 'Percentage of Fibre in 90-deg Direction': 1,
+                'Percentage of Fibre in 0-deg Direction': 1,
+                'Length(nominal)': 1,
+                'Absolute Maximum Stress': 0,
+                'Absolute Peak-to-peak Stress': 0,
+                'Thickness': 1,
+                # 'Frequency': 0,
+                # 'Load Length': 1,
+                # 'Fibre Volumn Fraction': 1,
+
+            },
+            'feature_types': ['Fatigue loading', 'Material'],
+            'label_name': ['Cycles to Failure'],
+
+        }
+
+        if do_super:
+            for key, value in zip(cfg.keys(), cfg.values()):
+                if key in self.data.keys():
+                    self.data[key] = value
+                else:
+                    raise Exception(f'Unexpected item \"{key}\" in config file.')
+        else:
+            self.data = cfg
 
 
 if __name__ == '__main__':
     import shutil
 
     file_name = ''
-    cfg = config()
+    cfg = config(do_super=False)
     for key, value in zip(cfg.data.keys(), cfg.data.values()):
         if not isinstance(value, list) and not isinstance(value, dict):
             short_name = key.split('_')[0][:2]

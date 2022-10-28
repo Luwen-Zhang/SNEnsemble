@@ -2,6 +2,7 @@
 The basic class for the project. It includes configuration, data processing, training, plotting,
 and comparing with baseline models.
 """
+import numpy as np
 
 from utils import *
 import torch
@@ -30,7 +31,7 @@ class Trainer():
     def __init__(self, device):
         self.device = device
 
-    def load_config(self, default_configfile):
+    def load_config(self, default_configfile, verbose=False):
         if is_notebook():
             self.configfile = default_configfile
         else:
@@ -40,9 +41,12 @@ class Trainer():
             self.configfile = parser.parse_args().configfile
 
         if self.configfile not in sys.modules:
-            arg_loaded = import_module(self.configfile).config.data
+            arg_loaded = import_module(self.configfile).config().data
         else:
-            arg_loaded = reload(sys.modules.get(self.configfile)).config.data
+            arg_loaded = reload(sys.modules.get(self.configfile)).config().data
+
+        if verbose:
+            print(arg_loaded)
 
         tmp_static_params = {}
         for key in arg_loaded['static_params']:
@@ -115,22 +119,34 @@ class Trainer():
 
         self.label_name = self.args['label_name']
 
-        self.feature_data, self.label_data, self.X, self.y, \
+        if self.use_sequence and 'Sequence' in self.df.columns:
+            self.sequence = [[int(y) if y != 'nan' else np.nan for y in str(x).split('/')] for x in
+                             self.df['Sequence'].values]
+
+            self.deg_layers = np.zeros((len(self.sequence), 4),
+                                       dtype=np.int)  # for 0-deg, pm45-deg, 90-deg, and other directions respectively
+
+            for idx, seq in enumerate(self.sequence):
+                self.deg_layers[idx, 0] = seq.count(0)
+                self.deg_layers[idx, 1] = seq.count(45) + seq.count(-45)
+                self.deg_layers[idx, 2] = seq.count(90)
+                self.deg_layers[idx, 3] = len(seq) - seq.count(np.nan) - np.sum(self.deg_layers[idx, :3])
+        elif self.use_sequence and 'Sequence' not in self.df.columns:
+            print('No sequence infomation in the dataframe. use_sequence off.')
+            self.use_sequence = False
+            self.deg_layers = None
+        else:
+            self.deg_layers = None
+
+        self.feature_data, self.label_data, self.tensors, \
         self.train_dataset, self.val_dataset, self.test_dataset, self.scaler = split_dataset(
             self.df,
+            self.deg_layers,
             self.feature_names,
             self.label_name,
             self.device,
             self.validation,
             self.split_by)
-
-        if self.use_sequence:
-            self._all_sequence = np.array(
-                [np.array([int(y) if y != 'nan' else np.nan for y in str(x).split('/')]) for x in
-                 self.df['Sequence'].values], dtype=object)
-            self.train_sequence = self._all_sequence[self.train_dataset.indices]
-            self.val_sequence = self._all_sequence[self.val_dataset.indices] if self.val_dataset is not None else None
-            self.test_sequence = self._all_sequence[self.test_dataset.indices]
 
     def bayes(self):
         if not self.bayes_opt:
@@ -145,9 +161,9 @@ class Trainer():
 
         @skopt.utils.use_named_args(self.SPACE)
         def _trainer_bayes_objective(**params):
-            res = model_train(self.train_dataset, self.test_dataset, self.val_dataset, self.layers, self.validation,
+            res = model_train(self.train_dataset, self.val_dataset, self.validation,
                               self.loss_fn, self.ckp_path,
-                              self.device,
+                              model=self.new_model(),
                               verbose=False, return_loss_list=False, **{**params, **self.static_params})
 
             return res
@@ -186,11 +202,11 @@ class Trainer():
         return params
 
     def train(self, verbose_per_epoch=100):
-        self.model = NN(len(self.feature_names), len(self.label_name), self.layers).to(self.device)
+        self.model = self.new_model()
 
-        min_loss, self.train_ls, self.val_ls = model_train(self.train_dataset, self.test_dataset, self.val_dataset,
-                                                           self.layers, self.validation, self.loss_fn,
-                                                           self.ckp_path, self.device, model=self.model,
+        min_loss, self.train_ls, self.val_ls = model_train(self.train_dataset, self.val_dataset,
+                                                           self.validation, self.loss_fn,
+                                                           self.ckp_path, model=self.model,
                                                            verbose_per_epoch=verbose_per_epoch,
                                                            **{**self.params, **self.static_params})
 
@@ -200,6 +216,9 @@ class Trainer():
             torch.save(self.model.state_dict(), self.ckp_path)
 
         print('Minimum loss:', min_loss)
+
+    def new_model(self):
+        return NN(len(self.feature_names), len(self.label_name), self.layers, self.use_sequence).to(self.device)
 
     def plot_loss(self):
         plt.figure()
@@ -255,12 +274,12 @@ class Trainer():
 
     def plot_feature_importance(self):
         def forward_func(data):
-            prediction, ground_truth, loss = test_tensor(data, self.y[self.test_dataset.indices, :], self.model,
+            prediction, ground_truth, loss = test_tensor(data, self._get_additional_tensors_slice(self.test_dataset.indices), self.tensors[-1][self.test_dataset.indices, :], self.model,
                                                          self.loss_fn)
             return loss
 
         feature_perm = FeaturePermutation(forward_func)
-        attr = feature_perm.attribute(self.X[self.test_dataset.indices, :]).cpu().numpy()[0]
+        attr = feature_perm.attribute(self.tensors[0][self.test_dataset.indices, :]).cpu().numpy()[0]
 
         clr = sns.color_palette('deep')
 
@@ -287,13 +306,15 @@ class Trainer():
         for feature_idx in range(len(self.feature_names)):
             print('Calculate PDP: ', self.feature_names[feature_idx])
 
-            x_value, model_predictions = calculate_pdp(self.model, self.X[self.train_dataset.indices, :], feature_idx,
+            x_value, model_predictions = calculate_pdp(self.model, self.tensors[0][self.train_dataset.indices, :],
+                                                       self._get_additional_tensors_slice(self.train_dataset.indices),
+                                                       feature_idx,
                                                        grid_size=30)
 
             x_values_list.append(x_value)
             mean_pdp_list.append(model_predictions)
 
-        fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.X, self.train_dataset.indices)
+        fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.tensors[0], self.train_dataset.indices)
 
         plt.savefig(f'../output/{self.project}/partial_dependence.svg')
         if is_notebook():
@@ -301,8 +322,9 @@ class Trainer():
         plt.close()
 
     def plot_partial_err(self):
-        prediction, ground_truth, loss = test_tensor(self.X[self.test_dataset.indices, :],
-                                                     self.y[self.test_dataset.indices, :], self.model,
+        prediction, ground_truth, loss = test_tensor(self.tensors[0][self.test_dataset.indices, :],
+                                                     self._get_additional_tensors_slice(self.test_dataset.indices),
+                                                     self.tensors[-1][self.test_dataset.indices, :], self.model,
                                                      self.loss_fn)
         plot_partial_err(self.feature_data.loc[np.array(self.test_dataset.indices), :].reset_index(drop=True),
                          ground_truth, prediction)
@@ -311,3 +333,25 @@ class Trainer():
         if is_notebook():
             plt.show()
         plt.close()
+
+    def _get_additional_tensors_slice(self, indices):
+        res = []
+        for tensor in self.tensors[1:len(self.tensors)-1]:
+            if tensor is not None:
+                res.append(tensor[indices, :])
+        return tuple(res)
+
+if __name__ == '__main__':
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print("Using {} device".format(device))
+
+    configfile = 'pr-Upwind_sp-random_va-False_ph-False_ba-False_pa-500_ep-2000_lr-003_we-002_ba-1024_n-200_se-True'
+
+    trainer = Trainer(device=device)
+    ## Set params
+    trainer.load_config(default_configfile=configfile)
+    ## Set datasets
+    trainer.load_data()
+
+    trainer.train()
+    trainer.plot_loss()

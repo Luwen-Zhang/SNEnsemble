@@ -9,3 +9,4 @@ src/config.json
 .SynologyWorkingDirectory
 *.pdf
 src/__pycache__/
+configs/__pycache__/
