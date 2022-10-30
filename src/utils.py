@@ -59,6 +59,25 @@ plt.rcParams["figure.autolayout"] = True
 
 # plt.rcParams["legend.frameon"] = False
 
+# https://discuss.pytorch.org/t/rmse-loss-function/16540/3
+class RMSELoss(nn.Module):
+    def __init__(self, eps=1e-6):
+        super().__init__()
+        self.mse = nn.MSELoss()
+        self.eps = eps
+
+    def forward(self, yhat, y):
+        loss = torch.sqrt(self.mse(yhat, y) + self.eps)
+        return loss
+
+# https://stackoverflow.com/questions/65840698/how-to-make-r2-score-in-nn-lstm-pytorch
+def r2_loss(output, target):
+    target_mean = torch.mean(target)
+    ss_tot = torch.sum((target - target_mean) ** 2)
+    ss_res = torch.sum((target - output) ** 2)
+    r2 = 1 - ss_res / ss_tot
+    return 1 - r2
+
 def train(model, train_loader, optimizer, loss_fn):
     model.train()
     avg_loss = 0
@@ -444,7 +463,7 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
 
     prediction, ground_truth, loss = test(model, train_loader, loss_fn)
     r2 = r2_score(ground_truth, prediction)
-    print(f"Train MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+    print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,
         10 ** ground_truth,
@@ -459,7 +478,7 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
     if val_dataset is not None:
         prediction, ground_truth, loss = test(model, val_loader, loss_fn)
         r2 = r2_score(ground_truth, prediction)
-        print(f"Validation MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+        print(f"Validation Loss: {loss:.4f}, R2: {r2:.4f}")
         plot_truth_pred(
             ax,
             10 ** ground_truth,
@@ -473,7 +492,7 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
 
     prediction, ground_truth, loss = test(model, test_loader, loss_fn)
     r2 = r2_score(ground_truth, prediction)
-    print(f"Test MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+    print(f"Test Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,
         10 ** ground_truth,
@@ -506,7 +525,7 @@ def plot_truth_pred_sklearn(
     pred_y = model.predict(train_x)
     r2 = r2_score(train_y, pred_y)
     loss = np.mean((train_y - pred_y) ** 2)
-    print(f"Train MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+    print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,
         10 ** train_y,
@@ -521,7 +540,7 @@ def plot_truth_pred_sklearn(
     pred_y = model.predict(test_x)
     r2 = r2_score(test_y, pred_y)
     loss = np.mean((test_y - pred_y) ** 2)
-    print(f"Test MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+    print(f"Test Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,
         10 ** test_y,

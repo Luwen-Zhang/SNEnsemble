@@ -103,6 +103,12 @@ class Trainer():
 
         if self.loss == 'mse':
             self.loss_fn = nn.MSELoss()
+        elif self.loss == 'r2':
+            self.loss_fn = r2_loss
+        elif self.loss == 'rmse':
+            self.loss_fn = RMSELoss()
+        elif self.loss == 'mae':
+            self.loss_fn = nn.L1Loss()
         else:
             raise Exception(f'Loss function {self.loss} not implemented.')
 
@@ -235,6 +241,7 @@ class Trainer():
         plt.rcParams['font.size'] = 20
         ax = plt.subplot(111)
         plot_loss(self.train_ls, self.val_ls, ax)
+        ax.set_ylabel(f'{self.loss.upper()} Loss')
         plt.savefig(f'../output/{self.project}/loss_epoch.pdf')
         if is_notebook():
             plt.show()
