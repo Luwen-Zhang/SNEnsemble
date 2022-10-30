@@ -172,10 +172,9 @@ class Trainer():
 
         @skopt.utils.use_named_args(self.SPACE)
         def _trainer_bayes_objective(**params):
-            res = model_train(self.train_dataset, self.val_dataset,
-                              self.loss_fn, self.ckp_path,
-                              model=self.new_model(),
-                              verbose=False, return_loss_list=False, **{**params, **self.static_params})
+            res, _, _ = self._model_train(model=self.new_model(),
+                verbose=False,
+                **{**params, **self.static_params})
 
             return res
 
@@ -215,9 +214,7 @@ class Trainer():
     def train(self, verbose_per_epoch=100):
         self.model = self.new_model()
 
-        min_loss, self.train_ls, self.val_ls = model_train(self.train_dataset, self.val_dataset,
-                                                           self.loss_fn,
-                                                           self.ckp_path, model=self.model,
+        min_loss, self.train_ls, self.val_ls = self._model_train(model=self.model,
                                                            verbose_per_epoch=verbose_per_epoch,
                                                            **{**self.params, **self.static_params})
 
@@ -235,7 +232,26 @@ class Trainer():
         plt.figure()
         plt.rcParams['font.size'] = 20
         ax = plt.subplot(111)
-        plot_loss(self.train_ls, self.val_ls, ax)
+        ax.plot(
+            np.arange(len(self.train_ls)),
+            self.train_ls,
+            label="Train loss",
+            linewidth=2,
+            color=clr[0],
+        )
+        if len(self.val_ls) > 0:
+            ax.plot(
+                np.arange(len(self.val_ls)),
+                self.val_ls,
+                label="Validation loss",
+                linewidth=2,
+                color=clr[1],
+            )
+        # minposs = val_ls.index(min(val_ls))+1
+        # ax.axvline(minposs, linestyle='--', color='r',label='Early Stopping Checkpoint')
+        ax.legend()
+        ax.set_ylabel("MSE Loss")
+        ax.set_xlabel("Epoch")
         ax.set_ylabel(f'{self.loss.upper()} Loss')
         plt.savefig(f'../output/{self.project}/loss_epoch.pdf')
         if is_notebook():
@@ -397,6 +413,61 @@ class Trainer():
             if tensor is not None:
                 res.append(tensor[indices, :])
         return tuple(res)
+
+    def _model_train(self,
+            model,
+            verbose=True,
+            verbose_per_epoch=100,
+            **params,
+    ):
+        train_loader = Data.DataLoader(
+            self.train_dataset,
+            batch_size=int(params["batch_size"]),
+            generator=torch.Generator().manual_seed(0)
+        )
+        val_loader = Data.DataLoader(
+            self.val_dataset,
+            batch_size=len(self.val_dataset),
+            generator=torch.Generator().manual_seed(0)
+        )
+
+        optimizer = torch.optim.Adam(
+            model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"]
+        )
+
+        train_ls = []
+        val_ls = []
+        stop_epoch = params["epoch"]
+
+        early_stopping = EarlyStopping(
+            patience=params["patience"], verbose=False, path=self.ckp_path
+        )
+
+        for epoch in range(params["epoch"]):
+            train_loss = train(model, train_loader, optimizer, self.loss_fn)
+            train_ls.append(train_loss)
+            _, _, val_loss = test(model, val_loader, self.loss_fn)
+            val_ls.append(val_loss)
+
+            if verbose and ((epoch + 1) % verbose_per_epoch == 0 or epoch == 0):
+                print(
+                    f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min val loss: {np.min(val_ls):.4f}"
+                )
+
+            early_stopping(val_loss, model)
+
+            if early_stopping.early_stop:
+                if verbose:
+                    idx = val_ls.index(min(val_ls))
+                    print(
+                        f"Early stopping at epoch {epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}, Val loss: {val_ls[idx]:.4f}"
+                    )
+                break
+
+        idx = val_ls.index(min(val_ls))
+        min_loss = val_ls[idx]
+
+        return min_loss, train_ls, val_ls
 
 
 if __name__ == '__main__':

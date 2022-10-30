@@ -55,9 +55,6 @@ plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Times New Roman"
 plt.rcParams["figure.autolayout"] = True
 
-
-# plt.rcParams["legend.frameon"] = False
-
 # https://discuss.pytorch.org/t/rmse-loss-function/16540/3
 class RMSELoss(nn.Module):
     def __init__(self, eps=1e-6):
@@ -119,8 +116,6 @@ def test(model, test_loader, loss_fn):
 
 def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_fn):
     model.eval()
-    pred = []
-    truth = []
     with torch.no_grad():
         y = model(test_tensor, additional_tensors)
         loss = loss_fn(test_label_tensor, y)
@@ -129,70 +124,6 @@ def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_
         test_label_tensor.cpu().detach().numpy(),
         loss.item(),
     )
-
-
-def model_train(
-        train_dataset,
-        val_dataset,
-        loss_fn,
-        ckp_path,
-        model,
-        verbose=True,
-        return_loss_list=True,
-        verbose_per_epoch=100,
-        **params,
-):
-    train_loader = Data.DataLoader(
-        train_dataset,
-        batch_size=int(params["batch_size"]),
-        generator=torch.Generator().manual_seed(0)
-    )
-    val_loader = Data.DataLoader(
-        val_dataset,
-        batch_size=len(val_dataset),
-        generator=torch.Generator().manual_seed(0)
-    )
-
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"]
-    )
-
-    train_ls = []
-    val_ls = []
-    stop_epoch = params["epoch"]
-
-    early_stopping = EarlyStopping(
-        patience=params["patience"], verbose=False, path=ckp_path
-    )
-
-    for epoch in range(params["epoch"]):
-        train_loss = train(model, train_loader, optimizer, loss_fn)
-        train_ls.append(train_loss)
-        _, _, val_loss = test(model, val_loader, loss_fn)
-        val_ls.append(val_loss)
-
-        if verbose and ((epoch + 1) % verbose_per_epoch == 0 or epoch == 0):
-            print(
-                f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min val loss: {np.min(val_ls):.4f}"
-            )
-
-        early_stopping(val_loss, model)
-
-        if early_stopping.early_stop:
-            if verbose:
-                idx = val_ls.index(min(val_ls))
-                print(
-                    f"Early stopping at epoch {epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}, Val loss: {val_ls[idx]:.4f}"
-                )
-            break
-
-    idx = val_ls.index(min(val_ls))
-    min_loss = val_ls[idx]
-
-    if return_loss_list:
-        return min_loss, train_ls, val_ls
-    else:
-        return min_loss
 
 
 def split_dataset(data, deg_layers, feature_names, label_name, device, split_by, impute):
@@ -301,12 +232,6 @@ def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test):
     return train_dataset, val_dataset, test_dataset
 
 
-def plot_truth_pred(ax, ground_truth, prediction, **kargs):
-    ax.scatter(ground_truth, prediction, **kargs)
-    ax.set_xlabel("Ground truth")
-    ax.set_ylabel("Prediction")
-
-
 def plot_importance(ax, features, attr, pal, clr_map, **kargs):
     df = pd.DataFrame(columns=["feature", "attr", "clr"])
     df["feature"] = features
@@ -358,29 +283,10 @@ def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_siz
 
     return x_values, model_predictions
 
-
-def plot_loss(train_ls, val_ls, ax):
-    ax.plot(
-        np.arange(len(train_ls)),
-        train_ls,
-        label="Train loss",
-        linewidth=2,
-        color=clr[0],
-    )
-    if len(val_ls) > 0:
-        ax.plot(
-            np.arange(len(val_ls)),
-            val_ls,
-            label="Validation loss",
-            linewidth=2,
-            color=clr[1],
-        )
-    # minposs = val_ls.index(min(val_ls))+1
-    # ax.axvline(minposs, linestyle='--', color='r',label='Early Stopping Checkpoint')
-    ax.legend()
-    ax.set_ylabel("MSE Loss")
-    ax.set_xlabel("Epoch")
-
+def plot_truth_pred(ax, ground_truth, prediction, **kargs):
+    ax.scatter(ground_truth, prediction, **kargs)
+    ax.set_xlabel("Ground truth")
+    ax.set_ylabel("Prediction")
 
 def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn, ax):
     train_loader = Data.DataLoader(
