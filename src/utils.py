@@ -7,6 +7,8 @@ All utilities used in the project.
 ###############################################
 import warnings
 
+import sklearn.ensemble
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import numpy as np
@@ -23,6 +25,8 @@ from torch.utils.data import Subset
 import torch.utils.data as Data
 from torch.nn import functional as F
 from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.ensemble import RandomForestRegressor
+from sklearn import svm
 from models import *
 
 clr = sns.color_palette("deep")
@@ -508,23 +512,12 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
 
 
 def plot_truth_pred_sklearn(
-        feature_data, label_data, train_indices, test_indices, ax, model, split_by="random"
+        train_x, train_y, val_x, val_y, test_x, test_y, model, loss_fn, ax
 ):
-    train_x = feature_data.values[np.array(train_indices), :]
-    train_y = label_data.values[np.array(train_indices), :]
 
-    test_x = feature_data.values[np.array(test_indices), :]
-    test_y = label_data.values[np.array(test_indices), :]
-
-    if train_y.shape[1] == 1:
-        train_y = train_y[:, 0]
-        test_y = test_y[:, 0]
-
-    model.fit(train_x, train_y)
-
-    pred_y = model.predict(train_x)
+    pred_y = model.predict(train_x).reshape(-1,1)
     r2 = r2_score(train_y, pred_y)
-    loss = np.mean((train_y - pred_y) ** 2)
+    loss = loss_fn(torch.Tensor(train_y), torch.Tensor(pred_y))
     print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,
@@ -537,9 +530,25 @@ def plot_truth_pred_sklearn(
         edgecolors="k",
     )
 
-    pred_y = model.predict(test_x)
+    if val_x is not None:
+        pred_y = model.predict(val_x).reshape(-1,1)
+        r2 = r2_score(val_y, pred_y)
+        loss = loss_fn(torch.Tensor(val_y), torch.Tensor(pred_y))
+        print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
+        plot_truth_pred(
+            ax,
+            10 ** val_y,
+            10 ** pred_y,
+            s=20,
+            color=clr[2],
+            label=f"Val dataset ($R^2$={r2:.3f})",
+            linewidth=0.4,
+            edgecolors="k",
+        )
+
+    pred_y = model.predict(test_x).reshape(-1,1)
     r2 = r2_score(test_y, pred_y)
-    loss = np.mean((test_y - pred_y) ** 2)
+    loss = loss_fn(torch.Tensor(test_y), torch.Tensor(pred_y))
     print(f"Test Loss: {loss:.4f}, R2: {r2:.4f}")
     plot_truth_pred(
         ax,

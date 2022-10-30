@@ -264,20 +264,50 @@ class Trainer():
         plt.rcParams['font.size'] = 14
         ax = plt.subplot(111)
 
+        train_indices = self.train_dataset.indices
+        val_indices = self.val_dataset.indices if self.val_dataset is not None else None
+        test_indices = self.test_dataset.indices
+
+        train_x = self.feature_data.values[np.array(train_indices), :]
+        test_x = self.feature_data.values[np.array(test_indices), :]
+
+        train_y = self.label_data.values[np.array(train_indices), :].reshape(-1, 1)
+        test_y = self.label_data.values[np.array(test_indices), :].reshape(-1, 1)
+
+        if self.use_sequence:
+            train_x = np.hstack([train_x, self.deg_layers[np.array(train_indices), :]])
+            test_x = np.hstack([test_x, self.deg_layers[np.array(test_indices), :]])
+
+        if val_indices is not None:
+            val_x = self.feature_data.values[np.array(val_indices), :]
+            val_y = self.label_data.values[np.array(val_indices), :].reshape(-1, 1)
+
+            if self.use_sequence:
+                val_x = np.hstack([val_x, self.deg_layers[np.array(val_indices), :]])
+
+            eval_set = [(val_x, val_y)]
+        else:
+            val_x = None
+            val_y = None
+            eval_set = []
+
         if model_name == 'rf':
             if self.split_by == 'material':
-                rf = RandomForestRegressor(n_jobs=-1, max_depth=6)
+                model = RandomForestRegressor(n_jobs=-1, max_depth=6)
             else:
-                rf = RandomForestRegressor(n_jobs=-1, max_depth=15)
-
-            plot_truth_pred_sklearn(self.feature_data, self.label_data, self.train_dataset.indices,
-                                    self.test_dataset.indices, ax, model=rf,
-                                    split_by=self.split_by)
+                model = RandomForestRegressor(n_jobs=-1, max_depth=15)
+            model.fit(train_x, train_y[:, 0] if train_y.shape[1] == 1 else train_y)
+            plot_truth_pred_sklearn(train_x, train_y, val_x, val_y, test_x, test_y, model, self.loss_fn, ax)
         elif model_name == 'svm':
-            sv = svm.SVR()
-            plot_truth_pred_sklearn(self.feature_data, self.label_data, self.train_dataset.indices,
-                                    self.test_dataset.indices, ax, model=sv,
-                                    split_by=self.split_by)
+            model = svm.SVR()
+            model.fit(train_x, train_y[:, 0] if train_y.shape[1] == 0 else train_y)
+            plot_truth_pred_sklearn(train_x, train_y, val_x, val_y, test_x, test_y, model, self.loss_fn, ax)
+        elif model_name == 'tabnet':
+            from pytorch_tabnet.tab_model import TabNetRegressor
+            model = TabNetRegressor(verbose=100)
+            model.fit(train_x, train_y, eval_set=eval_set, max_epochs=2000, patience=500, loss_fn=self.loss_fn,
+                      eval_metric=[self.loss])
+            plot_truth_pred_sklearn(train_x, train_y, val_x, val_y, test_x, test_y, model, self.loss_fn, ax)
         else:
             plt.close()
             raise Exception('Sklearn model not implemented')
@@ -291,7 +321,9 @@ class Trainer():
 
     def plot_feature_importance(self):
         def forward_func(data):
-            prediction, ground_truth, loss = test_tensor(data, self._get_additional_tensors_slice(self.test_dataset.indices), self.tensors[-1][self.test_dataset.indices, :], self.model,
+            prediction, ground_truth, loss = test_tensor(data,
+                                                         self._get_additional_tensors_slice(self.test_dataset.indices),
+                                                         self.tensors[-1][self.test_dataset.indices, :], self.model,
                                                          self.loss_fn)
             return loss
 
@@ -352,11 +384,12 @@ class Trainer():
         plt.close()
 
     def plot_corr(self):
-        fig = plt.figure(figsize=(10,10))
+        fig = plt.figure(figsize=(10, 10))
         ax = plt.subplot(111)
         df_all = pd.concat([self.feature_data, self.label_data], axis=1)
         corr = df_all.corr()
-        sns.heatmap(corr, ax=ax, annot=True, xticklabels=corr.columns, yticklabels=corr.columns, square=True, cmap='Blues', cbar=False)
+        sns.heatmap(corr, ax=ax, annot=True, xticklabels=corr.columns, yticklabels=corr.columns, square=True,
+                    cmap='Blues', cbar=False)
         plt.tight_layout()
         plt.savefig(f'../output/{self.project}/corr.pdf')
         if is_notebook():
@@ -365,10 +398,11 @@ class Trainer():
 
     def _get_additional_tensors_slice(self, indices):
         res = []
-        for tensor in self.tensors[1:len(self.tensors)-1]:
+        for tensor in self.tensors[1:len(self.tensors) - 1]:
             if tensor is not None:
                 res.append(tensor[indices, :])
         return tuple(res)
+
 
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
