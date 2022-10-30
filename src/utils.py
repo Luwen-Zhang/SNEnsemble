@@ -22,6 +22,8 @@ from sklearn.metrics import r2_score
 from torch.utils.data import Subset
 import torch.utils.data as Data
 from torch.nn import functional as F
+from sklearn.impute import KNNImputer, SimpleImputer
+from models import *
 
 clr = sns.color_palette("deep")
 
@@ -46,57 +48,16 @@ else:
 
 sns.reset_defaults()
 
-matplotlib.rc("text", usetex=True)
+from distutils.spawn import find_executable
+
+if find_executable('latex'):
+    matplotlib.rc("text", usetex=True)
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Times New Roman"
 plt.rcParams["figure.autolayout"] = True
 
 
 # plt.rcParams["legend.frameon"] = False
-
-def init_weights(m):
-    if isinstance(m, nn.Linear):
-        torch.nn.init.kaiming_normal_(m.weight)
-
-
-class NN(nn.Module):
-    def __init__(self, n_inputs, n_outputs, layers, use_sequence):
-        super(NN, self).__init__()
-        num_inputs = n_inputs
-        num_outputs = n_outputs
-        self.use_sequence = use_sequence
-
-        self.net = nn.Sequential()
-        self.net.add_module("input", nn.Linear(num_inputs, layers[0]))
-        self.net.add_module("ReLU", nn.ReLU())
-        for idx in range(len(layers) - 1):
-            self.net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
-            self.net.add_module("ReLU" + str(idx), nn.ReLU())
-        self.net.add_module("output", nn.Linear(layers[-1], num_outputs))
-        self.net.apply(init_weights)
-
-        if self.use_sequence:
-            self.net_layers = nn.Sequential()
-            self.net_layers.add_module("input", nn.Linear(4, layers[0]))
-            self.net_layers.add_module("ReLU", nn.ReLU())
-            for idx in range(len(layers) - 1):
-                self.net_layers.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
-                self.net_layers.add_module("ReLU" + str(idx), nn.ReLU())
-            self.net_layers.add_module("output", nn.Linear(layers[-1], num_outputs))
-
-            self.net_post = nn.Sequential()
-            self.net_post.add_module('input', nn.Linear(num_outputs * 2, num_outputs))
-
-    def forward(self, x, additional_tensors):
-        x = self.net(x)
-        if self.use_sequence and len(additional_tensors) == 1:
-            y = self.net_layers(additional_tensors[0])
-            output = self.net_post(torch.concat([x, y], dim=1))
-        else:
-            output = x
-
-        return output
-
 
 def train(model, train_loader, optimizer, loss_fn):
     model.train()
@@ -198,10 +159,11 @@ def model_train(
         if verbose and ((epoch + 1) % verbose_per_epoch == 0 or epoch == 0):
             if validation:
                 print(
-                    f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}"
+                    f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min val loss: {np.min(val_ls):.4f}"
                 )
             else:
-                print(f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}")
+                print(
+                    f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Min train loss: {np.min(train_ls):.4f}")
 
         if validation:
             early_stopping(val_loss, model)
@@ -237,23 +199,7 @@ def model_train(
         return min_loss
 
 
-class PI_MSELoss(nn.Module):
-    def __init__(self, eps=1e-8):
-        super().__init__()
-        self.mse = nn.MSELoss()
-        self.eps = eps
-
-    def forward(self, yhat, y):
-        loss = (
-                self.mse(yhat, y)
-                + self.eps
-                + torch.sum(F.relu(-y)) / len(y)
-                + torch.sum(F.relu(y - 5)) / len(y)
-        )
-        return loss
-
-
-def split_dataset(data, deg_layers, feature_names, label_name, device, validation, split_by):
+def split_dataset(data, deg_layers, feature_names, label_name, device, validation, split_by, impute):
     tmp_data = (
         data[feature_names + label_name + ["Material_Code"]].copy().dropna(axis=0)
     )
@@ -261,11 +207,21 @@ def split_dataset(data, deg_layers, feature_names, label_name, device, validatio
     mat_lay = tmp_data['Material_Code'].copy()
     mat_lay_set = list(sorted(set(mat_lay)))
 
-    data = data[feature_names + label_name].dropna(axis=0)
-    drop_na_index = data.index
-    data.reset_index(drop=True, inplace=True)
-    feature_data = data[feature_names]
-    label_data = np.log10(data[label_name])
+    data = data[feature_names + label_name]
+
+    if impute == True:
+        data = data.dropna(axis=0, subset=label_name)
+        drop_na_index = data.index
+        data.reset_index(drop=True, inplace=True)
+        imputer = SimpleImputer(strategy='mean')
+        feature_data = pd.DataFrame(data=imputer.fit_transform(data[feature_names]), columns=feature_names)
+        label_data = np.log10(data[label_name])
+    else:
+        data = data.dropna(axis=0)
+        drop_na_index = data.index
+        data.reset_index(drop=True, inplace=True)
+        feature_data = data[feature_names]
+        label_data = np.log10(data[label_name])
 
     X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(device)
     y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(device)

@@ -14,58 +14,32 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            'project': 'FACT',
+            'project': 'OptiMat',
             'split_by': 'random',
-            'validation': False,
-            'physics_informed': False,
+            'validation': True,
             'bayes_opt': False,
-            'patience': 500,
-            'epoch': 2000,
             'lr': 0.003,
             'weight_decay': 0.002,
             'batch_size': 1024,
-            'static_params': ['patience', 'epoch'],
-            'chosen_params': ['lr', 'weight_decay', 'batch_size'],
-            'layers': [16, 64, 128, 128, 64, 16],
-            'n_calls': 200,
             'sequence': True,
-            'SPACEs': {
-                'lr': {'type': 'Real', 'low': 1e-3, 'high': 0.05, 'prior': 'log-uniform'},
-                'weight_decay': {'type': 'Real', 'low': 1e-5, 'high': 0.05, 'prior': 'log-uniform'},
-                'batch_size': {'type': 'Categorical', 'categories': [32, 64, 128, 256, 512, 1024, 2048, 4096]}
-            },
             'feature_names_type': {
-                # 'Lay-up': 1,
-                'Percentage of Fibre in 0-deg Direction': 1,
-                'Percentage of Fibre in 45-deg Direction': 1,
-                'Percentage of Fibre in 90-deg Direction': 1,
-                'Percentage of Fibre in Other Direction': 1,
-                'Fibre Volumn Fraction': 1,
-                # 'Porosity',  ##### Too much absence
-                # 'Barcol Hardness',  ##### What is it?
-                'Thickness': 1,
-                'Maximum Width': 1,
-                # 'Minimum Width',
+                'Width': 1,
                 'Area': 1,
-                'Length': 1,
-                # 'Load Length',
-                # 'Radius of Waist',
-                # 'Minimum/Maximum Stress',
-                'Maximum Strain': 0,
-                'Maximum Stress': 0,
-                # 'Static Maximum Tensile Stress',
-                # 'Static Maximum Compressive Stress',
-                # 'Static Maximum Tensile Strain',
-                # 'Static Maximum Compressive Strain',
-                # 'Strain Rate',
-                'Frequency': 0,
-                'Static Elastic Modulus': 1,
-                # 'Static Compressive Modulus',
-                # 'Temperature',
-                # 'Relative Humidity',
+                'Percentage of Fibre in 45-deg Direction': 1,
+                # 'Percentage of Fibre in 90-deg Direction': 1,
+                'Percentage of Fibre in 0-deg Direction': 1,
+                'Length(nominal)': 1,
+                'Absolute Maximum Stress': 0,
+                'Absolute Peak-to-peak Stress': 0,
+                'Thickness': 1,
+                # 'Frequency': 0,
+                # 'Load Length': 1,
+                # 'Fibre Volumn Fraction': 1,
+
             },
             'feature_types': ['Fatigue loading', 'Material'],
             'label_name': ['Cycles to Failure'],
+
         }
 
         if do_super:

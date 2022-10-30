@@ -7,9 +7,10 @@ class BaseConfig:
     def __init__(self):
         self.data = {
             'project': 'FACT',
+            'model': 'MLP',
+            'loss': 'mse',
             'split_by': 'random',
-            'validation': False,
-            'physics_informed': False,
+            'validation': True,
             'bayes_opt': False,
             'patience': 500,
             'epoch': 1000,

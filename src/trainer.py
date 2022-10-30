@@ -2,6 +2,8 @@
 The basic class for the project. It includes configuration, data processing, training, plotting,
 and comparing with baseline models.
 """
+import os.path
+
 import numpy as np
 
 from utils import *
@@ -19,7 +21,6 @@ from skopt.plots import plot_convergence
 from importlib import import_module, reload
 from skopt.space import Real, Integer, Categorical
 
-torch.use_deterministic_algorithms(True)
 np.random.seed(0)
 torch.manual_seed(0)
 random.seed(0)
@@ -84,10 +85,11 @@ class Trainer():
         self.split_by = self.args['split_by']  # 'random' or 'material'
 
         self.validation = self.args['validation']
-        self.physics_informed = self.args['physics_informed']
+        self.loss = self.args['loss']
         self.bayes_opt = self.args['bayes_opt']
 
         self.project = self.args['project']
+        self.model_name = self.args['model']
 
         self.data_path = f'../data/{self.project}_fatigue.xlsx'
         self.ckp_path = f'../output/{self.project}/fatigue.pt'
@@ -99,16 +101,19 @@ class Trainer():
         self.n_calls = self.args['n_calls']
         self.SPACE = self.args['SPACE']
 
-        if self.physics_informed:
-            self.loss_fn = PI_MSELoss()
-        else:
+        if self.loss == 'mse':
             self.loss_fn = nn.MSELoss()
+        else:
+            raise Exception(f'Loss function {self.loss} not implemented.')
 
         self.params = self.chosen_params
 
         self.use_sequence = self.args['sequence']
 
-    def load_data(self, data_path=None):
+        if not os.path.exists(f'../output/{self.project}'):
+            os.mkdir(f'../output/{self.project}')
+
+    def load_data(self, data_path=None, impute=False):
         if data_path is None:
             self.df = pd.read_excel(self.data_path, engine='openpyxl')
         else:
@@ -146,7 +151,9 @@ class Trainer():
             self.label_name,
             self.device,
             self.validation,
-            self.split_by)
+            self.split_by,
+            impute=impute
+        )
 
     def bayes(self):
         if not self.bayes_opt:
@@ -184,7 +191,7 @@ class Trainer():
                 plt.figure()
                 ax = plt.subplot(111)
                 ax = plot_convergence(result, ax)
-                plt.savefig(f'../output/{self.project}/skopt_convergence.svg')
+                plt.savefig(f'../output/{self.project}/skopt_convergence.pdf')
                 plt.close()
 
             bar.set_postfix(**postfix)
@@ -218,14 +225,17 @@ class Trainer():
         print('Minimum loss:', min_loss)
 
     def new_model(self):
-        return NN(len(self.feature_names), len(self.label_name), self.layers, self.use_sequence).to(self.device)
+        if self.model_name == 'MLP':
+            return NN(len(self.feature_names), len(self.label_name), self.layers, self.use_sequence).to(self.device)
+        else:
+            raise Exception(f'Model {self.model_name} not implemented.')
 
     def plot_loss(self):
         plt.figure()
         plt.rcParams['font.size'] = 20
         ax = plt.subplot(111)
         plot_loss(self.train_ls, self.val_ls, ax)
-        plt.savefig(f'../output/{self.project}/loss_epoch.svg')
+        plt.savefig(f'../output/{self.project}/loss_epoch.pdf')
         if is_notebook():
             plt.show()
         plt.close()
@@ -237,7 +247,7 @@ class Trainer():
         plot_truth_pred_NN(self.train_dataset, self.val_dataset, self.test_dataset, self.model, self.loss_fn, ax)
         plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
 
-        plt.savefig(f'../output/{self.project}/truth_pred.svg')
+        plt.savefig(f'../output/{self.project}/truth_pred.pdf')
         if is_notebook():
             plt.show()
         plt.close()
@@ -267,7 +277,7 @@ class Trainer():
 
         plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
 
-        plt.savefig(f'../output/{self.project}/{model_name}_truth_pred.svg')
+        plt.savefig(f'../output/{self.project}/{model_name}_truth_pred.pdf')
         if is_notebook():
             plt.show()
         plt.close()
@@ -316,7 +326,7 @@ class Trainer():
 
         fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.tensors[0], self.train_dataset.indices)
 
-        plt.savefig(f'../output/{self.project}/partial_dependence.svg')
+        plt.savefig(f'../output/{self.project}/partial_dependence.pdf')
         if is_notebook():
             plt.show()
         plt.close()
@@ -329,7 +339,19 @@ class Trainer():
         plot_partial_err(self.feature_data.loc[np.array(self.test_dataset.indices), :].reset_index(drop=True),
                          ground_truth, prediction)
 
-        plt.savefig(f'../output/{self.project}/partial_err.svg')
+        plt.savefig(f'../output/{self.project}/partial_err.pdf')
+        if is_notebook():
+            plt.show()
+        plt.close()
+
+    def plot_corr(self):
+        fig = plt.figure(figsize=(10,10))
+        ax = plt.subplot(111)
+        df_all = pd.concat([self.feature_data, self.label_data], axis=1)
+        corr = df_all.corr()
+        sns.heatmap(corr, ax=ax, annot=True, xticklabels=corr.columns, yticklabels=corr.columns, square=True, cmap='Blues', cbar=False)
+        plt.tight_layout()
+        plt.savefig(f'../output/{self.project}/corr.pdf')
         if is_notebook():
             plt.show()
         plt.close()
@@ -345,7 +367,7 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print("Using {} device".format(device))
 
-    configfile = 'pr-Upwind_sp-random_va-False_ph-False_ba-False_pa-500_ep-2000_lr-003_we-002_ba-1024_n-200_se-True'
+    configfile = 'pr-FACT_sp-random_va-True_ph-False_ba-False_pa-500_ep-2000_lr-003_we-002_ba-1024_n-200_se-True'
 
     trainer = Trainer(device=device)
     ## Set params

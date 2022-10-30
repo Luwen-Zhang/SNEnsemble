@@ -14,26 +14,14 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            'project': 'SNL_MSU_DOE',
+            'project': 'SNL_MSU_DOE_avg',
             'split_by': 'random',
             'validation': True,
-            'physics_informed': False,
             'bayes_opt': False,
-            'patience': 500,
-            'epoch': 2000,
-            'lr': 0.0034560325081541875,
-            'weight_decay': 0.0019904362054363267,
-            'batch_size': 1024,
-            'static_params': ['patience', 'epoch'],
-            'chosen_params': ['lr', 'weight_decay', 'batch_size'],
-            'layers': [16, 64, 128, 128, 64, 16],
-            'n_calls': 200,
-            'sequence': False,
-            'SPACEs': {
-                'lr': {'type': 'Real', 'low': 1e-3, 'high': 0.05, 'prior': 'log-uniform'},
-                'weight_decay': {'type': 'Real', 'low': 1e-5, 'high': 0.05, 'prior': 'log-uniform'},
-                'batch_size': {'type': 'Categorical', 'categories': [32, 64, 128, 256, 512, 1024, 2048, 4096]}
-            },
+            'lr': 0.0032092770724124367,
+            'weight_decay': 0.014122328496073377,
+            'batch_size': 256,
+            'sequence': True,
             'feature_names_type': {
                 "Percentage of Fibre in 0-deg Direction": 1,
                 "Percentage of Fibre in 45-deg Direction": 1,
