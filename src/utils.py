@@ -12,21 +12,16 @@ import sklearn.ensemble
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import numpy as np
-import torch
-from torch import nn
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
 from torch.utils.data import Subset
 import torch.utils.data as Data
-from torch.nn import functional as F
 from sklearn.impute import KNNImputer, SimpleImputer
-from sklearn.ensemble import RandomForestRegressor
-from sklearn import svm
 from models import *
 
 clr = sns.color_palette("deep")
@@ -74,6 +69,7 @@ class RMSELoss(nn.Module):
         loss = torch.sqrt(self.mse(yhat, y) + self.eps)
         return loss
 
+
 # https://stackoverflow.com/questions/65840698/how-to-make-r2-score-in-nn-lstm-pytorch
 def r2_loss(output, target):
     target_mean = torch.mean(target)
@@ -81,6 +77,7 @@ def r2_loss(output, target):
     ss_res = torch.sum((target - output) ** 2)
     r2 = 1 - ss_res / ss_tot
     return 1 - r2
+
 
 def train(model, train_loader, optimizer, loss_fn):
     model.train()
@@ -137,7 +134,6 @@ def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_
 def model_train(
         train_dataset,
         val_dataset,
-        validation,
         loss_fn,
         ckp_path,
         model,
@@ -151,14 +147,11 @@ def model_train(
         batch_size=int(params["batch_size"]),
         generator=torch.Generator().manual_seed(0)
     )
-    if validation:
-        val_loader = Data.DataLoader(
-            val_dataset,
-            batch_size=len(val_dataset),
-            generator=torch.Generator().manual_seed(0)
-        )
-    else:
-        val_loader = None
+    val_loader = Data.DataLoader(
+        val_dataset,
+        batch_size=len(val_dataset),
+        generator=torch.Generator().manual_seed(0)
+    )
 
     optimizer = torch.optim.Adam(
         model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"]
@@ -175,46 +168,26 @@ def model_train(
     for epoch in range(params["epoch"]):
         train_loss = train(model, train_loader, optimizer, loss_fn)
         train_ls.append(train_loss)
-        if validation:
-            _, _, val_loss = test(model, val_loader, loss_fn)
-            val_ls.append(val_loss)
+        _, _, val_loss = test(model, val_loader, loss_fn)
+        val_ls.append(val_loss)
 
         if verbose and ((epoch + 1) % verbose_per_epoch == 0 or epoch == 0):
-            if validation:
+            print(
+                f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min val loss: {np.min(val_ls):.4f}"
+            )
+
+        early_stopping(val_loss, model)
+
+        if early_stopping.early_stop:
+            if verbose:
+                idx = val_ls.index(min(val_ls))
                 print(
-                    f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min val loss: {np.min(val_ls):.4f}"
+                    f"Early stopping at epoch {epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}, Val loss: {val_ls[idx]:.4f}"
                 )
-            else:
-                print(
-                    f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Min train loss: {np.min(train_ls):.4f}")
+            break
 
-        if validation:
-            early_stopping(val_loss, model)
-
-            if early_stopping.early_stop:
-                if verbose:
-                    idx = val_ls.index(min(val_ls))
-                    print(
-                        f"Early stopping at epoch {epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}, Val loss: {val_ls[idx]:.4f}"
-                    )
-                stop_epoch = epoch + 1
-                break
-        else:
-            early_stopping(train_loss, model)
-
-            if early_stopping.early_stop:
-                if verbose:
-                    idx = train_ls.index(min(train_ls))
-                    print(
-                        f"Early stopping at epoch {epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}"
-                    )
-                stop_epoch = epoch + 1
-                break
-    if validation:
-        idx = val_ls.index(min(val_ls))
-        min_loss = val_ls[idx]
-    else:
-        min_loss = train_ls[-1]
+    idx = val_ls.index(min(val_ls))
+    min_loss = val_ls[idx]
 
     if return_loss_list:
         return min_loss, train_ls, val_ls
@@ -222,7 +195,7 @@ def model_train(
         return min_loss
 
 
-def split_dataset(data, deg_layers, feature_names, label_name, device, validation, split_by, impute):
+def split_dataset(data, deg_layers, feature_names, label_name, device, split_by, impute):
     tmp_data = (
         data[feature_names + label_name + ["Material_Code"]].copy().dropna(axis=0)
     )
@@ -255,43 +228,23 @@ def split_dataset(data, deg_layers, feature_names, label_name, device, validatio
         D = None
         dataset = Data.TensorDataset(X, y)
 
-    if validation:
-        train_val_test = np.array([0.6, 0.2, 0.2])
-        if split_by == "random":
-            train_size = np.floor(len(label_data) * train_val_test[0]).astype(int)
-            val_size = np.floor(len(label_data) * train_val_test[1]).astype(int)
-            test_size = len(label_data) - train_size - val_size
-            train_dataset, val_dataset, test_dataset = Data.random_split(
-                dataset,
-                [train_size, val_size, test_size],
-                generator=torch.Generator().manual_seed(0),
-            )
-        elif split_by == "material":
-            train_dataset, val_dataset, test_dataset = split_by_material(
-                dataset, mat_lay, mat_lay_set, train_val_test, validation
-            )
-        else:
-            raise Exception("Split type not implemented")
-
-        print("Dataset size:", len(train_dataset), len(val_dataset), len(test_dataset))
+    train_val_test = np.array([0.6, 0.2, 0.2])
+    if split_by == "random":
+        train_size = np.floor(len(label_data) * train_val_test[0]).astype(int)
+        val_size = np.floor(len(label_data) * train_val_test[1]).astype(int)
+        test_size = len(label_data) - train_size - val_size
+        train_dataset, val_dataset, test_dataset = Data.random_split(
+            dataset,
+            [train_size, val_size, test_size],
+            generator=torch.Generator().manual_seed(0),
+        )
+    elif split_by == "material":
+        train_dataset, val_dataset, test_dataset = split_by_material(
+            dataset, mat_lay, mat_lay_set, train_val_test)
     else:
-        train_test = np.array([0.8, 0.2])
-        if split_by == "random":
-            train_size = np.floor(len(label_data) * train_test[0]).astype(int)
-            test_size = len(label_data) - train_size
-            train_dataset, test_dataset = Data.random_split(
-                dataset,
-                [train_size, test_size],
-                generator=torch.Generator().manual_seed(0),
-            )
-        elif split_by == "material":
-            train_dataset, test_dataset = split_by_material(
-                dataset, mat_lay, mat_lay_set, train_test, validation
-            )
-        else:
-            raise Exception("Split type not implemented")
-        val_dataset = None
-        print("Dataset size:", len(train_dataset), len(test_dataset))
+        raise Exception("Split type not implemented")
+
+    print("Dataset size:", len(train_dataset), len(val_dataset), len(test_dataset))
 
     scaler = StandardScaler()
     # scaler = MinMaxScaler()
@@ -315,7 +268,7 @@ def split_dataset(data, deg_layers, feature_names, label_name, device, validatio
     )
 
 
-def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test, validation):
+def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test):
     def mat_lay_index(chosen_mat_lay, mat_lay):
         index = []
         for material in chosen_mat_lay:
@@ -323,47 +276,29 @@ def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test, validation)
             index += list(where_material)
         return np.array(index)
 
-    if validation:
-        train_mat_lay, test_mat_lay = train_test_split(
-            mat_lay_set, test_size=train_val_test[2], shuffle=False
-        )
-        train_mat_lay, val_mat_lay = train_test_split(
-            train_mat_lay,
-            test_size=train_val_test[1] / np.sum(train_val_test[0:2]),
-            shuffle=False,
-        )
-        train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
-        val_dataset = Subset(dataset, mat_lay_index(val_mat_lay, mat_lay))
-        test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
+    train_mat_lay, test_mat_lay = train_test_split(
+        mat_lay_set, test_size=train_val_test[2], shuffle=False
+    )
+    train_mat_lay, val_mat_lay = train_test_split(
+        train_mat_lay,
+        test_size=train_val_test[1] / np.sum(train_val_test[0:2]),
+        shuffle=False,
+    )
+    train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
+    val_dataset = Subset(dataset, mat_lay_index(val_mat_lay, mat_lay))
+    test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
 
-        df = pd.concat(
-            [
-                pd.DataFrame({"train material": train_mat_lay}),
-                pd.DataFrame({"val material": val_mat_lay}),
-                pd.DataFrame({"test material": test_mat_lay}),
-            ],
-            axis=1,
-        )
+    df = pd.concat(
+        [
+            pd.DataFrame({"train material": train_mat_lay}),
+            pd.DataFrame({"val material": val_mat_lay}),
+            pd.DataFrame({"test material": test_mat_lay}),
+        ],
+        axis=1,
+    )
 
-        df.to_excel("../output/material_split.xlsx", engine="openpyxl", index=False)
-        return train_dataset, val_dataset, test_dataset
-    else:
-        train_mat_lay, test_mat_lay = train_test_split(
-            mat_lay_set, test_size=train_val_test[1], shuffle=False
-        )
-
-        train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
-        test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
-
-        df = pd.concat(
-            [
-                pd.DataFrame({"train material": train_mat_lay}),
-                pd.DataFrame({"test material": test_mat_lay}),
-            ],
-            axis=1,
-        )
-        df.to_excel("../output/material_split.xlsx", engine="openpyxl", index=False)
-        return train_dataset, test_dataset
+    df.to_excel("../output/material_split.xlsx", engine="openpyxl", index=False)
+    return train_dataset, val_dataset, test_dataset
 
 
 def plot_truth_pred(ax, ground_truth, prediction, **kargs):
@@ -453,12 +388,11 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
         batch_size=len(train_dataset),
         generator=torch.Generator().manual_seed(0),
     )
-    if val_dataset is not None:
-        val_loader = Data.DataLoader(
-            val_dataset,
-            batch_size=len(val_dataset),
-            generator=torch.Generator().manual_seed(0),
-        )
+    val_loader = Data.DataLoader(
+        val_dataset,
+        batch_size=len(val_dataset),
+        generator=torch.Generator().manual_seed(0),
+    )
     test_loader = Data.DataLoader(
         test_dataset,
         batch_size=len(test_dataset),
@@ -479,20 +413,19 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
         edgecolors="k",
     )
 
-    if val_dataset is not None:
-        prediction, ground_truth, loss = test(model, val_loader, loss_fn)
-        r2 = r2_score(ground_truth, prediction)
-        print(f"Validation Loss: {loss:.4f}, R2: {r2:.4f}")
-        plot_truth_pred(
-            ax,
-            10 ** ground_truth,
-            10 ** prediction,
-            s=20,
-            color=clr[2],
-            label=f"Val dataset ($R^2$={r2:.3f})",
-            linewidth=0.4,
-            edgecolors="k",
-        )
+    prediction, ground_truth, loss = test(model, val_loader, loss_fn)
+    r2 = r2_score(ground_truth, prediction)
+    print(f"Validation Loss: {loss:.4f}, R2: {r2:.4f}")
+    plot_truth_pred(
+        ax,
+        10 ** ground_truth,
+        10 ** prediction,
+        s=20,
+        color=clr[2],
+        label=f"Val dataset ($R^2$={r2:.3f})",
+        linewidth=0.4,
+        edgecolors="k",
+    )
 
     prediction, ground_truth, loss = test(model, test_loader, loss_fn)
     r2 = r2_score(ground_truth, prediction)
@@ -514,8 +447,7 @@ def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn,
 def plot_truth_pred_sklearn(
         train_x, train_y, val_x, val_y, test_x, test_y, model, loss_fn, ax
 ):
-
-    pred_y = model.predict(train_x).reshape(-1,1)
+    pred_y = model.predict(train_x).reshape(-1, 1)
     r2 = r2_score(train_y, pred_y)
     loss = loss_fn(torch.Tensor(train_y), torch.Tensor(pred_y))
     print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
@@ -530,23 +462,22 @@ def plot_truth_pred_sklearn(
         edgecolors="k",
     )
 
-    if val_x is not None:
-        pred_y = model.predict(val_x).reshape(-1,1)
-        r2 = r2_score(val_y, pred_y)
-        loss = loss_fn(torch.Tensor(val_y), torch.Tensor(pred_y))
-        print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
-        plot_truth_pred(
-            ax,
-            10 ** val_y,
-            10 ** pred_y,
-            s=20,
-            color=clr[2],
-            label=f"Val dataset ($R^2$={r2:.3f})",
-            linewidth=0.4,
-            edgecolors="k",
-        )
+    pred_y = model.predict(val_x).reshape(-1, 1)
+    r2 = r2_score(val_y, pred_y)
+    loss = loss_fn(torch.Tensor(val_y), torch.Tensor(pred_y))
+    print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
+    plot_truth_pred(
+        ax,
+        10 ** val_y,
+        10 ** pred_y,
+        s=20,
+        color=clr[2],
+        label=f"Val dataset ($R^2$={r2:.3f})",
+        linewidth=0.4,
+        edgecolors="k",
+    )
 
-    pred_y = model.predict(test_x).reshape(-1,1)
+    pred_y = model.predict(test_x).reshape(-1, 1)
     r2 = r2_score(test_y, pred_y)
     loss = loss_fn(torch.Tensor(test_y), torch.Tensor(pred_y))
     print(f"Test Loss: {loss:.4f}, R2: {r2:.4f}")

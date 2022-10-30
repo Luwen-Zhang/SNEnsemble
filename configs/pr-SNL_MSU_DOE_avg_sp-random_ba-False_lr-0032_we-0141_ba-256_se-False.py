@@ -16,12 +16,11 @@ class config(BaseConfig):
         cfg = {
             'project': 'SNL_MSU_DOE_avg',
             'split_by': 'random',
-            'validation': True,
             'bayes_opt': False,
             'lr': 0.0032092770724124367,
             'weight_decay': 0.014122328496073377,
             'batch_size': 256,
-            'sequence': True,
+            'sequence': False,
             'feature_names_type': {
                 "Percentage of Fibre in 0-deg Direction": 1,
                 "Percentage of Fibre in 45-deg Direction": 1,

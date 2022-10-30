@@ -84,7 +84,6 @@ class Trainer():
 
         self.split_by = self.args['split_by']  # 'random' or 'material'
 
-        self.validation = self.args['validation']
         self.loss = self.args['loss']
         self.bayes_opt = self.args['bayes_opt']
 
@@ -156,7 +155,6 @@ class Trainer():
             self.feature_names,
             self.label_name,
             self.device,
-            self.validation,
             self.split_by,
             impute=impute
         )
@@ -174,7 +172,7 @@ class Trainer():
 
         @skopt.utils.use_named_args(self.SPACE)
         def _trainer_bayes_objective(**params):
-            res = model_train(self.train_dataset, self.val_dataset, self.validation,
+            res = model_train(self.train_dataset, self.val_dataset,
                               self.loss_fn, self.ckp_path,
                               model=self.new_model(),
                               verbose=False, return_loss_list=False, **{**params, **self.static_params})
@@ -218,15 +216,12 @@ class Trainer():
         self.model = self.new_model()
 
         min_loss, self.train_ls, self.val_ls = model_train(self.train_dataset, self.val_dataset,
-                                                           self.validation, self.loss_fn,
+                                                           self.loss_fn,
                                                            self.ckp_path, model=self.model,
                                                            verbose_per_epoch=verbose_per_epoch,
                                                            **{**self.params, **self.static_params})
 
-        if self.validation:
-            self.model.load_state_dict(torch.load(self.ckp_path))
-        else:
-            torch.save(self.model.state_dict(), self.ckp_path)
+        self.model.load_state_dict(torch.load(self.ckp_path))
 
         print('Minimum loss:', min_loss)
 

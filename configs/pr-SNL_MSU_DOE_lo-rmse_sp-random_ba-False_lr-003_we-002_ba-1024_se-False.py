@@ -17,7 +17,6 @@ class config(BaseConfig):
             'project': 'SNL_MSU_DOE',
             'loss': 'rmse',
             'split_by': 'random',
-            'validation': True,
             'bayes_opt': False,
             'lr': 0.003,
             'weight_decay': 0.002,

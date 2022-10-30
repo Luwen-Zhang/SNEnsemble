@@ -14,46 +14,33 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            'project': 'FACT',
+            'project': 'SNL_MSU_DOE',
+            'loss': 'mae',
             'split_by': 'random',
-            'validation': True,
             'bayes_opt': False,
             'lr': 0.003,
             'weight_decay': 0.002,
             'batch_size': 1024,
             'sequence': True,
             'feature_names_type': {
-                # 'Lay-up': 1,
-                'Percentage of Fibre in 0-deg Direction': 1,
-                'Percentage of Fibre in 45-deg Direction': 1,
-                'Percentage of Fibre in 90-deg Direction': 1,
-                'Percentage of Fibre in Other Direction': 1,
-                'Fibre Volumn Fraction': 1,
-                # 'Porosity',  ##### Too much absence
-                # 'Barcol Hardness',  ##### What is it?
-                'Thickness': 1,
-                'Maximum Width': 1,
-                # 'Minimum Width',
-                'Area': 1,
-                'Length': 1,
-                # 'Load Length',
-                # 'Radius of Waist',
-                # 'Minimum/Maximum Stress',
-                'Maximum Strain': 0,
-                'Maximum Stress': 0,
-                # 'Static Maximum Tensile Stress',
-                # 'Static Maximum Compressive Stress',
-                # 'Static Maximum Tensile Strain',
-                # 'Static Maximum Compressive Strain',
-                # 'Strain Rate',
-                'Frequency': 0,
-                'Static Elastic Modulus': 1,
-                # 'Static Compressive Modulus',
-                # 'Temperature',
-                # 'Relative Humidity',
+                "Percentage of Fibre in 0-deg Direction": 1,
+                "Percentage of Fibre in 45-deg Direction": 1,
+                "Percentage of Fibre in 90-deg Direction": 1,
+                "Percentage of Fibre in Other Direction": 1,
+                "Absolute Maximum Stress": 0,
+                "Absolute Peak-to-peak Stress": 0,
+                "Frequency": 0,
+                "Fibre Volumn Fraction": 1,
+                "Relative Maximum Stress": 0,
+                "Relative Peak-to-peak Stress": 0,
+                "Thickness": 1,
+                "Static Maximum Tensile Stress": 1,
+                "Static Maximum Tensile Strain": 1,
+                "Static Elastic Modulus": 1
             },
             'feature_types': ['Fatigue loading', 'Material'],
             'label_name': ['Cycles to Failure'],
+
         }
 
         if do_super:
