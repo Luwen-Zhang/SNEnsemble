@@ -32,22 +32,36 @@ class Trainer():
     def __init__(self, device):
         self.device = device
 
-    def load_config(self, default_configfile, verbose=False):
-        if is_notebook():
-            self.configfile = default_configfile
-        else:
+    def load_config(self, default_configfile=None, verbose=True):
+        base_config = import_module('base_config').BaseConfig().data
+
+        # The base config is loaded using the --base argument
+        if is_notebook() and default_configfile is None:
+            raise Exception('A config file must be assigned in notebook environment.')
+        elif is_notebook() or default_configfile is not None:
+            parse_res = {'base': default_configfile}
+        else: # not notebook and configfile is None
             import argparse
             parser = argparse.ArgumentParser()
-            parser.add_argument('--configfile', default=default_configfile)
-            self.configfile = parser.parse_args().configfile
+            parser.add_argument('--base', required=True)
+            for key in base_config.keys():
+                if type(base_config[key]) in [str, int, float, bool]:
+                    parser.add_argument(f'--{key}', type=type(base_config[key]), required=False)
+            parse_res = parser.parse_args().__dict__
+
+        self.configfile = parse_res['base']
 
         if self.configfile not in sys.modules:
             arg_loaded = import_module(self.configfile).config().data
         else:
             arg_loaded = reload(sys.modules.get(self.configfile)).config().data
 
-        if verbose:
-            print(arg_loaded)
+        # Then, several args can be modified using other arguments like --lr, --weight_decay
+        # only when a config file is not given so that configs depend on input arguments.
+        if not is_notebook() and default_configfile is None:
+            for key, value in zip(parse_res.keys(), parse_res.values()):
+                if value is not None:
+                    arg_loaded[key] = value
 
         tmp_static_params = {}
         for key in arg_loaded['static_params']:
@@ -68,17 +82,20 @@ class Trainer():
         SPACE = []
         for var in key_space:
             setting = arg_loaded['SPACEs'][var]
-            type = setting['type']
+            ty = setting['type']
             setting.pop('type')
-            if type == 'Real':
+            if ty == 'Real':
                 SPACE.append(Real(name=var, **setting))
-            elif type == 'Categorical':
+            elif ty == 'Categorical':
                 SPACE.append(Categorical(name=var, **setting))
-            elif type == 'Integer':
+            elif ty == 'Integer':
                 SPACE.append(Integer(name=var, **setting))
             else:
                 raise Exception('Invalid type of skopt space.')
         arg_loaded['SPACE'] = SPACE
+
+        if verbose:
+            print(arg_loaded)
 
         self.args = arg_loaded
 
