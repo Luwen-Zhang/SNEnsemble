@@ -15,12 +15,6 @@ class config(BaseConfig):
 
         cfg = {
             'project': 'OptiMat',
-            'split_by': 'random',
-            'bayes_opt': False,
-            'lr': 0.003,
-            'weight_decay': 0.002,
-            'batch_size': 1024,
-            'sequence': True,
             'feature_names_type': {
                 'Width': 1,
                 'Area': 1,

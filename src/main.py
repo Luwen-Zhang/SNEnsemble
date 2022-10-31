@@ -12,11 +12,11 @@ trainer.load_data()
 
 # trainer.params = trainer.bayes()
 #
-# trainer.train()
+trainer.train()
 #
-# trainer.plot_loss()
-# trainer.plot_truth_pred()
+trainer.plot_loss()
+trainer.plot_truth_pred()
 # trainer.plot_truth_pred_sklearn(model_name='rf')
-# trainer.plot_feature_importance()
-# trainer.plot_partial_dependence()
-# trainer.plot_partial_err()
+trainer.plot_feature_importance()
+trainer.plot_partial_dependence()
+trainer.plot_partial_err()

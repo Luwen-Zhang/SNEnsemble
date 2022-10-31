@@ -45,9 +45,13 @@ class Trainer():
             parser = argparse.ArgumentParser()
             parser.add_argument('--base', required=True)
             for key in base_config.keys():
-                if type(base_config[key]) in [str, int, float, bool]:
+                if type(base_config[key]) in [str, int, float]:
                     parser.add_argument(f'--{key}', type=type(base_config[key]), required=False)
+                elif type(base_config[key]) == bool:
+                    parser.add_argument(f'--{key}', dest=key, action='store_true')
+                    parser.add_argument(f'--no-{key}', dest=key, action='store_false')
             parse_res = parser.parse_args().__dict__
+            print(parse_res)
 
         self.configfile = parse_res['base']
 
