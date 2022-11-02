@@ -10,3 +10,5 @@ src/config.json
 *.pdf
 src/__pycache__/
 configs/__pycache__/
+autogluon
+pytorch_tabular

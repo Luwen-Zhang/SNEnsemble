@@ -40,7 +40,7 @@ class Trainer():
             raise Exception('A config file must be assigned in notebook environment.')
         elif is_notebook() or default_configfile is not None:
             parse_res = {'base': default_configfile}
-        else: # not notebook and configfile is None
+        else:  # not notebook and configfile is None
             import argparse
             parser = argparse.ArgumentParser()
             parser.add_argument('--base', required=True)
@@ -51,7 +51,6 @@ class Trainer():
                     parser.add_argument(f'--{key}', dest=key, action='store_true')
                     parser.add_argument(f'--no-{key}', dest=key, action='store_false')
             parse_res = parser.parse_args().__dict__
-            print(parse_res)
 
         self.configfile = parse_res['base']
 
@@ -114,6 +113,7 @@ class Trainer():
         self.data_path = f'../data/{self.project}_fatigue.xlsx'
         self.ckp_path = f'../output/{self.project}/fatigue.pt'
         self.skopt_path = f'../output/{self.project}/skopt.pt'
+        self.project_root = f'../output/{self.project}/'
 
         self.static_params = self.args['static_params']
         self.chosen_params = self.args['chosen_params']
@@ -194,8 +194,8 @@ class Trainer():
         @skopt.utils.use_named_args(self.SPACE)
         def _trainer_bayes_objective(**params):
             res, _, _ = self._model_train(model=self.new_model(),
-                verbose=False,
-                **{**params, **self.static_params})
+                                          verbose=False,
+                                          **{**params, **self.static_params})
 
             return res
 
@@ -236,8 +236,8 @@ class Trainer():
         self.model = self.new_model()
 
         min_loss, self.train_ls, self.val_ls = self._model_train(model=self.model,
-                                                           verbose_per_epoch=verbose_per_epoch,
-                                                           **{**self.params, **self.static_params})
+                                                                 verbose_per_epoch=verbose_per_epoch,
+                                                                 **{**self.params, **self.static_params})
 
         self.model.load_state_dict(torch.load(self.ckp_path))
 
@@ -248,6 +248,96 @@ class Trainer():
             return NN(len(self.feature_names), len(self.label_name), self.layers, self.use_sequence).to(self.device)
         else:
             raise Exception(f'Model {self.model_name} not implemented.')
+
+    def autogluon_tests(self, verbose=False):
+        print('\n-------------Run AutoGluon Tests-------------\n')
+        # https://github.com/awslabs/autogluon
+        self._disable_tqdm()
+        import warnings
+        warnings.simplefilter(action='ignore', category=UserWarning)
+        from autogluon.tabular import TabularPredictor
+        tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
+        predictor = TabularPredictor(label=self.label_name[0], path=self.project_root+'autogluon')
+        with HiddenPrints(disable_logging=True if not verbose else False):
+            predictor.fit(tabular_dataset.loc[self.train_dataset.indices + self.val_dataset.indices, :],
+                          presets='best_quality', hyperparameter_tune_kwargs='bayesopt', verbosity=0 if not verbose else 2)
+        self.autogluon_leaderboard = predictor.leaderboard(tabular_dataset.loc[self.test_dataset.indices, :])
+        # y_pred = predictor.predict(tabular_dataset.loc[self.test_dataset.indices, self.feature_names])
+        # predictor.evaluate_predictions(y_true=tabular_dataset.loc[self.test_dataset.indices, self.label_name[0]],
+        #                                y_pred=y_pred)
+        if verbose:
+            print(self.autogluon_leaderboard)
+        self._enable_tqdm()
+        warnings.simplefilter(action='default', category=UserWarning)
+        print('\n-------------AutoGluon Tests End-------------\n')
+
+    def pytorch_tabular_tests(self, verbose=False):
+        print('\n-------------Run Pytorch-tabular Tests-------------\n')
+        # https://github.com/manujosephv/pytorch_tabular
+        import warnings
+        warnings.simplefilter(action='ignore', category=UserWarning)
+        self._disable_tqdm()
+        from pytorch_tabular import TabularModel
+        from pytorch_tabular.models import CategoryEmbeddingModelConfig, \
+            NodeConfig, TabNetModelConfig, TabTransformerConfig, AutoIntConfig
+        from pytorch_tabular.config import DataConfig, OptimizerConfig, TrainerConfig
+
+        data_config = DataConfig(
+            target=self.label_name,
+            continuous_cols=self.feature_names,
+            num_workers=8
+        )
+
+        trainer_config = TrainerConfig(
+            auto_lr_find=False,
+            max_epochs=1000,
+            early_stopping_patience=100,
+        )
+        optimizer_config = OptimizerConfig(
+        )
+
+        models = [
+            CategoryEmbeddingModelConfig(task='regression'),
+            NodeConfig(task='regression'),
+            TabNetModelConfig(task='regression'),
+            TabTransformerConfig(task='regression'),
+            AutoIntConfig(task='regression')
+        ]
+
+        ####################################
+        # If using PyCharm, see lollows' answer on https://stackoverflow.com/questions/59455268/how-to-disable-progress-bar-in-pytorch-lightning/66731318#66731318
+        # to fix progress bar error
+        ####################################
+        metrics = {'model': [], 'mse': []}
+        for model_config in models:
+            print('Training', model_config)
+            with HiddenPrints(disable_logging=True if not verbose else False):
+                tabular_model = TabularModel(
+                    data_config=data_config,
+                    model_config=model_config,
+                    optimizer_config=optimizer_config,
+                    trainer_config=trainer_config
+                )
+                tabular_model.config.checkpoints_path = self.project_root + 'pytorch_tabular'
+                tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
+
+                tabular_model.fit(train=tabular_dataset.loc[self.train_dataset.indices,:],
+                                  validation=tabular_dataset.loc[self.val_dataset.indices,:],
+                                  loss=self.loss_fn)
+                # tabular_model.evaluate(tabular_dataset.loc[self.train_dataset.indices, :])
+                # y_pred = tabular_model.predict(tabular_dataset.loc[self.test_dataset.indices,:])
+                metrics['model'].append(model_config.__class__.__name__.replace('Config', ''))
+                metrics['mse'].append(tabular_model.evaluate(tabular_dataset.loc[self.test_dataset.indices,:])[0]['test_mean_squared_error'])
+
+        metrics = pd.DataFrame(metrics)
+        metrics['rmse'] = metrics['mse']**(1/2)
+        metrics.sort_values('rmse', inplace=True)
+        self.pytorch_tabular_leaderboard = metrics
+        print(self.pytorch_tabular_leaderboard)
+
+        self._enable_tqdm()
+        warnings.simplefilter(action='default', category=UserWarning)
+        print('\n-------------Pytorch-tabular Tests End-------------\n')
 
     def plot_loss(self):
         plt.figure()
@@ -436,11 +526,11 @@ class Trainer():
         return tuple(res)
 
     def _model_train(self,
-            model,
-            verbose=True,
-            verbose_per_epoch=100,
-            **params,
-    ):
+                     model,
+                     verbose=True,
+                     verbose_per_epoch=100,
+                     **params,
+                     ):
         train_loader = Data.DataLoader(
             self.train_dataset,
             batch_size=int(params["batch_size"]),
@@ -490,6 +580,31 @@ class Trainer():
 
         return min_loss, train_ls, val_ls
 
+    def _disable_tqdm(self):
+        from functools import partialmethod
+        from tqdm import tqdm
+        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+        from tqdm.notebook import tqdm
+        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+        from tqdm.autonotebook import tqdm
+        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+        from tqdm.auto import tqdm
+        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
+    def _enable_tqdm(self):
+        from functools import partialmethod
+        from tqdm import tqdm
+        tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+        from tqdm.notebook import tqdm
+        tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+        from tqdm.autonotebook import tqdm
+        tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+        from tqdm.auto import tqdm
+        tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+        # reload(sys.modules.get('tqdm.tqdm'))
+        # reload(sys.modules.get('tqdm.notebook.tqdm'))
+        # reload(sys.modules.get('tqdm.autonotebook.tqdm'))
+        # reload(sys.modules.get('tqdm.auto.tqdm'))
 
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

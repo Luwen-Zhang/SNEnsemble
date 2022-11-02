@@ -5,6 +5,8 @@ All utilities used in the project.
 ###############################################
 # Xueling Luo @ Shanghai Jiao Tong University #
 ###############################################
+import os
+import sys
 import warnings
 
 import sklearn.ensemble
@@ -23,6 +25,7 @@ from torch.utils.data import Subset
 import torch.utils.data as Data
 from sklearn.impute import KNNImputer, SimpleImputer
 from models import *
+import logging
 
 clr = sns.color_palette("deep")
 
@@ -614,3 +617,22 @@ class EarlyStopping:
             )
         torch.save(model.state_dict(), self.path)
         self.val_loss_min = val_loss
+
+class HiddenPrints:
+    def __init__(self, disable_logging=True, disable_std=True):
+        self.disable_logging = disable_logging
+        self.disable_std = disable_std
+
+    def __enter__(self):
+        if self.disable_std:
+            self._original_stdout = sys.stdout
+            sys.stdout = open(os.devnull, 'w')
+        if self.disable_logging:
+            logging.disable(logging.CRITICAL)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.disable_std:
+            sys.stdout.close()
+            sys.stdout = self._original_stdout
+        if self.disable_logging:
+            logging.disable(logging.NOTSET)

@@ -1,6 +1,7 @@
+autogluon==0.3.1
 captum==0.5.0
-joblib==1.1.0
 matplotlib==3.3.4
+mxnet==1.9.1
 numpy==1.19.5
 openpyxl==3.0.10
 pandas==1.1.5
@@ -8,4 +9,10 @@ scikit-learn==0.24.2
 scikit-optimize==0.9.0
 scipy==1.5.4
 seaborn==0.11.2
+torch==1.10.2
+torchaudio==0.10.2
+torchvision==0.11.3
 tqdm==4.64.1
+jupyter==1.0.0
+pytorch_tabular==0.7.0
+torchmetrics==0.6.0
