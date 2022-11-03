@@ -59,18 +59,6 @@ plt.rcParams["font.serif"] = "Times New Roman"
 plt.rcParams["figure.autolayout"] = True
 
 
-# https://discuss.pytorch.org/t/rmse-loss-function/16540/3
-class RMSELoss(nn.Module):
-    def __init__(self, eps=1e-6):
-        super().__init__()
-        self.mse = nn.MSELoss()
-        self.eps = eps
-
-    def forward(self, yhat, y):
-        loss = torch.sqrt(self.mse(yhat, y) + self.eps)
-        return loss
-
-
 # https://stackoverflow.com/questions/65840698/how-to-make-r2-score-in-nn-lstm-pytorch
 def r2_loss(output, target):
     target_mean = torch.mean(target)
@@ -261,7 +249,7 @@ def plot_importance(ax, features, attr, pal, clr_map, **kargs):
     from matplotlib.patches import Patch, Rectangle
 
     legend = ax.legend(handles=[Rectangle((0, 0), 1, 1, color=value, ec='k', label=key) for key, value in
-                                zip(clr_map.keys(), clr_map.values())],
+                                clr_map.items()],
                        loc='lower right', handleheight=2, fancybox=False, frameon=False)
 
     legend.get_frame().set_alpha(None)
@@ -287,124 +275,6 @@ def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_siz
 
     return x_values, model_predictions
 
-
-def plot_truth_pred(ax, ground_truth, prediction, **kargs):
-    ax.scatter(ground_truth, prediction, **kargs)
-    ax.set_xlabel("Ground truth")
-    ax.set_ylabel("Prediction")
-
-
-def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn, ax):
-    train_loader = Data.DataLoader(
-        train_dataset,
-        batch_size=len(train_dataset),
-        generator=torch.Generator().manual_seed(0),
-    )
-    val_loader = Data.DataLoader(
-        val_dataset,
-        batch_size=len(val_dataset),
-        generator=torch.Generator().manual_seed(0),
-    )
-    test_loader = Data.DataLoader(
-        test_dataset,
-        batch_size=len(test_dataset),
-        generator=torch.Generator().manual_seed(0),
-    )
-
-    prediction, ground_truth, loss = test(model, train_loader, loss_fn)
-    r2 = r2_score(ground_truth, prediction)
-    print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
-    plot_truth_pred(
-        ax,
-        10 ** ground_truth,
-        10 ** prediction,
-        s=20,
-        color=clr[0],
-        label=f"Train dataset ($R^2$={r2:.3f})",
-        linewidth=0.4,
-        edgecolors="k",
-    )
-
-    prediction, ground_truth, loss = test(model, val_loader, loss_fn)
-    r2 = r2_score(ground_truth, prediction)
-    print(f"Validation Loss: {loss:.4f}, R2: {r2:.4f}")
-    plot_truth_pred(
-        ax,
-        10 ** ground_truth,
-        10 ** prediction,
-        s=20,
-        color=clr[2],
-        label=f"Val dataset ($R^2$={r2:.3f})",
-        linewidth=0.4,
-        edgecolors="k",
-    )
-
-    prediction, ground_truth, loss = test(model, test_loader, loss_fn)
-    r2 = r2_score(ground_truth, prediction)
-    print(f"Test Loss: {loss:.4f}, R2: {r2:.4f}")
-    plot_truth_pred(
-        ax,
-        10 ** ground_truth,
-        10 ** prediction,
-        s=20,
-        color=clr[1],
-        label=f"Test dataset ($R^2$={r2:.3f})",
-        linewidth=0.4,
-        edgecolors="k",
-    )
-
-    set_truth_pred(ax)
-
-
-def plot_truth_pred_sklearn(
-        train_x, train_y, val_x, val_y, test_x, test_y, model, loss_fn, ax
-):
-    pred_y = model.predict(train_x).reshape(-1, 1)
-    r2 = r2_score(train_y, pred_y)
-    loss = loss_fn(torch.Tensor(train_y), torch.Tensor(pred_y))
-    print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
-    plot_truth_pred(
-        ax,
-        10 ** train_y,
-        10 ** pred_y,
-        s=20,
-        color=clr[0],
-        label=f"Train dataset ($R^2$={r2:.3f})",
-        linewidth=0.4,
-        edgecolors="k",
-    )
-
-    pred_y = model.predict(val_x).reshape(-1, 1)
-    r2 = r2_score(val_y, pred_y)
-    loss = loss_fn(torch.Tensor(val_y), torch.Tensor(pred_y))
-    print(f"Train Loss: {loss:.4f}, R2: {r2:.4f}")
-    plot_truth_pred(
-        ax,
-        10 ** val_y,
-        10 ** pred_y,
-        s=20,
-        color=clr[2],
-        label=f"Val dataset ($R^2$={r2:.3f})",
-        linewidth=0.4,
-        edgecolors="k",
-    )
-
-    pred_y = model.predict(test_x).reshape(-1, 1)
-    r2 = r2_score(test_y, pred_y)
-    loss = loss_fn(torch.Tensor(test_y), torch.Tensor(pred_y))
-    print(f"Test Loss: {loss:.4f}, R2: {r2:.4f}")
-    plot_truth_pred(
-        ax,
-        10 ** test_y,
-        10 ** pred_y,
-        s=20,
-        color=clr[1],
-        label=f"Test dataset ($R^2$={r2:.3f})",
-        linewidth=0.4,
-        edgecolors="k",
-    )
-
-    set_truth_pred(ax)
 
 
 def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices):

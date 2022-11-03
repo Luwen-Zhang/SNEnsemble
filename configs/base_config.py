@@ -8,7 +8,7 @@ class BaseConfig:
         self.data = {
             'project': 'FACT',
             'model': 'MLP',
-            'loss': 'rmse',
+            'loss': 'mse',
             'split_by': 'random',
             'bayes_opt': False,
             'patience': 500,

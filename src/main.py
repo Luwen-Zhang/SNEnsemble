@@ -10,7 +10,7 @@ trainer = Trainer(device=device)
 trainer.load_config(configfile)
 trainer.load_data()
 
-trainer.autogluon_tests(verbose=True)
+# trainer.autogluon_tests(verbose=True)
 # trainer.pytorch_tabular_tests()
 # trainer.params = trainer.bayes()
 #
@@ -18,7 +18,7 @@ trainer.autogluon_tests(verbose=True)
 #
 # trainer.plot_loss()
 # trainer.plot_truth_pred()
-# # trainer.plot_truth_pred_sklearn(model_name='rf')
+trainer.plot_truth_pred_sklearn(model_name='tabnet')
 # trainer.plot_feature_importance()
 # trainer.plot_partial_dependence()
 # trainer.plot_partial_err()

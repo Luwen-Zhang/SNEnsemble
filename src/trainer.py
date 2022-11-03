@@ -5,6 +5,7 @@ and comparing with baseline models.
 import os.path
 
 import numpy as np
+import pandas as pd
 
 from utils import *
 import torch
@@ -29,7 +30,7 @@ sys.path.append('../configs/')
 
 
 class Trainer():
-    def __init__(self, device):
+    def __init__(self, device='cpu'):
         self.device = device
 
     def load_config(self, default_configfile=None, verbose=True):
@@ -62,7 +63,7 @@ class Trainer():
         # Then, several args can be modified using other arguments like --lr, --weight_decay
         # only when a config file is not given so that configs depend on input arguments.
         if not is_notebook() and default_configfile is None:
-            for key, value in zip(parse_res.keys(), parse_res.values()):
+            for key, value in parse_res.items():
                 if value is not None:
                     arg_loaded[key] = value
 
@@ -125,8 +126,6 @@ class Trainer():
             self.loss_fn = nn.MSELoss()
         elif self.loss == 'r2':
             self.loss_fn = r2_loss
-        elif self.loss == 'rmse':
-            self.loss_fn = RMSELoss()
         elif self.loss == 'mae':
             self.loss_fn = nn.L1Loss()
         else:
@@ -241,7 +240,20 @@ class Trainer():
 
         self.model.load_state_dict(torch.load(self.ckp_path))
 
-        print('Minimum loss:', min_loss)
+        print(f'Minimum loss: {min_loss:.5f}')
+
+        test_loader = Data.DataLoader(
+            self.test_dataset,
+            batch_size=len(self.test_dataset),
+            generator=torch.Generator().manual_seed(0),
+        )
+
+        _, _, mse = test(self.model, test_loader, torch.nn.MSELoss())
+        rmse = np.sqrt(mse)
+        self.metrics = {'mse': mse, 'rmse': rmse}
+
+        print(f'Test MSE loss: {mse:.5f}, RMSE loss: {rmse:.5f}')
+        save_trainer(self)
 
     def new_model(self):
         if self.model_name == 'MLP':
@@ -249,7 +261,7 @@ class Trainer():
         else:
             raise Exception(f'Model {self.model_name} not implemented.')
 
-    def autogluon_tests(self, verbose=False):
+    def autogluon_tests(self, verbose=False, debug_mode=False):
         print('\n-------------Run AutoGluon Tests-------------\n')
         # https://github.com/awslabs/autogluon
         disable_tqdm()
@@ -260,7 +272,8 @@ class Trainer():
         predictor = TabularPredictor(label=self.label_name[0], path=self.project_root + 'autogluon')
         with HiddenPrints(disable_logging=True if not verbose else False):
             predictor.fit(tabular_dataset.loc[self.train_dataset.indices + self.val_dataset.indices, :],
-                          presets='best_quality', hyperparameter_tune_kwargs='bayesopt',
+                          presets='best_quality' if not debug_mode else 'medium_quality_faster_train',
+                          hyperparameter_tune_kwargs='bayesopt' if not debug_mode else None,
                           verbosity=0 if not verbose else 2)
         self.autogluon_leaderboard = predictor.leaderboard(tabular_dataset.loc[self.test_dataset.indices, :])
         # y_pred = predictor.predict(tabular_dataset.loc[self.test_dataset.indices, self.feature_names])
@@ -270,9 +283,10 @@ class Trainer():
         self.autogluon_predictor = predictor
         enable_tqdm()
         warnings.simplefilter(action='default', category=UserWarning)
+        save_trainer(self)
         print('\n-------------AutoGluon Tests End-------------\n')
 
-    def pytorch_tabular_tests(self, verbose=False):
+    def pytorch_tabular_tests(self, verbose=False, debug_mode=False):
         print('\n-------------Run Pytorch-tabular Tests-------------\n')
         # https://github.com/manujosephv/pytorch_tabular
         disable_tqdm()
@@ -290,8 +304,8 @@ class Trainer():
         )
 
         trainer_config = TrainerConfig(
-            auto_lr_find=True,
-            max_epochs=1000,
+            auto_lr_find=True if not debug_mode else False,
+            max_epochs=1000 if not debug_mode else 10,
             early_stopping_patience=100,
         )
         optimizer_config = OptimizerConfig(
@@ -342,23 +356,31 @@ class Trainer():
 
         enable_tqdm()
         warnings.simplefilter(action='default', category=UserWarning)
+        save_trainer(self)
         print('\n-------------Pytorch-tabular Tests End-------------\n')
 
-    def get_leaderboard(self):
+    def get_leaderboard(self, test_data_only=True):
         dfs = []
+        metrics = ['rmse', 'mse', 'mae', 'mape', 'r2']
         if hasattr(self, 'pytorch_tabular_leaderboard'):
-            df = self.pytorch_tabular_leaderboard[['model', 'rmse']].copy()
+            predictions = self._predict_all_pytorch_tabular(verbose=False, test_data_only=test_data_only)
+            df = Trainer._metrics(predictions, metrics, test_data_only=test_data_only)
             df['Program'] = 'Pytorch-Tabular'
             dfs.append(df)
         if hasattr(self, 'autogluon_leaderboard'):
-            df = self.autogluon_leaderboard[['model', 'score_test']].copy()
-            df.columns = ['model', 'rmse']
+            predictions = self._predict_all_autogluon(verbose=False, test_data_only=test_data_only)
+            df = Trainer._metrics(predictions, metrics, test_data_only=test_data_only)
             df['Program'] = 'AutoGluon'
-            df['rmse'] = np.abs(df['rmse'])
+            dfs.append(df)
+        if hasattr(self, 'metrics'):
+            predictions = self._predict_all(test_data_only=test_data_only)
+            df = Trainer._metrics(predictions, metrics, test_data_only=test_data_only)
+            df['Program'] = 'This work'
             dfs.append(df)
         df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
-        df_leaderboard.sort_values('rmse', inplace=True)
+        df_leaderboard.sort_values('Test_RMSE' if not test_data_only else 'RMSE', inplace=True)
         df_leaderboard.reset_index(drop=True, inplace=True)
+        df_leaderboard = df_leaderboard[['Program'] + list(df_leaderboard.columns)[:-1]]
         df_leaderboard.to_csv(self.project_root + 'leaderboard.csv')
         return df_leaderboard
 
@@ -396,7 +418,31 @@ class Trainer():
         plt.figure()
         plt.rcParams['font.size'] = 14
         ax = plt.subplot(111)
-        plot_truth_pred_NN(self.train_dataset, self.val_dataset, self.test_dataset, self.model, self.loss_fn, ax)
+
+        predictions = self._predict_all()
+
+        def plot_func(ax, model_name, name, color):
+            pred_y, y = predictions[model_name][name]
+            r2 = r2_score(y, pred_y)
+            loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
+            print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
+            self._plot_truth_pred(
+                ax,
+                10 ** y,
+                10 ** pred_y,
+                s=20,
+                color=color,
+                label=f"{name} dataset ($R^2$={r2:.3f})",
+                linewidth=0.4,
+                edgecolors="k",
+            )
+
+        plot_func(ax, '--', 'Train', clr[0])
+        plot_func(ax, '--', 'Validation', clr[2])
+        plot_func(ax, '--', 'Test', clr[1])
+
+        set_truth_pred(ax)
+
         plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
 
         plt.savefig(f'../output/{self.project}/truth_pred.pdf')
@@ -410,31 +456,23 @@ class Trainer():
         ax = plt.subplot(111)
 
         train_indices = self.train_dataset.indices
-        val_indices = self.val_dataset.indices if self.val_dataset is not None else None
+        val_indices = self.val_dataset.indices
         test_indices = self.test_dataset.indices
 
         train_x = self.feature_data.values[np.array(train_indices), :]
         test_x = self.feature_data.values[np.array(test_indices), :]
+        val_x = self.feature_data.values[np.array(val_indices), :]
 
         train_y = self.label_data.values[np.array(train_indices), :].reshape(-1, 1)
         test_y = self.label_data.values[np.array(test_indices), :].reshape(-1, 1)
+        val_y = self.label_data.values[np.array(val_indices), :].reshape(-1, 1)
 
-        if self.use_sequence:
-            train_x = np.hstack([train_x, self.deg_layers[np.array(train_indices), :]])
-            test_x = np.hstack([test_x, self.deg_layers[np.array(test_indices), :]])
+        # if self.use_sequence:
+        #     train_x = np.hstack([train_x, self.deg_layers[np.array(train_indices), :]])
+        #     test_x = np.hstack([test_x, self.deg_layers[np.array(test_indices), :]])
+        #     val_x = np.hstack([val_x, self.deg_layers[np.array(val_indices), :]])
 
-        if val_indices is not None:
-            val_x = self.feature_data.values[np.array(val_indices), :]
-            val_y = self.label_data.values[np.array(val_indices), :].reshape(-1, 1)
-
-            if self.use_sequence:
-                val_x = np.hstack([val_x, self.deg_layers[np.array(val_indices), :]])
-
-            eval_set = [(val_x, val_y)]
-        else:
-            val_x = None
-            val_y = None
-            eval_set = []
+        eval_set = [(val_x, val_y)]
 
         if model_name == 'rf':
             if self.split_by == 'material':
@@ -442,20 +480,39 @@ class Trainer():
             else:
                 model = RandomForestRegressor(n_jobs=-1, max_depth=15)
             model.fit(train_x, train_y[:, 0] if train_y.shape[1] == 1 else train_y)
-            plot_truth_pred_sklearn(train_x, train_y, val_x, val_y, test_x, test_y, model, self.loss_fn, ax)
         elif model_name == 'svm':
             model = svm.SVR()
             model.fit(train_x, train_y[:, 0] if train_y.shape[1] == 0 else train_y)
-            plot_truth_pred_sklearn(train_x, train_y, val_x, val_y, test_x, test_y, model, self.loss_fn, ax)
         elif model_name == 'tabnet':
             from pytorch_tabnet.tab_model import TabNetRegressor
             model = TabNetRegressor(verbose=100)
             model.fit(train_x, train_y, eval_set=eval_set, max_epochs=2000, patience=500, loss_fn=self.loss_fn,
                       eval_metric=[self.loss])
-            plot_truth_pred_sklearn(train_x, train_y, val_x, val_y, test_x, test_y, model, self.loss_fn, ax)
         else:
             plt.close()
             raise Exception('Sklearn model not implemented')
+
+        def plot_func(model, x, y, name, color):
+            pred_y = model.predict(x).reshape(-1, 1)
+            r2 = r2_score(y, pred_y)
+            loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
+            print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
+            self._plot_truth_pred(
+                ax,
+                10 ** y,
+                10 ** pred_y,
+                s=20,
+                color=color,
+                label=f"{name} dataset ($R^2$={r2:.3f})",
+                linewidth=0.4,
+                edgecolors="k",
+            )
+
+        plot_func(model, train_x, train_y, 'Train', clr[0])
+        plot_func(model, val_x, val_y, 'Validation', clr[2])
+        plot_func(model, test_x, test_y, 'Test', clr[1])
+
+        set_truth_pred(ax)
 
         plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
 
@@ -463,6 +520,58 @@ class Trainer():
         if is_notebook():
             plt.show()
         plt.close()
+
+    def plot_truth_pred_baseline(self, program):
+        print('Making baseline predictions...')
+        if program == 'autogluon':
+            if not hasattr(self, 'autogluon_predictor'):
+                raise Exception('Autogluon tests have not been run. Run Trainer.autogluon_tests() first.')
+            model_names = self.autogluon_leaderboard['model']
+            predictions = self._predict_all_autogluon()
+        elif program == 'pytorch_tabular':
+            if not hasattr(self, 'pytorch_tabular_models'):
+                raise Exception('Pytorch-Tabular tests have not been run. Run Trainer.pytorch_tabular_tests() first.')
+            model_names = self.pytorch_tabular_leaderboard['model']
+            predictions = self._predict_all_pytorch_tabular()
+        else:
+            raise Exception('Baseline program does not exist.')
+
+        def plot_func(ax, model_name, name, color):
+            pred_y, y = predictions[model_name][name]
+            r2 = r2_score(y, pred_y)
+            loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
+            print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
+            self._plot_truth_pred(
+                ax,
+                10 ** y,
+                10 ** pred_y,
+                s=20,
+                color=color,
+                label=f"{name} dataset ($R^2$={r2:.3f})",
+                linewidth=0.4,
+                edgecolors="k",
+            )
+
+        print('Plotting...')
+        for idx, model_name in enumerate(model_names):
+            print(model_name, f'{idx + 1}/{len(model_names)}')
+            plt.figure()
+            plt.rcParams['font.size'] = 14
+            ax = plt.subplot(111)
+
+            plot_func(ax, model_name, 'Train', clr[0])
+            if 'Validation' in predictions[model_name].keys():
+                plot_func(ax, model_name, 'Validation', clr[2])
+            plot_func(ax, model_name, 'Test', clr[1])
+
+            set_truth_pred(ax)
+
+            plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
+
+            s = model_name.replace('/', '_')
+            plt.savefig(f'../output/{self.project}/{program}/{s}_truth_pred.pdf')
+
+            plt.close()
 
     def plot_feature_importance(self):
         def forward_func(data):
@@ -541,6 +650,138 @@ class Trainer():
             plt.show()
         plt.close()
 
+    @staticmethod
+    def _metrics(predictions, metrics, test_data_only):
+        df_metrics = pd.DataFrame()
+        for model_name, model_predictions in predictions.items():
+            df = pd.DataFrame(index=[0])
+            df['Model'] = model_name
+            for tvt, (y_pred, y_true) in model_predictions.items():
+                if test_data_only and tvt != 'Test':
+                    continue
+                for metric in metrics:
+                    metric_value = Trainer._metric_sklearn(y_true, y_pred, metric)
+                    df[tvt + '_' + metric.upper() if not test_data_only else metric.upper()] = metric_value
+            df_metrics = pd.concat([df_metrics, df], axis=0, ignore_index=True)
+
+        return df_metrics
+
+    @staticmethod
+    def _metric_sklearn(y_true, y_pred, metric):
+        if metric == 'mse':
+            from sklearn.metrics import mean_squared_error
+            return mean_squared_error(y_true, y_pred)
+        elif metric == 'rmse':
+            from sklearn.metrics import mean_squared_error
+            return np.sqrt(mean_squared_error(y_true, y_pred))
+        elif metric == 'mae':
+            from sklearn.metrics import mean_absolute_error
+            return mean_absolute_error(y_true, y_pred)
+        elif metric == 'mape':
+            from sklearn.metrics import mean_absolute_percentage_error
+            return mean_absolute_percentage_error(y_true, y_pred)
+        elif metric == 'r2':
+            from sklearn.metrics import r2_score
+            return r2_score(y_true, y_pred)
+        else:
+            raise Exception(f'Metric {metric} not implemented.')
+
+    @staticmethod
+    def _plot_truth_pred(ax, ground_truth, prediction, **kargs):
+        ax.scatter(ground_truth, prediction, **kargs)
+        ax.set_xlabel("Ground truth")
+        ax.set_ylabel("Prediction")
+
+    def _predict_all(self, test_data_only=False):
+        train_loader = Data.DataLoader(
+            self.train_dataset,
+            batch_size=len(self.train_dataset),
+            generator=torch.Generator().manual_seed(0),
+        )
+        val_loader = Data.DataLoader(
+            self.val_dataset,
+            batch_size=len(self.val_dataset),
+            generator=torch.Generator().manual_seed(0),
+        )
+        test_loader = Data.DataLoader(
+            self.test_dataset,
+            batch_size=len(self.test_dataset),
+            generator=torch.Generator().manual_seed(0),
+        )
+
+        if not test_data_only:
+            y_train_pred, y_train, _ = test(self.model, train_loader, self.loss_fn)
+            y_val_pred, y_val, _ = test(self.model, val_loader, self.loss_fn)
+        else:
+            y_train_pred = y_train = None
+            y_val_pred = y_val = None
+        y_test_pred, y_test, _ = test(self.model, test_loader, self.loss_fn)
+
+        predictions = {}
+        predictions['--'] = {'Train': (y_train_pred, y_train),
+                             'Validation': (y_val_pred, y_val),
+                             'Test': (y_test_pred, y_test)}
+
+        return predictions
+
+    def _predict_all_autogluon(self, verbose=True, test_data_only=False):
+        model_names = self.autogluon_leaderboard['model']
+        tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
+        train_data = tabular_dataset.loc[self.train_dataset.indices + self.val_dataset.indices, :].copy()
+        test_data = tabular_dataset.loc[self.test_dataset.indices, :].copy()
+
+        predictions = {}
+
+        for idx, model_name in enumerate(model_names):
+            if verbose:
+                print(model_name, f'{idx + 1}/{len(model_names)}')
+            if not test_data_only:
+                y_train_pred = self.autogluon_predictor.predict(train_data, model=model_name, as_pandas=False)
+                y_train = train_data[self.autogluon_predictor.label].values
+            else:
+                y_train_pred = None
+                y_train = None
+
+            y_test_pred = self.autogluon_predictor.predict(test_data, model=model_name, as_pandas=False)
+            y_test = test_data[self.autogluon_predictor.label].values
+
+            predictions[model_name] = {'Train': (y_train_pred, y_train), 'Test': (y_test_pred, y_test)}
+        return predictions
+
+    def _predict_all_pytorch_tabular(self, verbose=True, test_data_only=False):
+        model_names = self.pytorch_tabular_leaderboard['model']
+        tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
+        train_data = tabular_dataset.loc[self.train_dataset.indices, :].copy()
+        val_data = tabular_dataset.loc[self.val_dataset.indices, :].copy()
+        test_data = tabular_dataset.loc[self.test_dataset.indices, :].copy()
+
+        predictions = {}
+        disable_tqdm()
+        for idx, model_name in enumerate(model_names):
+            if verbose:
+                print(model_name, f'{idx + 1}/{len(model_names)}')
+            model = self.pytorch_tabular_models[model_name]
+
+            target = model.config.target[0]
+
+            if not test_data_only:
+                y_train_pred = np.array(model.predict(train_data)[f'{target}_prediction'])
+                y_train = train_data[target].values
+
+                y_val_pred = np.array(model.predict(val_data)[f'{target}_prediction'])
+                y_val = val_data[target].values
+            else:
+                y_train_pred = y_train = None
+                y_val_pred = y_val = None
+
+            y_test_pred = np.array(model.predict(test_data)[f'{target}_prediction'])
+            y_test = test_data[target].values
+
+            predictions[model_name] = {'Train': (y_train_pred, y_train), 'Test': (y_test_pred, y_test),
+                                       'Validation': (y_val_pred, y_val)}
+        enable_tqdm()
+        return predictions
+
     def _get_additional_tensors_slice(self, indices):
         res = []
         for tensor in self.tensors[1:len(self.tensors) - 1]:
@@ -602,6 +843,19 @@ class Trainer():
         min_loss = val_ls[idx]
 
         return min_loss, train_ls, val_ls
+
+
+def save_trainer(trainer, path=None):
+    import pickle
+    with open(trainer.project_root + 'trainer.pkl' if path is None else path, 'wb') as outp:
+        pickle.dump(trainer, outp, pickle.HIGHEST_PROTOCOL)
+
+
+def load_trainer(path=None):
+    import pickle
+    with open(path, 'rb') as inp:
+        trainer = pickle.load(inp)
+    return trainer
 
 
 if __name__ == '__main__':
