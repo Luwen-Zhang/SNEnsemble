@@ -10,8 +10,8 @@ trainer = Trainer(device=device)
 trainer.load_config(configfile)
 trainer.load_data()
 
-# trainer.autogluon_tests(verbose=True)
-trainer.pytorch_tabular_tests()
+trainer.autogluon_tests(verbose=True)
+# trainer.pytorch_tabular_tests()
 # trainer.params = trainer.bayes()
 #
 # trainer.train()

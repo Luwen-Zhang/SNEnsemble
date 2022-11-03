@@ -58,6 +58,7 @@ plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Times New Roman"
 plt.rcParams["figure.autolayout"] = True
 
+
 # https://discuss.pytorch.org/t/rmse-loss-function/16540/3
 class RMSELoss(nn.Module):
     def __init__(self, eps=1e-6):
@@ -286,10 +287,12 @@ def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_siz
 
     return x_values, model_predictions
 
+
 def plot_truth_pred(ax, ground_truth, prediction, **kargs):
     ax.scatter(ground_truth, prediction, **kargs)
     ax.set_xlabel("Ground truth")
     ax.set_ylabel("Prediction")
+
 
 def plot_truth_pred_NN(train_dataset, val_dataset, test_dataset, model, loss_fn, ax):
     train_loader = Data.DataLoader(
@@ -618,6 +621,7 @@ class EarlyStopping:
         torch.save(model.state_dict(), self.path)
         self.val_loss_min = val_loss
 
+
 class HiddenPrints:
     def __init__(self, disable_logging=True, disable_std=True):
         self.disable_logging = disable_logging
@@ -636,3 +640,27 @@ class HiddenPrints:
             sys.stdout = self._original_stdout
         if self.disable_logging:
             logging.disable(logging.NOTSET)
+
+
+def disable_tqdm():
+    from functools import partialmethod
+    from tqdm import tqdm
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+    from tqdm.notebook import tqdm
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+    from tqdm.autonotebook import tqdm
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+    from tqdm.auto import tqdm
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
+
+def enable_tqdm():
+    from functools import partialmethod
+    from tqdm import tqdm
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+    from tqdm.notebook import tqdm
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+    from tqdm.autonotebook import tqdm
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+    from tqdm.auto import tqdm
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)

@@ -252,31 +252,32 @@ class Trainer():
     def autogluon_tests(self, verbose=False):
         print('\n-------------Run AutoGluon Tests-------------\n')
         # https://github.com/awslabs/autogluon
-        self._disable_tqdm()
+        disable_tqdm()
         import warnings
         warnings.simplefilter(action='ignore', category=UserWarning)
         from autogluon.tabular import TabularPredictor
         tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
-        predictor = TabularPredictor(label=self.label_name[0], path=self.project_root+'autogluon')
+        predictor = TabularPredictor(label=self.label_name[0], path=self.project_root + 'autogluon')
         with HiddenPrints(disable_logging=True if not verbose else False):
             predictor.fit(tabular_dataset.loc[self.train_dataset.indices + self.val_dataset.indices, :],
-                          presets='best_quality', hyperparameter_tune_kwargs='bayesopt', verbosity=0 if not verbose else 2)
+                          presets='best_quality', hyperparameter_tune_kwargs='bayesopt',
+                          verbosity=0 if not verbose else 2)
         self.autogluon_leaderboard = predictor.leaderboard(tabular_dataset.loc[self.test_dataset.indices, :])
         # y_pred = predictor.predict(tabular_dataset.loc[self.test_dataset.indices, self.feature_names])
         # predictor.evaluate_predictions(y_true=tabular_dataset.loc[self.test_dataset.indices, self.label_name[0]],
         #                                y_pred=y_pred)
-        if verbose:
-            print(self.autogluon_leaderboard)
-        self._enable_tqdm()
+        self.autogluon_leaderboard.to_csv(self.project_root + 'autogluon/leaderboard.csv')
+        self.autogluon_predictor = predictor
+        enable_tqdm()
         warnings.simplefilter(action='default', category=UserWarning)
         print('\n-------------AutoGluon Tests End-------------\n')
 
     def pytorch_tabular_tests(self, verbose=False):
         print('\n-------------Run Pytorch-tabular Tests-------------\n')
         # https://github.com/manujosephv/pytorch_tabular
+        disable_tqdm()
         import warnings
         warnings.simplefilter(action='ignore', category=UserWarning)
-        self._disable_tqdm()
         from pytorch_tabular import TabularModel
         from pytorch_tabular.models import CategoryEmbeddingModelConfig, \
             NodeConfig, TabNetModelConfig, TabTransformerConfig, AutoIntConfig
@@ -289,14 +290,14 @@ class Trainer():
         )
 
         trainer_config = TrainerConfig(
-            auto_lr_find=False,
+            auto_lr_find=True,
             max_epochs=1000,
             early_stopping_patience=100,
         )
         optimizer_config = OptimizerConfig(
         )
 
-        models = [
+        model_configs = [
             CategoryEmbeddingModelConfig(task='regression'),
             NodeConfig(task='regression'),
             TabNetModelConfig(task='regression'),
@@ -304,13 +305,10 @@ class Trainer():
             AutoIntConfig(task='regression')
         ]
 
-        ####################################
-        # If using PyCharm, see lollows' answer on https://stackoverflow.com/questions/59455268/how-to-disable-progress-bar-in-pytorch-lightning/66731318#66731318
-        # to fix progress bar error
-        ####################################
         metrics = {'model': [], 'mse': []}
-        for model_config in models:
-            print('Training', model_config)
+        models = {}
+        for model_config in model_configs:
+            print('Training', model_config._model_name)
             with HiddenPrints(disable_logging=True if not verbose else False):
                 tabular_model = TabularModel(
                     data_config=data_config,
@@ -319,25 +317,50 @@ class Trainer():
                     trainer_config=trainer_config
                 )
                 tabular_model.config.checkpoints_path = self.project_root + 'pytorch_tabular'
+                tabular_model.config['progress_bar_refresh_rate'] = 0
                 tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
 
-                tabular_model.fit(train=tabular_dataset.loc[self.train_dataset.indices,:],
-                                  validation=tabular_dataset.loc[self.val_dataset.indices,:],
+                tabular_model.fit(train=tabular_dataset.loc[self.train_dataset.indices, :],
+                                  validation=tabular_dataset.loc[self.val_dataset.indices, :],
                                   loss=self.loss_fn)
                 # tabular_model.evaluate(tabular_dataset.loc[self.train_dataset.indices, :])
                 # y_pred = tabular_model.predict(tabular_dataset.loc[self.test_dataset.indices,:])
-                metrics['model'].append(model_config.__class__.__name__.replace('Config', ''))
-                metrics['mse'].append(tabular_model.evaluate(tabular_dataset.loc[self.test_dataset.indices,:])[0]['test_mean_squared_error'])
+                metrics['model'].append(tabular_model.config._model_name)
+                metrics['mse'].append(tabular_model.evaluate(tabular_dataset.loc[self.test_dataset.indices, :])[0][
+                                          'test_mean_squared_error'])
+                models[tabular_model.config._model_name] = tabular_model
 
         metrics = pd.DataFrame(metrics)
-        metrics['rmse'] = metrics['mse']**(1/2)
+        metrics['rmse'] = metrics['mse'] ** (1 / 2)
         metrics.sort_values('rmse', inplace=True)
         self.pytorch_tabular_leaderboard = metrics
-        print(self.pytorch_tabular_leaderboard)
+        self.pytorch_tabular_models = models
 
-        self._enable_tqdm()
+        if verbose:
+            print(self.pytorch_tabular_leaderboard)
+        self.pytorch_tabular_leaderboard.to_csv(self.project_root + 'pytorch_tabular/leaderboard.csv')
+
+        enable_tqdm()
         warnings.simplefilter(action='default', category=UserWarning)
         print('\n-------------Pytorch-tabular Tests End-------------\n')
+
+    def get_leaderboard(self):
+        dfs = []
+        if hasattr(self, 'pytorch_tabular_leaderboard'):
+            df = self.pytorch_tabular_leaderboard[['model', 'rmse']].copy()
+            df['Program'] = 'Pytorch-Tabular'
+            dfs.append(df)
+        if hasattr(self, 'autogluon_leaderboard'):
+            df = self.autogluon_leaderboard[['model', 'score_test']].copy()
+            df.columns = ['model', 'rmse']
+            df['Program'] = 'AutoGluon'
+            df['rmse'] = np.abs(df['rmse'])
+            dfs.append(df)
+        df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
+        df_leaderboard.sort_values('rmse', inplace=True)
+        df_leaderboard.reset_index(drop=True, inplace=True)
+        df_leaderboard.to_csv(self.project_root + 'leaderboard.csv')
+        return df_leaderboard
 
     def plot_loss(self):
         plt.figure()
@@ -580,31 +603,6 @@ class Trainer():
 
         return min_loss, train_ls, val_ls
 
-    def _disable_tqdm(self):
-        from functools import partialmethod
-        from tqdm import tqdm
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-        from tqdm.notebook import tqdm
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-        from tqdm.autonotebook import tqdm
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-        from tqdm.auto import tqdm
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-
-    def _enable_tqdm(self):
-        from functools import partialmethod
-        from tqdm import tqdm
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
-        from tqdm.notebook import tqdm
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
-        from tqdm.autonotebook import tqdm
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
-        from tqdm.auto import tqdm
-        tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
-        # reload(sys.modules.get('tqdm.tqdm'))
-        # reload(sys.modules.get('tqdm.notebook.tqdm'))
-        # reload(sys.modules.get('tqdm.autonotebook.tqdm'))
-        # reload(sys.modules.get('tqdm.auto.tqdm'))
 
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
