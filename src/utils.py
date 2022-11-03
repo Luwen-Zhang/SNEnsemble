@@ -20,10 +20,9 @@ import seaborn as sns
 import matplotlib
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import r2_score
 from torch.utils.data import Subset
 import torch.utils.data as Data
-from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.impute import SimpleImputer
 from models import *
 import logging
 
@@ -274,7 +273,6 @@ def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_siz
     model_predictions = np.array(model_predictions)
 
     return x_values, model_predictions
-
 
 
 def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices):

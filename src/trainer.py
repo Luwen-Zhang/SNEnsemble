@@ -11,8 +11,6 @@ from utils import *
 import torch
 from torch import nn
 import matplotlib.pyplot as plt
-from sklearn.ensemble import RandomForestRegressor
-from sklearn import svm
 from captum.attr import FeaturePermutation
 import sys
 import random
@@ -275,7 +273,8 @@ class Trainer():
                           presets='best_quality' if not debug_mode else 'medium_quality_faster_train',
                           hyperparameter_tune_kwargs='bayesopt' if not debug_mode else None,
                           verbosity=0 if not verbose else 2)
-        self.autogluon_leaderboard = predictor.leaderboard(tabular_dataset.loc[self.test_dataset.indices, :])
+        self.autogluon_leaderboard = predictor.leaderboard(tabular_dataset.loc[self.test_dataset.indices, :],
+                                                           silent=True)
         # y_pred = predictor.predict(tabular_dataset.loc[self.test_dataset.indices, self.feature_names])
         # predictor.evaluate_predictions(y_true=tabular_dataset.loc[self.test_dataset.indices, self.label_name[0]],
         #                                y_pred=y_pred)
@@ -414,116 +413,13 @@ class Trainer():
             plt.show()
         plt.close()
 
-    def plot_truth_pred(self):
-        plt.figure()
-        plt.rcParams['font.size'] = 14
-        ax = plt.subplot(111)
-
-        predictions = self._predict_all()
-
-        def plot_func(ax, model_name, name, color):
-            pred_y, y = predictions[model_name][name]
-            r2 = r2_score(y, pred_y)
-            loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
-            print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
-            self._plot_truth_pred(
-                ax,
-                10 ** y,
-                10 ** pred_y,
-                s=20,
-                color=color,
-                label=f"{name} dataset ($R^2$={r2:.3f})",
-                linewidth=0.4,
-                edgecolors="k",
-            )
-
-        plot_func(ax, '--', 'Train', clr[0])
-        plot_func(ax, '--', 'Validation', clr[2])
-        plot_func(ax, '--', 'Test', clr[1])
-
-        set_truth_pred(ax)
-
-        plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
-
-        plt.savefig(f'../output/{self.project}/truth_pred.pdf')
-        if is_notebook():
-            plt.show()
-        plt.close()
-
-    def plot_truth_pred_sklearn(self, model_name):
-        plt.figure()
-        plt.rcParams['font.size'] = 14
-        ax = plt.subplot(111)
-
-        train_indices = self.train_dataset.indices
-        val_indices = self.val_dataset.indices
-        test_indices = self.test_dataset.indices
-
-        train_x = self.feature_data.values[np.array(train_indices), :]
-        test_x = self.feature_data.values[np.array(test_indices), :]
-        val_x = self.feature_data.values[np.array(val_indices), :]
-
-        train_y = self.label_data.values[np.array(train_indices), :].reshape(-1, 1)
-        test_y = self.label_data.values[np.array(test_indices), :].reshape(-1, 1)
-        val_y = self.label_data.values[np.array(val_indices), :].reshape(-1, 1)
-
-        # if self.use_sequence:
-        #     train_x = np.hstack([train_x, self.deg_layers[np.array(train_indices), :]])
-        #     test_x = np.hstack([test_x, self.deg_layers[np.array(test_indices), :]])
-        #     val_x = np.hstack([val_x, self.deg_layers[np.array(val_indices), :]])
-
-        eval_set = [(val_x, val_y)]
-
-        if model_name == 'rf':
-            if self.split_by == 'material':
-                model = RandomForestRegressor(n_jobs=-1, max_depth=6)
-            else:
-                model = RandomForestRegressor(n_jobs=-1, max_depth=15)
-            model.fit(train_x, train_y[:, 0] if train_y.shape[1] == 1 else train_y)
-        elif model_name == 'svm':
-            model = svm.SVR()
-            model.fit(train_x, train_y[:, 0] if train_y.shape[1] == 0 else train_y)
-        elif model_name == 'tabnet':
-            from pytorch_tabnet.tab_model import TabNetRegressor
-            model = TabNetRegressor(verbose=100)
-            model.fit(train_x, train_y, eval_set=eval_set, max_epochs=2000, patience=500, loss_fn=self.loss_fn,
-                      eval_metric=[self.loss])
-        else:
-            plt.close()
-            raise Exception('Sklearn model not implemented')
-
-        def plot_func(model, x, y, name, color):
-            pred_y = model.predict(x).reshape(-1, 1)
-            r2 = r2_score(y, pred_y)
-            loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
-            print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
-            self._plot_truth_pred(
-                ax,
-                10 ** y,
-                10 ** pred_y,
-                s=20,
-                color=color,
-                label=f"{name} dataset ($R^2$={r2:.3f})",
-                linewidth=0.4,
-                edgecolors="k",
-            )
-
-        plot_func(model, train_x, train_y, 'Train', clr[0])
-        plot_func(model, val_x, val_y, 'Validation', clr[2])
-        plot_func(model, test_x, test_y, 'Test', clr[1])
-
-        set_truth_pred(ax)
-
-        plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
-
-        plt.savefig(f'../output/{self.project}/{model_name}_truth_pred.pdf')
-        if is_notebook():
-            plt.show()
-        plt.close()
-
-    def plot_truth_pred_baseline(self, program):
-        print('Making baseline predictions...')
-        if program == 'autogluon':
+    def plot_truth_pred(self, program=None):
+        if program is not None:
+            print('Making baseline predictions...')
+        if program is None:
+            model_names = ['--']
+            predictions = self._predict_all()
+        elif program == 'autogluon':
             if not hasattr(self, 'autogluon_predictor'):
                 raise Exception('Autogluon tests have not been run. Run Trainer.autogluon_tests() first.')
             model_names = self.autogluon_leaderboard['model']
@@ -534,42 +430,34 @@ class Trainer():
             model_names = self.pytorch_tabular_leaderboard['model']
             predictions = self._predict_all_pytorch_tabular()
         else:
-            raise Exception('Baseline program does not exist.')
+            raise Exception(f'Program {program} does not exist.')
 
-        def plot_func(ax, model_name, name, color):
-            pred_y, y = predictions[model_name][name]
-            r2 = r2_score(y, pred_y)
-            loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
-            print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
-            self._plot_truth_pred(
-                ax,
-                10 ** y,
-                10 ** pred_y,
-                s=20,
-                color=color,
-                label=f"{name} dataset ($R^2$={r2:.3f})",
-                linewidth=0.4,
-                edgecolors="k",
-            )
-
-        print('Plotting...')
+        if program is not None:
+            print('Plotting...')
         for idx, model_name in enumerate(model_names):
-            print(model_name, f'{idx + 1}/{len(model_names)}')
+            if program is not None:
+                print(model_name, f'{idx + 1}/{len(model_names)}')
             plt.figure()
             plt.rcParams['font.size'] = 14
             ax = plt.subplot(111)
 
-            plot_func(ax, model_name, 'Train', clr[0])
+            self._plot_truth_pred(predictions, ax, model_name, 'Train', clr[0])
             if 'Validation' in predictions[model_name].keys():
-                plot_func(ax, model_name, 'Validation', clr[2])
-            plot_func(ax, model_name, 'Test', clr[1])
+                self._plot_truth_pred(predictions, ax, model_name, 'Validation', clr[2])
+            self._plot_truth_pred(predictions, ax, model_name, 'Test', clr[1])
 
             set_truth_pred(ax)
 
             plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
 
             s = model_name.replace('/', '_')
-            plt.savefig(f'../output/{self.project}/{program}/{s}_truth_pred.pdf')
+
+            if program is not None:
+                plt.savefig(f'../output/{self.project}/{program}/{s}_truth_pred.pdf')
+            else:
+                plt.savefig(f'../output/{self.project}/truth_pred.pdf')
+                if is_notebook():
+                    plt.show()
 
             plt.close()
 
@@ -686,9 +574,17 @@ class Trainer():
         else:
             raise Exception(f'Metric {metric} not implemented.')
 
-    @staticmethod
-    def _plot_truth_pred(ax, ground_truth, prediction, **kargs):
-        ax.scatter(ground_truth, prediction, **kargs)
+    def _plot_truth_pred(self, predictions, ax, model_name, name, color):
+        pred_y, y = predictions[model_name][name]
+        r2 = r2_score(y, pred_y)
+        loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
+        print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
+        ax.scatter(10 ** y, 10 ** pred_y,
+                   s=20,
+                   color=color,
+                   label=f"{name} dataset ($R^2$={r2:.3f})",
+                   linewidth=0.4,
+                   edgecolors="k")
         ax.set_xlabel("Ground truth")
         ax.set_ylabel("Prediction")
 
