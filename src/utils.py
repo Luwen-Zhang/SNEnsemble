@@ -8,9 +8,6 @@ All utilities used in the project.
 import os
 import sys
 import warnings
-
-import sklearn.ensemble
-
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import numpy as np
@@ -408,8 +405,8 @@ def set_truth_pred(ax):
     ax.set_yscale("log")
 
     ax.plot(
-        np.linspace(0, 10 ** 8, 100),
-        np.linspace(0, 10 ** 8, 100),
+        np.linspace(0, 10 ** 9, 100),
+        np.linspace(0, 10 ** 9, 100),
         "--",
         c="grey",
         alpha=0.2,
@@ -428,6 +425,9 @@ def set_truth_pred(ax):
     #     np.floor(np.min([np.min(ground_truth), np.min(prediction)])),
     #     np.ceil(np.max([np.max(ground_truth), np.max(prediction)]))
     # ]
+    ax.set_xlim(1, 10 ** 9)
+    ax.set_ylim(1, 10 ** 9)
+    ax.set_box_aspect(1)
 
 
 # https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py

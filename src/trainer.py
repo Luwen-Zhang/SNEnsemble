@@ -3,10 +3,6 @@ The basic class for the project. It includes configuration, data processing, tra
 and comparing with baseline models.
 """
 import os.path
-
-import numpy as np
-import pandas as pd
-
 from utils import *
 import torch
 from torch import nn
@@ -27,7 +23,7 @@ random.seed(0)
 sys.path.append('../configs/')
 
 
-class Trainer():
+class Trainer:
     def __init__(self, device='cpu'):
         self.device = device
 
@@ -258,6 +254,11 @@ class Trainer():
             return NN(len(self.feature_names), len(self.label_name), self.layers, self.use_sequence).to(self.device)
         else:
             raise Exception(f'Model {self.model_name} not implemented.')
+
+    '''
+    To add new baseline model-bases, implement (i) xxxx_tests for fitting predictors and (ii) _predict_all_pytorch_tabular
+    for metrics and plotting, and (iii) branches in get_leaderboard and plot_truth_pred.
+    '''
 
     def autogluon_tests(self, verbose=False, debug_mode=False):
         print('\n-------------Run AutoGluon Tests-------------\n')
@@ -576,7 +577,7 @@ class Trainer():
 
     def _plot_truth_pred(self, predictions, ax, model_name, name, color):
         pred_y, y = predictions[model_name][name]
-        r2 = r2_score(y, pred_y)
+        r2 = Trainer._metric_sklearn(y, pred_y, 'r2')
         loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
         print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
         ax.scatter(10 ** y, 10 ** pred_y,
@@ -758,13 +759,20 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print("Using {} device".format(device))
 
-    configfile = 'pr-FACT_sp-random_va-True_ph-False_ba-False_pa-500_ep-2000_lr-003_we-002_ba-1024_n-200_se-True'
-
     trainer = Trainer(device=device)
-    ## Set params
-    trainer.load_config(default_configfile=configfile)
-    ## Set datasets
+    trainer.load_config()
     trainer.load_data()
 
     trainer.train()
     trainer.plot_loss()
+
+    trainer.plot_truth_pred()
+    trainer.plot_feature_importance()
+    trainer.plot_partial_dependence()
+    trainer.plot_partial_err()
+
+    trainer.autogluon_tests(verbose=True)
+    trainer.pytorch_tabular_tests(verbose=True)
+    trainer.get_leaderboard(test_data_only=True)
+    trainer.plot_truth_pred(program='pytorch_tabular')
+    trainer.plot_truth_pred(program='autogluon')

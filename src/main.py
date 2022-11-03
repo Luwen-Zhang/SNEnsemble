@@ -1,24 +1,22 @@
-import argparse
 from trainer import *
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Using {} device".format(device))
 
-configfile = 'base_SNL_MSU_DOE_avg'
-
 trainer = Trainer(device=device)
-trainer.load_config(configfile)
+trainer.load_config()
 trainer.load_data()
 
-# trainer.autogluon_tests(verbose=True)
-# trainer.pytorch_tabular_tests()
-# trainer.params = trainer.bayes()
-#
-# trainer.train()
-#
-# trainer.plot_loss()
-# trainer.plot_truth_pred()
-trainer.plot_truth_pred_sklearn(model_name='tabnet')
-# trainer.plot_feature_importance()
-# trainer.plot_partial_dependence()
-# trainer.plot_partial_err()
+trainer.train()
+trainer.plot_loss()
+
+trainer.plot_truth_pred()
+trainer.plot_feature_importance()
+trainer.plot_partial_dependence()
+trainer.plot_partial_err()
+
+trainer.autogluon_tests(verbose=True)
+trainer.pytorch_tabular_tests(verbose=True)
+trainer.get_leaderboard(test_data_only=True)
+trainer.plot_truth_pred(program='pytorch_tabular')
+trainer.plot_truth_pred(program='autogluon')
