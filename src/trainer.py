@@ -419,7 +419,7 @@ class Trainer:
                     except Exception as e:
                         exceptions.append(e)
                         return 1e3
-                    res = tabular_model.evaluate(tabular_dataset.loc[self.test_dataset.indices, :])[0][
+                    res = tabular_model.evaluate(tabular_dataset.loc[self.val_dataset.indices, :])[0][
                         'test_mean_squared_error']
                 if verbose:
                     print(res)
