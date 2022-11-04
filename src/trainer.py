@@ -315,7 +315,7 @@ class Trainer:
 
         model_configs = [
             CategoryEmbeddingModelConfig(task='regression'),
-            # NodeConfig(task='regression'),
+            NodeConfig(task='regression'),
             TabNetModelConfig(task='regression'),
             TabTransformerConfig(task='regression'),
             AutoIntConfig(task='regression'),
@@ -388,7 +388,9 @@ class Trainer:
             SPACE = SPACEs[model_name]['SPACE']
             defaults = SPACEs[model_name]['defaults']
             config_class = SPACEs[model_name]['class']
+            exceptions = []
             global _pytorch_tabular_bayes_objective
+
             @skopt.utils.use_named_args(SPACE)
             def _pytorch_tabular_bayes_objective(**params):
                 if verbose:
@@ -402,23 +404,31 @@ class Trainer:
                     )
                     tabular_model.config.checkpoints = None
                     tabular_model.config['progress_bar_refresh_rate'] = 0
-                    tabular_model.fit(train=tabular_dataset.loc[self.train_dataset.indices, :],
-                                      validation=tabular_dataset.loc[self.val_dataset.indices, :],
-                                      loss=self.loss_fn)
+                    try:
+                        tabular_model.fit(train=tabular_dataset.loc[self.train_dataset.indices, :],
+                                          validation=tabular_dataset.loc[self.val_dataset.indices, :],
+                                          loss=self.loss_fn)
+                    except Exception as e:
+                        exceptions.append(e)
+                        return 1e3
                     res = tabular_model.evaluate(tabular_dataset.loc[self.test_dataset.indices, :])[0][
-                                          'test_mean_squared_error']
+                        'test_mean_squared_error']
                 if verbose:
                     print(res)
                 return res
 
             if not debugger_is_active():
                 # otherwise: AssertionError: can only test a child process
-                result = gp_minimize(_pytorch_tabular_bayes_objective, SPACE, x0=defaults, n_calls=30 if not debug_mode else 11, random_state=0)
+                result = gp_minimize(_pytorch_tabular_bayes_objective, SPACE, x0=defaults,
+                                     n_calls=30 if not debug_mode else 11, random_state=0)
                 param_names = [x.name for x in SPACE]
                 params = {}
                 for key, value in zip(param_names, result.x):
                     params[key] = value
                 model_config = config_class(task='regression', **params)
+
+                if len(exceptions) > 0 and verbose:
+                    print('Exceptions in bayes optimization:', exceptions)
 
             with HiddenPrints(disable_logging=True if not verbose else False):
                 tabular_model = TabularModel(

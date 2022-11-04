@@ -9,8 +9,8 @@
 #SBATCH --error=%j.err
 
 module load miniconda3
-module load cuda
+module load cuda/10.2
 source activate pytorch-env
-module load pytorch/1.6.0
 cd ~/lxl/ML-fracture/src
+
 bash run.sh
