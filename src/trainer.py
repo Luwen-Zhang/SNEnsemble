@@ -336,12 +336,12 @@ class Trainer:
                 Real(low=1e-5, high=0.1, prior='log-uniform', name='learning_rate')  # 0.001
             ], 'defaults': [0.5, 0.5, 0.001], 'class': CategoryEmbeddingModelConfig},
             'NODEModel': {'SPACE': [
-                Integer(low=2, high=10, prior='uniform', name='depth', dtype=int),  # 6
+                Integer(low=2, high=6, prior='uniform', name='depth', dtype=int),  # 6
                 Real(low=0, high=0.8, prior='uniform', name='embedding_dropout'),  # 0.0
                 Real(low=0, high=0.8, prior='uniform', name='input_dropout'),  # 0.0
                 Real(low=1e-5, high=0.1, prior='log-uniform', name='learning_rate'),  # 0.001
-                Integer(low=1, high=2, prior='uniform', name='num_layers', dtype=int)  # 1
-            ], 'defaults': [6, 0.0, 0.0, 0.001, 1], 'class': NodeConfig},
+                Integer(low=128, high=512, prior='uniform', name='num_trees', dtype=int)
+            ], 'defaults': [6, 0.0, 0.0, 0.001, 256], 'class': NodeConfig},
             'TabNetModel': {'SPACE': [
                 Integer(low=4, high=64, prior='uniform', name='n_d', dtype=int),  # 8
                 Integer(low=4, high=64, prior='uniform', name='n_a', dtype=int),  # 8
@@ -429,7 +429,7 @@ class Trainer:
             if not debugger_is_active():
                 # otherwise: AssertionError: can only test a child process
                 result = gp_minimize(_pytorch_tabular_bayes_objective, SPACE, x0=defaults,
-                                     n_calls=30 if not debug_mode else 11, random_state=0)
+                                     n_calls=self.n_calls if not debug_mode else 11, random_state=0)
                 param_names = [x.name for x in SPACE]
                 params = {}
                 for key, value in zip(param_names, result.x):

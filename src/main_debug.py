@@ -9,19 +9,19 @@ trainer = Trainer(device=device)
 trainer.load_config(default_configfile=configfile)
 trainer.load_data()
 
-trainer.params = trainer.bayes()
-print(trainer.params)
+# trainer.params = trainer.bayes()
+# print(trainer.params)
+#
+# trainer.train()
+#
+# if find_executable('latex'):
+#     trainer.plot_loss()
+#     trainer.plot_truth_pred()
+#     trainer.plot_feature_importance()
+#     trainer.plot_partial_dependence()
+#     trainer.plot_partial_err()
 
-trainer.train()
-
-if find_executable('latex'):
-    trainer.plot_loss()
-    trainer.plot_truth_pred()
-    trainer.plot_feature_importance()
-    trainer.plot_partial_dependence()
-    trainer.plot_partial_err()
-
-trainer.autogluon_tests(verbose=True, debug_mode=True)
+# trainer.autogluon_tests(verbose=True, debug_mode=True)
 trainer.pytorch_tabular_tests(verbose=True, debug_mode=True)
 trainer.get_leaderboard(test_data_only=True)
 
