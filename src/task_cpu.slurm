@@ -1,11 +1,10 @@
 #!/bin/bash
 
 #SBATCH --job-name=lxl
-#SBATCH --partition=dgx2
+#SBATCH --partition=small
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=6
-#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=20
 #SBATCH --output=%j.out
 #SBATCH --error=%j.err
 
@@ -14,5 +13,4 @@ module load cuda
 source activate pytorch-env
 module load pytorch/1.6.0
 cd ~/lxl/ML-fracture/src
-
-python main.py
+bash run.sh

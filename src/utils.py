@@ -532,3 +532,7 @@ def enable_tqdm():
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
     from tqdm.auto import tqdm
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+
+def debugger_is_active() -> bool:
+    """Return if the debugger is currently active"""
+    return hasattr(sys, 'gettrace') and sys.gettrace() is not None

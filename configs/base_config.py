@@ -19,7 +19,7 @@ class BaseConfig:
             'static_params': ['patience', 'epoch'],
             'chosen_params': ['lr', 'weight_decay', 'batch_size'],
             'layers': [16, 64, 128, 128, 64, 16],
-            'n_calls': 200,
+            'n_calls': 30,
             'sequence': True,
             'SPACEs': {
                 'lr': {'type': 'Real', 'low': 1e-3, 'high': 0.05, 'prior': 'log-uniform'},

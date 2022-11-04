@@ -294,8 +294,10 @@ class Trainer:
         warnings.simplefilter(action='ignore', category=UserWarning)
         from pytorch_tabular import TabularModel
         from pytorch_tabular.models import CategoryEmbeddingModelConfig, \
-            NodeConfig, TabNetModelConfig, TabTransformerConfig, AutoIntConfig
+            NodeConfig, TabNetModelConfig, TabTransformerConfig, AutoIntConfig, FTTransformerConfig
         from pytorch_tabular.config import DataConfig, OptimizerConfig, TrainerConfig
+
+        tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
 
         data_config = DataConfig(
             target=self.label_name,
@@ -305,24 +307,119 @@ class Trainer:
 
         trainer_config = TrainerConfig(
             auto_lr_find=True if not debug_mode else False,
-            max_epochs=1000 if not debug_mode else 10,
-            early_stopping_patience=100,
+            max_epochs=100 if not debug_mode else 10,
+            early_stopping_patience=20,
         )
         optimizer_config = OptimizerConfig(
         )
 
         model_configs = [
             CategoryEmbeddingModelConfig(task='regression'),
-            NodeConfig(task='regression'),
+            # NodeConfig(task='regression'),
             TabNetModelConfig(task='regression'),
             TabTransformerConfig(task='regression'),
-            AutoIntConfig(task='regression')
+            AutoIntConfig(task='regression'),
+            # FTTransformerConfig(task='regression')
         ]
+
+        # dtype=int because pytorch-tabular can not convert np.int64 to Integer
+        # All commented lines in SPACEs cause error. Do not uncomment them.
+        SPACEs = {
+            'CategoryEmbeddingModel': {'SPACE': [
+                Real(low=0, high=0.8, prior='uniform', name='dropout'),  # 0.5
+                Real(low=0, high=0.8, prior='uniform', name='embedding_dropout'),  # 0.5
+                Real(low=1e-5, high=0.1, prior='log-uniform', name='learning_rate')  # 0.001
+            ], 'defaults': [0.5, 0.5, 0.001], 'class': CategoryEmbeddingModelConfig},
+            'NODEModel': {'SPACE': [
+                Integer(low=2, high=10, prior='uniform', name='depth', dtype=int),  # 6
+                Real(low=0, high=0.8, prior='uniform', name='embedding_dropout'),  # 0.0
+                Real(low=0, high=0.8, prior='uniform', name='input_dropout'),  # 0.0
+                Real(low=1e-5, high=0.1, prior='log-uniform', name='learning_rate'),  # 0.001
+                Integer(low=1, high=2, prior='uniform', name='num_layers', dtype=int)  # 1
+            ], 'defaults': [6, 0.0, 0.0, 0.001, 1], 'class': NodeConfig},
+            'TabNetModel': {'SPACE': [
+                Integer(low=4, high=64, prior='uniform', name='n_d', dtype=int),  # 8
+                Integer(low=4, high=64, prior='uniform', name='n_a', dtype=int),  # 8
+                Integer(low=3, high=10, prior='uniform', name='n_steps', dtype=int),  # 3
+                Real(low=1.0, high=2.0, prior='uniform', name='gamma'),  # 1.3
+                Integer(low=1, high=5, prior='uniform', name='n_independent', dtype=int),  # 2
+                Integer(low=1, high=5, prior='uniform', name='n_shared', dtype=int),  # 2
+            ], 'defaults': [8, 8, 3, 1.3, 2, 2], 'class': TabNetModelConfig},
+            'TabTransformerModel': {'SPACE': [
+                Real(low=0, high=0.8, prior='uniform', name='embedding_dropout'),  # 0.1
+                Real(low=0, high=0.8, prior='uniform', name='ff_dropout'),  # 0.1
+                # Categorical([16, 32, 64, 128], name='input_embed_dim'),  # 32
+                Real(low=0, high=0.5, prior='uniform', name='shared_embedding_fraction'),  # 0.25
+                # Categorical([2, 4, 8, 16], name='num_heads'),  # 8
+                Integer(low=4, high=8, prior='uniform', name='num_attn_blocks', dtype=int),  # 6
+                Real(low=0, high=0.8, prior='uniform', name='attn_dropout'),  # 0.1
+                Real(low=0, high=0.8, prior='uniform', name='add_norm_dropout'),  # 0.1
+                Integer(low=2, high=6, prior='uniform', name='ff_hidden_multiplier', dtype=int),  # 4
+                Real(low=0, high=0.8, prior='uniform', name='out_ff_dropout'),  # 0.0
+            ], 'defaults': [0.1, 0.1, 0.25, 6, 0.1, 0.1, 4, 0.0], 'class': TabTransformerConfig},
+            'AutoIntModel': {'SPACE': [
+                Real(low=1e-5, high=0.1, prior='log-uniform', name='learning_rate'),  # 0.001
+                Real(low=0, high=0.8, prior='uniform', name='attn_dropouts'),  # 0.0
+                # Categorical([16, 32, 64, 128], name='attn_embed_dim'),  # 32
+                Real(low=0, high=0.8, prior='uniform', name='dropout'),  # 0.0
+                # Categorical([8, 16, 32, 64], name='embedding_dim'),  # 16
+                Real(low=0, high=0.8, prior='uniform', name='embedding_dropout'),  # 0.0
+                Integer(low=1, high=4, prior='uniform', name='num_attn_blocks', dtype=int),  # 3
+                # Integer(low=1, high=4, prior='uniform', name='num_heads', dtype=int),  # 2
+            ], 'defaults': [0.001, 0.0, 0.0, 0.0, 3], 'class': AutoIntConfig},
+            'FTTransformerModel': {'SPACE': [
+                Real(low=0, high=0.8, prior='uniform', name='embedding_dropout'),  # 0.1
+                Real(low=0, high=0.5, prior='uniform', name='shared_embedding_fraction'),  # 0.25
+                Integer(low=4, high=8, prior='uniform', name='num_attn_blocks', dtype=int),  # 6
+                Real(low=0, high=0.8, prior='uniform', name='attn_dropout'),  # 0.1
+                Real(low=0, high=0.8, prior='uniform', name='add_norm_dropout'),  # 0.1
+                Real(low=0, high=0.8, prior='uniform', name='ff_dropout'),  # 0.1
+                Integer(low=2, high=6, prior='uniform', name='ff_hidden_multiplier', dtype=int),  # 4
+                Real(low=0, high=0.8, prior='uniform', name='out_ff_dropout'),  # 0.0
+            ], 'defaults': [0.1, 0.25, 6, 0.1, 0.1, 0.1, 4, 0.0], 'class': FTTransformerConfig}
+        }
 
         metrics = {'model': [], 'mse': []}
         models = {}
         for model_config in model_configs:
-            print('Training', model_config._model_name)
+            model_name = model_config._model_name
+            print('Training', model_name)
+
+            SPACE = SPACEs[model_name]['SPACE']
+            defaults = SPACEs[model_name]['defaults']
+            config_class = SPACEs[model_name]['class']
+            global _pytorch_tabular_bayes_objective
+            @skopt.utils.use_named_args(SPACE)
+            def _pytorch_tabular_bayes_objective(**params):
+                if verbose:
+                    print(params, end=' ')
+                with HiddenPrints(disable_logging=True):
+                    tabular_model = TabularModel(
+                        data_config=data_config,
+                        model_config=config_class(task='regression', **params),
+                        optimizer_config=optimizer_config,
+                        trainer_config=trainer_config
+                    )
+                    tabular_model.config.checkpoints = None
+                    tabular_model.config['progress_bar_refresh_rate'] = 0
+                    tabular_model.fit(train=tabular_dataset.loc[self.train_dataset.indices, :],
+                                      validation=tabular_dataset.loc[self.val_dataset.indices, :],
+                                      loss=self.loss_fn)
+                    res = tabular_model.evaluate(tabular_dataset.loc[self.test_dataset.indices, :])[0][
+                                          'test_mean_squared_error']
+                if verbose:
+                    print(res)
+                return res
+
+            if not debugger_is_active():
+                # otherwise: AssertionError: can only test a child process
+                result = gp_minimize(_pytorch_tabular_bayes_objective, SPACE, x0=defaults, n_calls=30 if not debug_mode else 11, random_state=0)
+                param_names = [x.name for x in SPACE]
+                params = {}
+                for key, value in zip(param_names, result.x):
+                    params[key] = value
+                model_config = config_class(task='regression', **params)
+
             with HiddenPrints(disable_logging=True if not verbose else False):
                 tabular_model = TabularModel(
                     data_config=data_config,
@@ -332,13 +429,10 @@ class Trainer:
                 )
                 tabular_model.config.checkpoints_path = self.project_root + 'pytorch_tabular'
                 tabular_model.config['progress_bar_refresh_rate'] = 0
-                tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
 
                 tabular_model.fit(train=tabular_dataset.loc[self.train_dataset.indices, :],
                                   validation=tabular_dataset.loc[self.val_dataset.indices, :],
                                   loss=self.loss_fn)
-                # tabular_model.evaluate(tabular_dataset.loc[self.train_dataset.indices, :])
-                # y_pred = tabular_model.predict(tabular_dataset.loc[self.test_dataset.indices,:])
                 metrics['model'].append(tabular_model.config._model_name)
                 metrics['mse'].append(tabular_model.evaluate(tabular_dataset.loc[self.test_dataset.indices, :])[0][
                                           'test_mean_squared_error'])
