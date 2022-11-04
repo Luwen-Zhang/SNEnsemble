@@ -209,12 +209,12 @@ class Trainer:
                 postfix['Minimum at call'] = len(result.func_vals)
             skopt.dump(result, self.skopt_path)
 
-            if len(result.func_vals) % 5 == 0:
-                plt.figure()
-                ax = plt.subplot(111)
-                ax = plot_convergence(result, ax)
-                plt.savefig(f'../output/{self.project}/skopt_convergence.pdf')
-                plt.close()
+            # if len(result.func_vals) % 5 == 0:
+            #     plt.figure()
+            #     ax = plt.subplot(111)
+            #     ax = plot_convergence(result, ax)
+            #     plt.savefig(f'../output/{self.project}/skopt_convergence.pdf')
+            #     plt.close()
 
             bar.set_postfix(**postfix)
             bar.update(1)
@@ -230,7 +230,7 @@ class Trainer:
 
         return params
 
-    def train(self, verbose_per_epoch=20):
+    def train(self, verbose_per_epoch=100):
         self.model = self.new_model()
 
         min_loss, self.train_ls, self.val_ls = self._model_train(model=self.model,
@@ -275,15 +275,14 @@ class Trainer:
         tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
         predictor = TabularPredictor(label=self.label_name[0], path=self.project_root + 'autogluon')
         with HiddenPrints(disable_logging=True if not verbose else False):
-            predictor.fit(tabular_dataset.loc[self.train_dataset.indices + self.val_dataset.indices, :],
+            predictor.fit(tabular_dataset.loc[self.train_dataset.indices, :],
+                          tuning_data = tabular_dataset.loc[self.val_dataset.indices, :],
                           presets='best_quality' if not debug_mode else 'medium_quality_faster_train',
                           hyperparameter_tune_kwargs='bayesopt' if not debug_mode else None,
+                          use_bag_holdout = True,
                           verbosity=0 if not verbose else 2)
         self.autogluon_leaderboard = predictor.leaderboard(tabular_dataset.loc[self.test_dataset.indices, :],
                                                            silent=True)
-        # y_pred = predictor.predict(tabular_dataset.loc[self.test_dataset.indices, self.feature_names])
-        # predictor.evaluate_predictions(y_true=tabular_dataset.loc[self.test_dataset.indices, self.label_name[0]],
-        #                                y_pred=y_pred)
         self.autogluon_leaderboard.to_csv(self.project_root + 'autogluon/leaderboard.csv')
         self.autogluon_predictor = predictor
         enable_tqdm()
@@ -311,7 +310,6 @@ class Trainer:
         )
 
         trainer_config = TrainerConfig(
-            auto_lr_find=True if not debug_mode else False,
             max_epochs=self.static_params['epoch'] if not debug_mode else 10,
             early_stopping_patience=self.static_params['patience'],
         )
@@ -349,7 +347,8 @@ class Trainer:
                 Real(low=1.0, high=2.0, prior='uniform', name='gamma'),  # 1.3
                 Integer(low=1, high=5, prior='uniform', name='n_independent', dtype=int),  # 2
                 Integer(low=1, high=5, prior='uniform', name='n_shared', dtype=int),  # 2
-            ], 'defaults': [8, 8, 3, 1.3, 2, 2], 'class': TabNetModelConfig},
+                Real(low=1e-5, high=0.1, prior='log-uniform', name='learning_rate'),  # 0.001
+            ], 'defaults': [8, 8, 3, 1.3, 2, 2, 0.001], 'class': TabNetModelConfig},
             'TabTransformerModel': {'SPACE': [
                 Real(low=0, high=0.8, prior='uniform', name='embedding_dropout'),  # 0.1
                 Real(low=0, high=0.8, prior='uniform', name='ff_dropout'),  # 0.1
@@ -361,7 +360,8 @@ class Trainer:
                 Real(low=0, high=0.8, prior='uniform', name='add_norm_dropout'),  # 0.1
                 Integer(low=2, high=6, prior='uniform', name='ff_hidden_multiplier', dtype=int),  # 4
                 Real(low=0, high=0.8, prior='uniform', name='out_ff_dropout'),  # 0.0
-            ], 'defaults': [0.1, 0.1, 0.25, 6, 0.1, 0.1, 4, 0.0], 'class': TabTransformerConfig},
+                Real(low=1e-5, high=0.1, prior='log-uniform', name='learning_rate'),  # 0.001
+            ], 'defaults': [0.1, 0.1, 0.25, 6, 0.1, 0.1, 4, 0.0, 0.001], 'class': TabTransformerConfig},
             'AutoIntModel': {'SPACE': [
                 Real(low=1e-5, high=0.1, prior='log-uniform', name='learning_rate'),  # 0.001
                 Real(low=0, high=0.8, prior='uniform', name='attn_dropouts'),  # 0.0
@@ -406,8 +406,7 @@ class Trainer:
                         model_config=config_class(task='regression', **params),
                         optimizer_config=optimizer_config,
                         trainer_config=TrainerConfig(
-                            auto_lr_find=True,
-                            max_epochs=self.static_params['epoch'] // 5,
+                            max_epochs=self.static_params['epoch'] // 5 if not debug_mode else 10,
                             early_stopping_patience=self.static_params['patience'] // 2,
                         )
                     )
@@ -491,7 +490,7 @@ class Trainer:
             df['Program'] = 'This work'
             dfs.append(df)
         df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
-        df_leaderboard.sort_values('Test_RMSE' if not test_data_only else 'RMSE', inplace=True)
+        df_leaderboard.sort_values('Test RMSE' if not test_data_only else 'RMSE', inplace=True)
         df_leaderboard.reset_index(drop=True, inplace=True)
         df_leaderboard = df_leaderboard[['Program'] + list(df_leaderboard.columns)[:-1]]
         df_leaderboard.to_csv(self.project_root + 'leaderboard.csv')
@@ -663,7 +662,7 @@ class Trainer:
                     continue
                 for metric in metrics:
                     metric_value = Trainer._metric_sklearn(y_true, y_pred, metric)
-                    df[tvt + '_' + metric.upper() if not test_data_only else metric.upper()] = metric_value
+                    df[tvt + ' ' + metric.upper() if not test_data_only else metric.upper()] = metric_value
             df_metrics = pd.concat([df_metrics, df], axis=0, ignore_index=True)
 
         return df_metrics
@@ -737,7 +736,8 @@ class Trainer:
     def _predict_all_autogluon(self, verbose=True, test_data_only=False):
         model_names = self.autogluon_leaderboard['model']
         tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
-        train_data = tabular_dataset.loc[self.train_dataset.indices + self.val_dataset.indices, :].copy()
+        train_data = tabular_dataset.loc[self.train_dataset.indices, :].copy()
+        val_data = tabular_dataset.loc[self.val_dataset.indices, :].copy()
         test_data = tabular_dataset.loc[self.test_dataset.indices, :].copy()
 
         predictions = {}
@@ -748,14 +748,18 @@ class Trainer:
             if not test_data_only:
                 y_train_pred = self.autogluon_predictor.predict(train_data, model=model_name, as_pandas=False)
                 y_train = train_data[self.autogluon_predictor.label].values
+
+                y_val_pred = self.autogluon_predictor.predict(val_data, model=model_name, as_pandas=False)
+                y_val = val_data[self.autogluon_predictor.label].values
             else:
-                y_train_pred = None
-                y_train = None
+                y_train_pred = y_train = None
+                y_val_pred = y_val = None
 
             y_test_pred = self.autogluon_predictor.predict(test_data, model=model_name, as_pandas=False)
             y_test = test_data[self.autogluon_predictor.label].values
 
-            predictions[model_name] = {'Train': (y_train_pred, y_train), 'Test': (y_test_pred, y_test)}
+            predictions[model_name] = {'Train': (y_train_pred, y_train), 'Test': (y_test_pred, y_test),
+                                       'Validation': (y_val_pred, y_val)}
         return predictions
 
     def _predict_all_pytorch_tabular(self, verbose=True, test_data_only=False):
@@ -802,7 +806,7 @@ class Trainer:
     def _model_train(self,
                      model,
                      verbose=True,
-                     verbose_per_epoch=20,
+                     verbose_per_epoch=100,
                      **params,
                      ):
         train_loader = Data.DataLoader(

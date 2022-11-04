@@ -12,17 +12,6 @@ print(trainer.params)
 
 trainer.train()
 
-if find_executable('latex'):
-    trainer.plot_loss()
-    trainer.plot_truth_pred()
-    trainer.plot_feature_importance()
-    trainer.plot_partial_dependence()
-    trainer.plot_partial_err()
-
 trainer.autogluon_tests(verbose=True)
 trainer.pytorch_tabular_tests(verbose=True)
-trainer.get_leaderboard(test_data_only=True)
-
-if find_executable('latex'):
-    trainer.plot_truth_pred(program='pytorch_tabular')
-    trainer.plot_truth_pred(program='autogluon')
+trainer.get_leaderboard(test_data_only=False)
