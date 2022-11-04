@@ -184,11 +184,16 @@ class Trainer:
 
         bar = tqdm(total=self.n_calls)
 
+        from copy import deepcopy as cp
+        tmp_static_params = cp(self.static_params)
+        tmp_static_params['epoch'] = tmp_static_params['epoch'] // 5
+        tmp_static_params['patience'] = tmp_static_params['patience'] // 2
+
         @skopt.utils.use_named_args(self.SPACE)
         def _trainer_bayes_objective(**params):
             res, _, _ = self._model_train(model=self.new_model(),
                                           verbose=False,
-                                          **{**params, **self.static_params})
+                                          **{**params, **tmp_static_params})
 
             return res
 
@@ -225,7 +230,7 @@ class Trainer:
 
         return params
 
-    def train(self, verbose_per_epoch=100):
+    def train(self, verbose_per_epoch=20):
         self.model = self.new_model()
 
         min_loss, self.train_ls, self.val_ls = self._model_train(model=self.model,
@@ -307,8 +312,8 @@ class Trainer:
 
         trainer_config = TrainerConfig(
             auto_lr_find=True if not debug_mode else False,
-            max_epochs=100 if not debug_mode else 10,
-            early_stopping_patience=20,
+            max_epochs=self.static_params['epoch'] if not debug_mode else 10,
+            early_stopping_patience=self.static_params['patience'],
         )
         optimizer_config = OptimizerConfig(
         )
@@ -400,7 +405,11 @@ class Trainer:
                         data_config=data_config,
                         model_config=config_class(task='regression', **params),
                         optimizer_config=optimizer_config,
-                        trainer_config=trainer_config
+                        trainer_config=TrainerConfig(
+                            auto_lr_find=True,
+                            max_epochs=self.static_params['epoch'] // 5,
+                            early_stopping_patience=self.static_params['patience'] // 2,
+                        )
                     )
                     tabular_model.config.checkpoints = None
                     tabular_model.config['progress_bar_refresh_rate'] = 0
@@ -793,7 +802,7 @@ class Trainer:
     def _model_train(self,
                      model,
                      verbose=True,
-                     verbose_per_epoch=100,
+                     verbose_per_epoch=20,
                      **params,
                      ):
         train_loader = Data.DataLoader(
