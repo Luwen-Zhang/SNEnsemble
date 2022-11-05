@@ -338,7 +338,7 @@ class Trainer:
                           patience=self.bayes_epoch, loss_fn=self.loss_fn,
                           eval_metric=[self.loss])
 
-                res = self._metric_sklearn(model.predict(test_x).reshape(-1, 1), test_y, 'mse')
+                res = self._metric_sklearn(model.predict(val_x).reshape(-1, 1), test_y, 'mse')
             if verbose:
                 print(res)
             return res
