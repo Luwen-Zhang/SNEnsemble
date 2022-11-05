@@ -132,6 +132,8 @@ class Trainer:
         if not os.path.exists(f'../output/{self.project}'):
             os.mkdir(f'../output/{self.project}')
 
+        self.bayes_epoch = self.args['bayes_epoch']
+
     def load_data(self, data_path=None, impute=False):
         if data_path is None:
             self.df = pd.read_excel(self.data_path, engine='openpyxl')
@@ -186,8 +188,9 @@ class Trainer:
 
         from copy import deepcopy as cp
         tmp_static_params = cp(self.static_params)
-        tmp_static_params['epoch'] = tmp_static_params['epoch'] // 5
-        tmp_static_params['patience'] = tmp_static_params['patience'] // 2
+        # https://forums.fast.ai/t/hyperparameter-tuning-and-number-of-epochs/54935/2
+        tmp_static_params['epoch'] = self.bayes_epoch
+        tmp_static_params['patience'] = self.bayes_epoch
 
         @skopt.utils.use_named_args(self.SPACE)
         def _trainer_bayes_objective(**params):
@@ -289,6 +292,81 @@ class Trainer:
         warnings.simplefilter(action='default', category=UserWarning)
         save_trainer(self)
         print('\n-------------AutoGluon Tests End-------------\n')
+
+    '''
+    All sklearn-like models follow this template.
+    '''
+    def tabnet_tests(self, verbose=True, debug_mode=False):
+        print('\n-------------Run TabNet Test-------------\n')
+        train_indices = self.train_dataset.indices
+        val_indices = self.val_dataset.indices
+        test_indices = self.test_dataset.indices
+        train_x = self.feature_data.values[np.array(train_indices), :]
+        test_x = self.feature_data.values[np.array(test_indices), :]
+        val_x = self.feature_data.values[np.array(val_indices), :]
+        train_y = self.label_data.values[np.array(train_indices), :].reshape(-1, 1)
+        test_y = self.label_data.values[np.array(test_indices), :].reshape(-1, 1)
+        val_y = self.label_data.values[np.array(val_indices), :].reshape(-1, 1)
+
+        eval_set = [(val_x, val_y)]
+
+        if not os.path.exists(f'../output/{self.project}/TabNet'):
+            os.mkdir(f'../output/{self.project}/TabNet')
+
+        from pytorch_tabnet.tab_model import TabNetRegressor
+
+        SPACE = [
+            Integer(low=4, high=64, prior='uniform', name='n_d', dtype=int),  # 8
+            Integer(low=4, high=64, prior='uniform', name='n_a', dtype=int),  # 8
+            Integer(low=3, high=10, prior='uniform', name='n_steps', dtype=int),  # 3
+            Real(low=1.0, high=2.0, prior='uniform', name='gamma'),  # 1.3
+            Integer(low=1, high=5, prior='uniform', name='n_independent', dtype=int),  # 2
+            Integer(low=1, high=5, prior='uniform', name='n_shared', dtype=int),  # 2
+        ]
+
+        defaults = [8, 8, 3, 1.3, 2, 2]
+
+        global _tabnet_bayes_objective
+        @skopt.utils.use_named_args(SPACE)
+        def _tabnet_bayes_objective(**params):
+            if verbose:
+                print(params, end=' ')
+            with HiddenPrints(disable_logging=True):
+                model = TabNetRegressor(verbose=0)
+                model.set_params(**params)
+                model.fit(train_x, train_y, eval_set=eval_set, max_epochs=self.bayes_epoch,
+                          patience=self.bayes_epoch, loss_fn=self.loss_fn,
+                          eval_metric=[self.loss])
+
+                res = self._metric_sklearn(model.predict(test_x).reshape(-1, 1), test_y, 'mse')
+            if verbose:
+                print(res)
+            return res
+
+        if not debugger_is_active():
+            # otherwise: AssertionError: can only test a child process
+            result = gp_minimize(_tabnet_bayes_objective, SPACE, x0=defaults,
+                                 n_calls=self.n_calls if not debug_mode else 11, random_state=0)
+            param_names = [x.name for x in SPACE]
+            params = {}
+            for key, value in zip(param_names, result.x):
+                params[key] = value
+        else:
+            param_names = [x.name for x in SPACE]
+            params = {}
+            for key, value in zip(param_names, defaults):
+                params[key] = value
+
+        model = TabNetRegressor(verbose=100 if verbose else 0)
+        model.set_params(**params)
+        model.fit(train_x, train_y, eval_set=eval_set, max_epochs=self.static_params['epoch'], patience=self.static_params['patience'], loss_fn=self.loss_fn,
+                  eval_metric=[self.loss])
+
+        y_test_pred = model.predict(test_x).reshape(-1, 1)
+        print('MSE Loss:', self._metric_sklearn(y_test_pred, test_y, 'mse'), 'RMSE Loss:', self._metric_sklearn(y_test_pred, test_y, 'rmse'))
+        self.tabnet_model = model
+        save_trainer(self)
+        print('\n-------------TabNet Tests End-------------\n')
 
     def pytorch_tabular_tests(self, verbose=False, debug_mode=False):
         print('\n-------------Run Pytorch-tabular Tests-------------\n')
@@ -406,8 +484,8 @@ class Trainer:
                         model_config=config_class(task='regression', **params),
                         optimizer_config=optimizer_config,
                         trainer_config=TrainerConfig(
-                            max_epochs=self.static_params['epoch'] // 5 if not debug_mode else 10,
-                            early_stopping_patience=self.static_params['patience'] // 2,
+                            max_epochs=self.bayes_epoch,
+                            early_stopping_patience=self.bayes_epoch,
                         )
                     )
                     tabular_model.config.checkpoints = None
@@ -475,20 +553,30 @@ class Trainer:
         dfs = []
         metrics = ['rmse', 'mse', 'mae', 'mape', 'r2']
         if hasattr(self, 'pytorch_tabular_leaderboard'):
+            print('Pytorch-Tabular metrics')
             predictions = self._predict_all_pytorch_tabular(verbose=False, test_data_only=test_data_only)
             df = Trainer._metrics(predictions, metrics, test_data_only=test_data_only)
             df['Program'] = 'Pytorch-Tabular'
             dfs.append(df)
         if hasattr(self, 'autogluon_leaderboard'):
+            print('AutoGluon metrics')
             predictions = self._predict_all_autogluon(verbose=False, test_data_only=test_data_only)
             df = Trainer._metrics(predictions, metrics, test_data_only=test_data_only)
             df['Program'] = 'AutoGluon'
             dfs.append(df)
         if hasattr(self, 'metrics'):
+            print('This work metrics')
             predictions = self._predict_all(test_data_only=test_data_only)
             df = Trainer._metrics(predictions, metrics, test_data_only=test_data_only)
             df['Program'] = 'This work'
             dfs.append(df)
+        if hasattr(self, 'tabnet_model'):
+            print('TabNet metrics')
+            predictions = self._predict_all_sklearn(self.tabnet_model, 'TabNet', test_data_only=test_data_only)
+            df = Trainer._metrics(predictions, metrics, test_data_only=test_data_only)
+            df['Program'] = 'TabNet'
+            dfs.append(df)
+
         df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
         df_leaderboard.sort_values('Test RMSE' if not test_data_only else 'RMSE', inplace=True)
         df_leaderboard.reset_index(drop=True, inplace=True)
@@ -542,6 +630,11 @@ class Trainer:
                 raise Exception('Pytorch-Tabular tests have not been run. Run Trainer.pytorch_tabular_tests() first.')
             model_names = self.pytorch_tabular_leaderboard['model']
             predictions = self._predict_all_pytorch_tabular()
+        elif program == 'TabNet':
+            if not hasattr(self, 'tabnet_model'):
+                raise Exception('TabNet test has not been run. Run Trainer.tabnet_tests() first.')
+            model_names = ['TabNet']
+            predictions = self._predict_all_sklearn(self.tabnet_model, 'TabNet')
         else:
             raise Exception(f'Program {program} does not exist.')
 
@@ -794,6 +887,37 @@ class Trainer:
             predictions[model_name] = {'Train': (y_train_pred, y_train), 'Test': (y_test_pred, y_test),
                                        'Validation': (y_val_pred, y_val)}
         enable_tqdm()
+        return predictions
+
+    def _predict_all_sklearn(self, model, model_name, verbose=True, test_data_only=False):
+        train_indices = self.train_dataset.indices
+        val_indices = self.val_dataset.indices
+        test_indices = self.test_dataset.indices
+        train_x = self.feature_data.values[np.array(train_indices), :]
+        test_x = self.feature_data.values[np.array(test_indices), :]
+        val_x = self.feature_data.values[np.array(val_indices), :]
+        train_y = self.label_data.values[np.array(train_indices), :].reshape(-1, 1)
+        test_y = self.label_data.values[np.array(test_indices), :].reshape(-1, 1)
+        val_y = self.label_data.values[np.array(val_indices), :].reshape(-1, 1)
+
+        predictions = {}
+
+        if not test_data_only:
+            y_train_pred = model.predict(train_x).reshape(-1, 1)
+            y_train = train_y
+
+            y_val_pred = model.predict(val_x).reshape(-1, 1)
+            y_val = val_y
+        else:
+            y_train_pred = y_train = None
+            y_val_pred = y_val = None
+
+        y_test_pred = model.predict(test_x).reshape(-1, 1)
+        y_test = test_y
+
+        predictions[model_name] = {'Train': (y_train_pred, y_train), 'Test': (y_test_pred, y_test),
+                                   'Validation': (y_val_pred, y_val)}
+
         return predictions
 
     def _get_additional_tensors_slice(self, indices):

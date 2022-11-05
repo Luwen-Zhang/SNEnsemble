@@ -14,4 +14,5 @@ trainer.train()
 
 trainer.autogluon_tests(verbose=True)
 trainer.pytorch_tabular_tests(verbose=True)
+trainer.tabnet_tests(verbose=True)
 trainer.get_leaderboard(test_data_only=False)
