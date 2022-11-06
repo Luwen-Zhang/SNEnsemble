@@ -281,7 +281,7 @@ class Trainer:
             predictor.fit(tabular_dataset.loc[self.train_dataset.indices, :],
                           tuning_data = tabular_dataset.loc[self.val_dataset.indices, :],
                           presets='best_quality' if not debug_mode else 'medium_quality_faster_train',
-                          hyperparameter_tune_kwargs='bayesopt' if not debug_mode else None,
+                          hyperparameter_tune_kwargs='bayesopt' if (not debug_mode) and self.bayes_opt else None,
                           use_bag_holdout = True,
                           verbosity=0 if not verbose else 2)
         self.autogluon_leaderboard = predictor.leaderboard(tabular_dataset.loc[self.test_dataset.indices, :],
@@ -343,7 +343,7 @@ class Trainer:
                 print(res)
             return res
 
-        if not debugger_is_active():
+        if not debugger_is_active() and self.bayes_opt:
             # otherwise: AssertionError: can only test a child process
             result = gp_minimize(_tabnet_bayes_objective, SPACE, x0=defaults,
                                  n_calls=self.n_calls if not debug_mode else 11, random_state=0)
@@ -503,7 +503,7 @@ class Trainer:
                     print(res)
                 return res
 
-            if not debugger_is_active():
+            if not debugger_is_active() and self.bayes_opt:
                 # otherwise: AssertionError: can only test a child process
                 result = gp_minimize(_pytorch_tabular_bayes_objective, SPACE, x0=defaults,
                                      n_calls=self.n_calls if not debug_mode else 11, random_state=0)
