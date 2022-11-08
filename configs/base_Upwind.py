@@ -56,7 +56,7 @@ class config(BaseConfig):
                 # 'Relative Peak-to-peak Stress': 'Relative Peak-to-peak Stress',
             },
             'feature_types': ['Fatigue loading', 'Material'],
-            'label_name': ['Cycles to Failure'],
+            'label_name': ['log(Cycles to Failure)'],
 
         }
 

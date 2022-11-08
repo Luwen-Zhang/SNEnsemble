@@ -32,7 +32,7 @@ class config(BaseConfig):
                 "Static Elastic Modulus": 1
             },
             'feature_types': ['Fatigue loading', 'Material'],
-            'label_name': ['Cycles to Failure'],
+            'label_name': ['log(Cycles to Failure)'],
 
         }
 

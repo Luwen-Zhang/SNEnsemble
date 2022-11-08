@@ -130,13 +130,13 @@ def split_dataset(data, deg_layers, feature_names, label_name, device, split_by,
         data.reset_index(drop=True, inplace=True)
         imputer = SimpleImputer(strategy='mean')
         feature_data = pd.DataFrame(data=imputer.fit_transform(data[feature_names]), columns=feature_names)
-        label_data = np.log10(data[label_name])
+        label_data = data[label_name]
     else:
         data = data.dropna(axis=0)
         drop_na_index = data.index
         data.reset_index(drop=True, inplace=True)
         feature_data = data[feature_names]
-        label_data = np.log10(data[label_name])
+        label_data = data[label_name]
 
     X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(device)
     y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(device)

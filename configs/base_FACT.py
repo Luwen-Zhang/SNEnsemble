@@ -46,7 +46,7 @@ class config(BaseConfig):
                 # 'Relative Humidity',
             },
             'feature_types': ['Fatigue loading', 'Material'],
-            'label_name': ['Cycles to Failure'],
+            'label_name': ['log(Cycles to Failure)'],
         }
 
         if do_super:

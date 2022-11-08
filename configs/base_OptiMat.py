@@ -31,7 +31,7 @@ class config(BaseConfig):
 
             },
             'feature_types': ['Fatigue loading', 'Material'],
-            'label_name': ['Cycles to Failure'],
+            'label_name': ['log(Cycles to Failure)'],
 
         }
 
