@@ -106,9 +106,7 @@ class Trainer:
         self.model_name = self.args['model']
 
         self.data_path = f'../data/{self.project}_fatigue.xlsx'
-        self.ckp_path = f'../output/{self.project}/fatigue.pt'
-        self.skopt_path = f'../output/{self.project}/skopt.pt'
-        self.project_root = f'../output/{self.project}/'
+        self.project_root = f'../output/{self.project}/{self.configfile}/'
 
         self.static_params = self.args['static_params']
         self.chosen_params = self.args['chosen_params']
@@ -131,6 +129,8 @@ class Trainer:
 
         if not os.path.exists(f'../output/{self.project}'):
             os.mkdir(f'../output/{self.project}')
+        if not os.path.exists(self.project_root):
+            os.mkdir(self.project_root)
 
         self.bayes_epoch = self.args['bayes_epoch']
 
@@ -210,13 +210,13 @@ class Trainer:
                 postfix['Minimum'] = result.fun
                 postfix['Params'] = result.x
                 postfix['Minimum at call'] = len(result.func_vals)
-            skopt.dump(result, self.skopt_path)
+            skopt.dump(result, self.project_root + 'skopt.pt')
 
             # if len(result.func_vals) % 5 == 0:
             #     plt.figure()
             #     ax = plt.subplot(111)
             #     ax = plot_convergence(result, ax)
-            #     plt.savefig(f'../output/{self.project}/skopt_convergence.pdf')
+            #     plt.savefig(self.project_root + 'skopt_convergence.pdf')
             #     plt.close()
 
             bar.set_postfix(**postfix)
@@ -240,7 +240,7 @@ class Trainer:
                                                                  verbose_per_epoch=verbose_per_epoch,
                                                                  **{**self.params, **self.static_params})
 
-        self.model.load_state_dict(torch.load(self.ckp_path))
+        self.model.load_state_dict(torch.load(self.project_root + 'fatigue.pt'))
 
         print(f'Minimum loss: {min_loss:.5f}')
 
@@ -609,7 +609,7 @@ class Trainer:
         ax.set_ylabel("MSE Loss")
         ax.set_xlabel("Epoch")
         ax.set_ylabel(f'{self.loss.upper()} Loss')
-        plt.savefig(f'../output/{self.project}/loss_epoch.pdf')
+        plt.savefig(self.project_root + 'loss_epoch.pdf')
         if is_notebook():
             plt.show()
         plt.close()
@@ -659,9 +659,9 @@ class Trainer:
             s = model_name.replace('/', '_')
 
             if program is not None:
-                plt.savefig(f'../output/{self.project}/{program}/{s}_truth_pred.pdf')
+                plt.savefig(self.project_root + f'{program}/{s}_truth_pred.pdf')
             else:
-                plt.savefig(f'../output/{self.project}/truth_pred.pdf')
+                plt.savefig(self.project_root + 'truth_pred.pdf')
                 if is_notebook():
                     plt.show()
 
@@ -691,7 +691,7 @@ class Trainer:
         plot_importance(ax, self.feature_names, attr, pal=pal, clr_map=clr_map, linewidth=1, edgecolor='k', orient='h')
         plt.tight_layout()
 
-        plt.savefig(f'../output/{self.project}/feature_importance.png', dpi=600)
+        plt.savefig(self.project_root + 'feature_importance.png', dpi=600)
         if is_notebook():
             plt.show()
         plt.close()
@@ -713,7 +713,7 @@ class Trainer:
 
         fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.tensors[0], self.train_dataset.indices)
 
-        plt.savefig(f'../output/{self.project}/partial_dependence.pdf')
+        plt.savefig(self.project_root + 'partial_dependence.pdf')
         if is_notebook():
             plt.show()
         plt.close()
@@ -726,7 +726,7 @@ class Trainer:
         plot_partial_err(self.feature_data.loc[np.array(self.test_dataset.indices), :].reset_index(drop=True),
                          ground_truth, prediction)
 
-        plt.savefig(f'../output/{self.project}/partial_err.pdf')
+        plt.savefig(self.project_root + 'partial_err.pdf')
         if is_notebook():
             plt.show()
         plt.close()
@@ -739,7 +739,7 @@ class Trainer:
         sns.heatmap(corr, ax=ax, annot=True, xticklabels=corr.columns, yticklabels=corr.columns, square=True,
                     cmap='Blues', cbar=False)
         plt.tight_layout()
-        plt.savefig(f'../output/{self.project}/corr.pdf')
+        plt.savefig(self.project_root + 'corr.pdf')
         if is_notebook():
             plt.show()
         plt.close()
@@ -953,7 +953,7 @@ class Trainer:
         stop_epoch = params["epoch"]
 
         early_stopping = EarlyStopping(
-            patience=params["patience"], verbose=False, path=self.ckp_path
+            patience=params["patience"], verbose=False, path=self.project_root + 'fatigue.pt'
         )
 
         for epoch in range(params["epoch"]):
