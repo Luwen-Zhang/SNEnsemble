@@ -12,3 +12,4 @@ src/__pycache__/
 configs/__pycache__/
 autogluon
 pytorch_tabular
+src/.pt_tmp/exp_version_manager.yml

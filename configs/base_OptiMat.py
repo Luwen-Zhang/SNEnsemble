@@ -28,7 +28,10 @@ class config(BaseConfig):
                 # 'Frequency': 0,
                 # 'Load Length': 1,
                 # 'Fibre Volumn Fraction': 1,
-
+                "0-deg layers": 1,
+                "45-deg layers": 1,
+                "90-deg layers": 1,
+                "Other-deg layers": 1,
             },
             'feature_types': ['Fatigue loading', 'Material'],
             'label_name': ['log(Cycles to Failure)'],
