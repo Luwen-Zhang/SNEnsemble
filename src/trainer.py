@@ -311,12 +311,12 @@ class Trainer:
         feature_data = tabular_dataset[feature_names].copy()
         label_data = tabular_dataset[label_name].copy()
 
-        train_x = feature_data.values[np.array(train_indices), :]
-        test_x = feature_data.values[np.array(test_indices), :]
-        val_x = feature_data.values[np.array(val_indices), :]
-        train_y = label_data.values[np.array(train_indices), :].reshape(-1, 1)
-        test_y = label_data.values[np.array(test_indices), :].reshape(-1, 1)
-        val_y = label_data.values[np.array(val_indices), :].reshape(-1, 1)
+        train_x = feature_data.values[np.array(train_indices), :].astype(np.float32)
+        test_x = feature_data.values[np.array(test_indices), :].astype(np.float32)
+        val_x = feature_data.values[np.array(val_indices), :].astype(np.float32)
+        train_y = label_data.values[np.array(train_indices), :].reshape(-1, 1).astype(np.float32)
+        test_y = label_data.values[np.array(test_indices), :].reshape(-1, 1).astype(np.float32)
+        val_y = label_data.values[np.array(val_indices), :].reshape(-1, 1).astype(np.float32)
 
         eval_set = [(val_x, val_y)]
 
@@ -349,7 +349,7 @@ class Trainer:
                           patience=self.bayes_epoch, loss_fn=self.loss_fn,
                           eval_metric=[self.loss])
 
-                res = self._metric_sklearn(model.predict(val_x).reshape(-1, 1), test_y, 'mse')
+                res = self._metric_sklearn(model.predict(val_x).reshape(-1, 1), val_y, 'mse')
             if verbose:
                 print(res)
             return res
@@ -927,12 +927,12 @@ class Trainer:
         feature_data = tabular_dataset[feature_names].copy()
         label_data = tabular_dataset[label_name].copy()
 
-        train_x = feature_data.values[np.array(train_indices), :]
-        test_x = feature_data.values[np.array(test_indices), :]
-        val_x = feature_data.values[np.array(val_indices), :]
-        train_y = label_data.values[np.array(train_indices), :].reshape(-1, 1)
-        test_y = label_data.values[np.array(test_indices), :].reshape(-1, 1)
-        val_y = label_data.values[np.array(val_indices), :].reshape(-1, 1)
+        train_x = feature_data.values[np.array(train_indices), :].astype(np.float32)
+        test_x = feature_data.values[np.array(test_indices), :].astype(np.float32)
+        val_x = feature_data.values[np.array(val_indices), :].astype(np.float32)
+        train_y = label_data.values[np.array(train_indices), :].reshape(-1, 1).astype(np.float32)
+        test_y = label_data.values[np.array(test_indices), :].reshape(-1, 1).astype(np.float32)
+        val_y = label_data.values[np.array(val_indices), :].reshape(-1, 1).astype(np.float32)
 
         predictions = {}
 
