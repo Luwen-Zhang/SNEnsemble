@@ -8,7 +8,8 @@ All utilities used in the project.
 import os
 import sys
 import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
 import numpy as np
 import pandas as pd
@@ -48,7 +49,7 @@ sns.reset_defaults()
 
 from distutils.spawn import find_executable
 
-if find_executable('latex'):
+if find_executable("latex"):
     matplotlib.rc("text", usetex=True)
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Times New Roman"
@@ -71,7 +72,7 @@ def train(model, train_loader, optimizer, loss_fn):
         optimizer.zero_grad()
         yhat = tensors[-1]
         data = tensors[0]
-        additional_tensors = tensors[1:len(tensors) - 1]
+        additional_tensors = tensors[1 : len(tensors) - 1]
         y = model(data, additional_tensors)
         loss = loss_fn(yhat, y)
         loss.backward()
@@ -92,7 +93,7 @@ def test(model, test_loader, loss_fn):
         for idx, tensors in enumerate(test_loader):
             yhat = tensors[-1]
             data = tensors[0]
-            additional_tensors = tensors[1:len(tensors) - 1]
+            additional_tensors = tensors[1 : len(tensors) - 1]
             y = model(data, additional_tensors)
             loss = loss_fn(yhat, y)
             avg_loss += loss.item() * len(y)
@@ -114,12 +115,14 @@ def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_
     )
 
 
-def split_dataset(data, deg_layers, feature_names, label_name, device, split_by, impute):
+def split_dataset(
+    data, deg_layers, feature_names, label_name, device, split_by, impute
+):
     tmp_data = (
         data[feature_names + label_name + ["Material_Code"]].copy().dropna(axis=0)
     )
 
-    mat_lay = tmp_data['Material_Code'].copy()
+    mat_lay = tmp_data["Material_Code"].copy()
     mat_lay_set = list(sorted(set(mat_lay)))
 
     data = data[feature_names + label_name]
@@ -128,18 +131,24 @@ def split_dataset(data, deg_layers, feature_names, label_name, device, split_by,
         data = data.dropna(axis=0, subset=label_name)
         drop_na_index = data.index
         data.reset_index(drop=True, inplace=True)
-        imputer = SimpleImputer(strategy='mean')
-        feature_data = pd.DataFrame(data=imputer.fit_transform(data[feature_names]), columns=feature_names)
-        label_data = data[label_name]
+        imputer = SimpleImputer(strategy="mean")
+        feature_data = pd.DataFrame(
+            data=imputer.fit_transform(data[feature_names]), columns=feature_names
+        ).astype(np.float32)
+        label_data = data[label_name].astype(np.float32)
     else:
         data = data.dropna(axis=0)
         drop_na_index = data.index
         data.reset_index(drop=True, inplace=True)
-        feature_data = data[feature_names]
-        label_data = data[label_name]
+        feature_data = data[feature_names].astype(np.float32)
+        label_data = data[label_name].astype(np.float32)
 
-    X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(device)
-    y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(device)
+    X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(
+        device
+    )
+    y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(
+        device
+    )
     if deg_layers is not None:
         D = torch.tensor(deg_layers[drop_na_index, :], dtype=torch.float32).to(device)
         dataset = Data.TensorDataset(X, D, y)
@@ -159,7 +168,8 @@ def split_dataset(data, deg_layers, feature_names, label_name, device, split_by,
         )
     elif split_by == "material":
         train_dataset, val_dataset, test_dataset = split_by_material(
-            dataset, mat_lay, mat_lay_set, train_val_test)
+            dataset, mat_lay, mat_lay_set, train_val_test
+        )
     else:
         raise Exception("Split type not implemented")
 
@@ -171,8 +181,8 @@ def split_dataset(data, deg_layers, feature_names, label_name, device, split_by,
     # torch.data.Dataset.Subset share the same memory, so only transform once.
     transformed = scaler.transform(train_dataset.dataset.tensors[0].cpu().numpy())
     train_dataset.dataset.tensors = tuple(
-        [torch.tensor(transformed, dtype=torch.float32).to(device)] +
-        list(train_dataset.dataset.tensors[1:])
+        [torch.tensor(transformed, dtype=torch.float32).to(device)]
+        + list(train_dataset.dataset.tensors[1:])
     )
     X = torch.tensor(scaler.transform(X.cpu().numpy()), dtype=torch.float32).to(device)
 
@@ -232,7 +242,7 @@ def plot_importance(ax, features, attr, pal, clr_map, **kargs):
     x = df["feature"].values
     y = df["attr"].values
 
-    palette = df['pal']
+    palette = df["pal"]
 
     # ax.set_facecolor((0.97,0.97,0.97))
     # plt.grid(axis='x')
@@ -244,12 +254,19 @@ def plot_importance(ax, features, attr, pal, clr_map, **kargs):
 
     from matplotlib.patches import Patch, Rectangle
 
-    legend = ax.legend(handles=[Rectangle((0, 0), 1, 1, color=value, ec='k', label=key) for key, value in
-                                clr_map.items()],
-                       loc='lower right', handleheight=2, fancybox=False, frameon=False)
+    legend = ax.legend(
+        handles=[
+            Rectangle((0, 0), 1, 1, color=value, ec="k", label=key)
+            for key, value in clr_map.items()
+        ],
+        loc="lower right",
+        handleheight=2,
+        fancybox=False,
+        frameon=False,
+    )
 
     legend.get_frame().set_alpha(None)
-    legend.get_frame().set_facecolor([1, 1, 1, .4])
+    legend.get_frame().set_facecolor([1, 1, 1, 0.4])
 
 
 def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_size=100):
@@ -265,14 +282,18 @@ def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_siz
         X_pdp = feature_data.clone().detach()
         # X_pdp = resample(X_pdp)
         X_pdp[:, feature_idx] = n
-        model_predictions.append(np.mean(model(X_pdp, additional_tensors).cpu().detach().numpy()))
+        model_predictions.append(
+            np.mean(model(X_pdp, additional_tensors).cpu().detach().numpy())
+        )
 
     model_predictions = np.array(model_predictions)
 
     return x_values, model_predictions
 
 
-def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices, log_trans=True):
+def plot_pdp(
+    feature_names, x_values_list, mean_pdp_list, X, hist_indices, log_trans=True
+):
     max_col = 4
     if len(feature_names) > max_col:
         width = max_col
@@ -292,13 +313,18 @@ def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices, log_t
     for idx, focus_feature in enumerate(feature_names):
         ax = plt.subplot(height, width, idx + 1)
         # ax.plot(x_values_list[idx], mean_pdp_list[idx], color = clr_map[focus_feature], linewidth = 0.5)
-        ax.plot(x_values_list[idx], 10 ** mean_pdp_list[idx] if log_trans else mean_pdp_list[idx], color="k", linewidth=0.7)
+        ax.plot(
+            x_values_list[idx],
+            10 ** mean_pdp_list[idx] if log_trans else mean_pdp_list[idx],
+            color="k",
+            linewidth=0.7,
+        )
 
         ax.set_title(focus_feature, {"fontsize": 12})
         ax.set_xlim([0, 1])
         if log_trans:
             ax.set_yscale("log")
-            ax.set_ylim([10 ** 2, 10 ** 7])
+            ax.set_ylim([10**2, 10**7])
             locmin = matplotlib.ticker.LogLocator(
                 base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
             )
@@ -364,8 +390,12 @@ def plot_partial_err(feature_data, truth, pred, thres=0.8):
     for idx, focus_feature in enumerate(feature_names):
         ax = plt.subplot(height, width, idx + 1)
         # ax.plot(x_values_list[idx], mean_pdp_list[idx], color = clr_map[focus_feature], linewidth = 0.5)
-        ax.scatter(high_err_data[focus_feature].values, high_err, s=1, color=clr[0], marker='s')
-        ax.scatter(low_err_data[focus_feature].values, low_err, s=1, color=clr[1], marker='^')
+        ax.scatter(
+            high_err_data[focus_feature].values, high_err, s=1, color=clr[0], marker="s"
+        )
+        ax.scatter(
+            low_err_data[focus_feature].values, low_err, s=1, color=clr[1], marker="^"
+        )
 
         ax.set_title(focus_feature, {"fontsize": 12})
 
@@ -374,8 +404,11 @@ def plot_partial_err(feature_data, truth, pred, thres=0.8):
 
         ax2.hist(
             [high_err_data[focus_feature].values, low_err_data[focus_feature].values],
-            bins=np.linspace(np.min(feature_data[focus_feature].values), np.max(feature_data[focus_feature].values),
-                             20),
+            bins=np.linspace(
+                np.min(feature_data[focus_feature].values),
+                np.max(feature_data[focus_feature].values),
+                20,
+            ),
             density=True,
             color=clr[:2],
             alpha=0.2,
@@ -401,14 +434,14 @@ def plot_partial_err(feature_data, truth, pred, thres=0.8):
     return fig
 
 
-def set_truth_pred(ax, log_trans=True):
+def set_truth_pred(ax, log_trans=True, upper_lim=9):
     if log_trans:
         ax.set_xscale("log")
         ax.set_yscale("log")
 
         ax.plot(
-            np.linspace(0, 10 ** 9, 100),
-            np.linspace(0, 10 ** 9, 100),
+            np.linspace(0, 10**upper_lim, 100),
+            np.linspace(0, 10**upper_lim, 100),
             "--",
             c="grey",
             alpha=0.2,
@@ -424,15 +457,14 @@ def set_truth_pred(ax, log_trans=True):
         ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
         ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
 
-        ax.set_xlim(1, 10 ** 9)
-        ax.set_ylim(1, 10 ** 9)
+        ax.set_xlim(1, 10**upper_lim)
+        ax.set_ylim(1, 10**upper_lim)
         ax.set_box_aspect(1)
     else:
         # ax.set_aspect("equal", "box")
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
         ax.set_box_aspect(1)
-
 
     # ax.set(xlim=[10, 10 ** 6], ylim=[10, 10 ** 6])
 
@@ -442,14 +474,12 @@ def set_truth_pred(ax, log_trans=True):
     # ]
 
 
-
-
 # https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
     def __init__(
-            self, patience=7, verbose=False, delta=0, path="checkpoint.pt", trace_func=print
+        self, patience=7, verbose=False, delta=0, path="checkpoint.pt", trace_func=print
     ):
         """
         Args:
@@ -512,7 +542,7 @@ class HiddenPrints:
     def __enter__(self):
         if self.disable_std:
             self._original_stdout = sys.stdout
-            sys.stdout = open(os.devnull, 'w')
+            sys.stdout = open(os.devnull, "w")
         if self.disable_logging:
             logging.disable(logging.CRITICAL)
 
@@ -527,26 +557,35 @@ class HiddenPrints:
 def disable_tqdm():
     from functools import partialmethod
     from tqdm import tqdm
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
     from tqdm.notebook import tqdm
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
     from tqdm.autonotebook import tqdm
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
     from tqdm.auto import tqdm
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
 
 def enable_tqdm():
     from functools import partialmethod
     from tqdm import tqdm
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
     from tqdm.notebook import tqdm
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
     from tqdm.autonotebook import tqdm
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
     from tqdm.auto import tqdm
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+
 
 def debugger_is_active() -> bool:
     """Return if the debugger is currently active"""
-    return hasattr(sys, 'gettrace') and sys.gettrace() is not None
+    return hasattr(sys, "gettrace") and sys.gettrace() is not None

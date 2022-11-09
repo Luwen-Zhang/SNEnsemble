@@ -4,7 +4,7 @@ formatted name. This script itself could also be the input of the main script.
 """
 import sys
 
-sys.path.append('../configs/')
+sys.path.append("../configs/")
 from base_config import BaseConfig
 
 
@@ -14,8 +14,8 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            'project': 'SNL_MSU_DOE_static',
-            'feature_names_type': {
+            "project": "SNL_MSU_DOE_static",
+            "feature_names_type": {
                 "Percentage of Fibre in 0-deg Direction": 1,
                 "Percentage of Fibre in 45-deg Direction": 1,
                 "Percentage of Fibre in 90-deg Direction": 1,
@@ -23,10 +23,13 @@ class config(BaseConfig):
                 "Fibre Volumn Fraction": 1,
                 "Thickness": 1,
                 "Initial Elastic Modulus": 1,
+                "0-deg layers": 1,
+                "45-deg layers": 1,
+                "90-deg layers": 1,
+                "Other-deg layers": 1,
             },
-            'feature_types': ['Fatigue loading', 'Material'],
-            'label_name': ['log(Static Maximum Tensile Stress)'],
-
+            "feature_types": ["Fatigue loading", "Material"],
+            "label_name": ["log(Static Maximum Tensile Stress)"],
         }
 
         if do_super:
@@ -34,25 +37,25 @@ class config(BaseConfig):
                 if key in self.data.keys():
                     self.data[key] = value
                 else:
-                    raise Exception(f'Unexpected item \"{key}\" in config file.')
+                    raise Exception(f'Unexpected item "{key}" in config file.')
         else:
             self.data = cfg
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import shutil
 
-    file_name = ''
+    file_name = ""
     cfg = config(do_super=False)
     for key, value in zip(cfg.data.keys(), cfg.data.values()):
         if not isinstance(value, list) and not isinstance(value, dict):
-            short_name = key.split('_')[0][:2]
+            short_name = key.split("_")[0][:2]
             short_value = str(value)
-            if '.' in short_value:
-                short_value = short_value.split('.')[-1]
+            if "." in short_value:
+                short_value = short_value.split(".")[-1]
                 if len(short_value) > 4:
                     short_value = short_value[:4]
-            file_name += f'_{short_name}-{short_value}'
-    file_name = file_name.strip('_')
-    shutil.copy(__file__, '../configs/' + file_name + '.py')
+            file_name += f"_{short_name}-{short_value}"
+    file_name = file_name.strip("_")
+    shutil.copy(__file__, "../configs/" + file_name + ".py")
     print(file_name)

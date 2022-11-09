@@ -643,7 +643,7 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_truth_pred(self, program=None, log_trans=True):
+    def plot_truth_pred(self, program=None, log_trans=True, upper_lim=9):
         if program is not None:
             print('Making baseline predictions...')
         if program is None:
@@ -681,7 +681,7 @@ class Trainer:
                 self._plot_truth_pred(predictions, ax, model_name, 'Validation', clr[2], log_trans)
             self._plot_truth_pred(predictions, ax, model_name, 'Test', clr[1], log_trans)
 
-            set_truth_pred(ax, log_trans)
+            set_truth_pred(ax, log_trans, upper_lim=upper_lim)
 
             plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
 
