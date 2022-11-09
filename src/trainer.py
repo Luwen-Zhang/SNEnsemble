@@ -320,8 +320,8 @@ class Trainer:
 
         eval_set = [(val_x, val_y)]
 
-        if not os.path.exists(f'../output/{self.project}/TabNet'):
-            os.mkdir(f'../output/{self.project}/TabNet')
+        if not os.path.exists(self.project_root + 'TabNet'):
+            os.mkdir(self.project_root + 'TabNet')
 
         from pytorch_tabnet.tab_model import TabNetRegressor
 
@@ -349,7 +349,7 @@ class Trainer:
                           patience=self.bayes_epoch, loss_fn=self.loss_fn,
                           eval_metric=[self.loss])
 
-                res = self._metric_sklearn(model.predict(val_x).reshape(-1, 1), val_y, 'mse')
+                res = self._metric_sklearn(model.predict(val_x).reshape(-1, 1), val_y, self.loss)
             if verbose:
                 print(res)
             return res

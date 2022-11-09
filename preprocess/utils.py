@@ -38,6 +38,49 @@ plt.rcParams["font.serif"] = "Times New Roman"
 plt.rcParams["figure.autolayout"] = True
 
 
+def averaging(df_original, measure_features):
+    from sklearn.preprocessing import MinMaxScaler
+    fatigue_mat_lay = df_original['Material_Code'].copy()
+    df_final = pd.DataFrame(columns=df_original.columns)
+    bar = tqdm(total=len(list(set(fatigue_mat_lay))))
+    for material in list(set(fatigue_mat_lay)):
+        where_material = np.where(fatigue_mat_lay == material)[0]
+        # print(where_material)
+        df_material = df_original.loc[where_material, measure_features].copy()
+        scaler = MinMaxScaler()
+        df_material.loc[:, :] = scaler.fit_transform(df_material)
+        mse_matrix = np.zeros((len(where_material), len(where_material)))
+        for i_idx, i in enumerate(where_material):
+            for j_idx, j in enumerate(where_material):
+                if j_idx < i_idx:
+                    continue
+                val_i = df_material.loc[i, :]
+                val_j = df_material.loc[j, :]
+                mse_val = np.mean((val_i - val_j) ** 2)
+                mse_matrix[i_idx, j_idx] = mse_matrix[j_idx, i_idx] = mse_val
+
+        all_correlation = []
+        for i_idx, i in enumerate(where_material):
+            where_correlated = list(where_material[np.where(mse_matrix[i_idx, :] < 1e-5)[0]])
+            if where_correlated not in all_correlation:
+                all_correlation.append(where_correlated)
+        # all_correlation = all_correlation
+        for cor in all_correlation:
+            if len(cor) > 1:
+                df_avg = df_original.loc[[cor[0]], :].copy()
+                mean_values = df_original.loc[cor, :].mean()
+                df_avg[mean_values.index] = mean_values.values
+                df_final = pd.concat([df_final, df_avg], ignore_index=True, axis=0)
+            elif len(cor) == 1:
+                df_final = pd.concat([df_final, df_original.loc[[cor[0]], :]], ignore_index=True, axis=0)
+            else:
+                pass  # Min Stress, Max Stress or frequency is not recorded
+        bar.update(1)
+
+    df_final.reset_index(drop=True, inplace=True)
+    return df_final
+
+
 def replace_column_name(df, name_mapping):
     columns = list(df.columns)
     for idx in range(len(columns)):
