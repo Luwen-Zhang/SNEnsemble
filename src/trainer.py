@@ -3,6 +3,9 @@ The basic class for the project. It includes configuration, data processing, tra
 and comparing with baseline models.
 """
 import os.path
+
+import pandas as pd
+
 from utils import *
 import torch
 from torch import nn
@@ -275,14 +278,14 @@ class Trainer:
         import warnings
         warnings.simplefilter(action='ignore', category=UserWarning)
         from autogluon.tabular import TabularPredictor
-        tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
-        predictor = TabularPredictor(label=self.label_name[0], path=self.project_root + 'autogluon')
+        tabular_dataset, feature_names, label_name = self._get_tabular_dataset()
+        predictor = TabularPredictor(label=label_name[0], path=self.project_root + 'autogluon')
         with HiddenPrints(disable_logging=True if not verbose else False):
             predictor.fit(tabular_dataset.loc[self.train_dataset.indices, :],
-                          tuning_data = tabular_dataset.loc[self.val_dataset.indices, :],
+                          tuning_data=tabular_dataset.loc[self.val_dataset.indices, :],
                           presets='best_quality' if not debug_mode else 'medium_quality_faster_train',
                           hyperparameter_tune_kwargs='bayesopt' if (not debug_mode) and self.bayes_opt else None,
-                          use_bag_holdout = True,
+                          use_bag_holdout=True,
                           verbosity=0 if not verbose else 2)
         self.autogluon_leaderboard = predictor.leaderboard(tabular_dataset.loc[self.test_dataset.indices, :],
                                                            silent=True)
@@ -296,17 +299,23 @@ class Trainer:
     '''
     All sklearn-like models follow this template.
     '''
+
     def tabnet_tests(self, verbose=True, debug_mode=False):
         print('\n-------------Run TabNet Test-------------\n')
         train_indices = self.train_dataset.indices
         val_indices = self.val_dataset.indices
         test_indices = self.test_dataset.indices
-        train_x = self.feature_data.values[np.array(train_indices), :]
-        test_x = self.feature_data.values[np.array(test_indices), :]
-        val_x = self.feature_data.values[np.array(val_indices), :]
-        train_y = self.label_data.values[np.array(train_indices), :].reshape(-1, 1)
-        test_y = self.label_data.values[np.array(test_indices), :].reshape(-1, 1)
-        val_y = self.label_data.values[np.array(val_indices), :].reshape(-1, 1)
+
+        tabular_dataset, feature_names, label_name = self._get_tabular_dataset()
+        feature_data = tabular_dataset[feature_names].copy()
+        label_data = tabular_dataset[label_name].copy()
+
+        train_x = feature_data.values[np.array(train_indices), :]
+        test_x = feature_data.values[np.array(test_indices), :]
+        val_x = feature_data.values[np.array(val_indices), :]
+        train_y = label_data.values[np.array(train_indices), :].reshape(-1, 1)
+        test_y = label_data.values[np.array(test_indices), :].reshape(-1, 1)
+        val_y = label_data.values[np.array(val_indices), :].reshape(-1, 1)
 
         eval_set = [(val_x, val_y)]
 
@@ -327,6 +336,7 @@ class Trainer:
         defaults = [8, 8, 3, 1.3, 2, 2]
 
         global _tabnet_bayes_objective
+
         @skopt.utils.use_named_args(SPACE)
         def _tabnet_bayes_objective(**params):
             if verbose:
@@ -359,11 +369,13 @@ class Trainer:
 
         model = TabNetRegressor(verbose=100 if verbose else 0)
         model.set_params(**params)
-        model.fit(train_x, train_y, eval_set=eval_set, max_epochs=self.static_params['epoch'], patience=self.static_params['patience'], loss_fn=self.loss_fn,
+        model.fit(train_x, train_y, eval_set=eval_set, max_epochs=self.static_params['epoch'],
+                  patience=self.static_params['patience'], loss_fn=self.loss_fn,
                   eval_metric=[self.loss])
 
         y_test_pred = model.predict(test_x).reshape(-1, 1)
-        print('MSE Loss:', self._metric_sklearn(y_test_pred, test_y, 'mse'), 'RMSE Loss:', self._metric_sklearn(y_test_pred, test_y, 'rmse'))
+        print('MSE Loss:', self._metric_sklearn(y_test_pred, test_y, 'mse'), 'RMSE Loss:',
+              self._metric_sklearn(y_test_pred, test_y, 'rmse'))
         self.tabnet_model = model
         save_trainer(self)
         print('\n-------------TabNet Tests End-------------\n')
@@ -379,11 +391,11 @@ class Trainer:
             NodeConfig, TabNetModelConfig, TabTransformerConfig, AutoIntConfig, FTTransformerConfig
         from pytorch_tabular.config import DataConfig, OptimizerConfig, TrainerConfig
 
-        tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
+        tabular_dataset, feature_names, label_name = self._get_tabular_dataset()
 
         data_config = DataConfig(
-            target=self.label_name,
-            continuous_cols=self.feature_names,
+            target=label_name,
+            continuous_cols=feature_names,
             num_workers=8
         )
 
@@ -548,6 +560,22 @@ class Trainer:
         warnings.simplefilter(action='default', category=UserWarning)
         save_trainer(self)
         print('\n-------------Pytorch-tabular Tests End-------------\n')
+
+    def _get_tabular_dataset(self):
+        if not self.use_sequence:
+            tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
+            feature_names = self.feature_names
+            label_name = self.label_name
+        else:
+            deg_layers_name=['0-deg layers', '45-deg layers', '90-deg layers',
+                                                               'Other-deg layers']
+            tabular_dataset = pd.concat([self.feature_data, self.label_data,
+                                         pd.DataFrame(data=self.deg_layers,
+                                                      columns=deg_layers_name)], axis=1)
+            feature_names = self.feature_names + deg_layers_name
+            label_name = self.label_name
+
+        return tabular_dataset, feature_names, label_name
 
     def get_leaderboard(self, test_data_only=True):
         dfs = []
@@ -828,7 +856,7 @@ class Trainer:
 
     def _predict_all_autogluon(self, verbose=True, test_data_only=False):
         model_names = self.autogluon_leaderboard['model']
-        tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
+        tabular_dataset, feature_names, label_name = self._get_tabular_dataset()
         train_data = tabular_dataset.loc[self.train_dataset.indices, :].copy()
         val_data = tabular_dataset.loc[self.val_dataset.indices, :].copy()
         test_data = tabular_dataset.loc[self.test_dataset.indices, :].copy()
@@ -857,7 +885,7 @@ class Trainer:
 
     def _predict_all_pytorch_tabular(self, verbose=True, test_data_only=False):
         model_names = self.pytorch_tabular_leaderboard['model']
-        tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
+        tabular_dataset, feature_names, label_name = self._get_tabular_dataset()
         train_data = tabular_dataset.loc[self.train_dataset.indices, :].copy()
         val_data = tabular_dataset.loc[self.val_dataset.indices, :].copy()
         test_data = tabular_dataset.loc[self.test_dataset.indices, :].copy()
@@ -893,12 +921,17 @@ class Trainer:
         train_indices = self.train_dataset.indices
         val_indices = self.val_dataset.indices
         test_indices = self.test_dataset.indices
-        train_x = self.feature_data.values[np.array(train_indices), :]
-        test_x = self.feature_data.values[np.array(test_indices), :]
-        val_x = self.feature_data.values[np.array(val_indices), :]
-        train_y = self.label_data.values[np.array(train_indices), :].reshape(-1, 1)
-        test_y = self.label_data.values[np.array(test_indices), :].reshape(-1, 1)
-        val_y = self.label_data.values[np.array(val_indices), :].reshape(-1, 1)
+
+        tabular_dataset, feature_names, label_name = self._get_tabular_dataset()
+        feature_data = tabular_dataset[feature_names].copy()
+        label_data = tabular_dataset[label_name].copy()
+
+        train_x = feature_data.values[np.array(train_indices), :]
+        test_x = feature_data.values[np.array(test_indices), :]
+        val_x = feature_data.values[np.array(val_indices), :]
+        train_y = label_data.values[np.array(train_indices), :].reshape(-1, 1)
+        test_y = label_data.values[np.array(test_indices), :].reshape(-1, 1)
+        val_y = label_data.values[np.array(val_indices), :].reshape(-1, 1)
 
         predictions = {}
 
