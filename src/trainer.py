@@ -48,6 +48,7 @@ class Trainer:
                 elif type(base_config[key]) == bool:
                     parser.add_argument(f'--{key}', dest=key, action='store_true')
                     parser.add_argument(f'--no-{key}', dest=key, action='store_false')
+                    parser.set_defaults(**{key: base_config[key]})
             parse_res = parser.parse_args().__dict__
 
         self.configfile = parse_res['base']
