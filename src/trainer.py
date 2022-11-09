@@ -30,7 +30,14 @@ class Trainer:
     def __init__(self, device='cpu'):
         self.device = device
 
-    def load_config(self, default_configfile=None, verbose=True):
+    def load_config(self, default_configfile: str = None, verbose: bool = True) -> None:
+        """
+        Load a configfile.
+        :param default_configfile: The path to a configfile. If in notebook environment, this parameter is required.
+        If the parameter is assigned, the script will not take any input argument from command line. Default to None.
+        :param verbose: Whether to output the loaded configs. Default to True.
+        :return: None
+        """
         base_config = import_module('base_config').BaseConfig().data
 
         # The base config is loaded using the --base argument
@@ -138,7 +145,14 @@ class Trainer:
 
         self.bayes_epoch = self.args['bayes_epoch']
 
-    def load_data(self, data_path=None, impute=False):
+    def load_data(self, data_path: str = None, impute: bool = False) -> None:
+        """
+        Load the data file in ../data directory specified by the 'project' argument in configfile. Data will be splitted
+         into training, validation, and testing datasets.
+        :param data_path: specify a data file different from 'project'. Default to None.
+        :param impute: Whether to impute absence data in features by sklearn.impute.SimpleImputer. Default to False.
+        :return: None
+        """
         if data_path is None:
             self.df = pd.read_excel(self.data_path, engine='openpyxl')
         else:
@@ -179,7 +193,12 @@ class Trainer:
             impute=impute
         )
 
-    def bayes(self):
+    def bayes(self) -> dict:
+        """
+        Running Gaussian process bayesian optimization on hyperparameters. Configurations are given in the configfile.
+        chosen_params will be optimized.
+        :return: A dict of optimized hyperparameters, which can be assigned to Trainer.params.
+        """
         if not self.bayes_opt:
             print('Bayes optimization not activated in configuration file. Return preset chosen_params.')
             return self.chosen_params
@@ -237,7 +256,12 @@ class Trainer:
 
         return params
 
-    def train(self, verbose_per_epoch=100):
+    def train(self, verbose_per_epoch=100) -> None:
+        """
+        Train a new model.
+        :param verbose_per_epoch:  Output statistics while training.
+        :return: None
+        """
         self.model = self.new_model()
 
         min_loss, self.train_ls, self.val_ls = self._model_train(model=self.model,
@@ -262,6 +286,10 @@ class Trainer:
         save_trainer(self)
 
     def new_model(self):
+        """
+        Create a new model.
+        :return: A new model.
+        """
         if self.model_name == 'MLP':
             return NN(len(self.feature_names), len(self.label_name), self.layers, self.use_sequence).to(self.device)
         else:
@@ -272,9 +300,14 @@ class Trainer:
     for metrics and plotting, and (iii) branches in get_leaderboard and plot_truth_pred.
     '''
 
-    def autogluon_tests(self, verbose=False, debug_mode=False):
+    def autogluon_tests(self, verbose: bool = False, debug_mode: bool = False):
+        """
+        Run autogluon tests. For more information, please refer to https://github.com/awslabs/autogluon
+        :param verbose: whether to disable logging while training. Not recommanded when using notebook environment. Default to False.
+        :param debug_mode: Take faster training preset in autogluon.tabular.TabularPredictor. Default to False.
+        :return: None
+        """
         print('\n-------------Run AutoGluon Tests-------------\n')
-        # https://github.com/awslabs/autogluon
         disable_tqdm()
         import warnings
         warnings.simplefilter(action='ignore', category=UserWarning)
@@ -297,11 +330,13 @@ class Trainer:
         save_trainer(self)
         print('\n-------------AutoGluon Tests End-------------\n')
 
-    '''
-    All sklearn-like models follow this template.
-    '''
-
-    def tabnet_tests(self, verbose=True, debug_mode=False):
+    def tabnet_tests(self, verbose: bool = True, debug_mode: bool = False):
+        """
+        Run the TabNet test. All sklearn-like models follow this template.
+        :param verbose: whether to disable logging while training. Not recommanded when using notebook environment. Default to False.
+        :param debug_mode: Take less bayesopt steps. Default to False.
+        :return: None
+        """
         print('\n-------------Run TabNet Test-------------\n')
         train_indices = self.train_dataset.indices
         val_indices = self.val_dataset.indices
@@ -381,9 +416,14 @@ class Trainer:
         save_trainer(self)
         print('\n-------------TabNet Tests End-------------\n')
 
-    def pytorch_tabular_tests(self, verbose=False, debug_mode=False):
+    def pytorch_tabular_tests(self, verbose: bool = False, debug_mode: bool = False):
+        """
+        Run Pytorch-Tabular tests. For more information, please refer to https://github.com/manujosephv/pytorch_tabular
+        :param verbose: whether to disable logging while training. Not recommanded when using notebook environment. Default to False.
+        :param debug_mode: Take less training epochs and bayesopt calls. Default to False.
+        :return: None
+        """
         print('\n-------------Run Pytorch-tabular Tests-------------\n')
-        # https://github.com/manujosephv/pytorch_tabular
         disable_tqdm()
         import warnings
         warnings.simplefilter(action='ignore', category=UserWarning)
@@ -568,8 +608,8 @@ class Trainer:
             feature_names = self.feature_names
             label_name = self.label_name
         else:
-            deg_layers_name=['0-deg layers', '45-deg layers', '90-deg layers',
-                                                               'Other-deg layers']
+            deg_layers_name = ['0-deg layers', '45-deg layers', '90-deg layers',
+                               'Other-deg layers']
             tabular_dataset = pd.concat([self.feature_data, self.label_data,
                                          pd.DataFrame(data=self.deg_layers,
                                                       columns=deg_layers_name)], axis=1)
@@ -578,7 +618,12 @@ class Trainer:
 
         return tabular_dataset, feature_names, label_name
 
-    def get_leaderboard(self, test_data_only=True):
+    def get_leaderboard(self, test_data_only: bool = True) -> pd.DataFrame:
+        """
+        Run all baseline models and the model in this work for a leaderboard.
+        :param test_data_only: False to get metrics on training and validation datasets. Default to True.
+        :return: The leaderboard dataframe.
+        """
         dfs = []
         metrics = ['rmse', 'mse', 'mae', 'mape', 'r2']
         if hasattr(self, 'pytorch_tabular_leaderboard'):
@@ -614,6 +659,10 @@ class Trainer:
         return df_leaderboard
 
     def plot_loss(self):
+        """
+        Plot loss-epoch while training.
+        :return: None
+        """
         plt.figure()
         plt.rcParams['font.size'] = 20
         ax = plt.subplot(111)
@@ -643,7 +692,15 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_truth_pred(self, program=None, log_trans=True, upper_lim=9):
+    def plot_truth_pred(self, program: str = None, log_trans: bool = True, upper_lim=9):
+        """
+        Comparing ground truth and prediction for different models.
+        :param program: Choose a program from 'autogluon', 'pytorch_tabular', 'TabNet'. If None, the model in this work
+                        will be tested. Default to None.
+        :param log_trans: Whether the target is log10-transformed. Default to True.
+        :param upper_lim: The upper boundary of the plot. Default to 9.
+        :return: None
+        """
         if program is not None:
             print('Making baseline predictions...')
         if program is None:
@@ -697,6 +754,11 @@ class Trainer:
             plt.close()
 
     def plot_feature_importance(self):
+        """
+        Calculate and plot permutation feature importance.
+        :return: None
+        """
+
         def forward_func(data):
             prediction, ground_truth, loss = test_tensor(data,
                                                          self._get_additional_tensors_slice(self.test_dataset.indices),
@@ -725,7 +787,12 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_partial_dependence(self, log_trans=True):
+    def plot_partial_dependence(self, log_trans: bool = True):
+        """
+        Calculate and plot partial dependence plots.
+        :param log_trans: Whether the target is log10-transformed. Default to True.
+        :return: None
+        """
         x_values_list = []
         mean_pdp_list = []
 
@@ -740,7 +807,8 @@ class Trainer:
             x_values_list.append(x_value)
             mean_pdp_list.append(model_predictions)
 
-        fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.tensors[0], self.train_dataset.indices, log_trans=log_trans)
+        fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.tensors[0], self.train_dataset.indices,
+                       log_trans=log_trans)
 
         plt.savefig(self.project_root + 'partial_dependence.pdf')
         if is_notebook():
@@ -748,6 +816,11 @@ class Trainer:
         plt.close()
 
     def plot_partial_err(self, thres=0.8):
+        """
+        Calculate and plot partial error dependency for each feature.
+        :param thres: Points with loss higher than thres will be marked.
+        :return: None
+        """
         prediction, ground_truth, loss = test_tensor(self.tensors[0][self.test_dataset.indices, :],
                                                      self._get_additional_tensors_slice(self.test_dataset.indices),
                                                      self.tensors[-1][self.test_dataset.indices, :], self.model,
@@ -761,6 +834,10 @@ class Trainer:
         plt.close()
 
     def plot_corr(self):
+        """
+        Plot Pearson correlation among features and the target.
+        :return: None
+        """
         fig = plt.figure(figsize=(10, 10))
         ax = plt.subplot(111)
         df_all = pd.concat([self.feature_data, self.label_data], axis=1)
