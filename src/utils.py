@@ -226,7 +226,7 @@ def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test):
         axis=1,
     )
 
-    df.to_excel("../output/material_split.xlsx", engine="openpyxl", index=False)
+    # df.to_excel("../output/material_split.xlsx", engine="openpyxl", index=False)
     return train_dataset, val_dataset, test_dataset
 
 
