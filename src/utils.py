@@ -400,33 +400,42 @@ def plot_partial_err(feature_data, truth, pred, thres=0.8):
     return fig
 
 
-def set_truth_pred(ax):
-    ax.set_xscale("log")
-    ax.set_yscale("log")
+def set_truth_pred(ax, log_trans=True):
+    if log_trans:
+        ax.set_xscale("log")
+        ax.set_yscale("log")
 
-    ax.plot(
-        np.linspace(0, 10 ** 9, 100),
-        np.linspace(0, 10 ** 9, 100),
-        "--",
-        c="grey",
-        alpha=0.2,
-    )
-    ax.set_aspect("equal", "box")
-    locmin = matplotlib.ticker.LogLocator(
-        base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
-    )
+        ax.plot(
+            np.linspace(0, 10 ** 9, 100),
+            np.linspace(0, 10 ** 9, 100),
+            "--",
+            c="grey",
+            alpha=0.2,
+        )
+        locmin = matplotlib.ticker.LogLocator(
+            base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
+        )
+
+        ax.set_aspect("equal", "box")
+
+        ax.xaxis.set_minor_locator(locmin)
+        ax.yaxis.set_minor_locator(locmin)
+        ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+        ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+
+        ax.set_xlim(1, 10 ** 9)
+        ax.set_ylim(1, 10 ** 9)
+    else:
+        ax.set_aspect("equal", "box")
+
 
     # ax.set(xlim=[10, 10 ** 6], ylim=[10, 10 ** 6])
-    ax.xaxis.set_minor_locator(locmin)
-    ax.yaxis.set_minor_locator(locmin)
-    ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+
     # data_range = [
     #     np.floor(np.min([np.min(ground_truth), np.min(prediction)])),
     #     np.ceil(np.max([np.max(ground_truth), np.max(prediction)]))
     # ]
-    ax.set_xlim(1, 10 ** 9)
-    ax.set_ylim(1, 10 ** 9)
+
     ax.set_box_aspect(1)
 
 

@@ -105,7 +105,7 @@ class Trainer:
         self.project = self.args['project']
         self.model_name = self.args['model']
 
-        self.data_path = f'../data/{self.project}_fatigue.xlsx'
+        self.data_path = f'../data/{self.project}.xlsx'
         self.project_root = f'../output/{self.project}/{self.configfile}/'
 
         self.static_params = self.args['static_params']
@@ -614,7 +614,7 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_truth_pred(self, program=None):
+    def plot_truth_pred(self, program=None, log_trans=True):
         if program is not None:
             print('Making baseline predictions...')
         if program is None:
@@ -647,12 +647,12 @@ class Trainer:
             plt.rcParams['font.size'] = 14
             ax = plt.subplot(111)
 
-            self._plot_truth_pred(predictions, ax, model_name, 'Train', clr[0])
+            self._plot_truth_pred(predictions, ax, model_name, 'Train', clr[0], log_trans)
             if 'Validation' in predictions[model_name].keys():
-                self._plot_truth_pred(predictions, ax, model_name, 'Validation', clr[2])
-            self._plot_truth_pred(predictions, ax, model_name, 'Test', clr[1])
+                self._plot_truth_pred(predictions, ax, model_name, 'Validation', clr[2], log_trans)
+            self._plot_truth_pred(predictions, ax, model_name, 'Test', clr[1], log_trans)
 
-            set_truth_pred(ax)
+            set_truth_pred(ax, log_trans)
 
             plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
 
@@ -780,12 +780,12 @@ class Trainer:
         else:
             raise Exception(f'Metric {metric} not implemented.')
 
-    def _plot_truth_pred(self, predictions, ax, model_name, name, color):
+    def _plot_truth_pred(self, predictions, ax, model_name, name, color, log_trans=True):
         pred_y, y = predictions[model_name][name]
         r2 = Trainer._metric_sklearn(y, pred_y, 'r2')
         loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
         print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
-        ax.scatter(10 ** y, 10 ** pred_y,
+        ax.scatter(10 ** y if log_trans else y, 10 ** pred_y if log_trans else pred_y,
                    s=20,
                    color=color,
                    label=f"{name} dataset ($R^2$={r2:.3f})",
