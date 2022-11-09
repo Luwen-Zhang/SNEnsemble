@@ -409,7 +409,7 @@ class Trainer:
 
         model_configs = [
             CategoryEmbeddingModelConfig(task='regression'),
-            NodeConfig(task='regression'),
+            # NodeConfig(task='regression'),
             TabNetModelConfig(task='regression'),
             TabTransformerConfig(task='regression'),
             AutoIntConfig(task='regression'),
@@ -725,7 +725,7 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_partial_dependence(self):
+    def plot_partial_dependence(self, log_trans=True):
         x_values_list = []
         mean_pdp_list = []
 
@@ -740,20 +740,20 @@ class Trainer:
             x_values_list.append(x_value)
             mean_pdp_list.append(model_predictions)
 
-        fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.tensors[0], self.train_dataset.indices)
+        fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.tensors[0], self.train_dataset.indices, log_trans=log_trans)
 
         plt.savefig(self.project_root + 'partial_dependence.pdf')
         if is_notebook():
             plt.show()
         plt.close()
 
-    def plot_partial_err(self):
+    def plot_partial_err(self, thres=0.8):
         prediction, ground_truth, loss = test_tensor(self.tensors[0][self.test_dataset.indices, :],
                                                      self._get_additional_tensors_slice(self.test_dataset.indices),
                                                      self.tensors[-1][self.test_dataset.indices, :], self.model,
                                                      self.loss_fn)
         plot_partial_err(self.feature_data.loc[np.array(self.test_dataset.indices), :].reset_index(drop=True),
-                         ground_truth, prediction)
+                         ground_truth, prediction, thres=thres)
 
         plt.savefig(self.project_root + 'partial_err.pdf')
         if is_notebook():

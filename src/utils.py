@@ -272,7 +272,7 @@ def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_siz
     return x_values, model_predictions
 
 
-def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices):
+def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices, log_trans=True):
     max_col = 4
     if len(feature_names) > max_col:
         width = max_col
@@ -292,19 +292,20 @@ def plot_pdp(feature_names, x_values_list, mean_pdp_list, X, hist_indices):
     for idx, focus_feature in enumerate(feature_names):
         ax = plt.subplot(height, width, idx + 1)
         # ax.plot(x_values_list[idx], mean_pdp_list[idx], color = clr_map[focus_feature], linewidth = 0.5)
-        ax.plot(x_values_list[idx], 10 ** mean_pdp_list[idx], color="k", linewidth=0.7)
+        ax.plot(x_values_list[idx], 10 ** mean_pdp_list[idx] if log_trans else mean_pdp_list[idx], color="k", linewidth=0.7)
 
         ax.set_title(focus_feature, {"fontsize": 12})
         ax.set_xlim([0, 1])
-        ax.set_yscale("log")
-        ax.set_ylim([10 ** 2, 10 ** 7])
-        locmin = matplotlib.ticker.LogLocator(
-            base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
-        )
-        ax.xaxis.set_minor_locator(locmin)
-        ax.yaxis.set_minor_locator(locmin)
-        ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-        ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+        if log_trans:
+            ax.set_yscale("log")
+            ax.set_ylim([10 ** 2, 10 ** 7])
+            locmin = matplotlib.ticker.LogLocator(
+                base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
+            )
+            ax.xaxis.set_minor_locator(locmin)
+            ax.yaxis.set_minor_locator(locmin)
+            ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+            ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
 
         ax2 = ax.twinx()
 
@@ -416,7 +417,7 @@ def set_truth_pred(ax, log_trans=True):
             base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
         )
 
-        ax.set_aspect("equal", "box")
+        # ax.set_aspect("equal", "box")
 
         ax.xaxis.set_minor_locator(locmin)
         ax.yaxis.set_minor_locator(locmin)
@@ -425,8 +426,12 @@ def set_truth_pred(ax, log_trans=True):
 
         ax.set_xlim(1, 10 ** 9)
         ax.set_ylim(1, 10 ** 9)
+        ax.set_box_aspect(1)
     else:
-        ax.set_aspect("equal", "box")
+        # ax.set_aspect("equal", "box")
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax.set_box_aspect(1)
 
 
     # ax.set(xlim=[10, 10 ** 6], ylim=[10, 10 ** 6])
@@ -436,7 +441,7 @@ def set_truth_pred(ax, log_trans=True):
     #     np.ceil(np.max([np.max(ground_truth), np.max(prediction)]))
     # ]
 
-    ax.set_box_aspect(1)
+
 
 
 # https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py

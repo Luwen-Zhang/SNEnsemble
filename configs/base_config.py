@@ -11,7 +11,7 @@ class BaseConfig:
             'loss': 'mse',
             'split_by': 'random',
             'bayes_opt': False,
-            'bayes_epoch': 10,
+            'bayes_epoch': 3,
             'patience': 50,
             'epoch': 200,
             'lr': 0.003,
