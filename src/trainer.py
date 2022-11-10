@@ -669,18 +669,17 @@ class Trainer:
         ax.plot(
             np.arange(len(self.train_ls)),
             self.train_ls,
-            label="Train loss",
+            label="Training loss",
             linewidth=2,
             color=clr[0],
         )
-        if len(self.val_ls) > 0:
-            ax.plot(
-                np.arange(len(self.val_ls)),
-                self.val_ls,
-                label="Validation loss",
-                linewidth=2,
-                color=clr[1],
-            )
+        ax.plot(
+            np.arange(len(self.val_ls)),
+            self.val_ls,
+            label="Validation loss",
+            linewidth=2,
+            color=clr[1],
+        )
         # minposs = val_ls.index(min(val_ls))+1
         # ax.axvline(minposs, linestyle='--', color='r',label='Early Stopping Checkpoint')
         ax.legend()
@@ -733,10 +732,10 @@ class Trainer:
             plt.rcParams['font.size'] = 14
             ax = plt.subplot(111)
 
-            self._plot_truth_pred(predictions, ax, model_name, 'Train', clr[0], log_trans)
+            self._plot_truth_pred(predictions, ax, model_name, 'Train', clr[0], log_trans=log_trans)
             if 'Validation' in predictions[model_name].keys():
-                self._plot_truth_pred(predictions, ax, model_name, 'Validation', clr[2], log_trans)
-            self._plot_truth_pred(predictions, ax, model_name, 'Test', clr[1], log_trans)
+                self._plot_truth_pred(predictions, ax, model_name, 'Validation', clr[2], log_trans=log_trans)
+            self._plot_truth_pred(predictions, ax, model_name, 'Test', clr[1], log_trans=log_trans)
 
             set_truth_pred(ax, log_trans, upper_lim=upper_lim)
 
@@ -787,10 +786,12 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_partial_dependence(self, log_trans: bool = True):
+    def plot_partial_dependence(self, log_trans: bool = True, lower_lim=2, upper_lim=7):
         """
         Calculate and plot partial dependence plots.
         :param log_trans: Whether the target is log10-transformed. Default to True.
+        :param lower_lim: Lower limit of y-axis when plotting.
+        :param upper_lim: Upper limit of y-axis when plotting.
         :return: None
         """
         x_values_list = []
@@ -808,7 +809,7 @@ class Trainer:
             mean_pdp_list.append(model_predictions)
 
         fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.tensors[0], self.train_dataset.indices,
-                       log_trans=log_trans)
+                       log_trans=log_trans, lower_lim=lower_lim, upper_lim=upper_lim)
 
         plt.savefig(self.project_root + 'partial_dependence.pdf')
         if is_notebook():
@@ -886,14 +887,16 @@ class Trainer:
         else:
             raise Exception(f'Metric {metric} not implemented.')
 
-    def _plot_truth_pred(self, predictions, ax, model_name, name, color, log_trans=True):
+    def _plot_truth_pred(self, predictions, ax, model_name, name, color, marker='o', log_trans=True, verbose=True):
         pred_y, y = predictions[model_name][name]
         r2 = Trainer._metric_sklearn(y, pred_y, 'r2')
         loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
-        print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
+        if verbose:
+            print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
         ax.scatter(10 ** y if log_trans else y, 10 ** pred_y if log_trans else pred_y,
                    s=20,
                    color=color,
+                   marker=marker,
                    label=f"{name} dataset ($R^2$={r2:.3f})",
                    linewidth=0.4,
                    edgecolors="k")

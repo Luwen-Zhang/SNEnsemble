@@ -292,7 +292,7 @@ def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_siz
 
 
 def plot_pdp(
-    feature_names, x_values_list, mean_pdp_list, X, hist_indices, log_trans=True
+    feature_names, x_values_list, mean_pdp_list, X, hist_indices, log_trans=True, lower_lim=2, upper_lim=7
 ):
     max_col = 4
     if len(feature_names) > max_col:
@@ -324,7 +324,7 @@ def plot_pdp(
         ax.set_xlim([0, 1])
         if log_trans:
             ax.set_yscale("log")
-            ax.set_ylim([10**2, 10**7])
+            ax.set_ylim([10**lower_lim, 10**upper_lim])
             locmin = matplotlib.ticker.LogLocator(
                 base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
             )
