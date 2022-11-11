@@ -271,3 +271,26 @@ def calculate_absence_ratio(df_tmp):
     # df_presence.drop([0, 1, 2, 5, 9, 10, 11, 13, 14, 15, 19, 23, ])
 
     return df_presence
+
+
+def plot_absence(df_all, name_mapping, figure_name, fontsize=12):
+    df_tmp = replace_column_name(df_all, name_mapping)
+    col_to_include = [x for x in df_tmp.columns if x in name_mapping.values()]
+    df_tmp = df_tmp[col_to_include]
+
+    df_presence = calculate_absence_ratio(df_tmp)
+
+    matplotlib.rc("text", usetex=False)
+    plt.rcParams["font.size"] = fontsize
+
+    clr = sns.color_palette("deep")
+
+    plt.figure(figsize=(10, 8))
+    ax = plt.subplot(111)
+    plot_absence_ratio(ax, df_presence, orient='h', palette=clr, linewidth=1, edgecolor=[0, 0, 0])
+    plt.tight_layout()
+
+    plt.savefig(figure_name, dpi=600)
+    # plt.close()
+    # plt.show()
+    plt.close()

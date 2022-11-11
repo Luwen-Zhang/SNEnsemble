@@ -328,9 +328,9 @@ def plot_pdp(
             locmin = matplotlib.ticker.LogLocator(
                 base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
             )
-            ax.xaxis.set_minor_locator(locmin)
+            # ax.xaxis.set_minor_locator(locmin)
             ax.yaxis.set_minor_locator(locmin)
-            ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+            # ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
             ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
 
         ax2 = ax.twinx()
@@ -462,8 +462,21 @@ def set_truth_pred(ax, log_trans=True, upper_lim=9):
         ax.set_box_aspect(1)
     else:
         # ax.set_aspect("equal", "box")
-        ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
+        lx, rx = ax.get_xlim()
+        ly, ry = ax.get_ylim()
+        l = np.min([lx, ly])
+        r = np.max([rx, ry])
+
+        ax.plot(
+            np.linspace(l, r, 100),
+            np.linspace(l, r, 100),
+            "--",
+            c="grey",
+            alpha=0.2,
+        )
+
+        ax.set_xlim(left=l, right=r)
+        ax.set_ylim(bottom=l, top=r)
         ax.set_box_aspect(1)
 
     # ax.set(xlim=[10, 10 ** 6], ylim=[10, 10 ** 6])

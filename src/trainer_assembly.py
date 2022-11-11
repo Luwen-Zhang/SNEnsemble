@@ -2,6 +2,7 @@ from trainer import *
 from utils import *
 import os
 
+
 class TrainerAssembly:
     def __init__(self, trainer_paths: list, projects=None):
         self.trainers = [load_trainer(path) for path in trainer_paths]
@@ -40,7 +41,7 @@ class TrainerAssembly:
             plt.show()
         plt.close()
 
-    def eval_all(self, project_subset: list = None, programs = None, log_trans: bool = True, upper_lim=9):
+    def eval_all(self, project_subset: list = None, programs=None, log_trans: bool = True, upper_lim=9):
         """
         Plot all truth_pred plots and get the leaderboard.
         :param project_subset: Choose a list of projects from trainers.
@@ -103,26 +104,37 @@ class TrainerAssembly:
                 for proj_idx, (model_names, predictions) in enumerate(zip(all_model_names, all_predictions)):
 
                     if model_name in model_names:
-                        y_train_pred += list(predictions[model_name]['Train'][0].flatten()) if predictions[model_name]['Train'][0] is not None else []
-                        y_train_true += list(predictions[model_name]['Train'][1].flatten()) if predictions[model_name]['Train'][1] is not None else []
-                        y_val_pred += list(predictions[model_name]['Validation'][0].flatten()) if predictions[model_name]['Validation'][0] is not None else []
-                        y_val_true += list(predictions[model_name]['Validation'][1].flatten()) if predictions[model_name]['Validation'][1] is not None else []
-                        y_test_pred += list(predictions[model_name]['Test'][0].flatten()) if predictions[model_name]['Test'][0] is not None else []
-                        y_test_true += list(predictions[model_name]['Test'][1].flatten()) if predictions[model_name]['Test'][1] is not None else []
+                        y_train_pred += list(predictions[model_name]['Train'][0].flatten()) if \
+                        predictions[model_name]['Train'][0] is not None else []
+                        y_train_true += list(predictions[model_name]['Train'][1].flatten()) if \
+                        predictions[model_name]['Train'][1] is not None else []
+                        y_val_pred += list(predictions[model_name]['Validation'][0].flatten()) if \
+                        predictions[model_name]['Validation'][0] is not None else []
+                        y_val_true += list(predictions[model_name]['Validation'][1].flatten()) if \
+                        predictions[model_name]['Validation'][1] is not None else []
+                        y_test_pred += list(predictions[model_name]['Test'][0].flatten()) if \
+                        predictions[model_name]['Test'][0] is not None else []
+                        y_test_true += list(predictions[model_name]['Test'][1].flatten()) if \
+                        predictions[model_name]['Test'][1] is not None else []
 
-                predictions_model[model_name]['Train'] = (np.array(y_train_pred), np.array(y_train_true)) if len(y_train_pred) > 0 else (None, None)
-                predictions_model[model_name]['Validation'] = (np.array(y_val_pred), np.array(y_val_true)) if len(y_val_pred) > 0 else (None, None)
-                predictions_model[model_name]['Test'] = (np.array(y_test_pred), np.array(y_test_true)) if len(y_test_pred) > 0 else (None, None)
+                predictions_model[model_name]['Train'] = (np.array(y_train_pred), np.array(y_train_true)) if len(
+                    y_train_pred) > 0 else (None, None)
+                predictions_model[model_name]['Validation'] = (np.array(y_val_pred), np.array(y_val_true)) if len(
+                    y_val_pred) > 0 else (None, None)
+                predictions_model[model_name]['Test'] = (np.array(y_test_pred), np.array(y_test_true)) if len(
+                    y_test_pred) > 0 else (None, None)
 
                 df = Trainer._metrics(predictions_model, metrics, test_data_only=False)
                 df['Program'] = program
                 dfs.append(df)
 
-                self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Train', clr[0], log_trans=log_trans, verbose=False)
+                self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Train', clr[0],
+                                                  log_trans=log_trans, verbose=False)
                 if 'Validation' in predictions_model[model_name].keys():
                     self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Validation', clr[2],
-                                                          log_trans=log_trans, verbose=False)
-                self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Test', clr[1], log_trans=log_trans, verbose=False)
+                                                      log_trans=log_trans, verbose=False)
+                self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Test', clr[1],
+                                                  log_trans=log_trans, verbose=False)
 
                 plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
 
