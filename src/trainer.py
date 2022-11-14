@@ -851,6 +851,15 @@ class Trainer:
             plt.show()
         plt.close()
 
+    def plot_pairplot(self):
+        df_all = pd.concat([self.feature_data, self.label_data], axis=1)
+        sns.pairplot(df_all, corner=True)
+        plt.tight_layout()
+        plt.savefig(self.project_root + 'pair.pdf')
+        if is_notebook():
+            plt.show()
+        plt.close()
+
     @staticmethod
     def _metrics(predictions, metrics, test_data_only):
         df_metrics = pd.DataFrame()

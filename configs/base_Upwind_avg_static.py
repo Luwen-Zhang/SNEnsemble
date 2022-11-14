@@ -54,7 +54,7 @@ class config(BaseConfig):
                 "0-deg layers": 1,
                 "45-deg layers": 1,
                 "90-deg layers": 1,
-                "Other-deg layers": 1,
+                # "Other-deg layers": 1,
             },
             "feature_types": ["Fatigue loading", "Material"],
             "label_name": ["log(Static Maximum Tensile Stress)"],
