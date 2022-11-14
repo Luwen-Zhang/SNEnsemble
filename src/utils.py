@@ -116,7 +116,7 @@ def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_
 
 
 def split_dataset(
-    data, deg_layers, feature_names, label_name, device, split_by, impute
+    data, deg_layers, feature_names, label_name, device, split_by, impute, remove_outliers
 ):
     tmp_data = (
         data[feature_names + label_name + ["Material_Code"]].copy().dropna(axis=0)
@@ -126,6 +126,31 @@ def split_dataset(
     mat_lay_set = list(sorted(set(mat_lay)))
 
     data = data[feature_names + label_name]
+
+    if remove_outliers is not None:
+        print(f'Removing outliers by {remove_outliers}. Original size: {len(data)}')
+        for feature in feature_names:
+            if remove_outliers == 'IQR':
+                Q1 = np.percentile(data[feature].dropna(axis=0), 25, interpolation='midpoint')
+                Q3 = np.percentile(data[feature].dropna(axis=0), 75, interpolation='midpoint')
+                IQR = Q3 - Q1
+                if IQR == 0:
+                    continue
+                upper = np.where(data[feature] >= (Q3 + 1.5 * IQR))[0]
+                lower = np.where(data[feature] <= (Q1 - 1.5 * IQR))[0]
+            elif remove_outliers == 'std':
+                m = np.mean(data[feature].dropna(axis=0))
+                std = np.std(data[feature].dropna(axis=0))
+                if std == 0:
+                    continue
+                upper = np.where(data[feature] >= (m + 3 * std))[0]
+                lower = np.where(data[feature] <= (m - 3 * std))[0]
+            else:
+                raise Exception(f'remove_outlier {remove_outliers} not implemented.')
+            data = data.drop(upper)
+            data = data.drop(lower)
+            data.reset_index(drop=True, inplace=True)
+            # print(f'Outliers removed in {feature}, size remaining: {len(data)}')
 
     if impute == True:
         data = data.dropna(axis=0, subset=label_name)

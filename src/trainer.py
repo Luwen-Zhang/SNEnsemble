@@ -146,12 +146,13 @@ class Trainer:
 
         self.bayes_epoch = self.args['bayes_epoch']
 
-    def load_data(self, data_path: str = None, impute: bool = False) -> None:
+    def load_data(self, data_path: str = None, impute: bool = False, remove_outliers: str = None) -> None:
         """
         Load the data file in ../data directory specified by the 'project' argument in configfile. Data will be splitted
          into training, validation, and testing datasets.
         :param data_path: specify a data file different from 'project'. Default to None.
         :param impute: Whether to impute absence data in features by sklearn.impute.SimpleImputer. Default to False.
+        :param remove_outliers: Whether to remove all outliers for every feature. std or IQR
         :return: None
         """
         if data_path is None:
@@ -191,7 +192,8 @@ class Trainer:
             self.label_name,
             self.device,
             self.split_by,
-            impute=impute
+            impute=impute,
+            remove_outliers=remove_outliers
         )
 
     def bayes(self) -> dict:
