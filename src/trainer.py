@@ -9,6 +9,7 @@ import pandas as pd
 from utils import *
 import torch
 from torch import nn
+import matplotlib
 import matplotlib.pyplot as plt
 from captum.attr import FeaturePermutation
 import sys
@@ -858,6 +859,33 @@ class Trainer:
         plt.savefig(self.project_root + 'pair.pdf')
         if is_notebook():
             plt.show()
+        plt.close()
+
+    def plot_feature_box(self):
+        # sns.reset_defaults()
+        plt.figure(figsize=(6, 6))
+        ax = plt.subplot(111)
+        bp = sns.boxplot(data=pd.DataFrame(data=self.scaler.transform(self.feature_data), columns=self.feature_data.columns), orient='h', linewidth=1,
+                         fliersize=4, flierprops={'marker': 'o'})
+
+        boxes = []
+
+        for x in ax.get_children():
+            if isinstance(x, matplotlib.patches.PathPatch):
+                boxes.append(x)
+
+        color = '#639FFF'
+
+        for patch in boxes:
+            patch.set_facecolor(color)
+
+        plt.grid(linewidth=0.4, axis='y')
+        ax.set_axisbelow(True)
+        plt.ylabel('Values (Standard Scaled)')
+        # ax.tick_params(axis='x', rotation=90)
+        plt.tight_layout()
+        plt.savefig(self.project_root + 'feature_box.pdf')
+        plt.show()
         plt.close()
 
     @staticmethod
