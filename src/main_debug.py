@@ -1,25 +1,9 @@
-from trainer_assembly import TrainerAssembly
+from trainer import *
 
-trainer_paths = [
-    '../output/SNL_MSU_DOE_avg_fatigue/base_SNL_MSU_DOE_avg_fatigue/trainer.pkl',
-    '../output/OptiMat_avg_fatigue/base_OptiMat_avg_fatigue/trainer.pkl',
-    '../output/Upwind_avg_fatigue/base_Upwind_avg_fatigue/trainer.pkl',
-    '../output/FACT_avg_fatigue/base_FACT_avg_fatigue/trainer.pkl'
-]
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print("Using {} device".format(device))
 
-ta = TrainerAssembly(trainer_paths=trainer_paths, projects=['SNL-MSU-DOE', 'OptiMat', 'Upwind', 'FACT'])
-
-ta.plot_loss(metric='MSE')
-ta.eval_all()
-
-trainer_paths = [
-    '../output/SNL_MSU_DOE_avg_static/base_SNL_MSU_DOE_avg_static/trainer.pkl',
-    '../output/OptiMat_avg_static/base_OptiMat_avg_static/trainer.pkl',
-    '../output/Upwind_avg_static/base_Upwind_avg_static/trainer.pkl',
-    '../output/FACT_avg_static/base_FACT_avg_static/trainer.pkl'
-]
-
-ta = TrainerAssembly(trainer_paths=trainer_paths, projects=['SNL-MSU-DOE', 'OptiMat', 'Upwind', 'FACT'])
-
-ta.plot_loss(metric='MSE')
-ta.eval_all(log_trans=False)
+configfile = 'base_SNL_MSU_DOE_avg_fatigue'
+trainer = Trainer(device=device)
+trainer.load_config(configfile)
+trainer.load_data()

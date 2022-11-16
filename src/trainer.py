@@ -837,17 +837,37 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_corr(self):
+    def plot_corr(self, fontsize=10, cmap='bwr'):
         """
         Plot Pearson correlation among features and the target.
         :return: None
         """
+        feature_names = self.feature_names + self.label_name
+        # sns.reset_defaults()
         fig = plt.figure(figsize=(10, 10))
         ax = plt.subplot(111)
+        plt.box(on=True)
         df_all = pd.concat([self.feature_data, self.label_data], axis=1)
-        corr = df_all.corr()
-        sns.heatmap(corr, ax=ax, annot=True, xticklabels=corr.columns, yticklabels=corr.columns, square=True,
-                    cmap='Blues', cbar=False)
+        corr = df_all.corr().values
+        im = ax.imshow(corr, cmap=cmap)
+        ax.set_xticks(np.arange(len(feature_names)))
+        ax.set_yticks(np.arange(len(feature_names)))
+
+        ax.set_xticklabels(feature_names, fontsize=fontsize)
+        ax.set_yticklabels(feature_names, fontsize=fontsize)
+
+        plt.setp(ax.get_xticklabels(), rotation=90, ha="right",
+                 rotation_mode="anchor")
+
+        norm_corr = corr - (np.max(corr) + np.min(corr)) / 2
+        norm_corr /= np.max(norm_corr)
+
+        for i in range(len(feature_names)):
+            for j in range(len(feature_names)):
+                text = ax.text(j, i, round(corr[i, j], 2),
+                               ha="center", va="center", color="w" if np.abs(norm_corr[i, j]) > 0.3 else 'k',
+                               fontsize=fontsize)
+
         plt.tight_layout()
         plt.savefig(self.project_root + 'corr.pdf')
         if is_notebook():
@@ -867,8 +887,10 @@ class Trainer:
         # sns.reset_defaults()
         plt.figure(figsize=(6, 6))
         ax = plt.subplot(111)
-        bp = sns.boxplot(data=pd.DataFrame(data=self.scaler.transform(self.feature_data), columns=self.feature_data.columns), orient='h', linewidth=1,
-                         fliersize=4, flierprops={'marker': 'o'})
+        bp = sns.boxplot(
+            data=pd.DataFrame(data=self.scaler.transform(self.feature_data), columns=self.feature_data.columns),
+            orient='h', linewidth=1,
+            fliersize=4, flierprops={'marker': 'o'})
 
         boxes = []
 
@@ -881,7 +903,7 @@ class Trainer:
         for patch in boxes:
             patch.set_facecolor(color)
 
-        plt.grid(linewidth=0.4, axis='y')
+        plt.grid(linewidth=0.4, axis='x')
         ax.set_axisbelow(True)
         plt.ylabel('Values (Standard Scaled)')
         # ax.tick_params(axis='x', rotation=90)
