@@ -196,6 +196,12 @@ class Trainer:
             remove_outliers=remove_outliers
         )
 
+    def describe(self, transformed=False):
+        tabular = self._get_tabular_dataset(transformed=transformed)[0]
+        desc = tabular.describe()
+        desc.to_csv(self.project_root + 'describe.csv')
+        return desc
+
     def bayes(self) -> dict:
         """
         Running Gaussian process bayesian optimization on hyperparameters. Configurations are given in the configfile.
@@ -605,15 +611,20 @@ class Trainer:
         save_trainer(self)
         print('\n-------------Pytorch-tabular Tests End-------------\n')
 
-    def _get_tabular_dataset(self):
+    def _get_tabular_dataset(self, transformed=False):
+        if transformed:
+            feature_data = pd.DataFrame(data = self.scaler.transform(self.feature_data.values), columns = self.feature_data.columns)
+        else:
+            feature_data = self.feature_data
+        
         if not self.use_sequence:
-            tabular_dataset = pd.concat([self.feature_data, self.label_data], axis=1)
+            tabular_dataset = pd.concat([feature_data, self.label_data], axis=1)
             feature_names = self.feature_names
             label_name = self.label_name
         else:
             deg_layers_name = ['0-deg layers', '45-deg layers', '90-deg layers',
                                'Other-deg layers']
-            tabular_dataset = pd.concat([self.feature_data, self.label_data,
+            tabular_dataset = pd.concat([feature_data, self.label_data,
                                          pd.DataFrame(data=self.deg_layers,
                                                       columns=deg_layers_name)], axis=1)
             feature_names = self.feature_names + deg_layers_name
@@ -874,11 +885,11 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_pairplot(self):
+    def plot_pairplot(self, **kargs):
         df_all = pd.concat([self.feature_data, self.label_data], axis=1)
-        sns.pairplot(df_all, corner=True)
+        sns.pairplot(df_all, corner=True, diag_kind='kde', **kargs)
         plt.tight_layout()
-        plt.savefig(self.project_root + 'pair.pdf')
+        plt.savefig(self.project_root + 'pair.jpg')
         if is_notebook():
             plt.show()
         plt.close()
