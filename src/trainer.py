@@ -891,10 +891,10 @@ class Trainer:
             plt.rcParams['font.size'] = 14
             ax = plt.subplot(111)
 
-            self._plot_truth_pred(predictions, ax, model_name, 'Train', clr[0], log_trans=log_trans)
+            self._plot_truth_pred(predictions, ax, model_name, 'Training', clr[0], log_trans=log_trans)
             if 'Validation' in predictions[model_name].keys():
                 self._plot_truth_pred(predictions, ax, model_name, 'Validation', clr[2], log_trans=log_trans)
-            self._plot_truth_pred(predictions, ax, model_name, 'Test', clr[1], log_trans=log_trans)
+            self._plot_truth_pred(predictions, ax, model_name, 'Testing', clr[1], log_trans=log_trans)
 
             set_truth_pred(ax, log_trans, upper_lim=upper_lim)
 
@@ -1075,7 +1075,7 @@ class Trainer:
             df = pd.DataFrame(index=[0])
             df['Model'] = model_name
             for tvt, (y_pred, y_true) in model_predictions.items():
-                if test_data_only and tvt != 'Test':
+                if test_data_only and tvt != 'Testing':
                     continue
                 for metric in metrics:
                     metric_value = Trainer._metric_sklearn(y_true, y_pred, metric)
@@ -1146,9 +1146,9 @@ class Trainer:
         y_test_pred, y_test, _ = test(self.model, test_loader, self.loss_fn)
 
         predictions = {}
-        predictions['--'] = {'Train': (y_train_pred, y_train),
+        predictions['--'] = {'Training': (y_train_pred, y_train),
                              'Validation': (y_val_pred, y_val),
-                             'Test': (y_test_pred, y_test)}
+                             'Testing': (y_test_pred, y_test)}
 
         return predictions
 
@@ -1177,7 +1177,7 @@ class Trainer:
             y_test_pred = self.autogluon_predictor.predict(test_data, model=model_name, as_pandas=False)
             y_test = test_data[self.autogluon_predictor.label].values
 
-            predictions[model_name] = {'Train': (y_train_pred, y_train), 'Test': (y_test_pred, y_test),
+            predictions[model_name] = {'Training': (y_train_pred, y_train), 'Testing': (y_test_pred, y_test),
                                        'Validation': (y_val_pred, y_val)}
         return predictions
 
@@ -1210,7 +1210,7 @@ class Trainer:
             y_test_pred = np.array(model.predict(test_data)[f'{target}_prediction'])
             y_test = test_data[target].values
 
-            predictions[model_name] = {'Train': (y_train_pred, y_train), 'Test': (y_test_pred, y_test),
+            predictions[model_name] = {'Training': (y_train_pred, y_train), 'Testing': (y_test_pred, y_test),
                                        'Validation': (y_val_pred, y_val)}
         enable_tqdm()
         return predictions
@@ -1246,7 +1246,7 @@ class Trainer:
         y_test_pred = model.predict(test_x).reshape(-1, 1)
         y_test = test_y
 
-        predictions[model_name] = {'Train': (y_train_pred, y_train), 'Test': (y_test_pred, y_test),
+        predictions[model_name] = {'Training': (y_train_pred, y_train), 'Testing': (y_test_pred, y_test),
                                    'Validation': (y_val_pred, y_val)}
 
         return predictions
