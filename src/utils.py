@@ -17,10 +17,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 from torch.utils.data import Subset
-import torch.utils.data as Data
-from sklearn.impute import SimpleImputer
 from models import *
 import logging
 
@@ -29,6 +26,7 @@ clr = sns.color_palette("deep")
 
 def is_notebook() -> bool:
     try:
+        from IPython import get_ipython
         shell = get_ipython().__class__.__name__
         if shell == "ZMQInteractiveShell":
             return True  # Jupyter notebook or qtconsole
@@ -112,113 +110,6 @@ def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_
         y.cpu().detach().numpy(),
         test_label_tensor.cpu().detach().numpy(),
         loss.item(),
-    )
-
-
-def split_dataset(
-    data, deg_layers, feature_names, label_name, device, split_by, impute, remove_outliers
-):
-    tmp_data = (
-        data[feature_names + label_name + ["Material_Code"]].copy().dropna(axis=0)
-    )
-
-    mat_lay = [str(x) for x in tmp_data["Material_Code"].copy()]
-    mat_lay_set = list(sorted(set(mat_lay)))
-
-    data = data[feature_names + label_name]
-
-    if remove_outliers is not None:
-        print(f'Removing outliers by {remove_outliers}. Original size: {len(data)}')
-        for feature in feature_names:
-            if remove_outliers == 'IQR':
-                Q1 = np.percentile(data[feature].dropna(axis=0), 25, interpolation='midpoint')
-                Q3 = np.percentile(data[feature].dropna(axis=0), 75, interpolation='midpoint')
-                IQR = Q3 - Q1
-                if IQR == 0:
-                    continue
-                upper = np.where(data[feature] >= (Q3 + 1.5 * IQR))[0]
-                lower = np.where(data[feature] <= (Q1 - 1.5 * IQR))[0]
-            elif remove_outliers == 'std':
-                m = np.mean(data[feature].dropna(axis=0))
-                std = np.std(data[feature].dropna(axis=0))
-                if std == 0:
-                    continue
-                upper = np.where(data[feature] >= (m + 3 * std))[0]
-                lower = np.where(data[feature] <= (m - 3 * std))[0]
-            else:
-                raise Exception(f'remove_outlier {remove_outliers} not implemented.')
-            data = data.drop(upper)
-            data = data.drop(lower)
-            data.reset_index(drop=True, inplace=True)
-            # print(f'Outliers removed in {feature}, size remaining: {len(data)}')
-
-    if impute == True:
-        data = data.dropna(axis=0, subset=label_name)
-        drop_na_index = data.index
-        data.reset_index(drop=True, inplace=True)
-        imputer = SimpleImputer(strategy="mean")
-        feature_data = pd.DataFrame(
-            data=imputer.fit_transform(data[feature_names]), columns=feature_names
-        ).astype(np.float32)
-        label_data = data[label_name].astype(np.float32)
-    else:
-        data = data.dropna(axis=0)
-        drop_na_index = data.index
-        data.reset_index(drop=True, inplace=True)
-        feature_data = data[feature_names].astype(np.float32)
-        label_data = data[label_name].astype(np.float32)
-
-    X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(
-        device
-    )
-    y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(
-        device
-    )
-    if deg_layers is not None:
-        D = torch.tensor(deg_layers[drop_na_index, :], dtype=torch.float32).to(device)
-        dataset = Data.TensorDataset(X, D, y)
-    else:
-        D = None
-        dataset = Data.TensorDataset(X, y)
-
-    train_val_test = np.array([0.6, 0.2, 0.2])
-    if split_by == "random":
-        train_size = np.floor(len(label_data) * train_val_test[0]).astype(int)
-        val_size = np.floor(len(label_data) * train_val_test[1]).astype(int)
-        test_size = len(label_data) - train_size - val_size
-        train_dataset, val_dataset, test_dataset = Data.random_split(
-            dataset,
-            [train_size, val_size, test_size],
-            generator=torch.Generator().manual_seed(0),
-        )
-    elif split_by == "material":
-        train_dataset, val_dataset, test_dataset = split_by_material(
-            dataset, mat_lay, mat_lay_set, train_val_test
-        )
-    else:
-        raise Exception("Split type not implemented")
-
-    print("Dataset size:", len(train_dataset), len(val_dataset), len(test_dataset))
-
-    scaler = StandardScaler()
-    # scaler = MinMaxScaler()
-    scaler.fit(train_dataset.dataset.tensors[0].cpu().numpy()[train_dataset.indices, :])
-    # torch.data.Dataset.Subset share the same memory, so only transform once.
-    transformed = scaler.transform(train_dataset.dataset.tensors[0].cpu().numpy())
-    train_dataset.dataset.tensors = tuple(
-        [torch.tensor(transformed, dtype=torch.float32).to(device)]
-        + list(train_dataset.dataset.tensors[1:])
-    )
-    X = torch.tensor(scaler.transform(X.cpu().numpy()), dtype=torch.float32).to(device)
-
-    return (
-        feature_data,
-        label_data,
-        (X, D, y),
-        train_dataset,
-        val_dataset,
-        test_dataset,
-        scaler,
     )
 
 
