@@ -149,7 +149,8 @@ class Trainer:
 
         self.bayes_epoch = self.args['bayes_epoch']
 
-    def load_data(self, data_path: str = None, impute: bool = False, remove_outliers: str = None, selection: bool = False) -> None:
+    def load_data(self, data_path: str = None, impute: bool = False, remove_outliers: str = None,
+                  selection: bool = False) -> None:
         """
         Load the data file in ../data directory specified by the 'project' argument in configfile. Data will be splitted
          into training, validation, and testing datasets.
@@ -240,6 +241,15 @@ class Trainer:
 
         if selection:
             pass
+            # removed_features = []
+            # for feature in self.feature_names:
+            #     Q1 = np.percentile(feature_data[feature], 25, interpolation='midpoint')
+            #     Q3 = np.percentile(feature_data[feature], 75, interpolation='midpoint')
+            #     IQR = Q3 - Q1
+            #     print(feature, IQR, np.max(feature_data[feature].dropna(axis=0)), np.min(feature_data[feature].dropna(axis=0)))
+            #     if IQR == 0:
+            #         removed_features.append(feature)
+            # print(removed_features)
 
         X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(
             self.device
@@ -301,11 +311,40 @@ class Trainer:
             scaler,
         )
 
-    def describe(self, transformed=False):
+    def describe(self, transformed=False, save=True):
         tabular = self._get_tabular_dataset(transformed=transformed)[0]
         desc = tabular.describe()
-        desc.to_csv(self.project_root + 'describe.csv')
+
+        skew = tabular.skew()
+        desc = pd.concat(
+            [desc, pd.DataFrame(data=skew.values.reshape(len(skew), 1).T, columns=skew.index, index=['Skewness'])],
+            axis=0)
+
+        g = self._get_gini(tabular)
+        desc = pd.concat([desc, g], axis=0)
+
+        mode, cnt_mode, mode_percent = self._get_mode(tabular)
+        desc = pd.concat([desc, mode, cnt_mode, mode_percent], axis=0)
+
+        if save:
+            desc.to_csv(self.project_root + 'describe.csv')
         return desc
+
+    @staticmethod
+    def _get_gini(tabular):
+        return pd.DataFrame(data=np.array([[gini(tabular[x]) for x in tabular.columns]]), columns=tabular.columns,
+                         index=['Gini Index'])
+
+    @staticmethod
+    def _get_mode(tabular):
+        mode = tabular.mode().loc[0, :]
+        cnt_mode = pd.DataFrame(data=np.array([[tabular[mode.index[x]].value_counts()[mode.values[x]] for x in range(len(mode))]]),
+                     columns=tabular.columns, index=['Mode counts'])
+        mode_percent = cnt_mode / tabular.count()
+        mode_percent.index = ['Mode percentage']
+
+        mode = pd.DataFrame(data=mode.values.reshape(len(mode), 1).T, columns=mode.index, index=['Mode'])
+        return mode, cnt_mode, mode_percent
 
     def bayes(self) -> dict:
         """
@@ -718,10 +757,11 @@ class Trainer:
 
     def _get_tabular_dataset(self, transformed=False):
         if transformed:
-            feature_data = pd.DataFrame(data = self.scaler.transform(self.feature_data.values), columns = self.feature_data.columns)
+            feature_data = pd.DataFrame(data=self.scaler.transform(self.feature_data.values),
+                                        columns=self.feature_data.columns)
         else:
             feature_data = self.feature_data
-        
+
         if not self.use_sequence:
             tabular_dataset = pd.concat([feature_data, self.label_data], axis=1)
             feature_names = self.feature_names

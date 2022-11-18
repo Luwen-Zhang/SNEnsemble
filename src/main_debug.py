@@ -7,3 +7,4 @@ configfile = 'base_SNL_MSU_DOE_avg_fatigue'
 trainer = Trainer(device=device)
 trainer.load_config(configfile)
 trainer.load_data(selection=True)
+trainer.describe()
