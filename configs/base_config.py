@@ -10,7 +10,7 @@ class BaseConfig:
             "model": "MLP",
             "loss": "mse",
             "split_by": "random",
-            "bayes_opt": False,
+            "bayes_opt": True,
             "bayes_epoch": 3,
             "patience": 50,
             "epoch": 200,
