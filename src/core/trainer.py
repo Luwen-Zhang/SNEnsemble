@@ -1,6 +1,6 @@
 """
-The basic class for the project. It includes configuration, data processing, training, plotting,
-and comparing with baseline models.
+The basic class for the project. It includes configuration, data processing, plotting,
+and comparing baseline models.
 """
 import os.path
 

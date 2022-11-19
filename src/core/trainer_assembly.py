@@ -1,4 +1,4 @@
-from trainer import *
+from src.core.trainer import *
 from ..utils.utils import *
 import os
 
@@ -58,17 +58,19 @@ class TrainerAssembly:
         dfs = []
         metrics = ['rmse', 'mse', 'mae', 'mape', 'r2']
         programs = ['ThisWork', 'AutoGluon', 'PytorchTabular', 'TabNet'] if programs is None else programs
+        selected_projects = project_subset if project_subset is not None else self.projects
+
         for program in programs:
             unique_model_names = []
             all_model_names = []
             all_predictions = []
-            for project in project_subset if project_subset is not None else self.projects:
+            for project in selected_projects:
                 print(f'Program: {program}, project: {project}')
                 trainer = self.trainers[self.projects.index(project)]
 
                 modelbase = trainer._get_modelbase(program)
                 model_names = modelbase._get_model_names()
-                predictions = modelbase._predict_all(verbose=False)
+                predictions = modelbase._predict_all(verbose=True)
 
                 unique_model_names += model_names
                 all_model_names.append(model_names)
@@ -90,36 +92,36 @@ class TrainerAssembly:
                 for proj_idx, (model_names, predictions) in enumerate(zip(all_model_names, all_predictions)):
 
                     if model_name in model_names:
-                        y_train_pred += list(predictions[model_name]['Train'][0].flatten()) if \
-                        predictions[model_name]['Train'][0] is not None else []
-                        y_train_true += list(predictions[model_name]['Train'][1].flatten()) if \
-                        predictions[model_name]['Train'][1] is not None else []
+                        y_train_pred += list(predictions[model_name]['Training'][0].flatten()) if \
+                        predictions[model_name]['Training'][0] is not None else []
+                        y_train_true += list(predictions[model_name]['Training'][1].flatten()) if \
+                        predictions[model_name]['Training'][1] is not None else []
                         y_val_pred += list(predictions[model_name]['Validation'][0].flatten()) if \
                         predictions[model_name]['Validation'][0] is not None else []
                         y_val_true += list(predictions[model_name]['Validation'][1].flatten()) if \
                         predictions[model_name]['Validation'][1] is not None else []
-                        y_test_pred += list(predictions[model_name]['Test'][0].flatten()) if \
-                        predictions[model_name]['Test'][0] is not None else []
-                        y_test_true += list(predictions[model_name]['Test'][1].flatten()) if \
-                        predictions[model_name]['Test'][1] is not None else []
+                        y_test_pred += list(predictions[model_name]['Testing'][0].flatten()) if \
+                        predictions[model_name]['Testing'][0] is not None else []
+                        y_test_true += list(predictions[model_name]['Testing'][1].flatten()) if \
+                        predictions[model_name]['Testing'][1] is not None else []
 
-                predictions_model[model_name]['Train'] = (np.array(y_train_pred), np.array(y_train_true)) if len(
+                predictions_model[model_name]['Training'] = (np.array(y_train_pred), np.array(y_train_true)) if len(
                     y_train_pred) > 0 else (None, None)
                 predictions_model[model_name]['Validation'] = (np.array(y_val_pred), np.array(y_val_true)) if len(
                     y_val_pred) > 0 else (None, None)
-                predictions_model[model_name]['Test'] = (np.array(y_test_pred), np.array(y_test_true)) if len(
+                predictions_model[model_name]['Testing'] = (np.array(y_test_pred), np.array(y_test_true)) if len(
                     y_test_pred) > 0 else (None, None)
 
                 df = Trainer._metrics(predictions_model, metrics, test_data_only=False)
                 df['Program'] = program
                 dfs.append(df)
 
-                self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Train', clr[0],
+                self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Training', clr[0],
                                                   log_trans=log_trans, verbose=False)
                 if 'Validation' in predictions_model[model_name].keys():
                     self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Validation', clr[2],
                                                       log_trans=log_trans, verbose=False)
-                self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Test', clr[1],
+                self.trainers[0]._plot_truth_pred(predictions_model, ax, model_name, 'Testing', clr[1],
                                                   log_trans=log_trans, verbose=False)
 
                 plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
@@ -137,5 +139,24 @@ class TrainerAssembly:
         df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
         df_leaderboard.sort_values('Testing RMSE', inplace=True)
         df_leaderboard.reset_index(drop=True, inplace=True)
-        df_leaderboard = df_leaderboard[['Program'] + list(df_leaderboard.columns)[:-1]]
+
+        model_existence = df_leaderboard['Model']
+        model_existence = pd.concat([model_existence, pd.DataFrame(columns=selected_projects)], axis=1)
+        for project in selected_projects:
+            all_model_names = []
+            trainer = self.trainers[self.projects.index(project)]
+            for program in programs:
+                modelbase = trainer._get_modelbase(program)
+                model_names = modelbase._get_model_names()
+                all_model_names += model_names
+
+            unique_exist_model_names = list(set(all_model_names))
+            for model_name in unique_exist_model_names:
+                model_existence.loc[list(model_existence['Model']).index(model_name), project] = 1
+
+        df_leaderboard = pd.concat([df_leaderboard, model_existence[selected_projects]], axis=1)
+        columns_ahead = ['Program', 'Model'] + selected_projects
+        columns_back = list(sorted(np.setdiff1d(df_leaderboard.columns, columns_ahead)))
+
+        df_leaderboard = df_leaderboard[columns_ahead + columns_back]
         df_leaderboard.to_csv(self.project_root + 'leaderboard.csv')

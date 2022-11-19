@@ -88,7 +88,7 @@ class AutoGluon(AbstractModel):
         return predictions
 
     def _get_model_names(self):
-        return self.leaderboard['model']
+        return list(self.leaderboard['model'])
 
 
 class PytorchTabular(AbstractModel):
@@ -317,7 +317,7 @@ class PytorchTabular(AbstractModel):
         return predictions
 
     def _get_model_names(self):
-        return self.leaderboard['model']
+        return list(self.leaderboard['model'])
 
 class TabNet(AbstractModel):
     def __init__(self, trainer):

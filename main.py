@@ -4,9 +4,8 @@ from src.core.model import *
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Using {} device".format(device))
 
-configfile = 'base_Upwind_avg_fatigue'
 trainer = Trainer(device=device)
-trainer.load_config(configfile)
+trainer.load_config()
 trainer.load_data()
 trainer.describe()
 
