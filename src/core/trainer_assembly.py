@@ -7,9 +7,9 @@ class TrainerAssembly:
     def __init__(self, trainer_paths: list, projects=None):
         self.trainers = [load_trainer(path) for path in trainer_paths]
         self.projects = [trainer.project for trainer in self.trainers] if projects is None else projects
-        self.project_root = '../output/assembly/' + '_'.join([trainer.project for trainer in self.trainers]) + '/'
-        if not os.path.exists('../output/assembly/'):
-            os.mkdir('../output/assembly/')
+        self.project_root = 'output/assembly/' + '_'.join([trainer.project for trainer in self.trainers]) + '/'
+        if not os.path.exists('output/assembly/'):
+            os.mkdir('output/assembly/')
         if not os.path.exists(self.project_root):
             os.mkdir(self.project_root)
 
@@ -19,16 +19,21 @@ class TrainerAssembly:
         ax = plt.subplot(111)
 
         for idx, (project, trainer) in enumerate(zip(self.projects, self.trainers)):
+            if 'ThisWork' not in trainer.modelbases_names:
+                continue
+            else:
+                modelbase = trainer._get_modelbase('ThisWork')
+
             ax.plot(
-                np.arange(len(trainer.train_ls)),
-                trainer.train_ls,
+                np.arange(len(modelbase.train_ls)),
+                modelbase.train_ls,
                 label=project + " training loss",
                 linewidth=2,
                 color=clr[idx],
             )
             ax.plot(
-                np.arange(len(trainer.val_ls)),
-                trainer.val_ls,
+                np.arange(len(modelbase.val_ls)),
+                modelbase.val_ls,
                 label=project + " validation loss",
                 linewidth=2,
                 color=clr[idx],
@@ -52,7 +57,7 @@ class TrainerAssembly:
         markers = ['o', 'v', '^', 's', '<', '>']
         dfs = []
         metrics = ['rmse', 'mse', 'mae', 'mape', 'r2']
-        programs = ['This work', 'AutoGluon', 'Pytorch-Tabular', 'TabNet'] if programs is None else programs
+        programs = ['ThisWork', 'AutoGluon', 'PytorchTabular', 'TabNet'] if programs is None else programs
         for program in programs:
             unique_model_names = []
             all_model_names = []
@@ -60,29 +65,10 @@ class TrainerAssembly:
             for project in project_subset if project_subset is not None else self.projects:
                 print(f'Program: {program}, project: {project}')
                 trainer = self.trainers[self.projects.index(project)]
-                if program == 'This work':
-                    model_names = ['--']
-                    predictions = trainer._predict_all()
-                elif program == 'AutoGluon':
-                    if not hasattr(trainer, 'autogluon_predictor'):
-                        print(f'No program {program} in project {project}')
-                        continue
-                    model_names = list(trainer.autogluon_leaderboard['model'])
-                    predictions = trainer._predict_all_autogluon(verbose=False)
-                elif program == 'Pytorch-Tabular':
-                    if not hasattr(trainer, 'pytorch_tabular_models'):
-                        print(f'No program {program} in project {project}')
-                        continue
-                    model_names = list(trainer.pytorch_tabular_leaderboard['model'])
-                    predictions = trainer._predict_all_pytorch_tabular(verbose=False)
-                elif program == 'TabNet':
-                    if not hasattr(trainer, 'tabnet_model'):
-                        print(f'No program {program} in project {project}')
-                        continue
-                    model_names = ['TabNet']
-                    predictions = trainer._predict_all_sklearn(trainer.tabnet_model, 'TabNet', verbose=False)
-                else:
-                    raise Exception(f'Program {program} does not exist.')
+
+                modelbase = trainer._get_modelbase(program)
+                model_names = modelbase._get_model_names()
+                predictions = modelbase._predict_all(verbose=False)
 
                 unique_model_names += model_names
                 all_model_names.append(model_names)
@@ -149,7 +135,7 @@ class TrainerAssembly:
                 plt.close()
 
         df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
-        df_leaderboard.sort_values('Test RMSE', inplace=True)
+        df_leaderboard.sort_values('Testing RMSE', inplace=True)
         df_leaderboard.reset_index(drop=True, inplace=True)
         df_leaderboard = df_leaderboard[['Program'] + list(df_leaderboard.columns)[:-1]]
         df_leaderboard.to_csv(self.project_root + 'leaderboard.csv')

@@ -21,10 +21,16 @@ class AbstractModel:
         if self.model is None:
             raise Exception(f'{self.program} not trained, run {self.__class__.__name__}._train() first.')
 
+    def _mkdir(self):
+        self.root = self.trainer.project_root + self.program + '/'
+        if not os.path.exists(self.root):
+            os.mkdir(self.root)
+
 class AutoGluon(AbstractModel):
     def __init__(self, trainer):
         super(AutoGluon, self).__init__(trainer)
         self.program = 'AutoGluon'
+        self._mkdir()
 
     def _train(self, verbose: bool = False, debug_mode: bool = False):
         print('\n-------------Run AutoGluon Tests-------------\n')
@@ -33,7 +39,7 @@ class AutoGluon(AbstractModel):
         warnings.simplefilter(action='ignore', category=UserWarning)
         from autogluon.tabular import TabularPredictor
         tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
-        predictor = TabularPredictor(label=label_name[0], path=self.trainer.project_root + 'autogluon')
+        predictor = TabularPredictor(label=label_name[0], path=self.root)
         with HiddenPrints(disable_logging=True if not verbose else False):
             predictor.fit(tabular_dataset.loc[self.trainer.train_dataset.indices, :],
                           tuning_data=tabular_dataset.loc[self.trainer.val_dataset.indices, :],
@@ -43,7 +49,7 @@ class AutoGluon(AbstractModel):
                           verbosity=0 if not verbose else 2)
         self.leaderboard = predictor.leaderboard(tabular_dataset.loc[self.trainer.test_dataset.indices, :],
                                                            silent=True)
-        self.leaderboard.to_csv(self.trainer.project_root + 'autogluon/leaderboard.csv')
+        self.leaderboard.to_csv(self.root + 'leaderboard.csv')
         self.model = predictor
         enable_tqdm()
         warnings.simplefilter(action='default', category=UserWarning)
@@ -89,6 +95,7 @@ class PytorchTabular(AbstractModel):
     def __init__(self, trainer):
         super(PytorchTabular, self).__init__(trainer)
         self.program = 'PytorchTabular'
+        self._mkdir()
 
     def _train(self, verbose: bool = False, debug_mode: bool = False):
         print('\n-------------Run Pytorch-tabular Tests-------------\n')
@@ -244,7 +251,7 @@ class PytorchTabular(AbstractModel):
                     optimizer_config=optimizer_config,
                     trainer_config=trainer_config
                 )
-                tabular_model.config.checkpoints_path = self.trainer.project_root + 'pytorch_tabular'
+                tabular_model.config.checkpoints_path = self.root
                 tabular_model.config['progress_bar_refresh_rate'] = 0
 
                 tabular_model.fit(train=tabular_dataset.loc[self.trainer.train_dataset.indices, :],
@@ -263,7 +270,7 @@ class PytorchTabular(AbstractModel):
 
         if verbose:
             print(self.leaderboard)
-        self.leaderboard.to_csv(self.trainer.project_root + 'pytorch_tabular/leaderboard.csv')
+        self.leaderboard.to_csv(self.root + 'leaderboard.csv')
 
         enable_tqdm()
         warnings.simplefilter(action='default', category=UserWarning)
@@ -313,6 +320,7 @@ class TabNet(AbstractModel):
     def __init__(self, trainer):
         super(TabNet, self).__init__(trainer)
         self.program = 'TabNet'
+        self._mkdir()
 
     def _train(self, verbose: bool = False, debug_mode: bool = False):
         print('\n-------------Run TabNet Test-------------\n')
@@ -332,9 +340,6 @@ class TabNet(AbstractModel):
         val_y = label_data.values[np.array(val_indices), :].reshape(-1, 1).astype(np.float32)
 
         eval_set = [(val_x, val_y)]
-
-        if not os.path.exists(self.trainer.project_root + 'TabNet'):
-            os.mkdir(self.trainer.project_root + 'TabNet')
 
         from pytorch_tabnet.tab_model import TabNetRegressor
 
@@ -533,7 +538,7 @@ class TorchModel(AbstractModel):
         y_test_pred, y_test, _ = test(self.model, test_loader, self.trainer.loss_fn)
 
         predictions = {}
-        predictions['--'] = {'Training': (y_train_pred, y_train),
+        predictions[self._get_model_names()[0]] = {'Training': (y_train_pred, y_train),
                              'Validation': (y_val_pred, y_val),
                              'Testing': (y_test_pred, y_test)}
 
@@ -618,11 +623,11 @@ class TorchModel(AbstractModel):
         print(f'Test MSE loss: {mse:.5f}, RMSE loss: {rmse:.5f}')
         save_trainer(self.trainer)
 
-
 class ThisWork(TorchModel):
     def __init__(self, trainer):
         super(ThisWork, self).__init__(trainer)
         self.program = 'ThisWork'
+        self._mkdir()
 
     def _new_model(self):
         if self.trainer.model_name == 'MLP':
@@ -631,4 +636,4 @@ class ThisWork(TorchModel):
             raise Exception(f'Model {self.trainer.model_name} not implemented.')
 
     def _get_model_names(self):
-        return ['--']
+        return ['ThisWork']

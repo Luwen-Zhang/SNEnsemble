@@ -13,11 +13,11 @@ trainer.describe()
 models = [
     AutoGluon(trainer),
     # PytorchTabular(trainer),
-    TabNet(trainer),
+    # TabNet(trainer),
     ThisWork(trainer)
 ]
 
-trainer.add_models(models)
+trainer.add_modelbases(models)
 
 trainer.train(verbose=True)
 trainer.get_leaderboard(test_data_only=False)

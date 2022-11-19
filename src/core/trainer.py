@@ -36,9 +36,14 @@ class Trainer:
         self.modelbases = []
         self.modelbases_names = []
 
-    def add_models(self, models: list):
+    def add_modelbases(self, models: list):
         self.modelbases += models
         self.modelbases_names = [x.program for x in self.modelbases]
+
+    def _get_modelbase(self, program: str):
+        if program not in self.modelbases_names:
+            raise Exception(f'Program {program} not added to the trainer.')
+        return self.modelbases[self.modelbases_names.index(program)]
 
     def load_config(self, default_configfile: str = None, verbose: bool = True) -> None:
         """
@@ -340,7 +345,7 @@ class Trainer:
         if programs is None:
             modelbases_to_train = self.modelbases
         else:
-            modelbases_to_train = [self.modelbases[self.modelbases_names.index(x)] for x in programs]
+            modelbases_to_train = [self._get_modelbase(x) for x in programs]
 
         from src.core.model import TorchModel
         for modelbase in modelbases_to_train:
@@ -451,10 +456,8 @@ class Trainer:
         :param upper_lim: The upper boundary of the plot. Default to 9.
         :return: None
         """
-        if program not in self.modelbases_names:
-            raise Exception(f'Program {program} not added to the trainer.')
-        modelbase = self.modelbases[self.modelbases_names.index(program)]
-        model_names = modelbase._get_model_names
+        modelbase = self._get_modelbase(program)
+        model_names = modelbase._get_model_names()
         predictions = modelbase._predict_all()
 
         for idx, model_name in enumerate(model_names):
@@ -474,28 +477,25 @@ class Trainer:
 
             s = model_name.replace('/', '_')
 
-            if program is not None:
-                plt.savefig(self.project_root + f'{program}/{s}_truth_pred.pdf')
-            else:
-                plt.savefig(self.project_root + 'truth_pred.pdf')
-                if is_notebook():
-                    plt.show()
+            plt.savefig(self.project_root + f'{program}/{s}_truth_pred.pdf')
+            if is_notebook():
+                plt.show()
 
             plt.close()
 
-    def plot_feature_importance(self, model):
+    def plot_feature_importance(self, modelbase):
         """
         Calculate and plot permutation feature importance.
         :return: None
         """
         from src.core.model import TorchModel
-        if not issubclass(type(model), TorchModel):
+        if not issubclass(type(modelbase), TorchModel):
             raise Exception('A TorchModel should be passed.')
 
         def forward_func(data):
             prediction, ground_truth, loss = test_tensor(data,
                                                          self._get_additional_tensors_slice(self.test_dataset.indices),
-                                                         self.tensors[-1][self.test_dataset.indices, :], model,
+                                                         self.tensors[-1][self.test_dataset.indices, :], modelbase.model,
                                                          self.loss_fn)
             return loss
 
@@ -520,7 +520,7 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_partial_dependence(self, model, log_trans: bool = True, lower_lim=2, upper_lim=7):
+    def plot_partial_dependence(self, modelbase, log_trans: bool = True, lower_lim=2, upper_lim=7):
         """
         Calculate and plot partial dependence plots.
         :param log_trans: Whether the target is log10-transformed. Default to True.
@@ -529,7 +529,7 @@ class Trainer:
         :return: None
         """
         from src.core.model import TorchModel
-        if not issubclass(type(model), TorchModel):
+        if not issubclass(type(modelbase), TorchModel):
             raise Exception('A TorchModel should be passed.')
 
         x_values_list = []
@@ -538,7 +538,7 @@ class Trainer:
         for feature_idx in range(len(self.feature_names)):
             print('Calculate PDP: ', self.feature_names[feature_idx])
 
-            x_value, model_predictions = calculate_pdp(model, self.tensors[0][self.train_dataset.indices, :],
+            x_value, model_predictions = calculate_pdp(modelbase.model, self.tensors[0][self.train_dataset.indices, :],
                                                        self._get_additional_tensors_slice(self.train_dataset.indices),
                                                        feature_idx,
                                                        grid_size=30)
@@ -554,18 +554,18 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_partial_err(self, model, thres=0.8):
+    def plot_partial_err(self, modelbase, thres=0.8):
         """
         Calculate and plot partial error dependency for each feature.
         :param thres: Points with loss higher than thres will be marked.
         :return: None
         """
         from src.core.model import TorchModel
-        if not issubclass(type(model), TorchModel):
+        if not issubclass(type(modelbase), TorchModel):
             raise Exception('A TorchModel should be passed.')
         prediction, ground_truth, loss = test_tensor(self.tensors[0][self.test_dataset.indices, :],
                                                      self._get_additional_tensors_slice(self.test_dataset.indices),
-                                                     self.tensors[-1][self.test_dataset.indices, :], model,
+                                                     self.tensors[-1][self.test_dataset.indices, :], modelbase.model,
                                                      self.loss_fn)
         plot_partial_err(self.feature_data.loc[np.array(self.test_dataset.indices), :].reset_index(drop=True),
                          ground_truth, prediction, thres=thres)
