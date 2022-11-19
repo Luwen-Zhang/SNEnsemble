@@ -811,7 +811,7 @@ class Trainer:
             dfs.append(df)
 
         df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
-        df_leaderboard.sort_values('Test RMSE' if not test_data_only else 'RMSE', inplace=True)
+        df_leaderboard.sort_values('Testing RMSE' if not test_data_only else 'RMSE', inplace=True)
         df_leaderboard.reset_index(drop=True, inplace=True)
         df_leaderboard = df_leaderboard[['Program'] + list(df_leaderboard.columns)[:-1]]
         df_leaderboard.to_csv(self.project_root + 'leaderboard.csv')
