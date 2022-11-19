@@ -11,8 +11,8 @@ trainer.load_data()
 trainer.describe()
 
 models = [
-    AutoGluon(trainer),
-    # PytorchTabular(trainer),
+    # AutoGluon(trainer),
+    PytorchTabular(trainer),
     # TabNet(trainer),
     ThisWork(trainer)
 ]

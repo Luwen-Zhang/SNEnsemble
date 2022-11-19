@@ -8,8 +8,8 @@ src/config.json
 .SynologyWorkingDirectory
 .vscode
 *.pdf
-src/__pycache__/
-configs/__pycache__/
+__pycache__/
+*.pyc
 autogluon
 pytorch_tabular
 src/.pt_tmp/exp_version_manager.yml
