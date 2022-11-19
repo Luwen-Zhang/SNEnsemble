@@ -102,6 +102,9 @@ class PytorchTabular(AbstractModel):
         disable_tqdm()
         import warnings
         warnings.simplefilter(action='ignore', category=UserWarning)
+        from functools import partialmethod
+        from pytorch_tabular.config import ExperimentRunManager
+        ExperimentRunManager.__init__ = partialmethod(ExperimentRunManager.__init__, self.root + 'exp_version_manager.yml')
         from pytorch_tabular import TabularModel
         from pytorch_tabular.models import CategoryEmbeddingModelConfig, \
             NodeConfig, TabNetModelConfig, TabTransformerConfig, AutoIntConfig, FTTransformerConfig
