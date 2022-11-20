@@ -22,6 +22,8 @@ from skopt.space import Real, Integer, Categorical
 import torch.utils.data as Data
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import time
+import json
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -103,21 +105,6 @@ class Trainer:
             if a != b:
                 raise Exception('Variables in \'chosen_params\' and \'SPACEs\' should be in the same order.')
 
-        SPACE = []
-        for var in key_space:
-            setting = arg_loaded['SPACEs'][var]
-            ty = setting['type']
-            setting.pop('type')
-            if ty == 'Real':
-                SPACE.append(Real(name=var, **setting))
-            elif ty == 'Categorical':
-                SPACE.append(Categorical(name=var, **setting))
-            elif ty == 'Integer':
-                SPACE.append(Integer(name=var, **setting))
-            else:
-                raise Exception('Invalid type of skopt space.')
-        arg_loaded['SPACE'] = SPACE
-
         if verbose:
             print(arg_loaded)
 
@@ -131,14 +118,25 @@ class Trainer:
         self.project = self.args['project']
         self.model_name = self.args['model']
 
-        self.data_path = f'data/{self.project}.xlsx'
-        self.project_root = f'output/{self.project}/{self.configfile}/'
-
         self.static_params = self.args['static_params']
         self.chosen_params = self.args['chosen_params']
         self.layers = self.args['layers']
         self.n_calls = self.args['n_calls']
-        self.SPACE = self.args['SPACE']
+
+        SPACE = []
+        for var in key_space:
+            setting = arg_loaded['SPACEs'][var]
+            ty = setting['type']
+            setting.pop('type')
+            if ty == 'Real':
+                SPACE.append(Real(name=var, **setting))
+            elif ty == 'Categorical':
+                SPACE.append(Categorical(name=var, **setting))
+            elif ty == 'Integer':
+                SPACE.append(Integer(name=var, **setting))
+            else:
+                raise Exception('Invalid type of skopt space.')
+        self.SPACE = SPACE
 
         if self.loss == 'mse':
             self.loss_fn = nn.MSELoss()
@@ -153,12 +151,19 @@ class Trainer:
 
         self.use_sequence = self.args['sequence']
 
+        self.bayes_epoch = self.args['bayes_epoch']
+
+        folder_name = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + '_' + self.configfile
+
+        self.data_path = f'data/{self.project}.xlsx'
+        self.project_root = f'output/{self.project}/{folder_name}/'
+
         if not os.path.exists(f'output/{self.project}'):
             os.mkdir(f'output/{self.project}')
         if not os.path.exists(self.project_root):
             os.mkdir(self.project_root)
 
-        self.bayes_epoch = self.args['bayes_epoch']
+        json.dump(arg_loaded, open(self.project_root + 'args.json', 'w'), indent=4)
 
     def load_data(self, data_path: str = None, impute: bool = False, remove_outliers: str = None,
                   selection: bool = False) -> None:
