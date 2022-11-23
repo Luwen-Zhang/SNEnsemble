@@ -113,7 +113,7 @@ def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_
     )
 
 
-def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test):
+def split_by_material(mat_lay, mat_lay_set, train_val_test):
     def mat_lay_index(chosen_mat_lay, mat_lay):
         index = []
         for material in chosen_mat_lay:
@@ -122,29 +122,30 @@ def split_by_material(dataset, mat_lay, mat_lay_set, train_val_test):
         return np.array(index)
 
     train_mat_lay, test_mat_lay = train_test_split(
-        mat_lay_set, test_size=train_val_test[2], shuffle=False
+        mat_lay_set, test_size=train_val_test[2], shuffle=True
     )
     train_mat_lay, val_mat_lay = train_test_split(
         train_mat_lay,
         test_size=train_val_test[1] / np.sum(train_val_test[0:2]),
-        shuffle=False,
+        shuffle=True,
     )
-    train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
-    val_dataset = Subset(dataset, mat_lay_index(val_mat_lay, mat_lay))
-    test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
+    # train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
+    # val_dataset = Subset(dataset, mat_lay_index(val_mat_lay, mat_lay))
+    # test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
 
-    df = pd.concat(
-        [
-            pd.DataFrame({"train material": train_mat_lay}),
-            pd.DataFrame({"val material": val_mat_lay}),
-            pd.DataFrame({"test material": test_mat_lay}),
-        ],
-        axis=1,
+    return mat_lay_index(train_mat_lay, mat_lay), mat_lay_index(val_mat_lay, mat_lay), mat_lay_index(test_mat_lay, mat_lay)
+
+def split_by_random(length, train_val_test):
+    train_indices, test_indices = train_test_split(
+        np.arange(length), test_size=train_val_test[2], shuffle=True
+    )
+    train_indices, val_indices = train_test_split(
+        train_indices,
+        test_size=train_val_test[1] / np.sum(train_val_test[0:2]),
+        shuffle=True,
     )
 
-    # df.to_excel("../output/material_split.xlsx", engine="openpyxl", index=False)
-    return train_dataset, val_dataset, test_dataset
-
+    return train_indices, val_indices, test_indices
 
 def plot_importance(ax, features, attr, pal, clr_map, **kargs):
     df = pd.DataFrame(columns=["feature", "attr", "clr"])

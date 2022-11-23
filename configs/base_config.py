@@ -21,7 +21,6 @@ class BaseConfig:
             "chosen_params": ["lr", "weight_decay", "batch_size"],
             "layers": [16, 64, 128, 128, 64, 16],
             "n_calls": 100,
-            "sequence": False,
             "SPACEs": {
                 "lr": {
                     "type": "Real",
@@ -39,6 +38,10 @@ class BaseConfig:
                     "type": "Categorical",
                     "categories": [32, 64, 128, 256, 512, 1024, 2048, 4096],
                 },
+            },
+            "data_processors": ['IQRRemover', 'MeanImputer', 'UnscaledDataRecorder', 'StandardScaler'],
+            "data_derivers": {
+                'DegLayerDeriver': {'sequence_column': 'Sequence', 'derived_name': 'deg_layers'},
             },
             "feature_names_type": {},
             "feature_types": ["Fatigue loading", "Material"],

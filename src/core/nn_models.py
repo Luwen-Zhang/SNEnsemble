@@ -7,28 +7,16 @@ def init_weights(m):
 
 
 class NN(nn.Module):
-    def __init__(self, n_inputs, n_outputs, layers, use_sequence):
+    def __init__(self, n_inputs, n_outputs, layers):
         super(NN, self).__init__()
         num_inputs = n_inputs
         num_outputs = n_outputs
-        self.use_sequence = use_sequence
 
-        if self.use_sequence:
-            self.net = self.get_sequential(layers, num_inputs, num_outputs*4, nn.ReLU)
-
-            self.net_layers = self.get_sequential(layers, 4, num_outputs*4, nn.ReLU)
-
-            self.net_post = self.get_sequential(layers, num_outputs*8, num_outputs, nn.ReLU)
-        else:
-            self.net = self.get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
+        self.net = self.get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
 
     def forward(self, x, additional_tensors):
         x = self.net(x)
-        if self.use_sequence:
-            y = self.net_layers(additional_tensors[0])
-            output = self.net_post(torch.cat([x, y], dim=1))
-        else:
-            output = x
+        output = x
 
         return output
 

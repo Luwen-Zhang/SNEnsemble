@@ -4,6 +4,7 @@ and comparing baseline models.
 """
 import os.path
 
+import numpy as np
 import pandas as pd
 
 from ..utils.utils import *
@@ -20,10 +21,9 @@ from skopt.plots import plot_convergence
 from importlib import import_module, reload
 from skopt.space import Real, Integer, Categorical
 import torch.utils.data as Data
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import time
 import json
+from copy import deepcopy as cp
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -89,6 +89,7 @@ class Trainer:
                 if value is not None:
                     arg_loaded[key] = value
 
+        # Preprocess configs
         tmp_static_params = {}
         for key in arg_loaded['static_params']:
             tmp_static_params[key] = arg_loaded[key]
@@ -149,9 +150,17 @@ class Trainer:
 
         self.params = self.chosen_params
 
-        self.use_sequence = self.args['sequence']
-
         self.bayes_epoch = self.args['bayes_epoch']
+
+        from src.core.dataprocessor import get_data_processor
+        if 'UnscaledDataRecorder' not in self.args['data_processors']:
+            if verbose:
+                print('UnscaledDataRecorder not in the data_processors pipeline. Only scaled data will be recorded.')
+            self.args.append('UnscaledDataRecorder')
+        self.dataprocessors = [get_data_processor(name) for name in self.args['data_processors']]
+
+        from src.core.dataderiver import get_data_deriver
+        self.dataderivers = [(get_data_deriver(name), kargs) for name, kargs in self.args['data_derivers'].items()]
 
         folder_name = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + '_' + self.configfile
 
@@ -165,14 +174,11 @@ class Trainer:
 
         json.dump(arg_loaded, open(self.project_root + 'args.json', 'w'), indent=4)
 
-    def load_data(self, data_path: str = None, impute: bool = False, remove_outliers: str = None,
-                  selection: bool = False) -> None:
+    def load_data(self, data_path: str = None) -> None:
         """
         Load the data file in ../data directory specified by the 'project' argument in configfile. Data will be splitted
          into training, validation, and testing datasets.
         :param data_path: specify a data file different from 'project'. Default to None.
-        :param impute: Whether to impute absence data in features by sklearn.impute.SimpleImputer. Default to False.
-        :param remove_outliers: Whether to remove all outliers for every feature. std or IQR
         :return: None
         """
         if data_path is None:
@@ -185,147 +191,71 @@ class Trainer:
 
         self.label_name = self.args['label_name']
 
-        if self.use_sequence and 'Sequence' in self.df.columns:
-            self.sequence = [[int(y) if y != 'nan' else np.nan for y in str(x).split('/')] for x in
-                             self.df['Sequence'].values]
+        self.derived_data = {}
+        for deriver, kargs in self.dataderivers:
+            value, name = deriver.derive(self.df, **kargs)
+            self.derived_data[name] = value
 
-            self.deg_layers = np.zeros((len(self.sequence), 4),
-                                       dtype=np.int)  # for 0-deg, pm45-deg, 90-deg, and other directions respectively
+        self._split_dataset()
 
-            for idx, seq in enumerate(self.sequence):
-                self.deg_layers[idx, 0] = seq.count(0)
-                self.deg_layers[idx, 1] = seq.count(45) + seq.count(-45)
-                self.deg_layers[idx, 2] = seq.count(90)
-                self.deg_layers[idx, 3] = len(seq) - seq.count(np.nan) - np.sum(self.deg_layers[idx, :3])
-        elif self.use_sequence and 'Sequence' not in self.df.columns:
-            print('No sequence infomation in the dataframe. use_sequence off.')
-            self.use_sequence = False
-            self.deg_layers = None
-        else:
-            self.deg_layers = None
+        print("Dataset size:", len(self.train_dataset), len(self.val_dataset), len(self.test_dataset))
 
-        self.feature_data, self.label_data, self.tensors, \
-        self.train_dataset, self.val_dataset, self.test_dataset, self.scaler = self._split_dataset(
-            impute=impute,
-            remove_outliers=remove_outliers,
-            selection=selection
-        )
-
-    def _split_dataset(self, impute, remove_outliers, selection):
-        data = self.df[self.feature_names + self.label_name]
-
-        if remove_outliers is not None:
-            print(f'Removing outliers by {remove_outliers}. Original size: {len(data)}')
-            for feature in self.feature_names:
-                if remove_outliers == 'IQR':
-                    Q1 = np.percentile(data[feature].dropna(axis=0), 25, interpolation='midpoint')
-                    Q3 = np.percentile(data[feature].dropna(axis=0), 75, interpolation='midpoint')
-                    IQR = Q3 - Q1
-                    if IQR == 0:
-                        continue
-                    upper = np.where(data[feature] >= (Q3 + 1.5 * IQR))[0]
-                    lower = np.where(data[feature] <= (Q1 - 1.5 * IQR))[0]
-                elif remove_outliers == 'std':
-                    m = np.mean(data[feature].dropna(axis=0))
-                    std = np.std(data[feature].dropna(axis=0))
-                    if std == 0:
-                        continue
-                    upper = np.where(data[feature] >= (m + 3 * std))[0]
-                    lower = np.where(data[feature] <= (m - 3 * std))[0]
-                else:
-                    raise Exception(f'remove_outlier {remove_outliers} not implemented.')
-                data = data.drop(upper)
-                data = data.drop(lower)
-                data.reset_index(drop=True, inplace=True)
-                # print(f'Outliers removed in {feature}, size remaining: {len(data)}')
-
-        if impute:
-            data = data.dropna(axis=0, subset=self.label_name)
-            drop_na_index = data.index
-            data.reset_index(drop=True, inplace=True)
-            imputer = SimpleImputer(strategy="mean")
-            feature_data = pd.DataFrame(
-                data=imputer.fit_transform(data[self.feature_names]), columns=self.feature_names
-            ).astype(np.float32)
-            label_data = data[self.label_name].astype(np.float32)
-        else:
-            data = data.dropna(axis=0)
-            drop_na_index = data.index
-            data.reset_index(drop=True, inplace=True)
-            feature_data = data[self.feature_names].astype(np.float32)
-            label_data = data[self.label_name].astype(np.float32)
-
-        if selection:
-            pass
-            # removed_features = []
-            # for feature in self.feature_names:
-            #     Q1 = np.percentile(feature_data[feature], 25, interpolation='midpoint')
-            #     Q3 = np.percentile(feature_data[feature], 75, interpolation='midpoint')
-            #     IQR = Q3 - Q1
-            #     print(feature, IQR, np.max(feature_data[feature].dropna(axis=0)), np.min(feature_data[feature].dropna(axis=0)))
-            #     if IQR == 0:
-            #         removed_features.append(feature)
-            # print(removed_features)
-
-        X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(
-            self.device
-        )
-        y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(
-            self.device
-        )
-        if self.deg_layers is not None:
-            D = torch.tensor(self.deg_layers[drop_na_index, :], dtype=torch.float32).to(self.device)
-            dataset = Data.TensorDataset(X, D, y)
-        else:
-            D = None
-            dataset = Data.TensorDataset(X, y)
+    def _split_dataset(self):
+        self.feature_data = self.df[self.feature_names]
+        self.label_data = self.df[self.label_name]
+        self.unscaled_feature_data = cp(self.feature_data)
+        self.unscaled_label_data = cp(self.label_data)
+        self.unscaled_derived_data = cp(self.derived_data)
+        data, self.stacked_feature_names, label_name = self._get_tabular_dataset()
+        data = data.dropna(axis=0, subset=label_name)
+        data.reset_index(drop=True, inplace=True)
+        original_length = len(data)
 
         train_val_test = np.array([0.6, 0.2, 0.2])
         if self.split_by == "random":
-            train_size = np.floor(len(label_data) * train_val_test[0]).astype(int)
-            val_size = np.floor(len(label_data) * train_val_test[1]).astype(int)
-            test_size = len(label_data) - train_size - val_size
-            train_dataset, val_dataset, test_dataset = Data.random_split(
-                dataset,
-                [train_size, val_size, test_size],
-                generator=torch.Generator().manual_seed(0),
+            self.train_indices, self.val_indices, self.test_indices = split_by_random(
+                len(data), train_val_test
             )
         elif self.split_by == "material":
             tmp_data = (
-                self.df[self.feature_names + self.label_name + ["Material_Code"]].copy().dropna(axis=0)
+                self.df[label_name + ["Material_Code"]].copy().dropna(axis=0, subset=label_name)
             )
 
             mat_lay = [str(x) for x in tmp_data["Material_Code"].copy()]
             mat_lay_set = list(sorted(set(mat_lay)))
 
-            train_dataset, val_dataset, test_dataset = split_by_material(
-                dataset, mat_lay, mat_lay_set, train_val_test
+            self.train_indices, self.val_indices, self.test_indices = split_by_material(
+                mat_lay, mat_lay_set, train_val_test
             )
         else:
             raise Exception("Split type not implemented")
 
-        print("Dataset size:", len(train_dataset), len(val_dataset), len(test_dataset))
+        for processor in self.dataprocessors:
+            data = processor.fit_transform(data, self)
 
-        scaler = StandardScaler()
-        # scaler = MinMaxScaler()
-        scaler.fit(train_dataset.dataset.tensors[0].cpu().numpy()[train_dataset.indices, :])
-        # torch.data.Dataset.Subset share the same memory, so only transform once.
-        transformed = scaler.transform(train_dataset.dataset.tensors[0].cpu().numpy())
-        train_dataset.dataset.tensors = tuple(
-            [torch.tensor(transformed, dtype=torch.float32).to(self.device)]
-            + list(train_dataset.dataset.tensors[1:])
-        )
-        X = torch.tensor(scaler.transform(X.cpu().numpy()), dtype=torch.float32).to(self.device)
+        # Reset indices
+        dropped_indices = np.setdiff1d(np.arange(original_length), np.array(data.index))
+        self.train_indices = np.array([x - np.count_nonzero(dropped_indices<x) for x in self.train_indices if x in data.index])
+        self.val_indices = np.array([x - np.count_nonzero(dropped_indices < x) for x in self.val_indices if x in data.index])
+        self.test_indices = np.array([x - np.count_nonzero(dropped_indices < x) for x in self.test_indices if x in data.index])
 
-        return (
-            feature_data,
-            label_data,
-            (X, D, y),
-            train_dataset,
-            val_dataset,
-            test_dataset,
-            scaler,
+        # feature_data and label_data does not contain derived data.
+        self.feature_data, self.label_data, self.derived_data = self._divide_from_tabular_dataset(data)
+
+        X = torch.tensor(self.feature_data.values.astype(np.float32), dtype=torch.float32).to(
+            self.device
         )
+        y = torch.tensor(self.label_data.values.astype(np.float32), dtype=torch.float32).to(
+            self.device
+        )
+
+        D = [torch.tensor(value, dtype=torch.float32).to(self.device) for value in self.derived_data.values()]
+        dataset = Data.TensorDataset(X, *D, y)
+
+        self.train_dataset = Subset(dataset, self.train_indices)
+        self.val_dataset = Subset(dataset, self.val_indices)
+        self.test_dataset = Subset(dataset, self.test_indices)
+        self.tensors = (X, *D, y)
 
     def describe(self, transformed=False, save=True):
         tabular = self._get_tabular_dataset(transformed=transformed)[0]
@@ -354,7 +284,7 @@ class Trainer:
 
         from src.core.model import TorchModel
         for modelbase in modelbases_to_train:
-            if issubclass(type(modelbase), TorchModel):
+            if issubclass(type(modelbase), TorchModel) and self.bayes_opt:
                 self.params = modelbase._bayes()
             modelbase._train(verbose=verbose, debug_mode=debug_mode)
 
@@ -375,25 +305,35 @@ class Trainer:
         mode = pd.DataFrame(data=mode.values.reshape(len(mode), 1).T, columns=mode.index, index=['Mode'])
         return mode, cnt_mode, mode_percent
 
-    def _get_tabular_dataset(self, transformed=False):
-        if transformed:
-            feature_data = pd.DataFrame(data=self.scaler.transform(self.feature_data.values),
-                                        columns=self.feature_data.columns)
-        else:
-            feature_data = self.feature_data
+    def _divide_from_tabular_dataset(self, data: pd.DataFrame):
+        feature_data = data[self.feature_names].reset_index(drop=True)
+        label_data = data[self.label_name].reset_index(drop=True)
 
-        if not self.use_sequence:
-            tabular_dataset = pd.concat([feature_data, self.label_data], axis=1)
-            feature_names = self.feature_names
-            label_name = self.label_name
+        derived_data = {}
+        for key, value in self.derived_data.items():
+            names = [f'{key}-{idx}' for idx in range(value.shape[1])] if value.shape[1] > 1 else [key]
+            derived_data[key] = data[names].values
+
+        return feature_data, label_data, derived_data
+
+    def _get_tabular_dataset(self, transformed=False) -> (pd.DataFrame, list, list):
+        if transformed:
+            feature_data = self.feature_data
+            derived_data = self.derived_data
         else:
-            deg_layers_name = ['0-deg layers', '45-deg layers', '90-deg layers',
-                               'Other-deg layers']
-            tabular_dataset = pd.concat([feature_data, self.label_data,
-                                         pd.DataFrame(data=self.deg_layers,
-                                                      columns=deg_layers_name)], axis=1)
-            feature_names = self.feature_names + deg_layers_name
-            label_name = self.label_name
+            feature_data = self.unscaled_feature_data
+            derived_data = self.unscaled_derived_data
+
+        tabular_dataset = pd.concat([feature_data, self.label_data], axis=1)
+        feature_names = cp(self.feature_names)
+        label_name = cp(self.label_name)
+
+        for key, value in derived_data.items():
+            names = [f'{key}-{idx}' for idx in range(value.shape[1])] if value.shape[1] > 1 else [key]
+            tabular_dataset = pd.concat([tabular_dataset,
+                                         pd.DataFrame(data=value,
+                                                      columns=names)], axis=1)
+            feature_names += names
 
         return tabular_dataset, feature_names, label_name
 
@@ -500,7 +440,8 @@ class Trainer:
         def forward_func(data):
             prediction, ground_truth, loss = test_tensor(data,
                                                          self._get_additional_tensors_slice(self.test_dataset.indices),
-                                                         self.tensors[-1][self.test_dataset.indices, :], modelbase.model,
+                                                         self.tensors[-1][self.test_dataset.indices, :],
+                                                         modelbase.model,
                                                          self.loss_fn)
             return loss
 
