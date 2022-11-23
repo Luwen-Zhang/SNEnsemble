@@ -211,8 +211,7 @@ class Trainer:
         self.label_data = self.df[self.label_name]
         self.unscaled_feature_data = cp(self.feature_data)
         self.unscaled_label_data = cp(self.label_data)
-        self.unscaled_derived_data = cp(self.derived_data)
-        data, self.stacked_feature_names, label_name = self._get_tabular_dataset()
+        data, feature_names, label_name = self._get_tabular_dataset()
         data = data.dropna(axis=0, subset=label_name)
         data.reset_index(drop=True, inplace=True)
         original_length = len(data)
@@ -240,16 +239,31 @@ class Trainer:
             data = processor.fit_transform(data, self)
 
         # Reset indices
-        dropped_indices = np.setdiff1d(np.arange(original_length), np.array(data.index))
+        self.retained_indices = np.array(data.index)
+        self.dropped_indices = np.setdiff1d(np.arange(original_length), self.retained_indices)
         self.train_indices = np.array(
-            [x - np.count_nonzero(dropped_indices < x) for x in self.train_indices if x in data.index])
+            [x - np.count_nonzero(self.dropped_indices < x) for x in self.train_indices if x in data.index])
         self.val_indices = np.array(
-            [x - np.count_nonzero(dropped_indices < x) for x in self.val_indices if x in data.index])
+            [x - np.count_nonzero(self.dropped_indices < x) for x in self.val_indices if x in data.index])
         self.test_indices = np.array(
-            [x - np.count_nonzero(dropped_indices < x) for x in self.test_indices if x in data.index])
+            [x - np.count_nonzero(self.dropped_indices < x) for x in self.test_indices if x in data.index])
 
         # feature_data and label_data does not contain derived data.
-        self.feature_data, self.label_data, self.derived_data = self._divide_from_tabular_dataset(data)
+        self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
+
+        # derived data is dropped individually
+        for idx, (key, value) in enumerate(self.derived_data.items()):
+            if self.derived_data[key].shape[0] == original_length:
+                self.derived_data[key] = self.derived_data[key][self.retained_indices, :]
+            else:
+                print(f'Length of derived data {key} is not the number of data points, thus is re-derived.')
+                deriver, kargs = self.dataderivers[idx]
+                value, _, col_names, _ = deriver.derive(self.df.dropna(axis=0, subset=label_name).loc[self.retained_indices, :], **kargs)
+                self.derived_data[key] = value
+                self.derived_data_col_names[key] = col_names
+            if len(self.derived_data[key]) == 0:
+                self.derived_data_col_names.pop(key, None)
+                self.derived_data.pop(key, None)
 
         X = torch.tensor(self.feature_data.values.astype(np.float32), dtype=torch.float32).to(
             self.device
@@ -318,34 +332,18 @@ class Trainer:
         feature_data = data[self.feature_names].reset_index(drop=True)
         label_data = data[self.label_name].reset_index(drop=True)
 
-        derived_data = {}
-        for key, value in self.derived_data.items():
-            names = self.derived_data_col_names[key]
-            derived_data[key] = data[names].values
-
-        return feature_data, label_data, derived_data
+        return feature_data, label_data
 
     def _get_tabular_dataset(self, transformed=False) -> (pd.DataFrame, list, list):
         if transformed:
             feature_data = self.feature_data
-            derived_data = self.derived_data
         else:
             feature_data = self.unscaled_feature_data
-            derived_data = self.unscaled_derived_data
-
-        tabular_dataset = feature_data.copy()
 
         feature_names = cp(self.feature_names)
         label_name = cp(self.label_name)
 
-        for key, value in derived_data.items():
-            names = self.derived_data_col_names[key]
-            tabular_dataset = pd.concat([tabular_dataset,
-                                         pd.DataFrame(data=value,
-                                                      columns=names)], axis=1)
-            feature_names += names
-
-        tabular_dataset = pd.concat([tabular_dataset, self.label_data], axis=1)
+        tabular_dataset = pd.concat([feature_data, self.label_data], axis=1)
 
         return tabular_dataset, feature_names, label_name
 
@@ -586,7 +584,7 @@ class Trainer:
         plt.figure(figsize=(6, 6))
         ax = plt.subplot(111)
         bp = sns.boxplot(
-            data=pd.DataFrame(data=self.scaler.transform(self.feature_data), columns=self.feature_data.columns),
+            data=self.feature_data,
             orient='h', linewidth=1,
             fliersize=4, flierprops={'marker': 'o'})
 
