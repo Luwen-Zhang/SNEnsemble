@@ -541,3 +541,27 @@ def gini(x, w=None):
         cumx = np.cumsum(sorted_x, dtype=float)
         # The above formula, with all weights equal to 1 simplifies to:
         return (n + 1 - 2 * np.sum(cumx) / cumx[-1]) / n
+
+def pretty(value, htchar='\t', lfchar='\n', indent=0):
+    # https://stackoverflow.com/questions/3229419/how-to-pretty-print-nested-dictionaries
+    nlch = lfchar + htchar * (indent + 1)
+    if type(value) is dict:
+        items = [
+            nlch + repr(key) + ': ' + pretty(value[key], htchar, lfchar, indent + 1)
+            for key in value
+        ]
+        return '{%s}' % (','.join(items) + lfchar + htchar * indent)
+    elif type(value) is list:
+        items = [
+            nlch + pretty(item, htchar, lfchar, indent + 1)
+            for item in value
+        ]
+        return '[%s]' % (','.join(items) + lfchar + htchar * indent)
+    elif type(value) is tuple:
+        items = [
+            nlch + pretty(item, htchar, lfchar, indent + 1)
+            for item in value
+        ]
+        return '(%s)' % (','.join(items) + lfchar + htchar * indent)
+    else:
+        return repr(value)

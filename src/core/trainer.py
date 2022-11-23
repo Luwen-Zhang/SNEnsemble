@@ -106,7 +106,7 @@ class Trainer:
                 raise Exception('Variables in \'chosen_params\' and \'SPACEs\' should be in the same order.')
 
         if verbose:
-            print(arg_loaded)
+            print(pretty(arg_loaded))
 
         self.args = arg_loaded
 
