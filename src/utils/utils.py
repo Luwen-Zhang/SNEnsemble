@@ -523,6 +523,8 @@ def debugger_is_active() -> bool:
 def gini(x, w=None):
     # The rest of the code requires numpy arrays.
     x = np.asarray(x)
+    if len(np.unique(x)) == 1:
+        return np.nan
     if w is not None:
         w = np.asarray(w)
         sorted_indices = np.argsort(x)
