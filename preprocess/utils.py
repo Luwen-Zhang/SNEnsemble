@@ -294,3 +294,54 @@ def plot_absence(df_all, name_mapping, figure_name, fontsize=12):
     # plt.close()
     # plt.show()
     plt.close()
+
+def remove_s(x, s):
+    if type(x) == str:
+        if s in x:
+            x = x.replace(s,'')
+            x = float(x)
+    return x
+
+def cal_fraction(x, s):
+    if type(x) == str:
+        if s in x:
+            x = x.split(s)
+            x = (float(x[0])+float(x[1]))/2
+    return x
+
+def conditional_remove(x, s):
+    if type(x) == str:
+        if s in x:
+            return np.nan
+    return x
+
+def conditional_replace(x, s1, s2):
+    if type(x) == str:
+        if s1 in x:
+            x = x.replace(s1, s2)
+    return x
+
+def str2num(x, s, n):
+    if type(x) == str:
+        if s == x:
+            x = n
+    return x
+
+def remove_strs(x):
+    if type(x) == str:
+        return np.nan
+    else:
+        return x
+
+def fill_na(x, n):
+    if np.isnan(x):
+        return n
+    else:
+        return x
+
+
+def modify_col(df, column_name, func, **kargs):
+    if column_name in list(df.columns):
+        col = df[column_name]
+        col = [func(x,**kargs) for x in col]
+        df.loc[:, column_name] = col
