@@ -39,7 +39,7 @@ class BaseConfig:
                     "categories": [32, 64, 128, 256, 512, 1024, 2048, 4096],
                 },
             },
-            "data_processors": ['IQRRemover', 'MeanImputer', 'UnscaledDataRecorder', 'StandardScaler'],
+            "data_processors": ['IQRRemover', 'MeanImputer', 'SingleValueFeatureRemover', 'UnscaledDataRecorder', 'StandardScaler'],
             "data_derivers": {
                 'DegLayerDeriver': {'sequence_column': 'Sequence', 'derived_name': 'deg_layers',
                                     'col_names': ['0-deg layers', '45-deg layers', '90-deg layers',

@@ -62,6 +62,33 @@ class StdRemover(AbstractProcessor):
         return input_data.copy()
 
 
+class SingleValueFeatureRemover(AbstractProcessor):
+    def __init__(self):
+        super(SingleValueFeatureRemover, self).__init__()
+
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+        data = input_data.copy()
+        retain_features = []
+        removed_features = []
+        for feature in trainer.stacked_feature_names:
+            if len(np.unique(data[feature])) == 1:
+                removed_features.append(feature)
+            else:
+                retain_features.append(feature)
+
+        if len(removed_features) > 0:
+            trainer.feature_names = [feature for feature in trainer.feature_names if feature in retain_features]
+            for key, col_names in trainer.derived_data_col_names.items():
+                trainer.derived_data_col_names[key] = [feature for feature in trainer.derived_data_col_names[key] if feature in retain_features]
+                if len(trainer.derived_data_col_names[key]) == 0:
+                    trainer.derived_data_col_names.pop(key, None)
+                    trainer.derived_data.pop(key, None)
+            trainer.stacked_feature_names = retain_features
+            print(f'{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features retained: {retain_features}.')
+
+        return data[retain_features + trainer.label_name]
+
+
 class UnscaledDataRecorder(AbstractProcessor):
     def __init__(self):
         super(UnscaledDataRecorder, self).__init__()
@@ -155,6 +182,8 @@ processor_mapping = {
     'MeanImputer': MeanImputer(),
     'NaNImputer': NaNImputer(),
     'StandardScaler': StandardScaler()
+    'StandardScaler': StandardScaler(),
+    'SingleValueFeatureRemover': SingleValueFeatureRemover(),
 }
 
 
