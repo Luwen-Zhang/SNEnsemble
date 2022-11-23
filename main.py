@@ -12,7 +12,7 @@ trainer.describe()
 models = [
     AutoGluon(trainer),
     PytorchTabular(trainer),
-    TabNet(trainer),
+    # TabNet(trainer),
     ThisWork(trainer)
 ]
 

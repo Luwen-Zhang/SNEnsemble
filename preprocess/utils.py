@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib
 import re
+from pandas.api.types import is_numeric_dtype
 
 clr = sns.color_palette("deep")
 
@@ -68,8 +69,10 @@ def averaging(df_original, measure_features):
         for cor in all_correlation:
             if len(cor) > 1:
                 df_avg = df_original.loc[[cor[0]], :].copy()
-                mean_values = df_original.loc[cor, :].mean()
-                df_avg[mean_values.index] = mean_values.values
+                for col in df_original.columns:
+                    tmp = df_original.loc[cor, col]
+                    if is_numeric_dtype(tmp):
+                        df_avg[col] = np.mean(tmp)
                 df_final = pd.concat([df_final, df_avg], ignore_index=True, axis=0)
             elif len(cor) == 1:
                 df_final = pd.concat([df_final, df_original.loc[[cor[0]], :]], ignore_index=True, axis=0)
