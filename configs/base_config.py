@@ -41,7 +41,9 @@ class BaseConfig:
             },
             "data_processors": ['IQRRemover', 'MeanImputer', 'UnscaledDataRecorder', 'StandardScaler'],
             "data_derivers": {
-                'DegLayerDeriver': {'sequence_column': 'Sequence', 'derived_name': 'deg_layers'},
+                'DegLayerDeriver': {'sequence_column': 'Sequence', 'derived_name': 'deg_layers',
+                                    'col_names': ['0-deg layers', '45-deg layers', '90-deg layers',
+                                                  'Other-deg layers']},
             },
             "feature_names_type": {},
             "feature_types": ["Fatigue loading", "Material"],

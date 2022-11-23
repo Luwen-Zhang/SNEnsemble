@@ -192,9 +192,11 @@ class Trainer:
         self.label_name = self.args['label_name']
 
         self.derived_data = {}
+        self.derived_data_col_names = {}
         for deriver, kargs in self.dataderivers:
-            value, name = deriver.derive(self.df, **kargs)
+            value, name, col_names = deriver.derive(self.df, **kargs)
             self.derived_data[name] = value
+            self.derived_data_col_names[name] = col_names
 
         self._split_dataset()
 
@@ -311,7 +313,7 @@ class Trainer:
 
         derived_data = {}
         for key, value in self.derived_data.items():
-            names = [f'{key}-{idx}' for idx in range(value.shape[1])] if value.shape[1] > 1 else [key]
+            names = self.derived_data_col_names[key]
             derived_data[key] = data[names].values
 
         return feature_data, label_data, derived_data
@@ -329,7 +331,7 @@ class Trainer:
         label_name = cp(self.label_name)
 
         for key, value in derived_data.items():
-            names = [f'{key}-{idx}' for idx in range(value.shape[1])] if value.shape[1] > 1 else [key]
+            names = self.derived_data_col_names[key]
             tabular_dataset = pd.concat([tabular_dataset,
                                          pd.DataFrame(data=value,
                                                       columns=names)], axis=1)
