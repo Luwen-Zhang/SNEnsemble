@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class AbstractDeriver:
     def __init__(self):
         pass
@@ -15,6 +16,7 @@ class AbstractDeriver:
     def _check_arg(self, arg, name):
         if arg is None:
             raise Exception(f'Derivation: {name} should be specified for deriver {self.__class__.__name__}')
+
 
 class DegLayerDeriver(AbstractDeriver):
     def __init__(self):
@@ -39,9 +41,11 @@ class DegLayerDeriver(AbstractDeriver):
             deg_layers[idx, 2] = seq.count(90)
             deg_layers[idx, 3] = len(seq) - seq.count(np.nan) - np.sum(deg_layers[idx, :3])
 
-        names = self._generate_col_names(derived_name, deg_layers.shape[1]) if col_names is None or len(col_names) != deg_layers.shape[1] else col_names
+        names = self._generate_col_names(derived_name, deg_layers.shape[1]) if col_names is None or len(col_names) != \
+                                                                               deg_layers.shape[1] else col_names
 
         return deg_layers, derived_name, names
+
 
 deriver_mapping = {
     'DegLayerDeriver': DegLayerDeriver(),

@@ -70,7 +70,7 @@ def train(model, train_loader, optimizer, loss_fn):
         optimizer.zero_grad()
         yhat = tensors[-1]
         data = tensors[0]
-        additional_tensors = tensors[1 : len(tensors) - 1]
+        additional_tensors = tensors[1: len(tensors) - 1]
         y = model(data, additional_tensors)
         loss = loss_fn(yhat, y)
         loss.backward()
@@ -91,7 +91,7 @@ def test(model, test_loader, loss_fn):
         for idx, tensors in enumerate(test_loader):
             yhat = tensors[-1]
             data = tensors[0]
-            additional_tensors = tensors[1 : len(tensors) - 1]
+            additional_tensors = tensors[1: len(tensors) - 1]
             y = model(data, additional_tensors)
             loss = loss_fn(yhat, y)
             avg_loss += loss.item() * len(y)
@@ -133,7 +133,9 @@ def split_by_material(mat_lay, mat_lay_set, train_val_test):
     # val_dataset = Subset(dataset, mat_lay_index(val_mat_lay, mat_lay))
     # test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
 
-    return mat_lay_index(train_mat_lay, mat_lay), mat_lay_index(val_mat_lay, mat_lay), mat_lay_index(test_mat_lay, mat_lay)
+    return mat_lay_index(train_mat_lay, mat_lay), mat_lay_index(val_mat_lay, mat_lay), mat_lay_index(test_mat_lay,
+                                                                                                     mat_lay)
+
 
 def split_by_random(length, train_val_test):
     train_indices, test_indices = train_test_split(
@@ -146,6 +148,7 @@ def split_by_random(length, train_val_test):
     )
 
     return train_indices, val_indices, test_indices
+
 
 def plot_importance(ax, features, attr, pal, clr_map, **kargs):
     df = pd.DataFrame(columns=["feature", "attr", "clr"])
@@ -209,7 +212,7 @@ def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_siz
 
 
 def plot_pdp(
-    feature_names, x_values_list, mean_pdp_list, X, hist_indices, log_trans=True, lower_lim=2, upper_lim=7
+        feature_names, x_values_list, mean_pdp_list, X, hist_indices, log_trans=True, lower_lim=2, upper_lim=7
 ):
     max_col = 4
     if len(feature_names) > max_col:
@@ -241,7 +244,7 @@ def plot_pdp(
         ax.set_xlim([0, 1])
         if log_trans:
             ax.set_yscale("log")
-            ax.set_ylim([10**lower_lim, 10**upper_lim])
+            ax.set_ylim([10 ** lower_lim, 10 ** upper_lim])
             locmin = matplotlib.ticker.LogLocator(
                 base=10.0, subs=[0.1 * x for x in range(10)], numticks=20
             )
@@ -357,8 +360,8 @@ def set_truth_pred(ax, log_trans=True, upper_lim=9):
         ax.set_yscale("log")
 
         ax.plot(
-            np.linspace(0, 10**upper_lim, 100),
-            np.linspace(0, 10**upper_lim, 100),
+            np.linspace(0, 10 ** upper_lim, 100),
+            np.linspace(0, 10 ** upper_lim, 100),
             "--",
             c="grey",
             alpha=0.2,
@@ -374,8 +377,8 @@ def set_truth_pred(ax, log_trans=True, upper_lim=9):
         ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
         ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
 
-        ax.set_xlim(1, 10**upper_lim)
-        ax.set_ylim(1, 10**upper_lim)
+        ax.set_xlim(1, 10 ** upper_lim)
+        ax.set_ylim(1, 10 ** upper_lim)
         ax.set_box_aspect(1)
     else:
         # ax.set_aspect("equal", "box")
@@ -409,7 +412,7 @@ class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
     def __init__(
-        self, patience=7, verbose=False, delta=0, path="checkpoint.pt", trace_func=print
+            self, patience=7, verbose=False, delta=0, path="checkpoint.pt", trace_func=print
     ):
         """
         Args:
@@ -542,6 +545,7 @@ def gini(x, w=None):
         cumx = np.cumsum(sorted_x, dtype=float)
         # The above formula, with all weights equal to 1 simplifies to:
         return (n + 1 - 2 * np.sum(cumx) / cumx[-1]) / n
+
 
 def pretty(value, htchar='\t', lfchar='\n', indent=0):
     # https://stackoverflow.com/questions/3229419/how-to-pretty-print-nested-dictionaries

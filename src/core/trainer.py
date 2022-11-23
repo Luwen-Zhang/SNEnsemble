@@ -237,9 +237,12 @@ class Trainer:
 
         # Reset indices
         dropped_indices = np.setdiff1d(np.arange(original_length), np.array(data.index))
-        self.train_indices = np.array([x - np.count_nonzero(dropped_indices<x) for x in self.train_indices if x in data.index])
-        self.val_indices = np.array([x - np.count_nonzero(dropped_indices < x) for x in self.val_indices if x in data.index])
-        self.test_indices = np.array([x - np.count_nonzero(dropped_indices < x) for x in self.test_indices if x in data.index])
+        self.train_indices = np.array(
+            [x - np.count_nonzero(dropped_indices < x) for x in self.train_indices if x in data.index])
+        self.val_indices = np.array(
+            [x - np.count_nonzero(dropped_indices < x) for x in self.val_indices if x in data.index])
+        self.test_indices = np.array(
+            [x - np.count_nonzero(dropped_indices < x) for x in self.test_indices if x in data.index])
 
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data, self.derived_data = self._divide_from_tabular_dataset(data)

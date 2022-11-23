@@ -3,6 +3,7 @@ import pandas as pd
 from copy import deepcopy as cp
 import numpy as np
 
+
 class AbstractProcessor:
     def __init__(self):
         pass
@@ -108,6 +109,7 @@ class MeanImputer(AbstractTransformer):
         return pd.DataFrame(data=self.transformer.transform(input_data[trainer.stacked_feature_names]),
                             columns=trainer.stacked_feature_names).astype(np.float32)
 
+
 class NaNImputer(AbstractTransformer):
     def __init__(self):
         super(NaNImputer, self).__init__()
@@ -119,6 +121,7 @@ class NaNImputer(AbstractTransformer):
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
         data = input_data.copy()
         return data.dropna(axis=0, subset=trainer.stacked_feature_names)
+
 
 class StandardScaler(AbstractTransformer):
     def __init__(self):
