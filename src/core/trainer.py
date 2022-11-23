@@ -253,12 +253,14 @@ class Trainer:
 
         # derived data is dropped individually
         for idx, (key, value) in enumerate(self.derived_data.items()):
-            if self.derived_data[key].shape[0] == original_length:
+            if self.derived_data[key].shape[0] == len(self.df) and len(self.derived_data[key].shape) == 2:
                 self.derived_data[key] = self.derived_data[key][self.retained_indices, :]
             else:
                 print(f'Length of derived data {key} is not the number of data points, thus is re-derived.')
                 deriver, kargs = self.dataderivers[idx]
-                value, _, col_names, _ = deriver.derive(self.df.dropna(axis=0, subset=label_name).loc[self.retained_indices, :], **kargs)
+                value, _, col_names, _ = deriver.derive(
+                    self.df.dropna(axis=0, subset=label_name).reset_index(drop=True).loc[self.retained_indices, :],
+                    **kargs)
                 self.derived_data[key] = value
                 self.derived_data_col_names[key] = col_names
             if len(self.derived_data[key]) == 0:
@@ -278,7 +280,7 @@ class Trainer:
         self.train_dataset = Subset(dataset, self.train_indices)
         self.val_dataset = Subset(dataset, self.val_indices)
         self.test_dataset = Subset(dataset, self.test_indices)
-        self.tensors = (X, *D, y) if len(D)>0 else (X, None, y)
+        self.tensors = (X, *D, y) if len(D) > 0 else (X, None, y)
 
     def describe(self, transformed=False, save=True):
         tabular = self._get_tabular_dataset(transformed=transformed)[0]
