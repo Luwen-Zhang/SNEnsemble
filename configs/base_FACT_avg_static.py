@@ -42,7 +42,7 @@ class config(BaseConfig):
                 # 'Temperature',
                 # 'Relative Humidity',
             },
-            'feature_types': ['Fatigue loading', 'Material'],
+            'feature_types': ['Fatigue loading', 'Material', 'Derived'],
             'label_name': ['log(Static Maximum Tensile Stress)'],
         }
 

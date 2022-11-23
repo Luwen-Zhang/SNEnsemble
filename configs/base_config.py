@@ -43,9 +43,10 @@ class BaseConfig:
             "data_derivers": {
                 'DegLayerDeriver': {'sequence_column': 'Sequence', 'derived_name': 'deg_layers',
                                     'col_names': ['0-deg layers', '45-deg layers', '90-deg layers',
-                                                  'Other-deg layers']},
+                                                  'Other-deg layers'],
+                                    'stacked': True},
             },
             "feature_names_type": {},
-            "feature_types": ["Fatigue loading", "Material"],
+            "feature_types": ["Fatigue loading", "Material", "Derived"],
             "label_name": ["Cycles to Failure"],
         }

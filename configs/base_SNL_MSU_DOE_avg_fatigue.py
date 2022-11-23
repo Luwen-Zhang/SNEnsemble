@@ -31,7 +31,7 @@ class config(BaseConfig):
                 "Static Maximum Tensile Strain": 1,
                 "Static Elastic Modulus": 1,
             },
-            'feature_types': ['Fatigue loading', 'Material'],
+            'feature_types': ['Fatigue loading', 'Material', 'Derived'],
             'label_name': ['log(Cycles to Failure)'],
 
         }

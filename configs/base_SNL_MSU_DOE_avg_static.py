@@ -24,7 +24,7 @@ class config(BaseConfig):
                 "Thickness": 1,
                 "Initial Elastic Modulus": 1,
             },
-            "feature_types": ["Fatigue loading", "Material"],
+            'feature_types': ['Fatigue loading', 'Material', 'Derived'],
             "label_name": ["log(Static Maximum Tensile Stress)"],
         }
 

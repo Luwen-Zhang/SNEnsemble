@@ -22,7 +22,7 @@ class IQRRemover(AbstractProcessor):
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
         print(f'Removing outliers by IQR. Original size: {len(input_data)}')
         data = input_data.copy()
-        for feature in trainer.feature_names:
+        for feature in trainer.stacked_feature_names:
             Q1 = np.percentile(data[feature].dropna(axis=0), 25, interpolation='midpoint')
             Q3 = np.percentile(data[feature].dropna(axis=0), 75, interpolation='midpoint')
             IQR = Q3 - Q1
@@ -46,7 +46,7 @@ class StdRemover(AbstractProcessor):
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
         print(f'Removing outliers by std. Original size: {len(input_data)}')
         data = input_data.copy()
-        for feature in trainer.feature_names:
+        for feature in trainer.stacked_feature_names:
             m = np.mean(data[feature].dropna(axis=0))
             std = np.std(data[feature].dropna(axis=0))
             if std == 0:
@@ -181,7 +181,6 @@ processor_mapping = {
     'UnscaledDataRecorder': UnscaledDataRecorder(),
     'MeanImputer': MeanImputer(),
     'NaNImputer': NaNImputer(),
-    'StandardScaler': StandardScaler()
     'StandardScaler': StandardScaler(),
     'SingleValueFeatureRemover': SingleValueFeatureRemover(),
 }

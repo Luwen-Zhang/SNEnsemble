@@ -52,7 +52,7 @@ class config(BaseConfig):
                 # 'Relative Maximum Stress': 'Relative Maximum Stress',
                 # 'Relative Peak-to-peak Stress': 'Relative Peak-to-peak Stress',
             },
-            "feature_types": ["Fatigue loading", "Material"],
+            'feature_types': ['Fatigue loading', 'Material', 'Derived'],
             "label_name": ["log(Static Maximum Tensile Stress)"],
         }
 

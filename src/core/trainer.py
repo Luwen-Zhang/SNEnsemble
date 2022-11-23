@@ -194,9 +194,13 @@ class Trainer:
         self.derived_data = {}
         self.derived_data_col_names = {}
         for deriver, kargs in self.dataderivers:
-            value, name, col_names = deriver.derive(self.df, **kargs)
-            self.derived_data[name] = value
-            self.derived_data_col_names[name] = col_names
+            value, name, col_names, stacked = deriver.derive(self.df, **kargs)
+            if not stacked:
+                self.derived_data[name] = value
+                self.derived_data_col_names[name] = col_names
+            else:
+                self.feature_names += col_names
+                self.df = pd.concat([self.df, pd.DataFrame(data=value, columns=col_names)], axis=1)
 
         self._split_dataset()
 
@@ -260,7 +264,7 @@ class Trainer:
         self.train_dataset = Subset(dataset, self.train_indices)
         self.val_dataset = Subset(dataset, self.val_indices)
         self.test_dataset = Subset(dataset, self.test_indices)
-        self.tensors = (X, *D, y)
+        self.tensors = (X, *D, y) if len(D)>0 else (X, None, y)
 
     def describe(self, transformed=False, save=True):
         tabular = self._get_tabular_dataset(transformed=transformed)[0]
@@ -458,7 +462,9 @@ class Trainer:
 
         clr = sns.color_palette('deep')
 
-        pal = [clr[self.args['feature_names_type'][x]] for x in self.feature_names]
+        # if feature type is not assigned in config files, the feature is from dataderiver.
+        pal = [clr[self.args['feature_names_type'][x]] if x in self.args['feature_names_type'].keys() else clr[
+            len(self.args['feature_types']) - 1] for x in self.feature_names]
 
         clr_map = dict()
         for idx, feature_type in enumerate(self.args['feature_types']):
@@ -567,7 +573,7 @@ class Trainer:
         plt.close()
 
     def plot_pairplot(self, **kargs):
-        df_all = pd.concat([self.feature_data, self.label_data], axis=1)
+        df_all = pd.concat([self.unscaled_feature_data, self.unscaled_label_data], axis=1)
         sns.pairplot(df_all, corner=True, diag_kind='kde', **kargs)
         plt.tight_layout()
         plt.savefig(self.project_root + 'pair.jpg')
