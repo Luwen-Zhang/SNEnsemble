@@ -329,7 +329,8 @@ class Trainer:
             feature_data = self.unscaled_feature_data
             derived_data = self.unscaled_derived_data
 
-        tabular_dataset = pd.concat([feature_data, self.label_data], axis=1)
+        tabular_dataset = feature_data.copy()
+
         feature_names = cp(self.feature_names)
         label_name = cp(self.label_name)
 
@@ -339,6 +340,8 @@ class Trainer:
                                          pd.DataFrame(data=value,
                                                       columns=names)], axis=1)
             feature_names += names
+
+        tabular_dataset = pd.concat([tabular_dataset, self.label_data], axis=1)
 
         return tabular_dataset, feature_names, label_name
 
