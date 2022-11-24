@@ -314,6 +314,9 @@ class Trainer:
                 self.params = modelbase._bayes()
             modelbase._train(verbose=verbose, debug_mode=debug_mode)
 
+    def _get_derived_data_sizes(self):
+        return [x.shape for x in self.derived_data.values()]
+
     @staticmethod
     def _get_gini(tabular):
         return pd.DataFrame(data=np.array([[gini(tabular[x]) for x in tabular.columns]]), columns=tabular.columns,

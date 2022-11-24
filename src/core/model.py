@@ -634,7 +634,8 @@ class ThisWork(TorchModel):
 
     def _new_model(self):
         if self.trainer.model_name == 'MLP':
-            return NN(len(self.trainer.feature_names), len(self.trainer.label_name), self.trainer.layers).to(self.trainer.device)
+            return NN(len(self.trainer.feature_names), len(self.trainer.label_name), self.trainer.layers,
+                      self.trainer._get_derived_data_sizes()).to(self.trainer.device)
         else:
             raise Exception(f'Model {self.trainer.model_name} not implemented.')
 
