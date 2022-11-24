@@ -193,11 +193,13 @@ class Trainer:
 
         self.derived_data = {}
         self.derived_data_col_names = {}
+        self.derivation_related_cols = []
         for deriver, kargs in self.dataderivers:
-            value, name, col_names, stacked = deriver.derive(self.df, **kargs)
+            value, name, col_names, stacked, related_columns = deriver.derive(self.df, **kargs)
             if not stacked:
                 self.derived_data[name] = value
                 self.derived_data_col_names[name] = col_names
+                self.derivation_related_cols += related_columns
             else:
                 self.feature_names += col_names
                 self.df = pd.concat([self.df, pd.DataFrame(data=value, columns=col_names)], axis=1)
@@ -207,13 +209,14 @@ class Trainer:
         print("Dataset size:", len(self.train_dataset), len(self.val_dataset), len(self.test_dataset))
 
     def _split_dataset(self):
-        self.feature_data = self.df[self.feature_names]
-        self.label_data = self.df[self.label_name]
+        original_data = self.df.copy().dropna(axis=0, subset=self.label_name + self.derivation_related_cols)
+        self.feature_data = original_data[self.feature_names]
+        self.label_data = original_data[self.label_name]
         self.unscaled_feature_data = cp(self.feature_data)
         self.unscaled_label_data = cp(self.label_data)
         data, feature_names, label_name = self._get_tabular_dataset()
-        data = data.dropna(axis=0, subset=label_name)
         data.reset_index(drop=True, inplace=True)
+        original_data.reset_index(drop=True, inplace=True)
         original_length = len(data)
 
         train_val_test = np.array([0.6, 0.2, 0.2])
@@ -222,11 +225,7 @@ class Trainer:
                 len(data), train_val_test
             )
         elif self.split_by == "material":
-            tmp_data = (
-                self.df[label_name + ["Material_Code"]].copy().dropna(axis=0, subset=label_name)
-            )
-
-            mat_lay = [str(x) for x in tmp_data["Material_Code"].copy()]
+            mat_lay = [str(x) for x in original_data["Material_Code"].copy()]
             mat_lay_set = list(sorted(set(mat_lay)))
 
             self.train_indices, self.val_indices, self.test_indices = split_by_material(
@@ -250,21 +249,15 @@ class Trainer:
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
 
-        # derived data is dropped individually
-        for idx, (key, value) in enumerate(self.derived_data.items()):
-            if self.derived_data[key].shape[0] == len(self.df) and len(self.derived_data[key].shape) == 2:
-                self.derived_data[key] = self.derived_data[key][self.retained_indices, :]
-            else:
-                print(f'Length of derived data {key} is not the number of data points, thus is re-derived.')
-                deriver, kargs = self.dataderivers[idx]
-                value, _, col_names, _ = deriver.derive(
-                    self.df.dropna(axis=0, subset=label_name).reset_index(drop=True).loc[self.retained_indices, :],
-                    **kargs)
-                self.derived_data[key] = value
-                self.derived_data_col_names[key] = col_names
-            if len(self.derived_data[key]) == 0:
-                self.derived_data_col_names.pop(key, None)
-                self.derived_data.pop(key, None)
+        # derived data is re-derived
+        for deriver, kargs in self.dataderivers:
+            if kargs['derived_name'] in self.derived_data.keys():
+                value, name, col_names, _, _ = deriver.derive(original_data.loc[self.retained_indices, :], **kargs)
+                self.derived_data[name] = value
+                self.derived_data_col_names[name] = col_names
+                if len(self.derived_data[name]) == 0:
+                    self.derived_data_col_names.pop(name, None)
+                    self.derived_data.pop(name, None)
 
         self._update_dataset()
 
