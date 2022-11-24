@@ -7,7 +7,7 @@ class TrainerAssembly:
     def __init__(self, trainer_paths: list, projects=None):
         self.trainers = [load_trainer(path) for path in trainer_paths]
         self.projects = [trainer.project for trainer in self.trainers] if projects is None else projects
-        self.project_root = 'output/assembly/' + '_'.join([trainer.project for trainer in self.trainers]) + '/'
+        self.project_root = 'output/assembly/' + '_'.join([trainer.configfile for trainer in self.trainers]) + '/'
         if not os.path.exists('output/assembly/'):
             os.mkdir('output/assembly/')
         if not os.path.exists(self.project_root):
@@ -57,10 +57,11 @@ class TrainerAssembly:
         markers = ['o', 'v', '^', 's', '<', '>']
         dfs = []
         metrics = ['rmse', 'mse', 'mae', 'mape', 'r2']
-        programs = ['ThisWork', 'AutoGluon', 'PytorchTabular', 'TabNet'] if programs is None else programs
+        programs = ['ThisWork', 'AutoGluon', 'PytorchTabular'] if programs is None else programs
         selected_projects = project_subset if project_subset is not None else self.projects
 
         for program in programs:
+            print(f'\n-------------------- Program: {program} --------------------\n')
             unique_model_names = []
             all_model_names = []
             all_predictions = []
