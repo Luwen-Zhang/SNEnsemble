@@ -235,8 +235,7 @@ class Trainer:
         else:
             raise Exception("Split type not implemented")
 
-        for processor in self.dataprocessors:
-            data = processor.fit_transform(data, self)
+        data = self._data_preprocess(data)
 
         # Reset indices
         self.retained_indices = np.array(data.index)
@@ -267,6 +266,15 @@ class Trainer:
                 self.derived_data_col_names.pop(key, None)
                 self.derived_data.pop(key, None)
 
+        self._update_dataset()
+
+    def _data_preprocess(self, input_data: pd.DataFrame):
+        data = input_data.copy()
+        for processor in self.dataprocessors:
+            data = processor.fit_transform(data, self)
+        return data
+
+    def _update_dataset(self):
         X = torch.tensor(self.feature_data.values.astype(np.float32), dtype=torch.float32).to(
             self.device
         )
