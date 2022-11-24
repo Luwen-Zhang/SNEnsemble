@@ -69,6 +69,8 @@ class Trainer:
             for key in base_config.keys():
                 if type(base_config[key]) in [str, int, float]:
                     parser.add_argument(f'--{key}', type=type(base_config[key]), required=False)
+                elif type(base_config[key]) == list:
+                    parser.add_argument(f'--{key}', nargs='+', required=False)
                 elif type(base_config[key]) == bool:
                     parser.add_argument(f'--{key}', dest=key, action='store_true')
                     parser.add_argument(f'--no-{key}', dest=key, action='store_false')
