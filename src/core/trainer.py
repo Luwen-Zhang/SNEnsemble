@@ -197,7 +197,12 @@ class Trainer:
         self.derived_data_col_names = {}
         self.derivation_related_cols = []
         for deriver, kargs in self.dataderivers:
-            value, name, col_names, stacked, related_columns = deriver.derive(self.df, **kargs)
+            try:
+                value, name, col_names, stacked, related_columns = deriver.derive(self.df, **kargs)
+            except Exception as e:
+                print(f'Skip deriver {deriver.__class__.__name__} because of the following exception:')
+                print(f'\t{e}')
+                continue
             if not stacked:
                 self.derived_data[name] = value
                 self.derived_data_col_names[name] = col_names

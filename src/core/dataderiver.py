@@ -9,13 +9,20 @@ class AbstractDeriver:
         raise NotImplementedError
 
     @staticmethod
-    def _generate_col_names(derived_name, length):
-        names = [f'{derived_name}-{idx}' for idx in range(length)] if length > 1 else [derived_name]
+    def _generate_col_names(derived_name, length, col_names):
+        if col_names is None or len(col_names) != length:
+            names = [f'{derived_name}-{idx}' for idx in range(length)] if length > 1 else [derived_name]
+        else:
+            names = col_names
         return names
 
     def _check_arg(self, arg, name):
         if arg is None:
             raise Exception(f'Derivation: {name} should be specified for deriver {self.__class__.__name__}')
+
+    def _check_exist(self, df, arg, name):
+        if arg not in df.columns:
+            raise Exception(f'Derivation: {name} is not a valid column in df for deriver {self.__class__.__name__}.')
 
 
 class DegLayerDeriver(AbstractDeriver):
@@ -25,9 +32,7 @@ class DegLayerDeriver(AbstractDeriver):
     def derive(self, df, sequence_column=None, derived_name=None, col_names=None, stacked=True):
         self._check_arg(sequence_column, 'sequence_column')
         self._check_arg(derived_name, 'derived_name')
-
-        if sequence_column not in df.columns:
-            raise Exception(f'Derivation: {sequence_column} is not a valid column.')
+        self._check_exist(df, sequence_column, 'sequence_column')
 
         sequence = [[int(y) if y != 'nan' else np.nan for y in str(x).split('/')] for x in
                     df['Sequence'].values]
@@ -41,16 +46,36 @@ class DegLayerDeriver(AbstractDeriver):
             deg_layers[idx, 2] = seq.count(90)
             deg_layers[idx, 3] = len(seq) - seq.count(np.nan) - np.sum(deg_layers[idx, :3])
 
-        names = self._generate_col_names(derived_name, deg_layers.shape[1]) if col_names is None or len(col_names) != \
-                                                                               deg_layers.shape[1] else col_names
+        names = self._generate_col_names(derived_name, deg_layers.shape[1], col_names)
 
         related_columns = [sequence_column]
 
         return deg_layers, derived_name, names, stacked, related_columns
 
 
+class MeanStressDeriver(AbstractDeriver):
+    def __init__(self):
+        super(MeanStressDeriver, self).__init__()
+
+    def derive(self, df, derived_name=None, col_names=None, stacked=True, maximum_col=None, p2p_col=None):
+        self._check_arg(maximum_col, 'maximum_col')
+        self._check_arg(p2p_col, 'p2p_col')
+        self._check_arg(derived_name, 'derived_name')
+        self._check_exist(df, maximum_col, 'maximum_col')
+        self._check_exist(df, p2p_col, 'p2p_col')
+
+        mean_stress = df[maximum_col] - df[p2p_col] / 2
+        mean_stress = mean_stress.values
+
+        names = self._generate_col_names(derived_name, 1, col_names)
+        related_columns = [maximum_col, p2p_col]
+
+        return mean_stress, derived_name, names, stacked, related_columns
+
+
 deriver_mapping = {
     'DegLayerDeriver': DegLayerDeriver(),
+    'MeanStressDeriver': MeanStressDeriver(),
 }
 
 
