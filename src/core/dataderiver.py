@@ -30,8 +30,8 @@ class DegLayerDeriver(AbstractDeriver):
         super(DegLayerDeriver, self).__init__()
 
     def derive(self, df, sequence_column=None, derived_name=None, col_names=None, stacked=True):
-        self._check_arg(sequence_column, 'sequence_column')
         self._check_arg(derived_name, 'derived_name')
+        self._check_arg(sequence_column, 'sequence_column')
         self._check_exist(df, sequence_column, 'sequence_column')
 
         sequence = [[int(y) if y != 'nan' else np.nan for y in str(x).split('/')] for x in
@@ -58,9 +58,9 @@ class MeanStressDeriver(AbstractDeriver):
         super(MeanStressDeriver, self).__init__()
 
     def derive(self, df, derived_name=None, col_names=None, stacked=True, maximum_col=None, p2p_col=None):
+        self._check_arg(derived_name, 'derived_name')
         self._check_arg(maximum_col, 'maximum_col')
         self._check_arg(p2p_col, 'p2p_col')
-        self._check_arg(derived_name, 'derived_name')
         self._check_exist(df, maximum_col, 'maximum_col')
         self._check_exist(df, p2p_col, 'p2p_col')
 
@@ -73,9 +73,30 @@ class MeanStressDeriver(AbstractDeriver):
         return mean_stress, derived_name, names, stacked, related_columns
 
 
+class RelativeDeriver(AbstractDeriver):
+    def __init__(self):
+        super(RelativeDeriver, self).__init__()
+
+    def derive(self, df, derived_name=None, col_names=None, stacked=True, absolute_col=None, relative2_col=None):
+        self._check_arg(derived_name, 'derived_name')
+        self._check_arg(absolute_col, 'absolute_col')
+        self._check_arg(relative2_col, 'relative2_col')
+        self._check_exist(df, absolute_col, 'absolute_col')
+        self._check_exist(df, relative2_col, 'relative2_col')
+
+        relative = df[absolute_col] / df[relative2_col]
+        relative = relative.values
+
+        names = self._generate_col_names(derived_name, 1, col_names)
+        related_columns = [absolute_col, relative2_col]
+
+        return relative, derived_name, names, stacked, related_columns
+
+
 deriver_mapping = {
     'DegLayerDeriver': DegLayerDeriver(),
     'MeanStressDeriver': MeanStressDeriver(),
+    'RelativeDeriver': RelativeDeriver(),
 }
 
 
