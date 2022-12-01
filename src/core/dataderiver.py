@@ -57,18 +57,18 @@ class MeanStressDeriver(AbstractDeriver):
     def __init__(self):
         super(MeanStressDeriver, self).__init__()
 
-    def derive(self, df, derived_name=None, col_names=None, stacked=True, maximum_col=None, p2p_col=None):
+    def derive(self, df, derived_name=None, col_names=None, stacked=True, abs_maximum_col=None, p2p_col=None):
         self._check_arg(derived_name, 'derived_name')
-        self._check_arg(maximum_col, 'maximum_col')
+        self._check_arg(abs_maximum_col, 'abs_maximum_col')
         self._check_arg(p2p_col, 'p2p_col')
-        self._check_exist(df, maximum_col, 'maximum_col')
+        self._check_exist(df, abs_maximum_col, 'abs_maximum_col')
         self._check_exist(df, p2p_col, 'p2p_col')
 
-        mean_stress = df[maximum_col] - df[p2p_col] / 2
+        mean_stress = df[abs_maximum_col] - np.sign(df[abs_maximum_col]) * df[p2p_col] / 2
         mean_stress = mean_stress.values
 
         names = self._generate_col_names(derived_name, 1, col_names)
-        related_columns = [maximum_col, p2p_col]
+        related_columns = [abs_maximum_col, p2p_col]
 
         return mean_stress, derived_name, names, stacked, related_columns
 
