@@ -374,7 +374,7 @@ class Trainer:
 
         return tabular_dataset, feature_names, label_name
 
-    def get_leaderboard(self, test_data_only: bool = True) -> pd.DataFrame:
+    def get_leaderboard(self, test_data_only: bool = True, dump_trainer=True) -> pd.DataFrame:
         """
         Run all baseline models and the model in this work for a leaderboard.
         :param test_data_only: False to get metrics on training and validation datasets. Default to True.
@@ -395,6 +395,9 @@ class Trainer:
         df_leaderboard.reset_index(drop=True, inplace=True)
         df_leaderboard = df_leaderboard[['Program'] + list(df_leaderboard.columns)[:-1]]
         df_leaderboard.to_csv(self.project_root + 'leaderboard.csv')
+        self.leaderboard = df_leaderboard
+        if dump_trainer:
+            save_trainer(self)
         return df_leaderboard
 
     def plot_loss(self, train_ls, val_ls):
