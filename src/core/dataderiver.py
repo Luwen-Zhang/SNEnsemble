@@ -53,26 +53,6 @@ class DegLayerDeriver(AbstractDeriver):
         return deg_layers, derived_name, names, stacked, related_columns
 
 
-class MeanStressDeriver(AbstractDeriver):
-    def __init__(self):
-        super(MeanStressDeriver, self).__init__()
-
-    def derive(self, df, derived_name=None, col_names=None, stacked=True, abs_maximum_col=None, p2p_col=None):
-        self._check_arg(derived_name, 'derived_name')
-        self._check_arg(abs_maximum_col, 'abs_maximum_col')
-        self._check_arg(p2p_col, 'p2p_col')
-        self._check_exist(df, abs_maximum_col, 'abs_maximum_col')
-        self._check_exist(df, p2p_col, 'p2p_col')
-
-        mean_stress = df[abs_maximum_col] - np.sign(df[abs_maximum_col]) * df[p2p_col] / 2
-        mean_stress = mean_stress.values
-
-        names = self._generate_col_names(derived_name, 1, col_names)
-        related_columns = [abs_maximum_col, p2p_col]
-
-        return mean_stress, derived_name, names, stacked, related_columns
-
-
 class RelativeDeriver(AbstractDeriver):
     def __init__(self):
         super(RelativeDeriver, self).__init__()
@@ -93,10 +73,67 @@ class RelativeDeriver(AbstractDeriver):
         return relative, derived_name, names, stacked, related_columns
 
 
+class SuppStressDeriver(AbstractDeriver):
+    def __init__(self):
+        super(SuppStressDeriver, self).__init__()
+
+    def derive(self, df, derived_name=None, col_names=None, stacked=True, max_stress_col=None, min_stress_col=None, relative=False):
+        self._check_arg(derived_name, 'derived_name')
+        self._check_arg(max_stress_col, 'max_stress_col')
+        self._check_arg(min_stress_col, 'min_stress_col')
+        self._check_exist(df, max_stress_col, 'max_stress_col')
+        self._check_exist(df, min_stress_col, 'min_stress_col')
+
+        df_tmp = df.copy()
+
+        df_tmp['Absolute Maximum Stress'] = np.nan
+        df_tmp['Absolute Peak-to-peak Stress'] = np.nan
+        df_tmp['Absolute Mean Stress'] = np.nan
+        df_tmp['Relative Maximum Stress'] = np.nan
+        df_tmp['Relative Peak-to-peak Stress'] = np.nan
+        df_tmp['Relative Mean Stress'] = np.nan
+
+        for idx in range(df_tmp.values.shape[0]):
+            s = np.array([df_tmp.loc[idx, max_stress_col], df_tmp.loc[idx, min_stress_col]])
+            which_max_stress = np.where(np.abs(s) == np.max(np.abs(s)))[0]
+            if len(which_max_stress) == 0:
+                which_max_stress = 1 - int(np.isnan(s[1]))  # when nan appears in s
+            else:
+                which_max_stress = which_max_stress[0]
+
+            relative_to = np.abs(df_tmp.loc[idx, 'Static Maximum Tensile Stress']) \
+                if s[which_max_stress] > 0 else np.abs(df_tmp.loc[idx, 'Static Maximum Compressive Stress'])
+            if np.isnan(relative_to) and s[0] + s[1] < 1e-5 and s[which_max_stress] > 0:
+                relative_to = np.abs(df_tmp.loc[idx, 'Static Maximum Compressive Stress'])
+
+            df_tmp.loc[idx, 'Absolute Maximum Stress'] = s[which_max_stress]
+            p2p = np.abs(s[0] - s[1])
+            if np.isnan(p2p):
+                p2p = np.abs(s[1 - int(np.isnan(s[1]))])
+            df_tmp.loc[idx, 'Absolute Peak-to-peak Stress'] = p2p
+            df_tmp.loc[idx, 'Absolute Mean Stress'] = s[which_max_stress] - np.sign(s[which_max_stress]) * p2p / 2
+
+            if np.abs(s[which_max_stress] / relative_to) <= 1.1:  # otherwise static data is not correct
+                df_tmp.loc[idx, 'Relative Maximum Stress'] = np.abs(s[which_max_stress] / relative_to)
+                df_tmp.loc[idx, 'Relative Peak-to-peak Stress'] = np.abs(p2p / relative_to)
+                df_tmp.loc[idx, 'Relative Mean Stress'] = np.abs(df_tmp.loc[idx, 'Absolute Mean Stress'] / relative_to)
+            else:
+                df_tmp.loc[idx, 'Static Maximum Tensile Stress'] = np.nan
+                df_tmp.loc[idx, 'Static Maximum Compressive Stress'] = np.nan
+
+        names = ['Absolute Maximum Stress', 'Absolute Peak-to-peak Stress', 'Absolute Mean Stress',
+                 'Relative Maximum Stress', 'Relative Peak-to-peak Stress', 'Relative Mean Stress'] \
+            if relative else ['Absolute Maximum Stress', 'Absolute Peak-to-peak Stress', 'Absolute Mean Stress']
+        stresses = df_tmp[names].values
+        related_columns = [max_stress_col, min_stress_col]
+
+        return stresses, derived_name, names, stacked, related_columns
+
+
 deriver_mapping = {
     'DegLayerDeriver': DegLayerDeriver(),
-    'MeanStressDeriver': MeanStressDeriver(),
     'RelativeDeriver': RelativeDeriver(),
+    'SuppStressDeriver': SuppStressDeriver(),
 }
 
 
