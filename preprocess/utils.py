@@ -235,7 +235,7 @@ def code2seq(layer_original):
         return []  # Can not recognize the code
 
 
-def plot_absence_ratio(ax, df_presence, **kargs):
+def plot_absence_ratio(ax, df_presence, **kwargs):
     ax.set_axisbelow(True)
     x = df_presence["feature"].values
     y = df_presence["ratio"].values
@@ -244,7 +244,7 @@ def plot_absence_ratio(ax, df_presence, **kargs):
     # plt.grid(axis='x')
     plt.grid(axis="x", linewidth=0.2)
     # plt.barh(x,y, color= [clr_map[name] for name in x])
-    sns.barplot(y, x, **kargs)
+    sns.barplot(y, x, **kwargs)
     ax.set_xlim([0, 1])
     ax.set_xlabel("Data absence ratio")
 
@@ -343,8 +343,8 @@ def fill_na(x, n):
         return x
 
 
-def modify_col(df, column_name, func, **kargs):
+def modify_col(df, column_name, func, **kwargs):
     if column_name in list(df.columns):
         col = df[column_name]
-        col = [func(x,**kargs) for x in col]
+        col = [func(x,**kwargs) for x in col]
         df.loc[:, column_name] = col

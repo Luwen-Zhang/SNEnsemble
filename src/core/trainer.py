@@ -162,7 +162,7 @@ class Trainer:
         self.dataprocessors = [get_data_processor(name) for name in self.args['data_processors']]
 
         from src.core.dataderiver import get_data_deriver
-        self.dataderivers = [(get_data_deriver(name), kargs) for name, kargs in self.args['data_derivers'].items()]
+        self.dataderivers = [(get_data_deriver(name), kwargs) for name, kwargs in self.args['data_derivers'].items()]
 
         folder_name = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + '_' + self.configfile
 
@@ -196,9 +196,9 @@ class Trainer:
         self.derived_data = {}
         self.derived_data_col_names = {}
         self.derivation_related_cols = []
-        for deriver, kargs in self.dataderivers:
+        for deriver, kwargs in self.dataderivers:
             try:
-                value, name, col_names, stacked, related_columns = deriver.derive(self.df, **kargs)
+                value, name, col_names, stacked, related_columns = deriver.derive(self.df, **kwargs)
             except Exception as e:
                 print(f'Skip deriver {deriver.__class__.__name__} because of the following exception:')
                 print(f'\t{e}')
@@ -257,9 +257,9 @@ class Trainer:
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
 
         # derived data is re-derived
-        for deriver, kargs in self.dataderivers:
-            if kargs['derived_name'] in self.derived_data.keys():
-                value, name, col_names, _, _ = deriver.derive(original_data.loc[self.retained_indices, :], **kargs)
+        for deriver, kwargs in self.dataderivers:
+            if kwargs['derived_name'] in self.derived_data.keys():
+                value, name, col_names, _, _ = deriver.derive(original_data.loc[self.retained_indices, :], **kwargs)
                 self.derived_data[name] = value
                 self.derived_data_col_names[name] = col_names
                 if len(self.derived_data[name]) == 0:
@@ -583,9 +583,9 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_pairplot(self, **kargs):
+    def plot_pairplot(self, **kwargs):
         df_all = pd.concat([self.unscaled_feature_data, self.unscaled_label_data], axis=1)
-        sns.pairplot(df_all, corner=True, diag_kind='kde', **kargs)
+        sns.pairplot(df_all, corner=True, diag_kind='kde', **kwargs)
         plt.tight_layout()
         plt.savefig(self.project_root + 'pair.jpg')
         if is_notebook():

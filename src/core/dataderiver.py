@@ -5,7 +5,7 @@ class AbstractDeriver:
     def __init__(self):
         pass
 
-    def derive(self, df, derived_name, col_names, stacked, **kargs):
+    def derive(self, df, derived_name, col_names, stacked, **kwargs):
         raise NotImplementedError
 
     @staticmethod

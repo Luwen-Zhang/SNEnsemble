@@ -150,7 +150,7 @@ def split_by_random(length, train_val_test):
     return train_indices, val_indices, test_indices
 
 
-def plot_importance(ax, features, attr, pal, clr_map, **kargs):
+def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
     df = pd.DataFrame(columns=["feature", "attr", "clr"])
     df["feature"] = features
     df["attr"] = np.abs(attr) / np.sum(np.abs(attr))
@@ -168,7 +168,7 @@ def plot_importance(ax, features, attr, pal, clr_map, **kargs):
     # plt.grid(axis='x')
     plt.grid(axis="x", linewidth=0.2)
     # plt.barh(x,y, color= [clr_map[name] for name in x])
-    sns.barplot(y, x, palette=palette, **kargs)
+    sns.barplot(y, x, palette=palette, **kwargs)
     # ax.set_xlim([0, 1])
     ax.set_xlabel("Permutation feature importance")
 
