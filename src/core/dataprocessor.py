@@ -82,6 +82,9 @@ class SingleValueFeatureRemover(AbstractProcessor):
 
         return data[retain_features + trainer.label_name]
 
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+        return input_data.copy()
+
 
 class UnscaledDataRecorder(AbstractProcessor):
     def __init__(self):
@@ -96,13 +99,14 @@ class UnscaledDataRecorder(AbstractProcessor):
         return input_data.copy()
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        pass
+        return input_data.copy()
 
 
 class AbstractTransformer(AbstractProcessor):
     def __init__(self):
         super(AbstractTransformer, self).__init__()
         self.transformer = None
+        self.record_features = None
 
 
 class MeanImputer(AbstractTransformer):
@@ -122,12 +126,12 @@ class MeanImputer(AbstractTransformer):
             data.loc[trans_indices, trainer.feature_names]).astype(np.float32)
 
         self.transformer = imputer
-
+        self.record_features = cp(trainer.feature_names)
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        return pd.DataFrame(data=self.transformer.transform(input_data[trainer.feature_names]),
-                            columns=trainer.feature_names).astype(np.float32)
+        return pd.DataFrame(data=self.transformer.transform(input_data[self.record_features]),
+                            columns=self.record_features).astype(np.float32)
 
 
 class NaNImputer(AbstractTransformer):
@@ -136,11 +140,12 @@ class NaNImputer(AbstractTransformer):
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
         data = input_data.copy()
+        self.record_features = cp(trainer.feature_names)
         return data.dropna(axis=0, subset=trainer.feature_names)
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
         data = input_data.copy()
-        return data.dropna(axis=0, subset=trainer.feature_names)
+        return data.dropna(axis=0, subset=self.record_features)
 
 
 class StandardScaler(AbstractTransformer):
@@ -160,12 +165,12 @@ class StandardScaler(AbstractTransformer):
             data.loc[trans_indices, trainer.feature_names]).astype(np.float32)
 
         self.transformer = scaler
-
+        self.record_features = cp(trainer.feature_names)
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        return pd.DataFrame(data=self.transformer.transform(input_data[trainer.feature_names]),
-                            columns=trainer.feature_names).astype(np.float32)
+        return pd.DataFrame(data=self.transformer.transform(input_data[self.record_features]),
+                            columns=self.record_features).astype(np.float32)
 
 
 processor_mapping = {
