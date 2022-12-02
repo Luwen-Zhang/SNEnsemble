@@ -1,5 +1,9 @@
+import numpy as np
+import pandas as pd
+
 from ..utils.utils import *
 from .trainer import *
+
 
 class AbstractModel:
     def __init__(self, trainer: Trainer):
@@ -8,7 +12,40 @@ class AbstractModel:
         self.leaderboard = None
         self.program = None
 
-    def _predict_all(self):
+    def _predict_all(self, verbose=True, test_data_only=False):
+        self._check_train_status()
+
+        model_names = self._get_model_names()
+        tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
+        train_data = tabular_dataset.loc[self.trainer.train_dataset.indices, :].copy()
+        val_data = tabular_dataset.loc[self.trainer.val_dataset.indices, :].copy()
+        test_data = tabular_dataset.loc[self.trainer.test_dataset.indices, :].copy()
+
+        predictions = {}
+        disable_tqdm()
+        for idx, model_name in enumerate(model_names):
+            if verbose:
+                print(model_name, f'{idx + 1}/{len(model_names)}')
+            if not test_data_only:
+                y_train_pred = self._predict(train_data, model_name=model_name, as_pandas=False)
+                y_train = train_data[self.trainer.label_name[0]].values
+
+                y_val_pred = self._predict(val_data, model_name=model_name, as_pandas=False)
+                y_val = val_data[self.trainer.label_name[0]].values
+            else:
+                y_train_pred = y_train = None
+                y_val_pred = y_val = None
+
+            y_test_pred = self._predict(test_data, model_name=model_name, as_pandas=False)
+            y_test = test_data[self.trainer.label_name[0]].values
+
+            predictions[model_name] = {'Training': (y_train_pred, y_train), 'Testing': (y_test_pred, y_test),
+                                       'Validation': (y_val_pred, y_val)}
+
+        enable_tqdm()
+        return predictions
+
+    def _predict(self, df: pd.DataFrame, model_name, **kwargs):
         raise NotImplementedError
 
     def _train(self):
@@ -25,6 +62,7 @@ class AbstractModel:
         self.root = self.trainer.project_root + self.program + '/'
         if not os.path.exists(self.root):
             os.mkdir(self.root)
+
 
 class AutoGluon(AbstractModel):
     def __init__(self, trainer):
@@ -44,11 +82,12 @@ class AutoGluon(AbstractModel):
             predictor.fit(tabular_dataset.loc[self.trainer.train_dataset.indices, :],
                           tuning_data=tabular_dataset.loc[self.trainer.val_dataset.indices, :],
                           presets='best_quality' if not debug_mode else 'medium_quality_faster_train',
-                          hyperparameter_tune_kwargs='bayesopt' if (not debug_mode) and self.trainer.bayes_opt else None,
+                          hyperparameter_tune_kwargs='bayesopt' if (
+                                                                       not debug_mode) and self.trainer.bayes_opt else None,
                           use_bag_holdout=True,
                           verbosity=0 if not verbose else 2)
         self.leaderboard = predictor.leaderboard(tabular_dataset.loc[self.trainer.test_dataset.indices, :],
-                                                           silent=True)
+                                                 silent=True)
         self.leaderboard.to_csv(self.root + 'leaderboard.csv')
         self.model = predictor
         enable_tqdm()
@@ -56,36 +95,8 @@ class AutoGluon(AbstractModel):
         save_trainer(self.trainer)
         print('\n-------------AutoGluon Tests End-------------\n')
 
-    def _predict_all(self, verbose=True, test_data_only=False):
-        self._check_train_status()
-
-        model_names = self.leaderboard['model']
-        tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
-        train_data = tabular_dataset.loc[self.trainer.train_dataset.indices, :].copy()
-        val_data = tabular_dataset.loc[self.trainer.val_dataset.indices, :].copy()
-        test_data = tabular_dataset.loc[self.trainer.test_dataset.indices, :].copy()
-
-        predictions = {}
-
-        for idx, model_name in enumerate(model_names):
-            if verbose:
-                print(model_name, f'{idx + 1}/{len(model_names)}')
-            if not test_data_only:
-                y_train_pred = self.model.predict(train_data, model=model_name, as_pandas=False)
-                y_train = train_data[self.model.label].values
-
-                y_val_pred = self.model.predict(val_data, model=model_name, as_pandas=False)
-                y_val = val_data[self.model.label].values
-            else:
-                y_train_pred = y_train = None
-                y_val_pred = y_val = None
-
-            y_test_pred = self.model.predict(test_data, model=model_name, as_pandas=False)
-            y_test = test_data[self.model.label].values
-
-            predictions[model_name] = {'Training': (y_train_pred, y_train), 'Testing': (y_test_pred, y_test),
-                                       'Validation': (y_val_pred, y_val)}
-        return predictions
+    def _predict(self, df: pd.DataFrame, model_name, **kwargs):
+        return self.model.predict(df[self.trainer.feature_names], model=model_name, **kwargs)
 
     def _get_model_names(self):
         return list(self.leaderboard['model'])
@@ -104,7 +115,8 @@ class PytorchTabular(AbstractModel):
         warnings.simplefilter(action='ignore', category=UserWarning)
         from functools import partialmethod
         from pytorch_tabular.config import ExperimentRunManager
-        ExperimentRunManager.__init__ = partialmethod(ExperimentRunManager.__init__, self.root + 'exp_version_manager.yml')
+        ExperimentRunManager.__init__ = partialmethod(ExperimentRunManager.__init__,
+                                                      self.root + 'exp_version_manager.yml')
         from pytorch_tabular import TabularModel
         from pytorch_tabular.models import CategoryEmbeddingModelConfig, \
             NodeConfig, TabNetModelConfig, TabTransformerConfig, AutoIntConfig, FTTransformerConfig
@@ -261,8 +273,9 @@ class PytorchTabular(AbstractModel):
                                   validation=tabular_dataset.loc[self.trainer.val_dataset.indices, :],
                                   loss=self.trainer.loss_fn)
                 metrics['model'].append(tabular_model.config._model_name)
-                metrics['mse'].append(tabular_model.evaluate(tabular_dataset.loc[self.trainer.test_dataset.indices, :])[0][
-                                          'test_mean_squared_error'])
+                metrics['mse'].append(
+                    tabular_model.evaluate(tabular_dataset.loc[self.trainer.test_dataset.indices, :])[0][
+                        'test_mean_squared_error'])
                 models[tabular_model.config._model_name] = tabular_model
 
         metrics = pd.DataFrame(metrics)
@@ -280,44 +293,14 @@ class PytorchTabular(AbstractModel):
         save_trainer(self.trainer)
         print('\n-------------Pytorch-tabular Tests End-------------\n')
 
-    def _predict_all(self, verbose=True, test_data_only=False):
-        self._check_train_status()
-
-        model_names = self.leaderboard['model']
-        tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
-        train_data = tabular_dataset.loc[self.trainer.train_dataset.indices, :].copy()
-        val_data = tabular_dataset.loc[self.trainer.val_dataset.indices, :].copy()
-        test_data = tabular_dataset.loc[self.trainer.test_dataset.indices, :].copy()
-
-        predictions = {}
-        disable_tqdm()
-        for idx, model_name in enumerate(model_names):
-            if verbose:
-                print(model_name, f'{idx + 1}/{len(model_names)}')
-            model = self.model[model_name]
-
-            target = model.config.target[0]
-
-            if not test_data_only:
-                y_train_pred = np.array(model.predict(train_data)[f'{target}_prediction'])
-                y_train = train_data[target].values
-
-                y_val_pred = np.array(model.predict(val_data)[f'{target}_prediction'])
-                y_val = val_data[target].values
-            else:
-                y_train_pred = y_train = None
-                y_val_pred = y_val = None
-
-            y_test_pred = np.array(model.predict(test_data)[f'{target}_prediction'])
-            y_test = test_data[target].values
-
-            predictions[model_name] = {'Training': (y_train_pred, y_train), 'Testing': (y_test_pred, y_test),
-                                       'Validation': (y_val_pred, y_val)}
-        enable_tqdm()
-        return predictions
+    def _predict(self, df: pd.DataFrame, model_name, **kwargs):
+        model = self.model[model_name]
+        target = model.config.target[0]
+        return np.array(model.predict(df)[f'{target}_prediction'])
 
     def _get_model_names(self):
         return list(self.leaderboard['model'])
+
 
 class TabNet(AbstractModel):
     def __init__(self, trainer):
@@ -402,46 +385,12 @@ class TabNet(AbstractModel):
         save_trainer(self.trainer)
         print('\n-------------TabNet Tests End-------------\n')
 
-    def _predict_all(self, verbose=True, test_data_only=False):
-        self._check_train_status()
-
-        train_indices = self.trainer.train_dataset.indices
-        val_indices = self.trainer.val_dataset.indices
-        test_indices = self.trainer.test_dataset.indices
-
-        tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
-        feature_data = tabular_dataset[feature_names].copy()
-        label_data = tabular_dataset[label_name].copy()
-
-        train_x = feature_data.values[np.array(train_indices), :].astype(np.float32)
-        test_x = feature_data.values[np.array(test_indices), :].astype(np.float32)
-        val_x = feature_data.values[np.array(val_indices), :].astype(np.float32)
-        train_y = label_data.values[np.array(train_indices), :].reshape(-1, 1).astype(np.float32)
-        test_y = label_data.values[np.array(test_indices), :].reshape(-1, 1).astype(np.float32)
-        val_y = label_data.values[np.array(val_indices), :].reshape(-1, 1).astype(np.float32)
-
-        predictions = {}
-
-        if not test_data_only:
-            y_train_pred = self.model.predict(train_x).reshape(-1, 1)
-            y_train = train_y
-
-            y_val_pred = self.model.predict(val_x).reshape(-1, 1)
-            y_val = val_y
-        else:
-            y_train_pred = y_train = None
-            y_val_pred = y_val = None
-
-        y_test_pred = self.model.predict(test_x).reshape(-1, 1)
-        y_test = test_y
-
-        predictions[self.program] = {'Training': (y_train_pred, y_train), 'Testing': (y_test_pred, y_test),
-                                   'Validation': (y_val_pred, y_val)}
-
-        return predictions
+    def _predict(self, df: pd.DataFrame, model_name=None, **kwargs):
+        return self.model.predict(df[self.trainer.feature_names].values.astype(np.float32)).reshape(-1, 1)
 
     def _get_model_names(self):
         return ['TabNet']
+
 
 class TorchModel(AbstractModel):
     def __init__(self, trainer: Trainer):
@@ -542,10 +491,29 @@ class TorchModel(AbstractModel):
 
         predictions = {}
         predictions[self._get_model_names()[0]] = {'Training': (y_train_pred, y_train),
-                             'Validation': (y_val_pred, y_val),
-                             'Testing': (y_test_pred, y_test)}
+                                                   'Validation': (y_val_pred, y_val),
+                                                   'Testing': (y_test_pred, y_test)}
 
         return predictions
+
+    def _predict(self, df: pd.DataFrame, model_name, additional_data: list = None, **kwargs):
+        X = torch.tensor(df[self.trainer.feature_names].values.astype(np.float32), dtype=torch.float32).to(
+            self.trainer.device)
+        if additional_data is not None:
+            D = [torch.tensor(value, dtype=torch.float32).to(self.trainer.device) for value in additional_data]
+        else:
+            D = []
+
+        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(self.trainer.device)
+
+        loader = Data.DataLoader(
+            Data.TensorDataset(X, *D, y),
+            batch_size=len(df),
+            shuffle=False
+        )
+
+        pred, _, _ = test(self.model, loader, self.trainer.loss_fn)
+        return pred
 
     def _model_train(self,
                      model,
@@ -607,7 +575,8 @@ class TorchModel(AbstractModel):
 
         min_loss, self.train_ls, self.val_ls = self._model_train(model=self.model,
                                                                  verbose_per_epoch=verbose_per_epoch,
-                                                                 **{**self.trainer.params, **self.trainer.static_params})
+                                                                 **{**self.trainer.params,
+                                                                    **self.trainer.static_params})
 
         self.model.load_state_dict(torch.load(self.trainer.project_root + 'fatigue.pt'))
 
@@ -625,6 +594,7 @@ class TorchModel(AbstractModel):
 
         print(f'Test MSE loss: {mse:.5f}, RMSE loss: {rmse:.5f}')
         save_trainer(self.trainer)
+
 
 class ThisWork(TorchModel):
     def __init__(self, trainer):
