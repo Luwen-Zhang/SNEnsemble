@@ -45,7 +45,7 @@ class AbstractModel:
         enable_tqdm()
         return predictions
 
-    def _predict(self, df: pd.DataFrame, model_name, **kwargs):
+    def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         raise NotImplementedError
 
     def _train(self):
@@ -95,7 +95,7 @@ class AutoGluon(AbstractModel):
         save_trainer(self.trainer)
         print('\n-------------AutoGluon Tests End-------------\n')
 
-    def _predict(self, df: pd.DataFrame, model_name, **kwargs):
+    def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         return self.model.predict(df[self.trainer.feature_names], model=model_name, **kwargs)
 
     def _get_model_names(self):
@@ -293,7 +293,7 @@ class PytorchTabular(AbstractModel):
         save_trainer(self.trainer)
         print('\n-------------Pytorch-tabular Tests End-------------\n')
 
-    def _predict(self, df: pd.DataFrame, model_name, **kwargs):
+    def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         model = self.model[model_name]
         target = model.config.target[0]
         return np.array(model.predict(df)[f'{target}_prediction'])
@@ -385,7 +385,7 @@ class TabNet(AbstractModel):
         save_trainer(self.trainer)
         print('\n-------------TabNet Tests End-------------\n')
 
-    def _predict(self, df: pd.DataFrame, model_name=None, **kwargs):
+    def _predict(self, df: pd.DataFrame, model_name=None, additional_data=None, **kwargs):
         return self.model.predict(df[self.trainer.feature_names].values.astype(np.float32)).reshape(-1, 1)
 
     def _get_model_names(self):
@@ -499,11 +499,7 @@ class TorchModel(AbstractModel):
     def _predict(self, df: pd.DataFrame, model_name, additional_data: list = None, **kwargs):
         X = torch.tensor(df[self.trainer.feature_names].values.astype(np.float32), dtype=torch.float32).to(
             self.trainer.device)
-        if additional_data is not None:
-            D = [torch.tensor(value, dtype=torch.float32).to(self.trainer.device) for value in additional_data]
-        else:
-            D = []
-
+        D = [torch.tensor(value, dtype=torch.float32).to(self.trainer.device) for value in additional_data]
         y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(self.trainer.device)
 
         loader = Data.DataLoader(
