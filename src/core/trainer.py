@@ -668,6 +668,89 @@ class Trainer:
             raise Exception(f'Material code {m_code} not available.')
         return code_df.index[np.where(code_df['Material_Code'] == m_code)[0]]
 
+    def plot_S_N(self, s_col, n_col, m_code, load_dir='tension', ax=None):
+        if s_col not in self.df.columns:
+            raise Exception(f'{s_col} not in features.')
+        if n_col not in self.label_name:
+            raise Exception(f'{n_col} is not the target.')
+        m_train_indices = self._select_by_material_code(m_code, partition='train')
+        m_test_indices = self._select_by_material_code(m_code, partition='test')
+        m_val_indices = self._select_by_material_code(m_code, partition='val')
+        sgn = 1 if load_dir == 'tension' else -1
+        m_train_indices = m_train_indices[self.df.loc[m_train_indices, s_col].values * sgn > 0]
+        m_test_indices = m_test_indices[self.df.loc[m_test_indices, s_col].values * sgn > 0]
+        m_val_indices = m_val_indices[self.df.loc[m_val_indices, s_col].values * sgn > 0]
+
+        s_train = self.df.loc[m_train_indices, s_col]
+        n_train = self.df.loc[m_train_indices, n_col]
+        s_val = self.df.loc[m_val_indices, s_col]
+        n_val = self.df.loc[m_val_indices, n_col]
+        s_test = self.df.loc[m_test_indices, s_col]
+        n_test = self.df.loc[m_test_indices, n_col]
+
+        all_unscaled_s = np.vstack(
+            [s_train.values.reshape(-1, 1), s_val.values.reshape(-1, 1), s_test.values.reshape(-1, 1)])
+        s_unscaled_perm = np.linspace(np.min(all_unscaled_s), np.max(all_unscaled_s), 100)
+        df_perm = pd.DataFrame(data=np.repeat(self.df.loc[m_train_indices[0], :].values.reshape(-1, 1),
+                                              repeats=100, axis=1).T,
+                               columns=self.df.columns, index=[x for x in range(100)])
+        df_perm[s_col] = s_unscaled_perm
+        if s_col in self.stacked_derivation_related_cols + self.derivation_related_cols:
+            additional_data = []
+            for deriver, kwargs in self.dataderivers:
+                try:
+                    value, name, col_names, stacked, related_columns = deriver.derive(df_perm, **kwargs)
+                except Exception as e:
+                    continue
+                if stacked:
+                    df_perm[col_names] = value
+                else:
+                    additional_data.append(value)
+        else:
+            additional_data = list(self.derived_data.values())
+        df_perm = self._data_transform(df_perm)
+
+        best_model_program, best_model_name = self._get_best_model()
+        pred_n_perm = self._get_modelbase(best_model_program)._predict(df_perm, additional_data=additional_data,
+                                                                       model_name=best_model_name)
+
+        if ax is None:
+            new_ax = True
+            plt.figure()
+            plt.rcParams['font.size'] = 14
+            ax = plt.subplot(111)
+        else:
+            new_ax = False
+
+        def scatter_func(x, y, color, name):
+            ax.scatter(x, y,
+                       s=20,
+                       color=color,
+                       marker='o',
+                       label=f"{name} dataset",
+                       linewidth=0.4,
+                       edgecolors="k")
+
+        scatter_func(n_train, s_train, clr[0], 'Training')
+        scatter_func(n_val, s_val, clr[1], 'Validation')
+        scatter_func(n_test, s_test, clr[2], 'Testing')
+
+        ax.plot(pred_n_perm, s_unscaled_perm)
+
+        ax.legend(loc='upper right', markerscale=1.5, handlelength=0.2, handleheight=0.9)
+        ax.set_xlabel(n_col)
+        ax.set_ylabel(s_col)
+
+        if is_notebook() and new_ax:
+            plt.show()
+        if new_ax:
+            plt.close()
+
+    def _get_best_model(self):
+        if not hasattr(self, 'leaderboard'):
+            self.get_leaderboard(test_data_only=True, dump_trainer=False)
+        return self.leaderboard['Program'].values[0], self.leaderboard['Model'].values[0]
+
     @staticmethod
     def _metrics(predictions, metrics, test_data_only):
         df_metrics = pd.DataFrame()
