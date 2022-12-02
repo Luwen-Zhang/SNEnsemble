@@ -196,6 +196,7 @@ class Trainer:
         self.derived_data = {}
         self.derived_data_col_names = {}
         self.derivation_related_cols = []
+        self.stacked_derivation_related_cols = []
         for deriver, kwargs in self.dataderivers:
             try:
                 value, name, col_names, stacked, related_columns = deriver.derive(self.df, **kwargs)
@@ -210,6 +211,7 @@ class Trainer:
             else:
                 self.feature_names += col_names
                 self.df = pd.concat([self.df, pd.DataFrame(data=value, columns=col_names)], axis=1)
+                self.stacked_derivation_related_cols += related_columns
 
         self._split_dataset()
 
@@ -255,6 +257,7 @@ class Trainer:
 
         self._material_code = pd.DataFrame(original_data.loc[self.retained_indices, 'Material_Code']).reset_index(
             drop=True)
+        self.df = pd.DataFrame(original_data.loc[self.retained_indices, :]).reset_index(drop=True)
 
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
@@ -275,6 +278,14 @@ class Trainer:
         data = input_data.copy()
         for processor in self.dataprocessors:
             data = processor.fit_transform(data, self)
+        return data
+
+    def _data_transform(self, input_data: pd.DataFrame):
+        data = input_data.copy()
+        from src.core.dataprocessor import AbstractTransformer
+        for processor in self.dataprocessors:
+            if issubclass(type(processor), AbstractTransformer):
+                data = processor.transform(data, self)
         return data
 
     def _update_dataset(self):
@@ -717,7 +728,7 @@ class Trainer:
 def save_trainer(trainer, path=None):
     import pickle
     path = trainer.project_root + 'trainer.pkl' if path is None else path
-    print(f'Trainer saved. To load the trainer, run trainer = load_trainer(path={path})')
+    print(f'Trainer saved. To load the trainer, run trainer = load_trainer(path=\'{path}\')')
     with open(path, 'wb') as outp:
         pickle.dump(trainer, outp, pickle.HIGHEST_PROTOCOL)
 
