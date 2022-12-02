@@ -654,19 +654,19 @@ class Trainer:
     def get_material_code(self, unique=False, partition='all'):
         indices = self._get_indices(partition=partition)
         if unique:
-            unique_list = list(sorted(set(self._material_code.loc[indices, :])))
+            unique_list = list(sorted(set(self._material_code.loc[indices, 'Material_Code'])))
             val_cnt = self._material_code.loc[indices, :].value_counts()
             return pd.DataFrame({
                 'Material_Code': unique_list,
-                'Count': [val_cnt[x] for x in unique_list]})
+                'Count': [val_cnt[x].values[0] for x in unique_list]})
         else:
             return self._material_code.loc[indices, :]
 
-    def _select_by_material_code(self, code: str, partition='all'):
+    def _select_by_material_code(self, m_code: str, partition='all'):
         code_df = self.get_material_code(unique=False, partition=partition)
-        if code not in code_df['Material_Code'].values:
-            raise Exception(f'Material code {code} not available.')
-        return code_df.index[np.where(code_df['Material_Code'] == code)[0]]
+        if m_code not in code_df['Material_Code'].values:
+            raise Exception(f'Material code {m_code} not available.')
+        return code_df.index[np.where(code_df['Material_Code'] == m_code)[0]]
 
     @staticmethod
     def _metrics(predictions, metrics, test_data_only):
