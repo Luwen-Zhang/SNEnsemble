@@ -253,6 +253,9 @@ class Trainer:
         self.test_indices = np.array(
             [x - np.count_nonzero(self.dropped_indices < x) for x in self.test_indices if x in data.index])
 
+        self._material_code = pd.DataFrame(original_data.loc[self.retained_indices, 'Material_Code']).reset_index(
+            drop=True)
+
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
 
@@ -620,6 +623,36 @@ class Trainer:
         plt.savefig(self.project_root + 'feature_box.pdf')
         plt.show()
         plt.close()
+
+    def _get_indices(self, partition='train'):
+        indices_map = {
+            'train': self.train_indices,
+            'val': self.val_indices,
+            'test': self.test_indices,
+            'all': np.array(self.feature_data.index)
+        }
+
+        if partition not in indices_map.keys():
+            raise Exception(f'Partition {train} not available. Select among {list(indices_map.keys())}')
+
+        return indices_map[partition]
+
+    def get_material_code(self, unique=False, partition='all'):
+        indices = self._get_indices(partition=partition)
+        if unique:
+            unique_list = list(sorted(set(self._material_code.loc[indices, :])))
+            val_cnt = self._material_code.loc[indices, :].value_counts()
+            return pd.DataFrame({
+                'Material_Code': unique_list,
+                'Count': [val_cnt[x] for x in unique_list]})
+        else:
+            return self._material_code.loc[indices, :]
+
+    def _select_by_material_code(self, code: str, partition='all'):
+        code_df = self.get_material_code(unique=False, partition=partition)
+        if code not in code_df['Material_Code'].values:
+            raise Exception(f'Material code {code} not available.')
+        return code_df.index[np.where(code_df['Material_Code'] == code)[0]]
 
     @staticmethod
     def _metrics(predictions, metrics, test_data_only):
