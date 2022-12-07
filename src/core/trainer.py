@@ -752,13 +752,13 @@ class Trainer:
         if new_ax:
             plt.close()
 
-    def _bootstrap(self, model, df, focus_feature, n_bootstrap, grid_size, verbose=True):
+    def _bootstrap(self, model, df, focus_feature, n_bootstrap, grid_size, verbose=True, rederive=True, percentile=100):
         bootstrap_model = cp(model)
         x_value = np.linspace(np.min(df[focus_feature]), np.max(df[focus_feature]), grid_size)
         def _derive(df):
             data = df.copy()
-            derived_data = {}
-            if focus_feature in self.stacked_derivation_related_cols + self.derivation_related_cols:
+            if focus_feature in self.stacked_derivation_related_cols + self.derivation_related_cols and rederive:
+                derived_data = {}
                 for deriver, kwargs in self.dataderivers:
                     try:
                         value, name, col_names, stacked, related_columns = deriver.derive(data, **kwargs)
@@ -768,6 +768,8 @@ class Trainer:
                         data[col_names] = value
                     else:
                         derived_data[name] = value
+            else:
+                derived_data = cp(self.derived_data)
             return data, derived_data
 
         expected_value_bootstrap_replications = []
@@ -778,16 +780,12 @@ class Trainer:
                 df_bootstrap = resample(df).reset_index(drop=True)
             else:
                 df_bootstrap = df.copy()
-            if focus_feature in self.stacked_derivation_related_cols + self.derivation_related_cols:
-                df_bootstrap, derived_data = _derive(df_bootstrap)
-            else:
-                derived_data = cp(self.derived_data)
+            df_bootstrap, derived_data = _derive(df_bootstrap)
             bootstrap_model.fit(df_bootstrap, self.feature_names, self.label_name, derived_data, verbose=False)
             bootstrap_model_predictions = []
             for value in x_value:
                 df_perm = df_bootstrap.copy()
                 df_perm[focus_feature] = value
-
                 df_perm, derived_data = _derive(df_perm)
                 bootstrap_model_predictions.append(
                     np.mean(bootstrap_model.predict(df_perm, derived_data=derived_data, model_name='ThisWork')))
