@@ -699,7 +699,7 @@ class Trainer:
             available_r = []
             for r in unique_r:
                 if ((self.df.loc[original_train_indices, s_col] * sgn > 0) &
-                    ((self.df.loc[original_train_indices, r_col] - r).__abs__() < 1e-3)).any():
+                   ((self.df.loc[original_train_indices, r_col] - r).__abs__() < 1e-3)).any():
                     available_r.append(r)
             raise Exception(f'R-value {r_value} not available. Choose among {available_r}.')
 
@@ -710,31 +710,11 @@ class Trainer:
         s_test = self.df.loc[m_test_indices, s_col]
         n_test = self.df.loc[m_test_indices, n_col]
 
-        all_unscaled_s = np.vstack(
-            [s_train.values.reshape(-1, 1), s_val.values.reshape(-1, 1), s_test.values.reshape(-1, 1)])
-        s_unscaled_perm = np.linspace(np.min(all_unscaled_s), np.max(all_unscaled_s), grid_size)
-        df_perm = pd.DataFrame(data=np.repeat(self.df.loc[m_train_indices[0], :].values.reshape(-1, 1),
-                                              repeats=grid_size, axis=1).T,
-                               columns=self.df.columns, index=[x for x in range(grid_size)])
-        df_perm[s_col] = s_unscaled_perm
-        if s_col in self.stacked_derivation_related_cols + self.derivation_related_cols:
-            additional_data = []
-            for deriver, kwargs in self.dataderivers:
-                try:
-                    value, name, col_names, stacked, related_columns = deriver.derive(df_perm, **kwargs)
-                except Exception as e:
-                    continue
-                if stacked:
-                    df_perm[col_names] = value
-                else:
-                    additional_data.append(value)
-        else:
-            additional_data = list(self.derived_data.values())
-        df_perm = self._data_transform(df_perm)
-
-        best_model_program, best_model_name = self._get_best_model()
-        pred_n_perm = self._get_modelbase(best_model_program)._predict(df_perm, additional_data=additional_data,
-                                                                       model_name=best_model_name)
+        x_value, mean_pred, ci_left, ci_right = self._bootstrap(model=self._get_modelbase(program='ThisWork'),
+                                                                df=self.df.loc[m_train_indices, :],
+                                                                focus_feature=s_col,
+                                                                n_bootstrap=n_bootstrap,
+                                                                grid_size=grid_size)
 
         if ax is None:
             new_ax = True
@@ -757,7 +737,10 @@ class Trainer:
         scatter_func(n_val, s_val, clr[1], 'Validation')
         scatter_func(n_test, s_test, clr[2], 'Testing')
 
-        ax.plot(pred_n_perm, s_unscaled_perm)
+        ax.plot(mean_pred, x_value)
+
+        if n_bootstrap != 1:
+            ax.fill_betweenx(x_value, ci_left, ci_right, alpha=.4, color=clr[0], edgecolor=None)
 
         ax.legend(loc='upper right', markerscale=1.5, handlelength=0.2, handleheight=0.9)
         ax.set_xlabel(n_col)
@@ -768,6 +751,62 @@ class Trainer:
             plt.show()
         if new_ax:
             plt.close()
+
+    def _bootstrap(self, model, df, focus_feature, n_bootstrap, grid_size):
+        bootstrap_model = cp(model)
+        x_value = np.linspace(np.min(df[focus_feature]), np.max(df[focus_feature]), grid_size)
+
+        def _derive(df):
+            data = df.copy()
+            derived_data = {}
+            if focus_feature in self.stacked_derivation_related_cols + self.derivation_related_cols:
+                for deriver, kwargs in self.dataderivers:
+                    try:
+                        value, name, col_names, stacked, related_columns = deriver.derive(data, **kwargs)
+                    except Exception as e:
+                        continue
+                    if stacked:
+                        data[col_names] = value
+                    else:
+                        derived_data[name] = value
+            return data, derived_data
+
+        expected_value_bootstrap_replications = []
+        for i_bootstrap in range(n_bootstrap):
+            if n_bootstrap != 1:
+                print(f'Bootstrap: {i_bootstrap + 1}/{n_bootstrap}')
+                df_bootstrap = resample(df).reset_index(drop=True)
+            else:
+                df_bootstrap = df.copy()
+            if focus_feature in self.stacked_derivation_related_cols + self.derivation_related_cols:
+                df_bootstrap, derived_data = _derive(df_bootstrap)
+            else:
+                derived_data = cp(self.derived_data)
+            bootstrap_model.fit(df_bootstrap, self.feature_names, self.label_name, derived_data, verbose=False)
+            bootstrap_model_predictions = []
+            for value in x_value:
+                df_perm = df_bootstrap.copy()
+                df_perm[focus_feature] = value
+                df_perm, derived_data = _derive(df_perm)
+                bootstrap_model_predictions.append(
+                    np.mean(bootstrap_model.predict(df_perm, derived_data=derived_data, model_name='ThisWork')))
+            expected_value_bootstrap_replications.append(bootstrap_model_predictions)
+
+        expected_value_bootstrap_replications = np.array(expected_value_bootstrap_replications)
+        ci_left = []
+        ci_right = []
+        mean_pred = []
+        for col_idx in range(expected_value_bootstrap_replications.shape[1]):
+            y_pred = expected_value_bootstrap_replications[:, col_idx]
+            if n_bootstrap != 1:
+                ci_int = st.norm.interval(alpha=0.9, loc=np.mean(y_pred), scale=st.sem(y_pred))
+            else:
+                ci_int = (np.nan, np.nan)
+            ci_left.append(ci_int[0])
+            ci_right.append(ci_int[1])
+            mean_pred.append(np.mean(y_pred))
+
+        return x_value, mean_pred, ci_left, ci_right
 
     def _get_best_model(self):
         if not hasattr(self, 'leaderboard'):
