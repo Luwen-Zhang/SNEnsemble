@@ -262,7 +262,7 @@ class Trainer:
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
 
-        # derived data is re-derived
+        # derived data (not stacked) is re-derived
         for deriver, kwargs in self.dataderivers:
             if kwargs['derived_name'] in self.derived_data.keys():
                 value, name, col_names, _, _ = deriver.derive(original_data.loc[self.retained_indices, :], **kwargs)
@@ -272,7 +272,7 @@ class Trainer:
                     self.derived_data_col_names.pop(name, None)
                     self.derived_data.pop(name, None)
 
-        self._update_dataset()
+        self._update_dataset_auto()
 
     def _data_preprocess(self, input_data: pd.DataFrame):
         data = input_data.copy()
@@ -288,20 +288,24 @@ class Trainer:
                 data = processor.transform(data, self)
         return data
 
-    def _update_dataset(self):
-        X = torch.tensor(self.feature_data.values.astype(np.float32), dtype=torch.float32).to(
+    def _update_dataset_auto(self):
+        self._update_dataset(self.feature_data, self.label_data, self.derived_data.values(),
+                                     self.train_indices, self.val_indices, self.test_indices)
+
+    def _update_dataset(self, feature_data, label_data, additional_data, train_indices, val_indices, test_indices):
+        X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(
             self.device
         )
-        y = torch.tensor(self.label_data.values.astype(np.float32), dtype=torch.float32).to(
+        y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(
             self.device
         )
 
-        D = [torch.tensor(value, dtype=torch.float32).to(self.device) for value in self.derived_data.values()]
+        D = [torch.tensor(value, dtype=torch.float32).to(self.device) for value in additional_data]
         dataset = Data.TensorDataset(X, *D, y)
 
-        self.train_dataset = Subset(dataset, self.train_indices)
-        self.val_dataset = Subset(dataset, self.val_indices)
-        self.test_dataset = Subset(dataset, self.test_indices)
+        self.train_dataset = Subset(dataset, train_indices)
+        self.val_dataset = Subset(dataset, val_indices)
+        self.test_dataset = Subset(dataset, test_indices)
         self.tensors = (X, *D, y) if len(D) > 0 else (X, None, y)
 
     def describe(self, transformed=False, save=True):
@@ -668,7 +672,7 @@ class Trainer:
             raise Exception(f'Material code {m_code} not available.')
         return code_df.index[np.where(code_df['Material_Code'] == m_code)[0]]
 
-    def plot_S_N(self, s_col, n_col, m_code, load_dir='tension', ax=None):
+    def plot_S_N(self, s_col, n_col, m_code, load_dir='tension', ax=None, grid_size=100):
         if s_col not in self.df.columns:
             raise Exception(f'{s_col} not in features.')
         if n_col not in self.label_name:
@@ -690,10 +694,10 @@ class Trainer:
 
         all_unscaled_s = np.vstack(
             [s_train.values.reshape(-1, 1), s_val.values.reshape(-1, 1), s_test.values.reshape(-1, 1)])
-        s_unscaled_perm = np.linspace(np.min(all_unscaled_s), np.max(all_unscaled_s), 100)
+        s_unscaled_perm = np.linspace(np.min(all_unscaled_s), np.max(all_unscaled_s), grid_size)
         df_perm = pd.DataFrame(data=np.repeat(self.df.loc[m_train_indices[0], :].values.reshape(-1, 1),
-                                              repeats=100, axis=1).T,
-                               columns=self.df.columns, index=[x for x in range(100)])
+                                              repeats=grid_size, axis=1).T,
+                               columns=self.df.columns, index=[x for x in range(grid_size)])
         df_perm[s_col] = s_unscaled_perm
         if s_col in self.stacked_derivation_related_cols + self.derivation_related_cols:
             additional_data = []
