@@ -517,7 +517,8 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_partial_dependence(self, modelbase, log_trans: bool = True, lower_lim=2, upper_lim=7):
+    def plot_partial_dependence(self, modelbase, log_trans: bool = True, lower_lim=2, upper_lim=7, n_bootstrap=30,
+                                grid_size=30):
         """
         Calculate and plot partial dependence plots.
         :param log_trans: Whether the target is log10-transformed. Default to True.
@@ -531,19 +532,36 @@ class Trainer:
 
         x_values_list = []
         mean_pdp_list = []
+        ci_left_list = []
+        ci_right_list = []
 
-        for feature_idx in range(len(self.feature_names)):
-            print('Calculate PDP: ', self.feature_names[feature_idx])
+        for feature_idx, feature_name in enumerate(self.feature_names):
+            print('Calculate PDP: ', feature_name)
 
-            x_value, model_predictions = calculate_pdp(modelbase.model, self.tensors[0][self.train_dataset.indices, :],
+            if n_bootstrap > 1:
+                x_value, model_predictions, ci_left, ci_right = self._bootstrap(model=modelbase,
+                                                                                df=self.df.loc[self.train_indices, :],
+                                                                                focus_feature=feature_name,
+                                                                                n_bootstrap=n_bootstrap,
+                                                                                grid_size=grid_size,
+                                                                                verbose=False,
+                                                                                rederive=True,
+                                                                                percentile=80)
+            else:
+                x_value, model_predictions = calculate_pdp(modelbase.model, self.tensors[0][self.train_dataset.indices, :],
                                                        self._get_additional_tensors_slice(self.train_dataset.indices),
                                                        feature_idx,
                                                        grid_size=30)
+                ci_left = model_predictions
+                ci_right = model_predictions
 
             x_values_list.append(x_value)
             mean_pdp_list.append(model_predictions)
+            ci_left_list.append(ci_left)
+            ci_right_list.append(ci_right)
 
-        fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, self.tensors[0], self.train_dataset.indices,
+        fig = plot_pdp(self.feature_names, x_values_list, mean_pdp_list, ci_left_list, ci_right_list,
+                       self.feature_data if n_bootstrap == 1 else self.unscaled_feature_data,
                        log_trans=log_trans, lower_lim=lower_lim, upper_lim=upper_lim)
 
         plt.savefig(self.project_root + 'partial_dependence.pdf')

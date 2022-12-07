@@ -1,10 +1,6 @@
 """
 All utilities used in the project.
 """
-
-###############################################
-# Xueling Luo @ Shanghai Jiao Tong University #
-###############################################
 import os
 import sys
 import warnings
@@ -212,7 +208,8 @@ def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_siz
 
 
 def plot_pdp(
-        feature_names, x_values_list, mean_pdp_list, X, hist_indices, log_trans=True, lower_lim=2, upper_lim=7
+        feature_names, x_values_list, mean_pdp_list, ci_left_list, ci_right_list, hist_data, log_trans=True,
+        lower_lim=2, upper_lim=7
 ):
     max_col = 4
     if len(feature_names) > max_col:
@@ -240,6 +237,10 @@ def plot_pdp(
             linewidth=0.7,
         )
 
+        ax.fill_between(x_values_list[idx], 10 ** ci_left_list[idx] if log_trans else ci_left_list,
+                        10 ** ci_right_list[idx] if log_trans else ci_right_list, alpha=.4,
+                        color='k', edgecolor=None)
+
         ax.set_title(focus_feature, {"fontsize": 12})
         ax.set_xlim([0, 1])
         if log_trans:
@@ -255,12 +256,11 @@ def plot_pdp(
 
         ax2 = ax.twinx()
 
-        chosen_data = X[hist_indices, idx].cpu().detach().numpy()
         ax2.hist(
-            chosen_data,
+            hist_data[focus_feature],
             bins=x_values_list[idx],
             density=True,
-            color=[0, 0, 0],
+            color='k',
             alpha=0.2,
             rwidth=0.8,
         )
