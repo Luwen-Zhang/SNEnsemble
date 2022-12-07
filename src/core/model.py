@@ -6,8 +6,10 @@ from .trainer import *
 
 
 class AbstractModel:
-    def __init__(self, trainer: Trainer):
+    def __init__(self, trainer: Trainer = None):
         self.trainer = trainer
+        if not hasattr(trainer, 'project'):
+            trainer.load_config(default_configfile='base_config')
         self.model = None
         self.leaderboard = None
         self.program = None
@@ -65,7 +67,7 @@ class AbstractModel:
 
 
 class AutoGluon(AbstractModel):
-    def __init__(self, trainer):
+    def __init__(self, trainer = None):
         super(AutoGluon, self).__init__(trainer)
         self.program = 'AutoGluon'
         self._mkdir()
@@ -103,7 +105,7 @@ class AutoGluon(AbstractModel):
 
 
 class PytorchTabular(AbstractModel):
-    def __init__(self, trainer):
+    def __init__(self, trainer = None):
         super(PytorchTabular, self).__init__(trainer)
         self.program = 'PytorchTabular'
         self._mkdir()
@@ -303,7 +305,7 @@ class PytorchTabular(AbstractModel):
 
 
 class TabNet(AbstractModel):
-    def __init__(self, trainer):
+    def __init__(self, trainer = None):
         super(TabNet, self).__init__(trainer)
         self.program = 'TabNet'
         self._mkdir()
@@ -393,7 +395,7 @@ class TabNet(AbstractModel):
 
 
 class TorchModel(AbstractModel):
-    def __init__(self, trainer: Trainer):
+    def __init__(self, trainer = None):
         super(TorchModel, self).__init__(trainer)
 
     def _new_model(self):
@@ -595,7 +597,7 @@ class TorchModel(AbstractModel):
 
 
 class ThisWork(TorchModel):
-    def __init__(self, trainer):
+    def __init__(self, trainer = None):
         super(ThisWork, self).__init__(trainer)
         self.program = 'ThisWork'
         self._mkdir()

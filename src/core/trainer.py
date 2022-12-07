@@ -254,6 +254,8 @@ class Trainer:
                 )
             else:
                 raise Exception("Split type not implemented")
+        else:
+            self.train_indices, self.val_indices, self.test_indices = train_indices, val_indices, test_indices
 
         if preprocess:
             data = self._data_preprocess(data)
