@@ -25,19 +25,27 @@ class AbstractModel:
         self.trainer._update_dataset_auto()
         self._train(dump_trainer=False, verbose=verbose)
 
-    def predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
+    def predict(self, df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs):
         if self.model is None:
             raise Exception('Run fit() before predict().')
         if model_name not in self._get_model_names():
             raise Exception(f'Model {model_name} is not available. Select among {self._get_model_names()}')
-        if self.trainer.label_name[0] not in df.columns:
-            raise Exception(f'Label {self.trainer.label_name} not in the input dataframe.')
         absent_features = []
         for feature_name in self.trainer.feature_names:
             if feature_name not in df.columns:
                 absent_features.append(feature_name)
         if len(absent_features) > 0:
             raise Exception(f'Feature {absent_features} not in the input dataframe.')
+
+        additional_data = []
+        absent_keys = []
+        for key in self.trainer.derived_data.keys():
+            if key not in derived_data.keys():
+                absent_keys.append(key)
+            else:
+                additional_data.append(derived_data[key])
+        if len(absent_keys) > 0:
+            raise Exception(f'Additional feature {absent_keys} not in the input derived_data.')
         return self._predict(df, model_name, additional_data, **kwargs)
 
     def _predict_all(self, verbose=True, test_data_only=False):
