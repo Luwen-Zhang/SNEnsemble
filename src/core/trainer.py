@@ -699,7 +699,7 @@ class Trainer:
             available_r = []
             for r in unique_r:
                 if ((self.df.loc[original_train_indices, s_col] * sgn > 0) &
-                   ((self.df.loc[original_train_indices, r_col] - r).__abs__() < 1e-3)).any():
+                    ((self.df.loc[original_train_indices, r_col] - r).__abs__() < 1e-3)).any():
                     available_r.append(r)
             raise Exception(f'R-value {r_value} not available. Choose among {available_r}.')
 
@@ -752,10 +752,9 @@ class Trainer:
         if new_ax:
             plt.close()
 
-    def _bootstrap(self, model, df, focus_feature, n_bootstrap, grid_size):
+    def _bootstrap(self, model, df, focus_feature, n_bootstrap, grid_size, verbose=True):
         bootstrap_model = cp(model)
         x_value = np.linspace(np.min(df[focus_feature]), np.max(df[focus_feature]), grid_size)
-
         def _derive(df):
             data = df.copy()
             derived_data = {}
@@ -774,7 +773,8 @@ class Trainer:
         expected_value_bootstrap_replications = []
         for i_bootstrap in range(n_bootstrap):
             if n_bootstrap != 1:
-                print(f'Bootstrap: {i_bootstrap + 1}/{n_bootstrap}')
+                if verbose:
+                    print(f'Bootstrap: {i_bootstrap + 1}/{n_bootstrap}')
                 df_bootstrap = resample(df).reset_index(drop=True)
             else:
                 df_bootstrap = df.copy()
@@ -787,6 +787,7 @@ class Trainer:
             for value in x_value:
                 df_perm = df_bootstrap.copy()
                 df_perm[focus_feature] = value
+
                 df_perm, derived_data = _derive(df_perm)
                 bootstrap_model_predictions.append(
                     np.mean(bootstrap_model.predict(df_perm, derived_data=derived_data, model_name='ThisWork')))
@@ -806,7 +807,7 @@ class Trainer:
             ci_right.append(ci_int[1])
             mean_pred.append(np.mean(y_pred))
 
-        return x_value, mean_pred, ci_left, ci_right
+        return x_value, np.array(mean_pred), np.array(ci_left), np.array(ci_right)
 
     def _get_best_model(self):
         if not hasattr(self, 'leaderboard'):
