@@ -122,8 +122,9 @@ class MeanImputer(AbstractTransformer):
         trans_indices = np.setdiff1d(np.array(data.index), fit_indices)
         data.loc[fit_indices, trainer.feature_names] = imputer.fit_transform(
             data.loc[fit_indices, trainer.feature_names]).astype(np.float32)
-        data.loc[trans_indices, trainer.feature_names] = imputer.transform(
-            data.loc[trans_indices, trainer.feature_names]).astype(np.float32)
+        if len(trans_indices) > 0:
+            data.loc[trans_indices, trainer.feature_names] = imputer.transform(
+                data.loc[trans_indices, trainer.feature_names]).astype(np.float32)
 
         self.transformer = imputer
         self.record_features = cp(trainer.feature_names)
@@ -161,8 +162,9 @@ class StandardScaler(AbstractTransformer):
         trans_indices = np.setdiff1d(np.array(data.index), fit_indices)
         data.loc[fit_indices, trainer.feature_names] = scaler.fit_transform(
             data.loc[fit_indices, trainer.feature_names]).astype(np.float32)
-        data.loc[trans_indices, trainer.feature_names] = scaler.transform(
-            data.loc[trans_indices, trainer.feature_names]).astype(np.float32)
+        if len(trans_indices) > 0:
+            data.loc[trans_indices, trainer.feature_names] = scaler.transform(
+                data.loc[trans_indices, trainer.feature_names]).astype(np.float32)
 
         self.transformer = scaler
         self.record_features = cp(trainer.feature_names)
