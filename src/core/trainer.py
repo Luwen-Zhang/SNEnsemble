@@ -754,7 +754,11 @@ class Trainer:
 
     def _bootstrap(self, model, df, focus_feature, n_bootstrap, grid_size, verbose=True, rederive=True, percentile=100):
         bootstrap_model = cp(model)
-        x_value = np.linspace(np.min(df[focus_feature]), np.max(df[focus_feature]), grid_size)
+        x_value = np.linspace(
+            np.nanpercentile(df[focus_feature].values, (100-percentile)/2),
+            np.nanpercentile(df[focus_feature].values, 100-(100-percentile)/2),
+            grid_size,
+        )
         def _derive(df):
             data = df.copy()
             if focus_feature in self.stacked_derivation_related_cols + self.derivation_related_cols and rederive:
