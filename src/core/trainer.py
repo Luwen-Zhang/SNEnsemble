@@ -229,7 +229,8 @@ class Trainer:
                     self.derived_data_col_names.pop(name, None)
                     self.derived_data.pop(name, None)
 
-    def _data_process(self, train_indices=None, val_indices=None, test_indices=None, preprocess=True):
+    def _data_process(self, train_indices=None, val_indices=None, test_indices=None, preprocess=True,
+                      transform_only=False):
         self.feature_data = self.df[self.feature_names]
         self.label_data = self.df[self.label_name]
         self.unscaled_feature_data = cp(self.feature_data)
@@ -258,7 +259,7 @@ class Trainer:
             self.train_indices, self.val_indices, self.test_indices = train_indices, val_indices, test_indices
 
         if preprocess:
-            data = self._data_preprocess(data)
+            data = self._data_preprocess(data, transform_only=transform_only)
 
         # Reset indices
         self.retained_indices = np.array(data.index)
@@ -276,10 +277,15 @@ class Trainer:
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
 
-    def _data_preprocess(self, input_data: pd.DataFrame):
+    def _data_preprocess(self, input_data: pd.DataFrame, transform_only=False):
         data = input_data.copy()
+        from src.core.dataprocessor import AbstractTransformer
         for processor in self.dataprocessors:
-            data = processor.fit_transform(data, self)
+            if transform_only:
+                if issubclass(type(processor), AbstractTransformer):
+                    data = processor.fit_transform(data, self)
+            else:
+                data = processor.fit_transform(data, self)
         return data
 
     def _data_transform(self, input_data: pd.DataFrame):

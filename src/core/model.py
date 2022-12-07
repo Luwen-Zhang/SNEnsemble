@@ -20,7 +20,8 @@ class AbstractModel:
         self.trainer.label_name = label_name
         self.trainer.derived_data = derived_data
         indices = np.arange(len(df))
-        self.trainer._data_process(preprocess=True, train_indices=indices, val_indices=indices, test_indices=indices)
+        self.trainer._data_process(preprocess=True, train_indices=indices, val_indices=indices, test_indices=indices,
+                                   transform_only=True)
         self.trainer._update_dataset_auto()
         self._train(dump_trainer=False, verbose=verbose)
 
