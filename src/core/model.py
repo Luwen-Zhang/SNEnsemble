@@ -526,7 +526,8 @@ class TorchModel(AbstractModel):
 
         return predictions
 
-    def _predict(self, df: pd.DataFrame, model_name, additional_data: list = None, **kwargs):
+    def _predict(self, input_df: pd.DataFrame, model_name, additional_data: list = None, **kwargs):
+        df = self.trainer._data_transform(input_df.copy())
         X = torch.tensor(df[self.trainer.feature_names].values.astype(np.float32), dtype=torch.float32).to(
             self.trainer.device)
         D = [torch.tensor(value, dtype=torch.float32).to(self.trainer.device) for value in additional_data]
