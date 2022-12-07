@@ -190,7 +190,6 @@ class Trainer:
             self.data_path = data_path
 
         self.feature_names = list(self.args['feature_names_type'].keys())
-
         self.label_name = self.args['label_name']
 
         self.derived_data = {}
@@ -213,12 +212,24 @@ class Trainer:
                 self.df = pd.concat([self.df, pd.DataFrame(data=value, columns=col_names)], axis=1)
                 self.stacked_derivation_related_cols += related_columns
 
-        self._split_dataset()
+        self.df = self.df.copy().dropna(axis=0, subset=self.label_name + self.derivation_related_cols)
+        self._data_process()
+        self._rederive_unstacked()
+        self._update_dataset_auto()
 
         print("Dataset size:", len(self.train_dataset), len(self.val_dataset), len(self.test_dataset))
 
-    def _split_dataset(self):
-        self.df = self.df.copy().dropna(axis=0, subset=self.label_name + self.derivation_related_cols)
+    def _rederive_unstacked(self):
+        for deriver, kwargs in self.dataderivers:
+            if kwargs['derived_name'] in self.derived_data.keys():
+                value, name, col_names, _, _ = deriver.derive(self.df, **kwargs)
+                self.derived_data[name] = value
+                self.derived_data_col_names[name] = col_names
+                if len(self.derived_data[name]) == 0:
+                    self.derived_data_col_names.pop(name, None)
+                    self.derived_data.pop(name, None)
+
+    def _data_process(self, train_indices=None, val_indices=None, test_indices=None):
         self.feature_data = self.df[self.feature_names]
         self.label_data = self.df[self.label_name]
         self.unscaled_feature_data = cp(self.feature_data)
@@ -228,20 +239,21 @@ class Trainer:
         self.df.reset_index(drop=True, inplace=True)
         original_length = len(data)
 
-        train_val_test = np.array([0.6, 0.2, 0.2])
-        if self.split_by == "random":
-            self.train_indices, self.val_indices, self.test_indices = split_by_random(
-                len(data), train_val_test
-            )
-        elif self.split_by == "material":
-            mat_lay = [str(x) for x in self.df["Material_Code"].copy()]
-            mat_lay_set = list(sorted(set(mat_lay)))
+        if train_indices is None or val_indices is None or test_indices is None:
+            train_val_test = np.array([0.6, 0.2, 0.2])
+            if self.split_by == "random":
+                self.train_indices, self.val_indices, self.test_indices = split_by_random(
+                    len(data), train_val_test
+                )
+            elif self.split_by == "material":
+                mat_lay = [str(x) for x in self.df["Material_Code"].copy()]
+                mat_lay_set = list(sorted(set(mat_lay)))
 
-            self.train_indices, self.val_indices, self.test_indices = split_by_material(
-                mat_lay, mat_lay_set, train_val_test
-            )
-        else:
-            raise Exception("Split type not implemented")
+                self.train_indices, self.val_indices, self.test_indices = split_by_material(
+                    mat_lay, mat_lay_set, train_val_test
+                )
+            else:
+                raise Exception("Split type not implemented")
 
         data = self._data_preprocess(data)
 
@@ -260,18 +272,6 @@ class Trainer:
 
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
-
-        # derived data (not stacked) is re-derived
-        for deriver, kwargs in self.dataderivers:
-            if kwargs['derived_name'] in self.derived_data.keys():
-                value, name, col_names, _, _ = deriver.derive(self.df, **kwargs)
-                self.derived_data[name] = value
-                self.derived_data_col_names[name] = col_names
-                if len(self.derived_data[name]) == 0:
-                    self.derived_data_col_names.pop(name, None)
-                    self.derived_data.pop(name, None)
-
-        self._update_dataset_auto()
 
     def _data_preprocess(self, input_data: pd.DataFrame):
         data = input_data.copy()
