@@ -24,6 +24,8 @@ import torch.utils.data as Data
 import time
 import json
 from copy import deepcopy as cp
+from sklearn.utils import resample
+import scipy.stats as st
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -216,7 +218,7 @@ class Trainer:
         self._data_process()
         self._rederive_unstacked()
         self._update_dataset_auto()
-
+        self._material_code = pd.DataFrame(self.df['Material_Code'])
         print("Dataset size:", len(self.train_dataset), len(self.val_dataset), len(self.test_dataset))
 
     def _rederive_unstacked(self):
@@ -272,7 +274,6 @@ class Trainer:
             [x - np.count_nonzero(self.dropped_indices < x) for x in self.test_indices if x in data.index])
 
         self.df = pd.DataFrame(self.df.loc[self.retained_indices, :]).reset_index(drop=True)
-        self._material_code = pd.DataFrame(self.df['Material_Code'])
 
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
@@ -297,23 +298,19 @@ class Trainer:
         return data
 
     def _update_dataset_auto(self):
-        self._update_dataset(self.feature_data, self.label_data, self.derived_data.values(),
-                                     self.train_indices, self.val_indices, self.test_indices)
-
-    def _update_dataset(self, feature_data, label_data, additional_data, train_indices, val_indices, test_indices):
-        X = torch.tensor(feature_data.values.astype(np.float32), dtype=torch.float32).to(
+        X = torch.tensor(self.feature_data.values.astype(np.float32), dtype=torch.float32).to(
             self.device
         )
-        y = torch.tensor(label_data.values.astype(np.float32), dtype=torch.float32).to(
+        y = torch.tensor(self.label_data.values.astype(np.float32), dtype=torch.float32).to(
             self.device
         )
 
-        D = [torch.tensor(value, dtype=torch.float32).to(self.device) for value in additional_data]
+        D = [torch.tensor(value, dtype=torch.float32).to(self.device) for value in self.derived_data.values()]
         dataset = Data.TensorDataset(X, *D, y)
 
-        self.train_dataset = Subset(dataset, train_indices)
-        self.val_dataset = Subset(dataset, val_indices)
-        self.test_dataset = Subset(dataset, test_indices)
+        self.train_dataset = Subset(dataset, self.train_indices)
+        self.val_dataset = Subset(dataset, self.val_indices)
+        self.test_dataset = Subset(dataset, self.test_indices)
         self.tensors = (X, *D, y) if len(D) > 0 else (X, None, y)
 
     def describe(self, transformed=False, save=True):
