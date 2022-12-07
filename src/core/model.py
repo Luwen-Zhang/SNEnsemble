@@ -566,7 +566,7 @@ class TorchModel(AbstractModel):
 
         return min_loss, train_ls, val_ls
 
-    def _train(self, verbose_per_epoch=100, verbose: bool = False, debug_mode: bool = False):
+    def _train(self, verbose_per_epoch=100, verbose: bool = True, debug_mode: bool = False):
         self.model = self._new_model()
 
         min_loss, self.train_ls, self.val_ls = self._model_train(model=self.model,
@@ -576,7 +576,8 @@ class TorchModel(AbstractModel):
 
         self.model.load_state_dict(torch.load(self.trainer.project_root + 'fatigue.pt'))
 
-        print(f'Minimum loss: {min_loss:.5f}')
+        if verbose:
+            print(f'Minimum loss: {min_loss:.5f}')
 
         test_loader = Data.DataLoader(
             self.trainer.test_dataset,
@@ -588,8 +589,9 @@ class TorchModel(AbstractModel):
         rmse = np.sqrt(mse)
         self.metrics = {'mse': mse, 'rmse': rmse}
 
-        print(f'Test MSE loss: {mse:.5f}, RMSE loss: {rmse:.5f}')
-        save_trainer(self.trainer)
+        if verbose:
+            print(f'Test MSE loss: {mse:.5f}, RMSE loss: {rmse:.5f}')
+        save_trainer(self.trainer, verbose=verbose)
 
 
 class ThisWork(TorchModel):

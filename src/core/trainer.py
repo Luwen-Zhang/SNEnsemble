@@ -815,10 +815,11 @@ class Trainer:
         return tuple(res)
 
 
-def save_trainer(trainer, path=None):
+def save_trainer(trainer, path=None, verbose=True):
     import pickle
     path = trainer.project_root + 'trainer.pkl' if path is None else path
-    print(f'Trainer saved. To load the trainer, run trainer = load_trainer(path=\'{path}\')')
+    if verbose:
+        print(f'Trainer saved. To load the trainer, run trainer = load_trainer(path=\'{path}\')')
     with open(path, 'wb') as outp:
         pickle.dump(trainer, outp, pickle.HIGHEST_PROTOCOL)
 
