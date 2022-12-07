@@ -50,7 +50,7 @@ class AbstractModel:
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         raise NotImplementedError
 
-    def _train(self):
+    def _train(self, dump_trainer=True):
         raise NotImplementedError
 
     def _get_model_names(self):
@@ -72,7 +72,7 @@ class AutoGluon(AbstractModel):
         self.program = 'AutoGluon'
         self._mkdir()
 
-    def _train(self, verbose: bool = False, debug_mode: bool = False):
+    def _train(self, verbose: bool = False, debug_mode: bool = False, dump_trainer = True):
         print('\n-------------Run AutoGluon Tests-------------\n')
         disable_tqdm()
         import warnings
@@ -94,7 +94,8 @@ class AutoGluon(AbstractModel):
         self.model = predictor
         enable_tqdm()
         warnings.simplefilter(action='default', category=UserWarning)
-        save_trainer(self.trainer)
+        if dump_trainer:
+            save_trainer(self.trainer)
         print('\n-------------AutoGluon Tests End-------------\n')
 
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
@@ -110,7 +111,7 @@ class PytorchTabular(AbstractModel):
         self.program = 'PytorchTabular'
         self._mkdir()
 
-    def _train(self, verbose: bool = False, debug_mode: bool = False):
+    def _train(self, verbose: bool = False, debug_mode: bool = False, dump_trainer = True):
         print('\n-------------Run Pytorch-tabular Tests-------------\n')
         disable_tqdm()
         import warnings
@@ -292,7 +293,8 @@ class PytorchTabular(AbstractModel):
 
         enable_tqdm()
         warnings.simplefilter(action='default', category=UserWarning)
-        save_trainer(self.trainer)
+        if dump_trainer:
+            save_trainer(self.trainer)
         print('\n-------------Pytorch-tabular Tests End-------------\n')
 
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
@@ -310,7 +312,7 @@ class TabNet(AbstractModel):
         self.program = 'TabNet'
         self._mkdir()
 
-    def _train(self, verbose: bool = False, debug_mode: bool = False):
+    def _train(self, verbose: bool = False, debug_mode: bool = False, dump_trainer = True):
         print('\n-------------Run TabNet Test-------------\n')
         train_indices = self.trainer.train_dataset.indices
         val_indices = self.trainer.val_dataset.indices
@@ -384,7 +386,8 @@ class TabNet(AbstractModel):
         print('MSE Loss:', self.trainer._metric_sklearn(y_test_pred, test_y, 'mse'), 'RMSE Loss:',
               self.trainer._metric_sklearn(y_test_pred, test_y, 'rmse'))
         self.model = model
-        save_trainer(self.trainer)
+        if dump_trainer:
+            save_trainer(self.trainer)
         print('\n-------------TabNet Tests End-------------\n')
 
     def _predict(self, df: pd.DataFrame, model_name=None, additional_data=None, **kwargs):
@@ -568,7 +571,7 @@ class TorchModel(AbstractModel):
 
         return min_loss, train_ls, val_ls
 
-    def _train(self, verbose_per_epoch=100, verbose: bool = True, debug_mode: bool = False):
+    def _train(self, verbose_per_epoch=100, verbose: bool = True, debug_mode: bool = False, dump_trainer = True):
         self.model = self._new_model()
 
         min_loss, self.train_ls, self.val_ls = self._model_train(model=self.model,
@@ -593,7 +596,9 @@ class TorchModel(AbstractModel):
 
         if verbose:
             print(f'Test MSE loss: {mse:.5f}, RMSE loss: {rmse:.5f}')
-        save_trainer(self.trainer, verbose=verbose)
+
+        if dump_trainer:
+            save_trainer(self.trainer, verbose=verbose)
 
 
 class ThisWork(TorchModel):
