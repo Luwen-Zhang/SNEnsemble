@@ -14,7 +14,7 @@ class AbstractModel:
         self.leaderboard = None
         self.program = None
 
-    def fit(self, df, feature_names: list, label_name: list, derived_data: dict = None):
+    def fit(self, df, feature_names: list, label_name: list, derived_data: dict = None, verbose=True):
         self.trainer.df = df
         self.trainer.feature_names = feature_names
         self.trainer.label_name = label_name
@@ -22,7 +22,7 @@ class AbstractModel:
         indices = np.arange(len(df))
         self.trainer._data_process(preprocess=True, train_indices=indices, val_indices=indices, test_indices=indices)
         self.trainer._update_dataset_auto()
-        self._train(dump_trainer=False)
+        self._train(dump_trainer=False, verbose=verbose)
 
     def predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         if self.model is None:
@@ -75,7 +75,7 @@ class AbstractModel:
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         raise NotImplementedError
 
-    def _train(self, dump_trainer=True):
+    def _train(self, dump_trainer=True, verbose=True):
         raise NotImplementedError
 
     def _get_model_names(self):
@@ -601,6 +601,7 @@ class TorchModel(AbstractModel):
         self.model = self._new_model()
 
         min_loss, self.train_ls, self.val_ls = self._model_train(model=self.model,
+                                                                 verbose=verbose,
                                                                  verbose_per_epoch=verbose_per_epoch,
                                                                  **{**self.trainer.params,
                                                                     **self.trainer.static_params})
