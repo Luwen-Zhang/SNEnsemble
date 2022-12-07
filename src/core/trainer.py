@@ -229,7 +229,7 @@ class Trainer:
                     self.derived_data_col_names.pop(name, None)
                     self.derived_data.pop(name, None)
 
-    def _data_process(self, train_indices=None, val_indices=None, test_indices=None):
+    def _data_process(self, train_indices=None, val_indices=None, test_indices=None, preprocess=True):
         self.feature_data = self.df[self.feature_names]
         self.label_data = self.df[self.label_name]
         self.unscaled_feature_data = cp(self.feature_data)
@@ -255,7 +255,8 @@ class Trainer:
             else:
                 raise Exception("Split type not implemented")
 
-        data = self._data_preprocess(data)
+        if preprocess:
+            data = self._data_preprocess(data)
 
         # Reset indices
         self.retained_indices = np.array(data.index)
