@@ -218,14 +218,14 @@ class Trainer:
         print("Dataset size:", len(self.train_dataset), len(self.val_dataset), len(self.test_dataset))
 
     def _split_dataset(self):
-        original_data = self.df.copy().dropna(axis=0, subset=self.label_name + self.derivation_related_cols)
-        self.feature_data = original_data[self.feature_names]
-        self.label_data = original_data[self.label_name]
+        self.df = self.df.copy().dropna(axis=0, subset=self.label_name + self.derivation_related_cols)
+        self.feature_data = self.df[self.feature_names]
+        self.label_data = self.df[self.label_name]
         self.unscaled_feature_data = cp(self.feature_data)
         self.unscaled_label_data = cp(self.label_data)
         data, feature_names, label_name = self._get_tabular_dataset()
         data.reset_index(drop=True, inplace=True)
-        original_data.reset_index(drop=True, inplace=True)
+        self.df.reset_index(drop=True, inplace=True)
         original_length = len(data)
 
         train_val_test = np.array([0.6, 0.2, 0.2])
@@ -234,7 +234,7 @@ class Trainer:
                 len(data), train_val_test
             )
         elif self.split_by == "material":
-            mat_lay = [str(x) for x in original_data["Material_Code"].copy()]
+            mat_lay = [str(x) for x in self.df["Material_Code"].copy()]
             mat_lay_set = list(sorted(set(mat_lay)))
 
             self.train_indices, self.val_indices, self.test_indices = split_by_material(
@@ -255,9 +255,8 @@ class Trainer:
         self.test_indices = np.array(
             [x - np.count_nonzero(self.dropped_indices < x) for x in self.test_indices if x in data.index])
 
-        self._material_code = pd.DataFrame(original_data.loc[self.retained_indices, 'Material_Code']).reset_index(
-            drop=True)
-        self.df = pd.DataFrame(original_data.loc[self.retained_indices, :]).reset_index(drop=True)
+        self.df = pd.DataFrame(self.df.loc[self.retained_indices, :]).reset_index(drop=True)
+        self._material_code = pd.DataFrame(self.df['Material_Code'])
 
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
@@ -265,7 +264,7 @@ class Trainer:
         # derived data (not stacked) is re-derived
         for deriver, kwargs in self.dataderivers:
             if kwargs['derived_name'] in self.derived_data.keys():
-                value, name, col_names, _, _ = deriver.derive(original_data.loc[self.retained_indices, :], **kwargs)
+                value, name, col_names, _, _ = deriver.derive(self.df, **kwargs)
                 self.derived_data[name] = value
                 self.derived_data_col_names[name] = col_names
                 if len(self.derived_data[name]) == 0:
