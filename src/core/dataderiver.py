@@ -93,7 +93,7 @@ class SuppStressDeriver(AbstractDeriver):
         df_tmp['Relative Peak-to-peak Stress'] = np.nan
         df_tmp['Relative Mean Stress'] = np.nan
 
-        for idx in range(df_tmp.values.shape[0]):
+        for idx in df_tmp.index:
             s = np.array([df_tmp.loc[idx, max_stress_col], df_tmp.loc[idx, min_stress_col]])
             which_max_stress = np.where(np.abs(s) == np.max(np.abs(s)))[0]
             if len(which_max_stress) == 0:
