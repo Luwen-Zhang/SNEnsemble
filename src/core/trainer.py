@@ -752,6 +752,7 @@ class Trainer:
         ax.legend(loc='upper right', markerscale=1.5, handlelength=0.2, handleheight=0.9)
         ax.set_xlabel(n_col)
         ax.set_ylabel(s_col)
+        ax.set_title(f'{m_code} R-value: {r_value}')
 
         if is_notebook() and new_ax:
             plt.show()
