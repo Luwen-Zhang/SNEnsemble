@@ -677,7 +677,7 @@ class Trainer:
             raise Exception(f'Material code {m_code} not available.')
         return code_df.index[np.where(code_df['Material_Code'] == m_code)[0]]
 
-    def plot_S_N(self, s_col, n_col, m_code, load_dir='tension', ax=None, grid_size=100):
+    def plot_S_N(self, s_col, n_col, r_col, m_code, r_value, load_dir='tension', ax=None, grid_size=30, n_bootstrap=30):
         if s_col not in self.df.columns:
             raise Exception(f'{s_col} not in features.')
         if n_col not in self.label_name:
@@ -685,10 +685,23 @@ class Trainer:
         m_train_indices = self._select_by_material_code(m_code, partition='train')
         m_test_indices = self._select_by_material_code(m_code, partition='test')
         m_val_indices = self._select_by_material_code(m_code, partition='val')
+        original_train_indices = cp(m_train_indices)
         sgn = 1 if load_dir == 'tension' else -1
-        m_train_indices = m_train_indices[self.df.loc[m_train_indices, s_col].values * sgn > 0]
-        m_test_indices = m_test_indices[self.df.loc[m_test_indices, s_col].values * sgn > 0]
-        m_val_indices = m_val_indices[self.df.loc[m_val_indices, s_col].values * sgn > 0]
+        m_train_indices = m_train_indices[(self.df.loc[m_train_indices, s_col] * sgn > 0) &
+                                          ((self.df.loc[m_train_indices, r_col] - r_value).__abs__() < 1e-3)]
+        m_test_indices = m_test_indices[(self.df.loc[m_test_indices, s_col] * sgn > 0) &
+                                        ((self.df.loc[m_test_indices, r_col] - r_value).__abs__() < 1e-3)]
+        m_val_indices = m_val_indices[(self.df.loc[m_val_indices, s_col] * sgn > 0) &
+                                      ((self.df.loc[m_val_indices, r_col] - r_value).__abs__() < 1e-3)]
+
+        if len(m_train_indices) == 0:
+            unique_r = np.unique(self.df.loc[original_train_indices, r_col])
+            available_r = []
+            for r in unique_r:
+                if ((self.df.loc[original_train_indices, s_col] * sgn > 0) &
+                    ((self.df.loc[original_train_indices, r_col] - r).__abs__() < 1e-3)).any():
+                    available_r.append(r)
+            raise Exception(f'R-value {r_value} not available. Choose among {available_r}.')
 
         s_train = self.df.loc[m_train_indices, s_col]
         n_train = self.df.loc[m_train_indices, n_col]
