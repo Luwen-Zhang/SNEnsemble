@@ -14,6 +14,7 @@ autogluon
 pytorch_tabular
 src/.pt_tmp/exp_version_manager.yml
 output/*
+main_debug.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
