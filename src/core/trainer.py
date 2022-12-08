@@ -200,7 +200,7 @@ class Trainer:
         self.stacked_derivation_related_cols = []
         for deriver, kwargs in self.dataderivers:
             try:
-                value, name, col_names, stacked, related_columns = deriver.derive(self.df, **kwargs)
+                value, name, col_names, stacked, intermediate, related_columns = deriver.derive(self.df, **kwargs)
             except Exception as e:
                 print(f'Skip deriver {deriver.__class__.__name__} because of the following exception:')
                 print(f'\t{e}')
@@ -210,8 +210,11 @@ class Trainer:
                 self.derived_data_col_names[name] = col_names
                 self.derivation_related_cols += related_columns
             else:
-                self.feature_names += col_names
-                self.df = pd.concat([self.df, pd.DataFrame(data=value, columns=col_names)], axis=1)
+                if not intermediate:
+                    for col_name in col_names:
+                        if col_name not in self.feature_names:
+                            self.feature_names.append(col_name)
+                self.df[col_names] = value
                 self.stacked_derivation_related_cols += related_columns
 
         self.df = self.df.copy().dropna(axis=0, subset=self.label_name + self.derivation_related_cols)
@@ -224,7 +227,7 @@ class Trainer:
     def _rederive_unstacked(self):
         for deriver, kwargs in self.dataderivers:
             if kwargs['derived_name'] in self.derived_data.keys():
-                value, name, col_names, _, _ = deriver.derive(self.df, **kwargs)
+                value, name, col_names, _, _, _ = deriver.derive(self.df, **kwargs)
                 self.derived_data[name] = value
                 self.derived_data_col_names[name] = col_names
                 if len(self.derived_data[name]) == 0:
@@ -787,7 +790,7 @@ class Trainer:
                 derived_data = {}
                 for deriver, kwargs in self.dataderivers:
                     try:
-                        value, name, col_names, stacked, related_columns = deriver.derive(data, **kwargs)
+                        value, name, col_names, stacked, intermediate, related_columns = deriver.derive(data, **kwargs)
                     except Exception as e:
                         continue
                     if stacked:

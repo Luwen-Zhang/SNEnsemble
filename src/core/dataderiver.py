@@ -5,7 +5,7 @@ class AbstractDeriver:
     def __init__(self):
         pass
 
-    def derive(self, df, derived_name, col_names, stacked, **kwargs):
+    def derive(self, df, derived_name, col_names, stacked, intermediate=False, **kwargs):
         raise NotImplementedError
 
     @staticmethod
@@ -29,7 +29,7 @@ class DegLayerDeriver(AbstractDeriver):
     def __init__(self):
         super(DegLayerDeriver, self).__init__()
 
-    def derive(self, df, sequence_column=None, derived_name=None, col_names=None, stacked=True):
+    def derive(self, df, derived_name=None, col_names=None, stacked=True, intermediate=False, sequence_column=None):
         self._check_arg(derived_name, 'derived_name')
         self._check_arg(sequence_column, 'sequence_column')
         self._check_exist(df, sequence_column, 'sequence_column')
@@ -50,14 +50,14 @@ class DegLayerDeriver(AbstractDeriver):
 
         related_columns = [sequence_column]
 
-        return deg_layers, derived_name, names, stacked, related_columns
+        return deg_layers, derived_name, names, stacked, intermediate, related_columns
 
 
 class RelativeDeriver(AbstractDeriver):
     def __init__(self):
         super(RelativeDeriver, self).__init__()
 
-    def derive(self, df, derived_name=None, col_names=None, stacked=True, absolute_col=None, relative2_col=None):
+    def derive(self, df, derived_name=None, col_names=None, stacked=True, intermediate=False, absolute_col=None, relative2_col=None):
         self._check_arg(derived_name, 'derived_name')
         self._check_arg(absolute_col, 'absolute_col')
         self._check_arg(relative2_col, 'relative2_col')
@@ -70,14 +70,14 @@ class RelativeDeriver(AbstractDeriver):
         names = self._generate_col_names(derived_name, 1, col_names)
         related_columns = [absolute_col, relative2_col]
 
-        return relative, derived_name, names, stacked, related_columns
+        return relative, derived_name, names, stacked, intermediate, related_columns
 
 
 class SuppStressDeriver(AbstractDeriver):
     def __init__(self):
         super(SuppStressDeriver, self).__init__()
 
-    def derive(self, df, derived_name=None, col_names=None, stacked=True, max_stress_col=None, min_stress_col=None, relative=False):
+    def derive(self, df, derived_name=None, col_names=None, stacked=True, intermediate=False, max_stress_col=None, min_stress_col=None, relative=False):
         self._check_arg(derived_name, 'derived_name')
         self._check_arg(max_stress_col, 'max_stress_col')
         self._check_arg(min_stress_col, 'min_stress_col')
@@ -127,7 +127,7 @@ class SuppStressDeriver(AbstractDeriver):
         stresses = df_tmp[names].values
         related_columns = [max_stress_col, min_stress_col]
 
-        return stresses, derived_name, names, stacked, related_columns
+        return stresses, derived_name, names, stacked, intermediate, related_columns
 
 
 deriver_mapping = {
