@@ -728,11 +728,14 @@ class Trainer:
         s_test = self.df.loc[m_test_indices, s_col]
         n_test = self.df.loc[m_test_indices, n_col]
 
+        all_s = np.vstack([s_train.values.reshape(-1, 1), s_val.values.reshape(-1, 1), s_test.values.reshape(-1, 1)])
+
         x_value, mean_pred, ci_left, ci_right = self._bootstrap(model=self._get_modelbase(program='ThisWork'),
                                                                 df=self.df.loc[m_train_indices, :],
                                                                 focus_feature=s_col,
                                                                 n_bootstrap=n_bootstrap,
-                                                                grid_size=grid_size)
+                                                                grid_size=grid_size,
+                                                                x_min=np.min(all_s), x_max=np.max(all_s))
 
         if ax is None:
             new_ax = True
@@ -770,11 +773,12 @@ class Trainer:
         if new_ax:
             plt.close()
 
-    def _bootstrap(self, model, df, focus_feature, n_bootstrap, grid_size, verbose=True, rederive=True, percentile=100):
+    def _bootstrap(self, model, df, focus_feature, n_bootstrap, grid_size, verbose=True, rederive=True, percentile=100,
+                   x_min=None, x_max=None):
         bootstrap_model = cp(model)
         x_value = np.linspace(
-            np.nanpercentile(df[focus_feature].values, (100-percentile)/2),
-            np.nanpercentile(df[focus_feature].values, 100-(100-percentile)/2),
+            np.nanpercentile(df[focus_feature].values, (100-percentile)/2) if x_min is None else x_min,
+            np.nanpercentile(df[focus_feature].values, 100-(100-percentile)/2) if x_max is None else x_max,
             grid_size,
         )
         def _derive(df):
