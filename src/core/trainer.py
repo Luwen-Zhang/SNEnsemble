@@ -350,19 +350,20 @@ class Trainer:
     def random_cross_validation(self, n_random=5, verbose=True, test_data_only=False):
         leaderboards = []
         for i in range(n_random):
-            print(f'----------------------------{i+1}/{n_random} random cross validation----------------------------')
+            print(f'----------------------------{i + 1}/{n_random} random cross validation----------------------------')
             self.load_data()
             self.train(verbose=verbose)
             leaderboards.append(self.get_leaderboard(test_data_only=test_data_only))
 
         final_leaderboard = leaderboards[0].copy()
         model_col_idx = list(final_leaderboard.columns).index('Model')
-        metrics_columns = final_leaderboard.columns[model_col_idx+1:]
-        for model_idx, model_name in enumerate(final_leaderboard['Model']):
+        metrics_cols = final_leaderboard.columns[model_col_idx + 1:]
+        model_rep = [str(x) + str(y) for x, y in zip(final_leaderboard['Program'], final_leaderboard['Model'])]
+        for model_idx, model_name in enumerate(model_rep):
             for df in leaderboards[1:]:
-                final_leaderboard.loc[model_idx, metrics_columns] += \
-                    df.loc[list(df['Model']).index(model_name), metrics_columns]
-        final_leaderboard.loc[:, metrics_columns] /= n_random
+                tmp_model_rep = [str(x) + str(y) for x, y in zip(df['Program'], df['Model'])]
+                final_leaderboard.loc[model_idx, metrics_cols] += df.loc[tmp_model_rep.index(model_name), metrics_cols]
+        final_leaderboard.loc[:, metrics_cols] /= n_random
 
         final_leaderboard.sort_values('Testing RMSE' if not test_data_only else 'RMSE', inplace=True)
         final_leaderboard.reset_index(drop=True, inplace=True)
