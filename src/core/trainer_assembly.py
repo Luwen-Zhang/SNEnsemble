@@ -22,7 +22,7 @@ class TrainerAssembly:
             if 'ThisWork' not in trainer.modelbases_names:
                 continue
             else:
-                modelbase = trainer._get_modelbase('ThisWork')
+                modelbase = trainer.get_modelbase('ThisWork')
 
             ax.plot(
                 np.arange(len(modelbase.train_ls)),
@@ -69,7 +69,7 @@ class TrainerAssembly:
                 print(f'Program: {program}, project: {project}')
                 trainer = self.trainers[self.projects.index(project)]
 
-                modelbase = trainer._get_modelbase(program)
+                modelbase = trainer.get_modelbase(program)
                 model_names = modelbase._get_model_names()
                 predictions = modelbase._predict_all(verbose=True)
 
@@ -147,7 +147,7 @@ class TrainerAssembly:
             all_model_names = []
             trainer = self.trainers[self.projects.index(project)]
             for program in programs:
-                modelbase = trainer._get_modelbase(program)
+                modelbase = trainer.get_modelbase(program)
                 model_names = modelbase._get_model_names()
                 all_model_names += model_names
 

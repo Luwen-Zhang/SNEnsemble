@@ -44,7 +44,7 @@ class Trainer:
         self.modelbases += models
         self.modelbases_names = [x.program for x in self.modelbases]
 
-    def _get_modelbase(self, program: str):
+    def get_modelbase(self, program: str):
         if program not in self.modelbases_names:
             raise Exception(f'Program {program} not added to the trainer.')
         return self.modelbases[self.modelbases_names.index(program)]
@@ -339,7 +339,7 @@ class Trainer:
         if programs is None:
             modelbases_to_train = self.modelbases
         else:
-            modelbases_to_train = [self._get_modelbase(x) for x in programs]
+            modelbases_to_train = [self.get_modelbase(x) for x in programs]
 
         from src.core.model import TorchModel
         for modelbase in modelbases_to_train:
@@ -453,7 +453,7 @@ class Trainer:
         :param upper_lim: The upper boundary of the plot. Default to 9.
         :return: None
         """
-        modelbase = self._get_modelbase(program)
+        modelbase = self.get_modelbase(program)
         model_names = modelbase._get_model_names()
         predictions = modelbase._predict_all()
 
@@ -733,7 +733,7 @@ class Trainer:
 
         all_s = np.vstack([s_train.values.reshape(-1, 1), s_val.values.reshape(-1, 1), s_test.values.reshape(-1, 1)])
 
-        x_value, mean_pred, ci_left, ci_right = self._bootstrap(model=self._get_modelbase(program='ThisWork'),
+        x_value, mean_pred, ci_left, ci_right = self._bootstrap(model=self.get_modelbase(program='ThisWork'),
                                                                 df=self.df.loc[m_train_indices, :],
                                                                 focus_feature=s_col,
                                                                 n_bootstrap=n_bootstrap,
@@ -770,6 +770,11 @@ class Trainer:
         ax.set_xlabel(n_col)
         ax.set_ylabel(s_col)
         ax.set_title(f'{m_code} R-value: {r_value}')
+
+        if not os.path.exists(self.project_root + 'SN_curves'):
+            os.mkdir(path=self.project_root + 'SN_curves')
+        fig_name = m_code.replace('/','_') + f'_r_{r_value}.pdf'
+        plt.savefig(self.project_root + 'SN_curves/' + fig_name)
 
         if is_notebook() and new_ax:
             plt.show()
