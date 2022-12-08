@@ -30,6 +30,8 @@ class config(BaseConfig):
                 # 'Fibre Volumn Fraction': 1,
             },
             "data_derivers": {
+                'MinStressDeriver': {'derived_name': 'Minimum Stress', 'stacked': True, 'intermediate': True,
+                                     'max_stress_col': 'Maximum Stress', 'r_value_col': 'Minimum/Maximum Stress'},
                 'SuppStressDeriver': {'derived_name': 'Support Stress', 'stacked': True,
                                       'max_stress_col': 'Maximum Stress', 'min_stress_col': 'Minimum Stress',
                                       'relative': False},
