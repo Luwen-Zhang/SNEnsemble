@@ -480,7 +480,7 @@ class Trainer:
 
             plt.close()
 
-    def plot_feature_importance(self, modelbase):
+    def plot_feature_importance(self, modelbase, fig_size=(7, 4)):
         """
         Calculate and plot permutation feature importance.
         :return: None
@@ -510,10 +510,19 @@ class Trainer:
         for idx, feature_type in enumerate(self.args['feature_types']):
             clr_map[feature_type] = clr[idx]
 
-        plt.figure(figsize=(7, 4))
+        plt.figure(figsize=fig_size)
         ax = plt.subplot(111)
         plot_importance(ax, self.feature_names, attr, pal=pal, clr_map=clr_map, linewidth=1, edgecolor='k', orient='h')
         plt.tight_layout()
+
+        boxes = []
+        import matplotlib
+        for x in ax.get_children():
+            if isinstance(x, matplotlib.patches.PathPatch):
+                boxes.append(x)
+
+        for patch, color in zip(boxes, pal):
+            patch.set_facecolor(color)
 
         plt.savefig(self.project_root + 'feature_importance.png', dpi=600)
         if is_notebook():
@@ -551,10 +560,12 @@ class Trainer:
                                                                                 rederive=True,
                                                                                 percentile=80)
             else:
-                x_value, model_predictions = calculate_pdp(modelbase.model, self.tensors[0][self.train_dataset.indices, :],
-                                                       self._get_additional_tensors_slice(self.train_dataset.indices),
-                                                       feature_idx,
-                                                       grid_size=30)
+                x_value, model_predictions = calculate_pdp(modelbase.model,
+                                                           self.tensors[0][self.train_dataset.indices, :],
+                                                           self._get_additional_tensors_slice(
+                                                               self.train_dataset.indices),
+                                                           feature_idx,
+                                                           grid_size=30)
                 ci_left = model_predictions
                 ci_right = model_predictions
 
@@ -773,7 +784,7 @@ class Trainer:
 
         if not os.path.exists(self.project_root + 'SN_curves'):
             os.mkdir(path=self.project_root + 'SN_curves')
-        fig_name = m_code.replace('/','_') + f'_r_{r_value}.pdf'
+        fig_name = m_code.replace('/', '_') + f'_r_{r_value}.pdf'
         plt.savefig(self.project_root + 'SN_curves/' + fig_name)
 
         if is_notebook() and new_ax:
@@ -785,10 +796,11 @@ class Trainer:
                    x_min=None, x_max=None):
         bootstrap_model = cp(model)
         x_value = np.linspace(
-            np.nanpercentile(df[focus_feature].values, (100-percentile)/2) if x_min is None else x_min,
-            np.nanpercentile(df[focus_feature].values, 100-(100-percentile)/2) if x_max is None else x_max,
+            np.nanpercentile(df[focus_feature].values, (100 - percentile) / 2) if x_min is None else x_min,
+            np.nanpercentile(df[focus_feature].values, 100 - (100 - percentile) / 2) if x_max is None else x_max,
             grid_size,
         )
+
         def _derive(df):
             data = df.copy()
             if focus_feature in self.stacked_derivation_related_cols + self.derivation_related_cols and rederive:

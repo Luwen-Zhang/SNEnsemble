@@ -242,7 +242,7 @@ def plot_pdp(
                         color='k', edgecolor=None)
 
         ax.set_title(focus_feature, {"fontsize": 12})
-        ax.set_xlim([0, 1])
+        # ax.set_xlim([0, 1])
         if log_trans:
             ax.set_yscale("log")
             ax.set_ylim([10 ** lower_lim, 10 ** upper_lim])
@@ -254,20 +254,27 @@ def plot_pdp(
             # ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
             ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
 
-        ax2 = ax.twinx()
+        if np.min(x_values_list[idx]) < np.max(x_values_list[idx]):
+            ax2 = ax.twinx()
 
-        ax2.hist(
-            hist_data[focus_feature],
-            bins=x_values_list[idx],
-            density=True,
-            color='k',
-            alpha=0.2,
-            rwidth=0.8,
-        )
-        # sns.rugplot(data=chosen_data, height=0.05, ax=ax2, color='k')
-        # ax2.set_ylim([0,1])
-        ax2.set_xlim([np.min(x_values_list[idx]), np.max(x_values_list[idx])])
-        ax2.set_yticks([])
+            ax2.hist(
+                hist_data[focus_feature],
+                bins=x_values_list[idx],
+                density=True,
+                color='k',
+                alpha=0.2,
+                rwidth=0.8,
+            )
+            # sns.rugplot(data=chosen_data, height=0.05, ax=ax2, color='k')
+            # ax2.set_ylim([0,1])
+            ax2.set_xlim([np.min(x_values_list[idx]), np.max(x_values_list[idx])])
+            ax2.set_yticks([])
+        else:
+            ax2 = ax.twinx()
+            ax2.text(0.5, 0.5, 'Invalid interval', ha="center", va="center")
+            ax2.set_xlim([0, 1])
+            ax2.set_ylim([0, 1])
+            ax2.set_yticks([])
 
     ax = fig.add_subplot(111, frameon=False)
     plt.tick_params(
