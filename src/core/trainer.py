@@ -347,6 +347,28 @@ class Trainer:
                 self.params = modelbase._bayes()
             modelbase._train(verbose=verbose, debug_mode=debug_mode)
 
+    def random_cross_validation(self, n_random=5, verbose=True, test_data_only=False):
+        leaderboards = []
+        for i in range(n_random):
+            print(f'----------------------------{i+1}/{n_random} random cross validation----------------------------')
+            self.load_data()
+            self.train(verbose=verbose)
+            leaderboards.append(self.get_leaderboard(test_data_only=test_data_only))
+
+        final_leaderboard = leaderboards[0].copy()
+        model_col_idx = list(final_leaderboard.columns).index('Model')
+        metrics_columns = final_leaderboard.columns[model_col_idx+1:]
+        for model_idx, model_name in enumerate(final_leaderboard['Model']):
+            for df in leaderboards[1:]:
+                final_leaderboard.loc[model_idx, metrics_columns] += \
+                    df.loc[list(df['Model']).index(model_name), metrics_columns]
+        final_leaderboard.loc[:, metrics_columns] /= n_random
+
+        final_leaderboard.sort_values('Testing RMSE' if not test_data_only else 'RMSE', inplace=True)
+        final_leaderboard.reset_index(drop=True, inplace=True)
+        final_leaderboard.to_csv(self.project_root + f'{n_random}_random_cross_val_leaderboard.csv')
+        return final_leaderboard, leaderboards
+
     def _get_derived_data_sizes(self):
         return [x.shape for x in self.derived_data.values()]
 
