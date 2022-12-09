@@ -981,8 +981,17 @@ class ModelAssembly(AbstractModel):
                 )
 
     def _get_model_idx(self, model_name):
+        available_idx = []
+        available_program = []
         for idx, submodel in enumerate(self.models):
             if model_name in submodel._get_model_names():
-                return idx
-        else:
+                available_idx.append(idx)
+                available_program.append(submodel.program)
+        if len(available_idx) == 1:
+            return available_idx[0]
+        elif len(available_idx) == 0:
             raise Exception(f"{model_name} not in the ModelAssembly.")
+        else:
+            raise Exception(
+                f"Multiple {model_name} in the ModelAssembly (in {available_program})."
+            )
