@@ -992,8 +992,10 @@ class Trainer:
             ]
         )
 
+        model = self.get_modelbase(program="ThisWork")
+
         x_value, mean_pred, ci_left, ci_right = self._bootstrap(
-            model=self.get_modelbase(program="ThisWork"),
+            model=model,
             df=self.df.loc[m_train_indices, :],
             focus_feature=s_col,
             n_bootstrap=n_bootstrap,
@@ -1001,11 +1003,27 @@ class Trainer:
             x_min=np.min(all_s),
             x_max=np.max(all_s),
         )
+
         # https://github.com/MatthewReid854/reliability/blob/master/reliability/PoF.py
-        # STEYX = (((stress - y_pred) ** 2).sum() / (n - 2)) ** 0.5
-        # tinv = ss.t.ppf((CI + 1) / 2, n - 2)
-        # DEVSQ = ((cycles - x_av) ** 2).sum()
-        # CL = tinv * STEYX * (1 / n + (xvals - x_av) ** 2 / DEVSQ) ** 0.5
+        def statistical_CI(y, y_pred, x, xvals, CI):
+            n = len(x)
+            STEYX = (
+                ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
+            ) ** 0.5
+            tinv = st.t.ppf((CI + 1) / 2, n - 2)
+            DEVSQ = ((x - np.mean(x)) ** 2).sum().reshape(1, -1)
+            CL = tinv * STEYX * (1 / n + (xvals - np.mean(x)) ** 2 / DEVSQ) ** 0.5
+            return CL.flatten()
+
+        CL = statistical_CI(
+            y=n_train.values,
+            y_pred=model.predict(
+                self.df.loc[m_train_indices, :], model_name="ThisWork"
+            ),
+            x=s_train.values,
+            xvals=x_value,
+            CI=0.90,
+        )
 
         if ax is None:
             new_ax = True
@@ -1035,11 +1053,26 @@ class Trainer:
 
         if n_bootstrap != 1:
             ax.fill_betweenx(
-                x_value, ci_left, ci_right, alpha=0.4, color=clr[0], edgecolor=None
+                x_value,
+                ci_left,
+                ci_right,
+                alpha=0.4,
+                color=clr[0],
+                edgecolor=None,
+                label="Bootstrap CI",
+            )
+            ax.fill_betweenx(
+                x_value,
+                mean_pred - CL,
+                mean_pred + CL,
+                alpha=0.4,
+                color=clr[1],
+                edgecolor=None,
+                label="Statistical CI",
             )
 
         ax.legend(
-            loc="upper right", markerscale=1.5, handlelength=0.2, handleheight=0.9
+            loc="upper right", markerscale=1.5, handlelength=0.6, handleheight=0.9
         )
         ax.set_xlabel(n_col)
         ax.set_ylabel(s_col)
