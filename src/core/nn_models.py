@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 
+
 def init_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.kaiming_normal_(m.weight)

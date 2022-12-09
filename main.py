@@ -1,7 +1,7 @@
 from src.core.trainer import *
 from src.core.model import *
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using {} device".format(device))
 
 trainer = Trainer(device=device)
@@ -13,7 +13,7 @@ models = [
     AutoGluon(trainer),
     PytorchTabular(trainer),
     # TabNet(trainer),
-    ThisWork(trainer)
+    ThisWork(trainer),
 ]
 
 trainer.add_modelbases(models)

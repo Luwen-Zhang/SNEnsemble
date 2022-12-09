@@ -21,11 +21,15 @@ class IQRRemover(AbstractProcessor):
         super(IQRRemover, self).__init__()
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        print(f'Removing outliers by IQR. Original size: {len(input_data)}, ', end='')
+        print(f"Removing outliers by IQR. Original size: {len(input_data)}, ", end="")
         data = input_data.copy()
         for feature in trainer.feature_names:
-            Q1 = np.percentile(data[feature].dropna(axis=0), 25, interpolation='midpoint')
-            Q3 = np.percentile(data[feature].dropna(axis=0), 75, interpolation='midpoint')
+            Q1 = np.percentile(
+                data[feature].dropna(axis=0), 25, interpolation="midpoint"
+            )
+            Q3 = np.percentile(
+                data[feature].dropna(axis=0), 75, interpolation="midpoint"
+            )
             IQR = Q3 - Q1
             if IQR == 0:
                 continue
@@ -34,7 +38,7 @@ class IQRRemover(AbstractProcessor):
 
             data = data.drop(upper)
             data = data.drop(lower)
-        print(f'Final size: {len(data)}.')
+        print(f"Final size: {len(data)}.")
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
@@ -46,7 +50,7 @@ class StdRemover(AbstractProcessor):
         super(StdRemover, self).__init__()
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        print(f'Removing outliers by std. Original size: {len(input_data)}, ', end='')
+        print(f"Removing outliers by std. Original size: {len(input_data)}, ", end="")
         data = input_data.copy()
         for feature in trainer.feature_names:
             m = np.mean(data[feature].dropna(axis=0))
@@ -58,7 +62,7 @@ class StdRemover(AbstractProcessor):
 
             data = data.drop(upper)
             data = data.drop(lower)
-        print(f'Final size: {len(data)}.')
+        print(f"Final size: {len(data)}.")
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
@@ -81,7 +85,9 @@ class SingleValueFeatureRemover(AbstractProcessor):
 
         if len(removed_features) > 0:
             trainer.feature_names = retain_features
-            print(f'{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features retained: {retain_features}.')
+            print(
+                f"{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features retained: {retain_features}."
+            )
 
         return data[retain_features + trainer.label_name]
 
@@ -119,23 +125,30 @@ class MeanImputer(AbstractTransformer):
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
         data = input_data.copy()
         from sklearn.impute import SimpleImputer
+
         imputer = SimpleImputer(strategy="mean")
-        fit_indices = np.intersect1d(np.array(list(trainer.train_indices) + list(trainer.val_indices)),
-                                     np.array(data.index))
+        fit_indices = np.intersect1d(
+            np.array(list(trainer.train_indices) + list(trainer.val_indices)),
+            np.array(data.index),
+        )
         trans_indices = np.setdiff1d(np.array(data.index), fit_indices)
         data.loc[fit_indices, trainer.feature_names] = imputer.fit_transform(
-            data.loc[fit_indices, trainer.feature_names]).astype(np.float32)
+            data.loc[fit_indices, trainer.feature_names]
+        ).astype(np.float32)
         if len(trans_indices) > 0:
             data.loc[trans_indices, trainer.feature_names] = imputer.transform(
-                data.loc[trans_indices, trainer.feature_names]).astype(np.float32)
+                data.loc[trans_indices, trainer.feature_names]
+            ).astype(np.float32)
 
         self.transformer = imputer
         self.record_features = cp(trainer.feature_names)
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        return pd.DataFrame(data=self.transformer.transform(input_data[self.record_features]),
-                            columns=self.record_features).astype(np.float32)
+        return pd.DataFrame(
+            data=self.transformer.transform(input_data[self.record_features]),
+            columns=self.record_features,
+        ).astype(np.float32)
 
 
 class NaNImputer(AbstractTransformer):
@@ -159,34 +172,30 @@ class StandardScaler(AbstractTransformer):
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
         data = input_data.copy()
         from sklearn.preprocessing import StandardScaler as ss
+
         scaler = ss()
-        fit_indices = np.intersect1d(np.array(list(trainer.train_indices) + list(trainer.val_indices)),
-                                     np.array(data.index))
+        fit_indices = np.intersect1d(
+            np.array(list(trainer.train_indices) + list(trainer.val_indices)),
+            np.array(data.index),
+        )
         trans_indices = np.setdiff1d(np.array(data.index), fit_indices)
         data.loc[fit_indices, trainer.feature_names] = scaler.fit_transform(
-            data.loc[fit_indices, trainer.feature_names]).astype(np.float32)
+            data.loc[fit_indices, trainer.feature_names]
+        ).astype(np.float32)
         if len(trans_indices) > 0:
             data.loc[trans_indices, trainer.feature_names] = scaler.transform(
-                data.loc[trans_indices, trainer.feature_names]).astype(np.float32)
+                data.loc[trans_indices, trainer.feature_names]
+            ).astype(np.float32)
 
         self.transformer = scaler
         self.record_features = cp(trainer.feature_names)
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        return pd.DataFrame(data=self.transformer.transform(input_data[self.record_features]),
-                            columns=self.record_features).astype(np.float32)
-
-
-# processor_mapping = {
-#     'IQRRemover': IQRRemover(),
-#     'StdRemover': StdRemover(),
-#     'UnscaledDataRecorder': UnscaledDataRecorder(),
-#     'MeanImputer': MeanImputer(),
-#     'NaNImputer': NaNImputer(),
-#     'StandardScaler': StandardScaler(),
-#     'SingleValueFeatureRemover': SingleValueFeatureRemover(),
-# }
+        return pd.DataFrame(
+            data=self.transformer.transform(input_data[self.record_features]),
+            columns=self.record_features,
+        ).astype(np.float32)
 
 
 processor_mapping = {}
@@ -198,8 +207,8 @@ for name, cls in clsmembers:
 
 def get_data_processor(name: str):
     if name not in processor_mapping.keys():
-        raise Exception(f'Data processor {name} not implemented.')
+        raise Exception(f"Data processor {name} not implemented.")
     elif not issubclass(type(processor_mapping[name]), AbstractProcessor):
-        raise Exception(f'{name} is not the subclass of AbstractProcessor.')
+        raise Exception(f"{name} is not the subclass of AbstractProcessor.")
     else:
         return processor_mapping[name]

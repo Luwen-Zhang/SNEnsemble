@@ -53,12 +53,19 @@ class config(BaseConfig):
                 # 'Relative Peak-to-peak Stress': 'Relative Peak-to-peak Stress',
             },
             "data_derivers": {
-                'DegLayerDeriver': {'sequence_column': 'Sequence', 'derived_name': 'deg_layers',
-                                    'col_names': ['0-deg layers', '45-deg layers', '90-deg layers',
-                                                  'Other-deg layers'],
-                                    'stacked': True},
+                "DegLayerDeriver": {
+                    "sequence_column": "Sequence",
+                    "derived_name": "deg_layers",
+                    "col_names": [
+                        "0-deg layers",
+                        "45-deg layers",
+                        "90-deg layers",
+                        "Other-deg layers",
+                    ],
+                    "stacked": True,
+                },
             },
-            'feature_types': ['Fatigue loading', 'Material', 'Derived'],
+            "feature_types": ["Fatigue loading", "Material", "Derived"],
             "label_name": ["log(Static Maximum Tensile Stress)"],
         }
 

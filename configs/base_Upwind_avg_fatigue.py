@@ -56,17 +56,33 @@ class config(BaseConfig):
                 # 'Relative Peak-to-peak Stress': 'Relative Peak-to-peak Stress',
             },
             "data_derivers": {
-                'MinStressDeriver': {'derived_name': 'Minimum Stress', 'stacked': True, 'intermediate': True,
-                                     'max_stress_col': 'Maximum Stress', 'r_value_col': 'Minimum/Maximum Stress'},
-                'SuppStressDeriver': {'derived_name': 'Support Stress', 'stacked': True,
-                                      'max_stress_col': 'Maximum Stress', 'min_stress_col': 'Minimum Stress',
-                                      'relative': False},
-                'DegLayerDeriver': {'sequence_column': 'Sequence', 'derived_name': 'deg_layers',
-                                    'col_names': ['0-deg layers', '45-deg layers', '90-deg layers',
-                                                  'Other-deg layers'],
-                                    'stacked': True},
+                "MinStressDeriver": {
+                    "derived_name": "Minimum Stress",
+                    "stacked": True,
+                    "intermediate": True,
+                    "max_stress_col": "Maximum Stress",
+                    "r_value_col": "Minimum/Maximum Stress",
+                },
+                "SuppStressDeriver": {
+                    "derived_name": "Support Stress",
+                    "stacked": True,
+                    "max_stress_col": "Maximum Stress",
+                    "min_stress_col": "Minimum Stress",
+                    "relative": False,
+                },
+                "DegLayerDeriver": {
+                    "sequence_column": "Sequence",
+                    "derived_name": "deg_layers",
+                    "col_names": [
+                        "0-deg layers",
+                        "45-deg layers",
+                        "90-deg layers",
+                        "Other-deg layers",
+                    ],
+                    "stacked": True,
+                },
             },
-            'feature_types': ['Fatigue loading', 'Material', 'Derived'],
+            "feature_types": ["Fatigue loading", "Material", "Derived"],
             "label_name": ["log(Cycles to Failure)"],
         }
 
