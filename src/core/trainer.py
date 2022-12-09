@@ -2,7 +2,7 @@
 The basic class for the project. It includes configuration, data processing, plotting,
 and comparing baseline models.
 """
-from ctypes import Union
+from typing import Tuple
 import os.path
 from ..utils.utils import *
 import torch
@@ -10,6 +10,7 @@ from torch import nn
 from torch.utils.data import Subset
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.patches
 from captum.attr import FeaturePermutation
 import sys
 import random
@@ -501,7 +502,7 @@ class Trainer:
 
     def _get_tabular_dataset(
         self, transformed=False
-    ) -> Union[pd.DataFrame, list, list]:
+    ) -> Tuple[pd.DataFrame, list, list]:
         if transformed:
             feature_data = self.feature_data
         else:

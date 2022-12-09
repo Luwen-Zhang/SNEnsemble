@@ -10,6 +10,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import seaborn as sns
 import matplotlib
 from sklearn.model_selection import train_test_split
@@ -171,7 +172,7 @@ def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
     # ax.set_xlim([0, 1])
     ax.set_xlabel("Permutation feature importance")
 
-    from matplotlib.patches import Patch, Rectangle
+    from matplotlib.patches import Rectangle
 
     legend = ax.legend(
         handles=[
