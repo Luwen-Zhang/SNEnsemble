@@ -7,7 +7,6 @@ class BaseConfig:
     def __init__(self):
         self.data = {
             "project": "FACT_fatigue",
-            "model": "MLP",
             "loss": "mse",
             "split_by": "random",
             "bayes_opt": False,

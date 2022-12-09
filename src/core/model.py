@@ -891,15 +891,98 @@ class ThisWork(TorchModel):
         self._mkdir()
 
     def _new_model(self):
-        if self.trainer.model_name == "MLP":
-            return NN(
-                len(self.trainer.feature_names),
-                len(self.trainer.label_name),
-                self.trainer.layers,
-                self.trainer._get_derived_data_sizes(),
-            ).to(self.trainer.device)
-        else:
-            raise Exception(f"Model {self.trainer.model_name} not implemented.")
+        return NN(
+            len(self.trainer.feature_names),
+            len(self.trainer.label_name),
+            self.trainer.layers,
+            self.trainer._get_derived_data_sizes(),
+        ).to(self.trainer.device)
 
     def _get_model_names(self):
         return ["ThisWork"]
+
+
+class MLP(TorchModel):
+    def __init__(self, trainer=None):
+        super(MLP, self).__init__(trainer)
+        self.program = "MLP"
+        self._mkdir()
+
+    def _new_model(self):
+        return NN(
+            len(self.trainer.feature_names),
+            len(self.trainer.label_name),
+            self.trainer.layers,
+            self.trainer._get_derived_data_sizes(),
+        ).to(self.trainer.device)
+
+    def _get_model_names(self):
+        return ["MLP"]
+
+
+class ModelAssembly(AbstractModel):
+    def __init__(self, trainer=None, models=None, program=None):
+        super(ModelAssembly, self).__init__(trainer)
+        self.models = (
+            [TabNet(self.trainer), MLP(self.trainer)] if models is None else models
+        )
+        self.program = "ModelAssembly" if program is None else program
+
+    def fit(self, **kwargs):
+        for submodel in self.models:
+            submodel.fit(**kwargs)
+
+    def predict(
+        self, df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
+    ):
+        return self.models[self._get_model_idx(model_name)].predict(
+            df=df, model_name=model_name, derived_data=derived_data, **kwargs
+        )
+
+    def _train(
+        self, verbose: bool = False, debug_mode: bool = False, dump_trainer=True
+    ):
+        print(f"\n-------------Run {self.program}-------------\n")
+        for submodel in self.models:
+            submodel._train(
+                verbose=verbose, debug_mode=debug_mode, dump_trainer=dump_trainer
+            )
+        print(f"\n-------------{self.program} End-------------\n")
+
+    def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
+        return self.models[self._get_model_idx(model_name)].predict(
+            df=df, model_name=model_name, additional_data=additional_data, **kwargs
+        )
+
+    def _predict_all(self, verbose=True, test_data_only=False):
+        self._check_train_status()
+        predictions = {}
+        for submodel in self.models:
+            sub_predictions = submodel._predict_all(
+                verbose=verbose, test_data_only=test_data_only
+            )
+            for key, value in sub_predictions.items():
+                predictions[key] = value
+        return predictions
+
+    def _get_model_names(self):
+        model_names = []
+        for submodel in self.models:
+            model_names += submodel._get_model_names()
+        return model_names
+
+    def _check_train_status(self):
+        for submodel in self.models:
+            try:
+                submodel._check_train_status()
+            except:
+                raise Exception(
+                    f"{self.program} not trained, run {self.__class__.__name__}._train() first."
+                )
+
+    def _get_model_idx(self, model_name):
+        for idx, submodel in enumerate(self.models):
+            if model_name in submodel._get_model_names():
+                return idx
+        else:
+            raise Exception(f"{model_name} not in the ModelAssembly.")

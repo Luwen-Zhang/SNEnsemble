@@ -122,7 +122,6 @@ class Trainer:
         self.bayes_opt = self.args["bayes_opt"]
 
         self.project = self.args["project"]
-        self.model_name = self.args["model"]
 
         self.static_params = self.args["static_params"]
         self.chosen_params = self.args["chosen_params"]
