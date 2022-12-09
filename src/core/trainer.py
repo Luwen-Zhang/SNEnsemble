@@ -2,6 +2,7 @@
 The basic class for the project. It includes configuration, data processing, plotting,
 and comparing baseline models.
 """
+from ctypes import Union
 import os.path
 from ..utils.utils import *
 import torch
@@ -498,7 +499,9 @@ class Trainer:
 
         return feature_data, label_data
 
-    def _get_tabular_dataset(self, transformed=False) -> (pd.DataFrame, list, list):
+    def _get_tabular_dataset(
+        self, transformed=False
+    ) -> Union[pd.DataFrame, list, list]:
         if transformed:
             feature_data = self.feature_data
         else:
