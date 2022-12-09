@@ -999,6 +999,11 @@ class Trainer:
             x_min=np.min(all_s),
             x_max=np.max(all_s),
         )
+        # https://github.com/MatthewReid854/reliability/blob/master/reliability/PoF.py
+        # STEYX = (((stress - y_pred) ** 2).sum() / (n - 2)) ** 0.5
+        # tinv = ss.t.ppf((CI + 1) / 2, n - 2)
+        # DEVSQ = ((cycles - x_av) ** 2).sum()
+        # CL = tinv * STEYX * (1 / n + (xvals - x_av) ** 2 / DEVSQ) ** 0.5
 
         if ax is None:
             new_ax = True

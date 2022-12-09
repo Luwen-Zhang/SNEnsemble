@@ -19,6 +19,7 @@ class AbstractModel:
         label_name: list,
         derived_data: dict = None,
         verbose=True,
+        **kwargs,
     ):
         self.trainer.df = df
         self.trainer.feature_names = feature_names
@@ -33,7 +34,7 @@ class AbstractModel:
             transform_only=True,
         )
         self.trainer._update_dataset_auto()
-        self._train(dump_trainer=False, verbose=verbose)
+        self._train(dump_trainer=False, verbose=verbose, **kwargs)
 
     def predict(
         self, df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
@@ -109,17 +110,24 @@ class AbstractModel:
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         raise NotImplementedError
 
-    def _train(self, dump_trainer=True, verbose=True):
+    def _train(self, dump_trainer=True, verbose=True, **kwargs):
         raise NotImplementedError
 
     def _get_model_names(self):
         raise NotImplementedError
 
     def _check_train_status(self):
-        if self.model is None:
+        if not self._trained:
             raise Exception(
                 f"{self.program} not trained, run {self.__class__.__name__}._train() first."
             )
+
+    @property
+    def _trained(self):
+        if self.model is None:
+            return False
+        else:
+            return True
 
     def _mkdir(self):
         self.root = self.trainer.project_root + self.program + "/"
@@ -852,8 +860,10 @@ class TorchModel(AbstractModel):
         verbose: bool = True,
         debug_mode: bool = False,
         dump_trainer=True,
+        warm_start=False,
     ):
-        self.model = self._new_model()
+        if not warm_start or (warm_start and not self._trained):
+            self.model = self._new_model()
 
         min_loss, self.train_ls, self.val_ls = self._model_train(
             model=self.model,
