@@ -19,7 +19,7 @@ class AbstractModel:
         label_name: list,
         derived_data: dict = None,
         verbose=True,
-        **kwargs,
+        warm_start=False,
     ):
         self.trainer.df = df
         self.trainer.feature_names = feature_names
@@ -32,9 +32,14 @@ class AbstractModel:
             val_indices=indices,
             test_indices=indices,
             transform_only=True,
+            warm_start=warm_start if self._trained else False,
         )
         self.trainer._update_dataset_auto()
-        self._train(dump_trainer=False, verbose=verbose, **kwargs)
+        self._train(
+            dump_trainer=False,
+            verbose=verbose,
+            warm_start=warm_start if self._trained else False,
+        )
 
     def predict(
         self, df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
@@ -110,7 +115,7 @@ class AbstractModel:
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         raise NotImplementedError
 
-    def _train(self, dump_trainer=True, verbose=True, **kwargs):
+    def _train(self, dump_trainer=True, verbose=True, warm_start=False, **kwargs):
         raise NotImplementedError
 
     def _get_model_names(self):
@@ -142,7 +147,12 @@ class AutoGluon(AbstractModel):
         self._mkdir()
 
     def _train(
-        self, verbose: bool = False, debug_mode: bool = False, dump_trainer=True
+        self,
+        verbose: bool = False,
+        debug_mode: bool = False,
+        dump_trainer=True,
+        warm_start=False,
+        **kwargs,
     ):
         print("\n-------------Run AutoGluon Tests-------------\n")
         disable_tqdm()
@@ -193,7 +203,12 @@ class PytorchTabular(AbstractModel):
         self._mkdir()
 
     def _train(
-        self, verbose: bool = False, debug_mode: bool = False, dump_trainer=True
+        self,
+        verbose: bool = False,
+        debug_mode: bool = False,
+        dump_trainer=True,
+        warm_start=False,
+        **kwargs,
     ):
         print("\n-------------Run Pytorch-tabular Tests-------------\n")
         disable_tqdm()
@@ -524,7 +539,12 @@ class TabNet(AbstractModel):
         self._mkdir()
 
     def _train(
-        self, verbose: bool = False, debug_mode: bool = False, dump_trainer=True
+        self,
+        verbose: bool = False,
+        debug_mode: bool = False,
+        dump_trainer=True,
+        warm_start=False,
+        **kwargs,
     ):
         print("\n-------------Run TabNet Test-------------\n")
         train_indices = self.trainer.train_dataset.indices
@@ -861,6 +881,7 @@ class TorchModel(AbstractModel):
         debug_mode: bool = False,
         dump_trainer=True,
         warm_start=False,
+        **kwargs,
     ):
         if not warm_start or (warm_start and not self._trained):
             self.model = self._new_model()
@@ -950,13 +971,12 @@ class ModelAssembly(AbstractModel):
         )
 
     def _train(
-        self, verbose: bool = False, debug_mode: bool = False, dump_trainer=True
+        self,
+        **kwargs,
     ):
         print(f"\n-------------Run {self.program}-------------\n")
         for submodel in self.models:
-            submodel._train(
-                verbose=verbose, debug_mode=debug_mode, dump_trainer=dump_trainer
-            )
+            submodel._train(**kwargs)
         print(f"\n-------------{self.program} End-------------\n")
 
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
@@ -964,13 +984,11 @@ class ModelAssembly(AbstractModel):
             df=df, model_name=model_name, additional_data=additional_data, **kwargs
         )
 
-    def _predict_all(self, verbose=True, test_data_only=False):
+    def _predict_all(self, **kwargs):
         self._check_train_status()
         predictions = {}
         for submodel in self.models:
-            sub_predictions = submodel._predict_all(
-                verbose=verbose, test_data_only=test_data_only
-            )
+            sub_predictions = submodel._predict_all(**kwargs)
             for key, value in sub_predictions.items():
                 predictions[key] = value
         return predictions

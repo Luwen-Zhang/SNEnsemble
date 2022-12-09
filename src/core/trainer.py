@@ -268,6 +268,7 @@ class Trainer:
         test_indices=None,
         preprocess=True,
         transform_only=False,
+        warm_start=False,
     ):
         self.feature_data = self.df[self.feature_names]
         self.label_data = self.df[self.label_name]
@@ -305,7 +306,9 @@ class Trainer:
             )
 
         if preprocess:
-            data = self._data_preprocess(data, transform_only=transform_only)
+            data = self._data_preprocess(
+                data, transform_only=transform_only, warm_start=warm_start
+            )
 
         # Reset indices
         self.retained_indices = np.array(data.index)
@@ -341,14 +344,19 @@ class Trainer:
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
 
-    def _data_preprocess(self, input_data: pd.DataFrame, transform_only=False):
+    def _data_preprocess(
+        self, input_data: pd.DataFrame, transform_only=False, warm_start=False
+    ):
         data = input_data.copy()
         from src.core.dataprocessor import AbstractTransformer
 
         for processor in self.dataprocessors:
             if transform_only:
                 if issubclass(type(processor), AbstractTransformer):
-                    data = processor.fit_transform(data, self)
+                    if warm_start:  # transform_only is True when fit()
+                        data = processor.transform(data, self)
+                    else:
+                        data = processor.fit_transform(data, self)
             else:
                 data = processor.fit_transform(data, self)
         return data
@@ -1066,7 +1074,10 @@ class Trainer:
         x_min=None,
         x_max=None,
     ):
-        bootstrap_model = cp(model)
+        from src.core.model import TorchModel
+
+        if not issubclass(type(model), TorchModel):
+            raise Exception(f"Model {type(model)} is not a TorchModel.")
         x_value = np.linspace(
             np.nanpercentile(df[focus_feature].values, (100 - percentile) / 2)
             if x_min is None
@@ -1114,12 +1125,14 @@ class Trainer:
             else:
                 df_bootstrap = df.copy()
             df_bootstrap, derived_data = _derive(df_bootstrap)
+            bootstrap_model = cp(model)
             bootstrap_model.fit(
                 df_bootstrap,
                 self.feature_names,
                 self.label_name,
                 derived_data,
-                verbose=False,
+                verbose=True,
+                warm_start=True,
             )
             bootstrap_model_predictions = []
             for value in x_value:
