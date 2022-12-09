@@ -2,6 +2,7 @@ from src.core.trainer import Trainer
 import pandas as pd
 from copy import deepcopy as cp
 import numpy as np
+import sys, inspect
 
 
 class AbstractProcessor:
@@ -177,20 +178,27 @@ class StandardScaler(AbstractTransformer):
                             columns=self.record_features).astype(np.float32)
 
 
-processor_mapping = {
-    'IQRRemover': IQRRemover(),
-    'StdRemover': StdRemover(),
-    'UnscaledDataRecorder': UnscaledDataRecorder(),
-    'MeanImputer': MeanImputer(),
-    'NaNImputer': NaNImputer(),
-    'StandardScaler': StandardScaler(),
-    'SingleValueFeatureRemover': SingleValueFeatureRemover(),
-}
+# processor_mapping = {
+#     'IQRRemover': IQRRemover(),
+#     'StdRemover': StdRemover(),
+#     'UnscaledDataRecorder': UnscaledDataRecorder(),
+#     'MeanImputer': MeanImputer(),
+#     'NaNImputer': NaNImputer(),
+#     'StandardScaler': StandardScaler(),
+#     'SingleValueFeatureRemover': SingleValueFeatureRemover(),
+# }
+
+
+processor_mapping = {}
+clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+for name, cls in clsmembers:
+    if issubclass(cls, AbstractProcessor):
+        processor_mapping[name] = cls()
 
 
 def get_data_processor(name: str):
     if name not in processor_mapping.keys():
-        raise Exception(f'Data processor {name} not implemented or added to dataprocessor.processor_mapping.')
+        raise Exception(f'Data processor {name} not implemented.')
     elif not issubclass(type(processor_mapping[name]), AbstractProcessor):
         raise Exception(f'{name} is not the subclass of AbstractProcessor.')
     else:

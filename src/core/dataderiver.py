@@ -1,5 +1,5 @@
 import numpy as np
-
+import sys, inspect
 
 class AbstractDeriver:
     def __init__(self):
@@ -148,17 +148,16 @@ class SuppStressDeriver(AbstractDeriver):
         return stresses, derived_name, names, stacked, intermediate, related_columns
 
 
-deriver_mapping = {
-    'DegLayerDeriver': DegLayerDeriver(),
-    'RelativeDeriver': RelativeDeriver(),
-    'MinStressDeriver': MinStressDeriver(),
-    'SuppStressDeriver': SuppStressDeriver(),
-}
+deriver_mapping = {}
+clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+for name, cls in clsmembers:
+    if issubclass(cls, AbstractDeriver):
+        deriver_mapping[name] = cls()
 
 
 def get_data_deriver(name: str):
     if name not in deriver_mapping.keys():
-        raise Exception(f'Data deriver {name} not implemented or added to dataprocessor.processor_mapping.')
+        raise Exception(f'Data deriver {name} not implemented.')
     elif not issubclass(type(deriver_mapping[name]), AbstractDeriver):
         raise Exception(f'{name} is not the subclass of AbstractDeriver.')
     else:
