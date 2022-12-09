@@ -7,7 +7,7 @@ import sys, inspect
 
 class AbstractProcessor:
     def __init__(self):
-        pass
+        self.record_features = None
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
         raise NotImplementedError
@@ -39,10 +39,12 @@ class IQRRemover(AbstractProcessor):
             data = data.drop(upper)
             data = data.drop(lower)
         print(f"Final size: {len(data)}.")
+        self.record_features = cp(trainer.feature_names)
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        return input_data.copy()
+        trainer.feature_names = self.record_features
+        return input_data[self.record_features + trainer.label_name].copy()
 
 
 class StdRemover(AbstractProcessor):
@@ -63,10 +65,12 @@ class StdRemover(AbstractProcessor):
             data = data.drop(upper)
             data = data.drop(lower)
         print(f"Final size: {len(data)}.")
+        self.record_features = cp(trainer.feature_names)
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        return input_data.copy()
+        trainer.feature_names = self.record_features
+        return input_data[self.record_features + trainer.label_name].copy()
 
 
 class SingleValueFeatureRemover(AbstractProcessor):
@@ -88,11 +92,12 @@ class SingleValueFeatureRemover(AbstractProcessor):
             print(
                 f"{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features retained: {retain_features}."
             )
-
+        self.record_features = cp(trainer.feature_names)
         return data[retain_features + trainer.label_name]
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        return input_data.copy()
+        trainer.feature_names = self.record_features
+        return input_data[self.record_features + trainer.label_name].copy()
 
 
 class UnscaledDataRecorder(AbstractProcessor):
@@ -104,18 +109,21 @@ class UnscaledDataRecorder(AbstractProcessor):
 
         trainer.unscaled_feature_data = feature_data
         trainer.unscaled_label_data = label_data
-
+        self.record_features = cp(trainer.feature_names)
         return input_data.copy()
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
-        return input_data.copy()
+        trainer.feature_names = self.record_features
+        feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
+        trainer.unscaled_feature_data = feature_data
+        trainer.unscaled_label_data = label_data
+        return input_data[self.record_features + trainer.label_name].copy()
 
 
 class AbstractTransformer(AbstractProcessor):
     def __init__(self):
         super(AbstractTransformer, self).__init__()
         self.transformer = None
-        self.record_features = None
 
 
 class MeanImputer(AbstractTransformer):
@@ -145,9 +153,15 @@ class MeanImputer(AbstractTransformer):
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+        trainer.feature_names = self.record_features
         return pd.DataFrame(
-            data=self.transformer.transform(input_data[self.record_features]),
-            columns=self.record_features,
+            data=np.hstack(
+                (
+                    self.transformer.transform(input_data[self.record_features]),
+                    input_data[trainer.label_name].values,
+                )
+            ),
+            columns=self.record_features + trainer.label_name,
         ).astype(np.float32)
 
 
@@ -161,6 +175,7 @@ class NaNImputer(AbstractTransformer):
         return data.dropna(axis=0, subset=trainer.feature_names)
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+        trainer.feature_names = self.record_features
         data = input_data.copy()
         return data.dropna(axis=0, subset=self.record_features)
 
@@ -192,9 +207,15 @@ class StandardScaler(AbstractTransformer):
         return data
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+        trainer.feature_names = self.record_features
         return pd.DataFrame(
-            data=self.transformer.transform(input_data[self.record_features]),
-            columns=self.record_features,
+            data=np.hstack(
+                (
+                    self.transformer.transform(input_data[self.record_features]),
+                    input_data[trainer.label_name].values,
+                )
+            ),
+            columns=self.record_features + trainer.label_name,
         ).astype(np.float32)
 
 

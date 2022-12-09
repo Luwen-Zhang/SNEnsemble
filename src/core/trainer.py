@@ -267,7 +267,6 @@ class Trainer:
         val_indices=None,
         test_indices=None,
         preprocess=True,
-        transform_only=False,
         warm_start=False,
     ):
         self.feature_data = self.df[self.feature_names]
@@ -306,9 +305,7 @@ class Trainer:
             )
 
         if preprocess:
-            data = self._data_preprocess(
-                data, transform_only=transform_only, warm_start=warm_start
-            )
+            data = self._data_preprocess(data, warm_start=warm_start)
 
         # Reset indices
         self.retained_indices = np.array(data.index)
@@ -344,19 +341,11 @@ class Trainer:
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
 
-    def _data_preprocess(
-        self, input_data: pd.DataFrame, transform_only=False, warm_start=False
-    ):
+    def _data_preprocess(self, input_data: pd.DataFrame, warm_start=False):
         data = input_data.copy()
-        from src.core.dataprocessor import AbstractTransformer
-
         for processor in self.dataprocessors:
-            if transform_only:
-                if issubclass(type(processor), AbstractTransformer):
-                    if warm_start:  # transform_only is True when fit()
-                        data = processor.transform(data, self)
-                    else:
-                        data = processor.fit_transform(data, self)
+            if warm_start:
+                data = processor.transform(data, self)
             else:
                 data = processor.fit_transform(data, self)
         return data
@@ -1128,10 +1117,10 @@ class Trainer:
             bootstrap_model = cp(model)
             bootstrap_model.fit(
                 df_bootstrap,
-                self.feature_names,
+                self.dataprocessors[0].record_features,
                 self.label_name,
                 derived_data,
-                verbose=True,
+                verbose=False,
                 warm_start=True,
             )
             bootstrap_model_predictions = []
