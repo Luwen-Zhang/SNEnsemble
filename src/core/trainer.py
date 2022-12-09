@@ -268,6 +268,7 @@ class Trainer:
         test_indices=None,
         preprocess=True,
         warm_start=False,
+        verbose=True,
     ):
         self.feature_data = self.df[self.feature_names]
         self.label_data = self.df[self.label_name]
@@ -305,7 +306,11 @@ class Trainer:
             )
 
         if preprocess:
-            data = self._data_preprocess(data, warm_start=warm_start)
+            if verbose:
+                data = self._data_preprocess(data, warm_start=warm_start)
+            else:
+                with HiddenPrints():
+                    data = self._data_preprocess(data, warm_start=warm_start)
 
         # Reset indices
         self.retained_indices = np.array(data.index)

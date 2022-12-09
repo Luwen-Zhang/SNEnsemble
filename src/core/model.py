@@ -32,6 +32,7 @@ class AbstractModel:
             val_indices=indices,
             test_indices=indices,
             warm_start=warm_start if self._trained else False,
+            verbose=verbose,
         )
         self.trainer._update_dataset_auto()
         self._train(
