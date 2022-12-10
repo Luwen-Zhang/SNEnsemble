@@ -821,6 +821,7 @@ class TorchModel(AbstractModel):
         model,
         verbose=True,
         verbose_per_epoch=100,
+        warm_start=False,
         **params,
     ):
         train_loader = Data.DataLoader(
@@ -835,7 +836,9 @@ class TorchModel(AbstractModel):
         )
 
         optimizer = torch.optim.Adam(
-            model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"]
+            model.parameters(),
+            lr=params["lr"] / 10 if warm_start else params["lr"],
+            weight_decay=params["weight_decay"],
         )
 
         train_ls = []
@@ -890,6 +893,7 @@ class TorchModel(AbstractModel):
             model=self.model,
             verbose=verbose,
             verbose_per_epoch=verbose_per_epoch,
+            warm_start=warm_start,
             **{**self.trainer.params, **self.trainer.static_params},
         )
 
