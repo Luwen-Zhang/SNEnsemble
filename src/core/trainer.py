@@ -939,6 +939,7 @@ class Trainer:
         grid_size=30,
         n_bootstrap=1,
         CI=0.95,
+        method="statistical",
     ):
         if s_col not in self.df.columns:
             raise Exception(f"{s_col} not in features.")
@@ -1006,18 +1007,8 @@ class Trainer:
             CI=CI,
         )
 
-        # https://github.com/MatthewReid854/reliability/blob/master/reliability/PoF.py
-        def statistical_CI(y, y_pred, x, xvals, CI):
-            n = len(x)
-            STEYX = (
-                ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
-            ) ** 0.5
-            tinv = st.t.ppf((CI + 1) / 2, n - 2)
-            DEVSQ = ((x - np.mean(x)) ** 2).sum().reshape(1, -1)
-            CL = tinv * STEYX * (1 / n + (xvals - np.mean(x)) ** 2 / DEVSQ) ** 0.5
-            return CL.flatten()
-
-        CL = statistical_CI(
+        CL, CR = self._psn(
+            method=method,
             y=n_train.values,
             y_pred=model.predict(
                 self.df.loc[m_train_indices, :], model_name="ThisWork"
@@ -1090,6 +1081,20 @@ class Trainer:
         if new_ax:
             plt.close()
 
+    @staticmethod
+    def _psn(method, y, y_pred, x, xvals, CI):
+        if method == "statistical":
+            n = len(x)
+            STEYX = (
+                ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
+            ) ** 0.5
+            tinv = st.t.ppf((CI + 1) / 2, n - 2)
+            DEVSQ = ((x - np.mean(x)) ** 2).sum().reshape(1, -1)
+            CL = tinv * STEYX * (1 / n + (xvals - np.mean(x)) ** 2 / DEVSQ) ** 0.5
+            return CL.flatten(), CL.flatten()
+        else:
+            raise Exception(f"P-S-N curve type {method} not implemented.")
+
     def _bootstrap(
         self,
         model,
@@ -1104,6 +1109,8 @@ class Trainer:
         x_max=None,
         CI=0.95,
     ):
+        # Cook, Thomas R., et al. Explaining Machine Learning by Bootstrapping Partial Dependence Functions and Shapley
+        # Values. No. RWP 21-12. 2021.
         from src.core.model import TorchModel
 
         if not issubclass(type(model), TorchModel):
