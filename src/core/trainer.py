@@ -731,28 +731,17 @@ class Trainer:
         for feature_idx, feature_name in enumerate(self.feature_names):
             print("Calculate PDP: ", feature_name)
 
-            if n_bootstrap > 1:
-                x_value, model_predictions, ci_left, ci_right = self._bootstrap(
-                    model=modelbase,
-                    df=self.df.loc[self.train_indices, :],
-                    focus_feature=feature_name,
-                    n_bootstrap=n_bootstrap,
-                    grid_size=grid_size,
-                    verbose=False,
-                    rederive=True,
-                    percentile=80,
-                    CI=CI,
-                )
-            else:
-                x_value, model_predictions = calculate_pdp(
-                    modelbase.model,
-                    self.tensors[0][self.train_dataset.indices, :],
-                    self._get_additional_tensors_slice(self.train_dataset.indices),
-                    feature_idx,
-                    grid_size=30,
-                )
-                ci_left = model_predictions
-                ci_right = model_predictions
+            x_value, model_predictions, ci_left, ci_right = self._bootstrap(
+                model=modelbase,
+                df=self.df.loc[self.train_indices, :],
+                focus_feature=feature_name,
+                n_bootstrap=n_bootstrap,
+                grid_size=grid_size,
+                verbose=False,
+                rederive=True,
+                percentile=80,
+                CI=CI,
+            )
 
             x_values_list.append(x_value)
             mean_pdp_list.append(model_predictions)
@@ -765,7 +754,7 @@ class Trainer:
             mean_pdp_list,
             ci_left_list,
             ci_right_list,
-            self.feature_data if n_bootstrap == 1 else self.unscaled_feature_data,
+            self.unscaled_feature_data,
             log_trans=log_trans,
             lower_lim=lower_lim,
             upper_lim=upper_lim,
