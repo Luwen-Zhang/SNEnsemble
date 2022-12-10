@@ -938,6 +938,7 @@ class Trainer:
         ax=None,
         grid_size=30,
         n_bootstrap=30,
+        CI=0.95,
     ):
         if s_col not in self.df.columns:
             raise Exception(f"{s_col} not in features.")
@@ -1002,6 +1003,7 @@ class Trainer:
             grid_size=grid_size,
             x_min=np.min(all_s) - np.abs(np.max(all_s) - np.min(all_s)) * 0.5,
             x_max=np.max(all_s) + np.abs(np.max(all_s) - np.min(all_s)) * 0.5,
+            CI=CI,
         )
 
         # https://github.com/MatthewReid854/reliability/blob/master/reliability/PoF.py
@@ -1022,7 +1024,7 @@ class Trainer:
             ),
             x=s_train.values,
             xvals=x_value,
-            CI=0.90,
+            CI=CI,
         )
 
         if ax is None:
@@ -1100,6 +1102,7 @@ class Trainer:
         percentile=100,
         x_min=None,
         x_max=None,
+        CI=0.95,
     ):
         from src.core.model import TorchModel
 
@@ -1185,7 +1188,7 @@ class Trainer:
             y_pred = expected_value_bootstrap_replications[:, col_idx]
             if n_bootstrap != 1:
                 ci_int = st.norm.interval(
-                    alpha=0.9, loc=np.mean(y_pred), scale=st.sem(y_pred)
+                    alpha=CI, loc=np.mean(y_pred), scale=st.sem(y_pred)
                 )
             else:
                 ci_int = (np.nan, np.nan)
