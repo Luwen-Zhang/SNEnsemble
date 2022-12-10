@@ -1065,7 +1065,7 @@ class Trainer:
                 alpha=0.4,
                 color=clr[1],
                 edgecolor=None,
-                label="Bootstrap CI",
+                label=f"Bootstrap CI {CI*100:.1f}%",
                 zorder=0,
             )
             print("In bootstrap CI:")
@@ -1086,7 +1086,7 @@ class Trainer:
             alpha=0.4,
             color=clr[0],
             edgecolor=None,
-            label="Statistical CI",
+            label=f"Statistical CI {CI*100:.1f}%",
             zorder=0,
         )
 
