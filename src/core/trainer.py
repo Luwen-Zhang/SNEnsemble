@@ -1210,8 +1210,10 @@ class Trainer:
                 df_perm[focus_feature] = value
                 df_perm, derived_data = _derive(df_perm)
                 bootstrap_model_predictions.append(
-                    bootstrap_model.predict(
-                        df_perm, derived_data=derived_data, model_name="ThisWork"
+                    np.mean(
+                        bootstrap_model.predict(
+                            df_perm, derived_data=derived_data, model_name="ThisWork"
+                        )
                     )
                 )
             expected_value_bootstrap_replications.append(
