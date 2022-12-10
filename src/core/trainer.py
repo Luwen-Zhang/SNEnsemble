@@ -1000,8 +1000,8 @@ class Trainer:
             focus_feature=s_col,
             n_bootstrap=n_bootstrap,
             grid_size=grid_size,
-            x_min=np.min(all_s),
-            x_max=np.max(all_s),
+            x_min=np.min(all_s) - np.abs(np.max(all_s) - np.min(all_s)) * 0.5,
+            x_max=np.max(all_s) + np.abs(np.max(all_s) - np.min(all_s)) * 0.5,
         )
 
         # https://github.com/MatthewReid854/reliability/blob/master/reliability/PoF.py
