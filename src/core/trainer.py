@@ -1112,6 +1112,11 @@ class Trainer:
     @staticmethod
     def _psn(method, y, y_pred, x, xvals, CI):
         if method == "statistical":
+            # Schneider, C. R. A., and S. J. Maddox. "Best practice guide on statistical analysis of fatigue data."
+            # Weld Inst Stat Rep (2003).
+            # Barbosa, Joelton Fonseca, et al. "Probabilistic SN fields based on statistical distributions applied to
+            # metallic and composite materials: State of the art." Advances in Mechanical Engineering 11.8 (2019):
+            # 1687814019870395.
             n = len(x)
             STEYX = (
                 ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
