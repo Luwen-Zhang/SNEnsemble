@@ -1018,6 +1018,18 @@ class Trainer:
             CI=CI,
         )
 
+        def in_fill_between(x_arr, y_arr, xvals, cl, cr):
+            def point_in_fill_between(x, y):
+                which_x = np.where(np.abs(x - xvals) == np.min(np.abs(x - xvals)))[0]
+                cl_x = cl[which_x]
+                cr_x = cr[which_x]
+                return True if cl_x <= y <= cr_x else False
+
+            res = []
+            for x, y in zip(x_arr, y_arr):
+                res.append(point_in_fill_between(x, y))
+            return np.count_nonzero(np.array(res))
+
         if ax is None:
             new_ax = True
             plt.figure()
@@ -1036,13 +1048,14 @@ class Trainer:
                 label=f"{name} dataset",
                 linewidth=0.4,
                 edgecolors="k",
+                zorder=20,
             )
 
         scatter_func(n_train, s_train, clr[0], "Training")
         scatter_func(n_val, s_val, clr[1], "Validation")
         scatter_func(n_test, s_test, clr[2], "Testing")
 
-        ax.plot(mean_pred, x_value)
+        ax.plot(mean_pred, x_value, zorder=10)
 
         if n_bootstrap != 1:
             ax.fill_betweenx(
@@ -1050,19 +1063,43 @@ class Trainer:
                 ci_left,
                 ci_right,
                 alpha=0.4,
-                color=clr[0],
-                edgecolor=None,
-                label="Bootstrap CI",
-            )
-            ax.fill_betweenx(
-                x_value,
-                mean_pred - CL,
-                mean_pred + CL,
-                alpha=0.4,
                 color=clr[1],
                 edgecolor=None,
-                label="Statistical CI",
+                label="Bootstrap CI",
+                zorder=0,
             )
+            print("In bootstrap CI:")
+            print(
+                f"Training {in_fill_between(s_train, n_train, x_value, ci_left, ci_right)}/{len(s_train)}"
+            )
+            print(
+                f"Validation {in_fill_between(s_val, n_val, x_value, ci_left, ci_right)}/{len(s_val)}"
+            )
+            print(
+                f"Testing {in_fill_between(s_test, n_test, x_value, ci_left, ci_right)}/{len(s_test)}"
+            )
+
+        ax.fill_betweenx(
+            x_value,
+            mean_pred - CL,
+            mean_pred + CR,
+            alpha=0.4,
+            color=clr[0],
+            edgecolor=None,
+            label="Statistical CI",
+            zorder=0,
+        )
+
+        print("In statistical CI:")
+        print(
+            f"Training {in_fill_between(s_train, n_train, x_value, mean_pred-CL, mean_pred+CL)}/{len(s_train)}"
+        )
+        print(
+            f"Validation {in_fill_between(s_val, n_val, x_value, mean_pred-CL, mean_pred+CL)}/{len(s_val)}"
+        )
+        print(
+            f"Testing {in_fill_between(s_test, n_test, x_value, mean_pred-CL, mean_pred+CL)}/{len(s_test)}"
+        )
 
         ax.legend(
             loc="upper right", markerscale=1.5, handlelength=0.6, handleheight=0.9
