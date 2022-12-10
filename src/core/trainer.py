@@ -707,7 +707,7 @@ class Trainer:
         log_trans: bool = True,
         lower_lim=2,
         upper_lim=7,
-        n_bootstrap=30,
+        n_bootstrap=1,
         grid_size=30,
     ):
         """
@@ -937,7 +937,7 @@ class Trainer:
         load_dir="tension",
         ax=None,
         grid_size=30,
-        n_bootstrap=30,
+        n_bootstrap=1,
         CI=0.95,
     ):
         if s_col not in self.df.columns:
