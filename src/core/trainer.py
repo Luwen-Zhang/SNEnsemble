@@ -709,6 +709,7 @@ class Trainer:
         upper_lim=7,
         n_bootstrap=1,
         grid_size=30,
+        CI=0.6,
     ):
         """
         Calculate and plot partial dependence plots.
@@ -740,6 +741,7 @@ class Trainer:
                     verbose=False,
                     rederive=True,
                     percentile=80,
+                    CI=CI,
                 )
             else:
                 x_value, model_predictions = calculate_pdp(
@@ -1214,15 +1216,15 @@ class Trainer:
                 df_perm[focus_feature] = value
                 df_perm, derived_data = _derive(df_perm)
                 bootstrap_model_predictions.append(
-                    np.mean(
-                        bootstrap_model.predict(
-                            df_perm, derived_data=derived_data, model_name="ThisWork"
-                        )
+                    bootstrap_model.predict(
+                        df_perm, derived_data=derived_data, model_name="ThisWork"
                     )
                 )
-            expected_value_bootstrap_replications.append(bootstrap_model_predictions)
+            expected_value_bootstrap_replications.append(
+                np.hstack(bootstrap_model_predictions)
+            )
 
-        expected_value_bootstrap_replications = np.array(
+        expected_value_bootstrap_replications = np.vstack(
             expected_value_bootstrap_replications
         )
         ci_left = []
@@ -1232,7 +1234,7 @@ class Trainer:
             y_pred = expected_value_bootstrap_replications[:, col_idx]
             if n_bootstrap != 1:
                 ci_int = st.norm.interval(
-                    alpha=CI, loc=np.mean(y_pred), scale=st.sem(y_pred)
+                    alpha=CI, loc=np.mean(y_pred), scale=np.std(y_pred)
                 )
             else:
                 ci_int = (np.nan, np.nan)
