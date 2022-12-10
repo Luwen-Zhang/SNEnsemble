@@ -1188,12 +1188,9 @@ class Trainer:
 
         expected_value_bootstrap_replications = []
         for i_bootstrap in range(n_bootstrap):
-            if n_bootstrap != 1:
-                if verbose:
-                    print(f"Bootstrap: {i_bootstrap + 1}/{n_bootstrap}")
-                df_bootstrap = resample(df).reset_index(drop=True)
-            else:
-                df_bootstrap = df.copy()
+            if n_bootstrap != 1 and verbose:
+                print(f"Bootstrap: {i_bootstrap + 1}/{n_bootstrap}")
+            df_bootstrap = resample(df).reset_index(drop=True)
             df_bootstrap, derived_data = _derive(df_bootstrap)
             bootstrap_model = cp(model)
             bootstrap_model.fit(
