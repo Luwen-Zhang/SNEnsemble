@@ -709,7 +709,7 @@ class Trainer:
         upper_lim=7,
         n_bootstrap=1,
         grid_size=30,
-        CI=0.6,
+        CI=0.95,
     ):
         """
         Calculate and plot partial dependence plots.
@@ -741,6 +741,7 @@ class Trainer:
                 rederive=True,
                 percentile=80,
                 CI=CI,
+                average=True,
             )
 
             x_values_list.append(x_value)
@@ -996,6 +997,7 @@ class Trainer:
             x_min=np.min(all_s) - np.abs(np.max(all_s) - np.min(all_s)) * 0.5,
             x_max=np.max(all_s) + np.abs(np.max(all_s) - np.min(all_s)) * 0.5,
             CI=CI,
+            average=False,
         )
 
         CL, CR = self._psn(
@@ -1048,7 +1050,7 @@ class Trainer:
 
         ax.plot(mean_pred, x_value, zorder=10)
 
-        if n_bootstrap != 1:
+        if not (np.isnan(ci_left).any() or np.isnan(ci_right).any()):
             ax.fill_betweenx(
                 x_value,
                 ci_left,
@@ -1056,7 +1058,7 @@ class Trainer:
                 alpha=0.4,
                 color=clr[1],
                 edgecolor=None,
-                label=f"Bootstrap CI {CI*100:.1f}%",
+                label=f"Bootstrap CI {CI*100:.1f}\%",
                 zorder=0,
             )
             print("In bootstrap CI:")
@@ -1077,7 +1079,7 @@ class Trainer:
             alpha=0.4,
             color=clr[0],
             edgecolor=None,
-            label=f"Statistical CI {CI*100:.1f}%",
+            label=f"Statistical CI {CI*100:.1f}\%",
             zorder=0,
         )
 
@@ -1141,6 +1143,7 @@ class Trainer:
         x_min=None,
         x_max=None,
         CI=0.95,
+        average=True,
     ):
         # Cook, Thomas R., et al. Explaining Machine Learning by Bootstrapping Partial Dependence Functions and Shapley
         # Values. No. RWP 21-12. 2021.
@@ -1207,15 +1210,18 @@ class Trainer:
                 df_perm[focus_feature] = value
                 df_perm, derived_data = _derive(df_perm)
                 bootstrap_model_predictions.append(
-                    np.mean(
-                        bootstrap_model.predict(
-                            df_perm, derived_data=derived_data, model_name="ThisWork"
-                        )
+                    bootstrap_model.predict(
+                        df_perm, derived_data=derived_data, model_name="ThisWork"
                     )
                 )
-            expected_value_bootstrap_replications.append(
-                np.hstack(bootstrap_model_predictions)
-            )
+            if average:
+                expected_value_bootstrap_replications.append(
+                    np.mean(np.hstack(bootstrap_model_predictions), axis=0)
+                )
+            else:
+                expected_value_bootstrap_replications.append(
+                    np.hstack(bootstrap_model_predictions)
+                )
 
         expected_value_bootstrap_replications = np.vstack(
             expected_value_bootstrap_replications
@@ -1225,7 +1231,7 @@ class Trainer:
         mean_pred = []
         for col_idx in range(expected_value_bootstrap_replications.shape[1]):
             y_pred = expected_value_bootstrap_replications[:, col_idx]
-            if n_bootstrap != 1:
+            if len(y_pred) != 1:
                 ci_int = st.norm.interval(
                     alpha=CI, loc=np.mean(y_pred), scale=np.std(y_pred)
                 )
