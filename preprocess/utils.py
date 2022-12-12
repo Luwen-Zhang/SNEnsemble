@@ -84,7 +84,7 @@ def averaging(df_original, measure_features):
             else:
                 pass  # Min Stress, Max Stress or frequency is not recorded
         bar.update(1)
-
+    bar.close()
     df_final.reset_index(drop=True, inplace=True)
     return df_final
 

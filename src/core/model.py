@@ -755,6 +755,7 @@ class TorchModel(AbstractModel):
             callback=_trainer_bayes_callback,
         )
         print(result.func_vals.min())
+        bar.close()
 
         params = {}
         for key, value in zip(self.params.keys(), result.x):
