@@ -112,15 +112,15 @@ class linlogSN(AbstractSN):
         )
 
 
-class loglogSN(linlogSN):
-    def __init__(self, trainer: Trainer):
-        super(loglogSN, self).__init__(trainer)
-
-    def forward(self, x, additional_tensors):
-        var_slices = self._get_var_slices(x, additional_tensors)
-        return self.a(x[:, self.material_features_idx]) * torch.log10(
-            torch.abs(var_slices[0])
-        ) + self.b(x[:, self.material_features_idx])
+# class loglogSN(linlogSN):
+#     def __init__(self, trainer: Trainer):
+#         super(loglogSN, self).__init__(trainer)
+#
+#     def forward(self, x, additional_tensors):
+#         var_slices = self._get_var_slices(x, additional_tensors)
+#         return self.a(x[:, self.material_features_idx]) * torch.log10(
+#             torch.abs(var_slices[0])
+#         ) + self.b(x[:, self.material_features_idx])
 
 
 sn_mapping = {}
