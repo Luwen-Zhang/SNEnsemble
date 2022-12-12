@@ -1,6 +1,6 @@
 import warnings
 
-warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
 import numpy as np
 import pandas as pd
@@ -41,7 +41,8 @@ plt.rcParams["figure.autolayout"] = True
 
 def averaging(df_original, measure_features):
     from sklearn.preprocessing import MinMaxScaler
-    fatigue_mat_lay = df_original['Material_Code'].copy()
+
+    fatigue_mat_lay = df_original["Material_Code"].copy()
     df_final = pd.DataFrame(columns=df_original.columns)
     bar = tqdm(total=len(list(set(fatigue_mat_lay))))
     for material in list(set(fatigue_mat_lay)):
@@ -62,7 +63,9 @@ def averaging(df_original, measure_features):
 
         all_correlation = []
         for i_idx, i in enumerate(where_material):
-            where_correlated = list(where_material[np.where(mse_matrix[i_idx, :] < 1e-5)[0]])
+            where_correlated = list(
+                where_material[np.where(mse_matrix[i_idx, :] < 1e-5)[0]]
+            )
             if where_correlated not in all_correlation:
                 all_correlation.append(where_correlated)
         # all_correlation = all_correlation
@@ -75,7 +78,9 @@ def averaging(df_original, measure_features):
                         df_avg[col] = np.mean(tmp)
                 df_final = pd.concat([df_final, df_avg], ignore_index=True, axis=0)
             elif len(cor) == 1:
-                df_final = pd.concat([df_final, df_original.loc[[cor[0]], :]], ignore_index=True, axis=0)
+                df_final = pd.concat(
+                    [df_final, df_original.loc[[cor[0]], :]], ignore_index=True, axis=0
+                )
             else:
                 pass  # Min Stress, Max Stress or frequency is not recorded
         bar.update(1)
@@ -97,32 +102,34 @@ def replace_column_name(df, name_mapping):
 
 
 def code2seq(layer_original):
-    pattern = re.compile(r'\d+(\(\d+\))')
+    pattern = re.compile(r"\d+(\(\d+\))")
 
     def bracket(layer):
-        if '±' in layer:
+        if "±" in layer:
             pm_indexes = []
             for x in range(len(layer)):
-                if layer[x] == '±':
+                if layer[x] == "±":
                     pm_indexes.append(x)
             for pm_idx in pm_indexes[::-1]:
-                pm_value = layer[pm_idx + 1:].split('/')[0].split(']')[0]
+                pm_value = layer[pm_idx + 1 :].split("/")[0].split("]")[0]
                 len_value = len(pm_value)
-                pm_s = pm_value + '/' + '-' + pm_value
-                layer = layer[:pm_idx] + pm_s + layer[pm_idx + len_value + 1:]
+                pm_s = pm_value + "/" + "-" + pm_value
+                layer = layer[:pm_idx] + pm_s + layer[pm_idx + len_value + 1 :]
 
-        if '[' not in layer and ']' not in layer:
+        if "[" not in layer and "]" not in layer:
             return layer
 
         queue = []
         for idx in range(len(layer)):
-            if layer[idx] == '[':
+            if layer[idx] == "[":
                 queue.append((1, idx))
-            elif layer[idx] == ']':
+            elif layer[idx] == "]":
                 queue.append((2, idx))
 
         pairs = []  # pairs of brackets in the outer loop
-        while len(queue) != 0 and queue[0][0] != 2:  # redundent right bracket left in the queue
+        while (
+            len(queue) != 0 and queue[0][0] != 2
+        ):  # redundent right bracket left in the queue
             t1, first_idx = queue.pop(0)
             current_idx = first_idx
             cnt_left_bracket = 1
@@ -133,7 +140,7 @@ def code2seq(layer_original):
                 else:
                     cnt_left_bracket -= 1
             if first_idx == current_idx:
-                raise Exception('Not recognized.')
+                raise Exception("Not recognized.")
             pairs.append((first_idx, current_idx))
 
         if len(queue) == 1 and queue[0][0] == 2:
@@ -141,32 +148,32 @@ def code2seq(layer_original):
             if queue[0][1] == len(layer) - 1:
                 layer = layer[:-1]
             else:
-                layer = layer[:queue[0][1]] + layer[queue[0][1] + 1:]
+                layer = layer[: queue[0][1]] + layer[queue[0][1] + 1 :]
 
         expanded = []
         for pair_idx, (left_bracket, right_bracket) in enumerate(pairs):
-            q = bracket(layer[left_bracket + 1:right_bracket])
+            q = bracket(layer[left_bracket + 1 : right_bracket])
             if right_bracket != len(layer) - 1:
-                postfix = layer[right_bracket + 1:].split('/')[0]
+                postfix = layer[right_bracket + 1 :].split("/")[0]
                 # if the bracket is followed by 'S'
                 inv = False
-                if len(postfix) > 0 and (postfix[-1] == 's' or postfix[-1] == 'S'):
+                if len(postfix) > 0 and (postfix[-1] == "s" or postfix[-1] == "S"):
                     inv = True
                     postfix = postfix[:-1]
                 try:
                     l = len(postfix)
                     n = round(float(postfix))
-                    q = q.split('/') * n
+                    q = q.split("/") * n
                 except:
                     l = 0
-                    q = q.split('/')
+                    q = q.split("/")
 
                 if inv:
                     q = q + q[::-1]
 
                 last_place = right_bracket + 1 + l + int(inv)
 
-                expanded.append('/'.join(q))
+                expanded.append("/".join(q))
                 if last_place == len(layer):
                     pairs[pair_idx] = (left_bracket, None)
                 else:
@@ -182,54 +189,58 @@ def code2seq(layer_original):
             else:
                 layer = layer[:left] + s + layer[right:]
 
-        return layer.strip(']').strip('[')
+        return layer.strip("]").strip("[")
 
     layer = str(layer_original)
 
     # for FACT dataset
-    layer = layer.replace('SB', '')
-    layer = layer.replace('WR', '')
-    layer = layer.replace('FW', '')
-    layer = layer.replace('K', '')
-    layer = layer.replace('()', '')
-    layer = layer.replace('100CSM', '0')
+    layer = layer.replace("SB", "")
+    layer = layer.replace("WR", "")
+    layer = layer.replace("FW", "")
+    layer = layer.replace("K", "")
+    layer = layer.replace("()", "")
+    layer = layer.replace("100CSM", "0")
 
     for match_str in re.findall(pattern, layer):
-        layer = layer.replace(match_str, '')
+        layer = layer.replace(match_str, "")
 
-    layer = layer.replace('s', 'S')
-    layer = layer.replace('(', '[')
-    layer = layer.replace(')', ']')
-    layer = layer.replace('/FOAM/', ' | ')
+    layer = layer.replace("s", "S")
+    layer = layer.replace("(", "[")
+    layer = layer.replace(")", "]")
+    layer = layer.replace("/FOAM/", " | ")
 
     # for upwind dataset
-    if (' - ' in layer and '/' in layer) or (' | ' in layer and '/' in layer):
-        layer_tmp = layer.split(' - ') if ' - ' in layer else layer.split(' | ')
-        layer_tmp = [x.split('/')[0] if x[-1] != ']' and x[-1] != 'S' else x.split('/')[0] + x[x.index(']'):] for x in
-                     layer_tmp]
-        layer = '/'.join(layer_tmp)
+    if (" - " in layer and "/" in layer) or (" | " in layer and "/" in layer):
+        layer_tmp = layer.split(" - ") if " - " in layer else layer.split(" | ")
+        layer_tmp = [
+            x.split("/")[0]
+            if x[-1] != "]" and x[-1] != "S"
+            else x.split("/")[0] + x[x.index("]") :]
+            for x in layer_tmp
+        ]
+        layer = "/".join(layer_tmp)
 
-    layer = layer.replace(' - ', '/')  # for upwind dataset
-    layer = layer.replace('|', '/')
-    layer = layer.replace(',', '/')
-    layer = layer.replace(';', '/')
-    layer = layer.replace(' ', '')
-    layer = layer.replace('\'', '')
-    layer = layer.replace('°', '')
-    layer = layer.replace('*', '')  # for upwind dataset
-    layer = layer.replace('+/-', '±')
-    layer = layer.replace('+-', '±')
-    layer = layer.replace('RM', '0')  # RM and FOAM are treated as 0 for simplicity
-    layer = layer.replace('C', '')  # C and G are for materials in SNL dataset
-    layer = layer.replace('G', '')
-    layer = layer.replace('M', '0')
-    layer = layer.replace('N', '')
-    layer = layer.replace('][', ']/[')
+    layer = layer.replace(" - ", "/")  # for upwind dataset
+    layer = layer.replace("|", "/")
+    layer = layer.replace(",", "/")
+    layer = layer.replace(";", "/")
+    layer = layer.replace(" ", "")
+    layer = layer.replace("'", "")
+    layer = layer.replace("°", "")
+    layer = layer.replace("*", "")  # for upwind dataset
+    layer = layer.replace("+/-", "±")
+    layer = layer.replace("+-", "±")
+    layer = layer.replace("RM", "0")  # RM and FOAM are treated as 0 for simplicity
+    layer = layer.replace("C", "")  # C and G are for materials in SNL dataset
+    layer = layer.replace("G", "")
+    layer = layer.replace("M", "0")
+    layer = layer.replace("N", "")
+    layer = layer.replace("][", "]/[")
     # print(layer, end=' ' * (40 - len(layer)))
     q = bracket(layer)
 
     try:
-        q = [int(x) for x in q.split('/')]
+        q = [int(x) for x in q.split("/")]
         return q
     except:
         return []  # Can not recognize the code
@@ -290,7 +301,9 @@ def plot_absence(df_all, name_mapping, figure_name, fontsize=12):
 
     plt.figure(figsize=(10, 8))
     ax = plt.subplot(111)
-    plot_absence_ratio(ax, df_presence, orient='h', palette=clr, linewidth=1, edgecolor=[0, 0, 0])
+    plot_absence_ratio(
+        ax, df_presence, orient="h", palette=clr, linewidth=1, edgecolor=[0, 0, 0]
+    )
     plt.tight_layout()
 
     plt.savefig(figure_name, dpi=600)
@@ -298,19 +311,22 @@ def plot_absence(df_all, name_mapping, figure_name, fontsize=12):
     # plt.show()
     plt.close()
 
+
 def remove_s(x, s):
     if type(x) == str:
         if s in x:
-            x = x.replace(s,'')
+            x = x.replace(s, "")
             x = float(x)
     return x
+
 
 def cal_fraction(x, s):
     if type(x) == str:
         if s in x:
             x = x.split(s)
-            x = (float(x[0])+float(x[1]))/2
+            x = (float(x[0]) + float(x[1])) / 2
     return x
+
 
 def conditional_remove(x, s):
     if type(x) == str:
@@ -318,11 +334,13 @@ def conditional_remove(x, s):
             return np.nan
     return x
 
+
 def conditional_replace(x, s1, s2):
     if type(x) == str:
         if s1 in x:
             x = x.replace(s1, s2)
     return x
+
 
 def str2num(x, s, n):
     if type(x) == str:
@@ -330,11 +348,13 @@ def str2num(x, s, n):
             x = n
     return x
 
+
 def remove_strs(x):
     if type(x) == str:
         return np.nan
     else:
         return x
+
 
 def fill_na(x, n):
     if np.isnan(x):
@@ -346,5 +366,5 @@ def fill_na(x, n):
 def modify_col(df, column_name, func, **kwargs):
     if column_name in list(df.columns):
         col = df[column_name]
-        col = [func(x,**kwargs) for x in col]
+        col = [func(x, **kwargs) for x in col]
         df.loc[:, column_name] = col
