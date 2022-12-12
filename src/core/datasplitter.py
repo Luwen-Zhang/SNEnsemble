@@ -142,6 +142,33 @@ class MaterialCycleSplitter(AbstractSplitter):
         return np.array(train_indices), np.array(val_indices), np.array(test_indices)
 
 
+class CycleSplitter(AbstractSplitter):
+    def __int__(self, train_val_test=None):
+        super(CycleSplitter, self).__init__(train_val_test)
+
+    def _split(self, data, df, feature_names, label_name):
+        cycle = df[label_name].values.flatten()
+
+        train_indices = np.where(
+            cycle <= np.percentile(cycle, self.train_val_test[0] * 100)
+        )[0]
+        val_indices = np.setdiff1d(
+            np.where(
+                cycle <= np.percentile(cycle, np.sum(self.train_val_test[0:2]) * 100)
+            )[0],
+            train_indices,
+        )
+        test_indices = np.where(
+            cycle > np.percentile(cycle, np.sum(self.train_val_test[0:2]) * 100)
+        )[0]
+
+        np.random.shuffle(train_indices)
+        np.random.shuffle(val_indices)
+        np.random.shuffle(test_indices)
+
+        return train_indices.flatten(), val_indices.flatten(), test_indices.flatten()
+
+
 splitter_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:
