@@ -939,7 +939,6 @@ class ThisWork(TorchModel):
             len(self.trainer.feature_names),
             len(self.trainer.label_name),
             self.trainer.layers,
-            self.trainer._get_derived_data_sizes(),
         ).to(self.trainer.device)
 
     def _get_model_names(self):
@@ -958,7 +957,6 @@ class MLP(TorchModel):
             len(self.trainer.feature_names),
             len(self.trainer.label_name),
             self.trainer.layers,
-            self.trainer._get_derived_data_sizes(),
         ).to(self.trainer.device)
 
     def _get_model_names(self):

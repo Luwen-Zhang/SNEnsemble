@@ -8,7 +8,7 @@ def init_weights(m):
 
 
 class NN(nn.Module):
-    def __init__(self, n_inputs, n_outputs, layers, additional_tensors_sizes):
+    def __init__(self, n_inputs, n_outputs, layers):
         super(NN, self).__init__()
         num_inputs = n_inputs
         num_outputs = n_outputs
