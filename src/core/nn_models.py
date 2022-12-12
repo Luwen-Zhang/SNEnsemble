@@ -13,26 +13,13 @@ class NN(nn.Module):
         num_inputs = n_inputs
         num_outputs = n_outputs
 
-        self.net = self.get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
+        self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
 
     def forward(self, x, additional_tensors):
         x = self.net(x)
         output = x
 
         return output
-
-    def get_sequential(self, layers, n_inputs, n_outputs, act_func):
-        net = nn.Sequential()
-        net.add_module("input", nn.Linear(n_inputs, layers[0]))
-        net.add_module("activate", act_func())
-        for idx in range(len(layers) - 1):
-            net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
-            net.add_module("activate" + str(idx), act_func())
-        net.add_module("output", nn.Linear(layers[-1], n_outputs))
-
-        net.apply(init_weights)
-
-        return net
 
 
 class ThisWorkNN(nn.Module):
@@ -41,10 +28,11 @@ class ThisWorkNN(nn.Module):
         num_inputs = n_inputs
         num_outputs = n_outputs
 
-        self.net = self.get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
+        self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
         self.activated_sn = nn.ModuleList(activated_sn)
         self.component_weights = nn.Parameter(
-            torch.ones(size=(len(activated_sn) + 1, 1)), requires_grad=True
+            torch.Tensor([1] + [0 for x in activated_sn]).view(-1, 1),
+            requires_grad=True,
         )
 
     def forward(self, x, additional_tensors):
@@ -56,15 +44,15 @@ class ThisWorkNN(nn.Module):
         output = torch.matmul(preds, self.component_weights)
         return output
 
-    def get_sequential(self, layers, n_inputs, n_outputs, act_func):
-        net = nn.Sequential()
-        net.add_module("input", nn.Linear(n_inputs, layers[0]))
-        net.add_module("activate", act_func())
-        for idx in range(len(layers) - 1):
-            net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
-            net.add_module("activate" + str(idx), act_func())
-        net.add_module("output", nn.Linear(layers[-1], n_outputs))
 
-        net.apply(init_weights)
+def get_sequential(layers, n_inputs, n_outputs, act_func):
+    net = nn.Sequential()
+    net.add_module("input", nn.Linear(n_inputs, layers[0]))
+    net.add_module("activate", act_func())
+    for idx in range(len(layers) - 1):
+        net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
+        net.add_module("activate" + str(idx), act_func())
+    net.add_module("output", nn.Linear(layers[-1], n_outputs))
 
-        return net
+    net.apply(init_weights)
+    return net
