@@ -118,9 +118,10 @@ class linlogSN(AbstractSN):
 #
 #     def forward(self, x, additional_tensors):
 #         var_slices = self._get_var_slices(x, additional_tensors)
+#         sgn = torch.sign(var_slices[0])
 #         return self.a(x[:, self.material_features_idx]) * torch.log10(
-#             torch.abs(var_slices[0])
-#         ) + self.b(x[:, self.material_features_idx])
+#             var_slices[0] * sgn + 1
+#         ) * sgn + self.b(x[:, self.material_features_idx])
 
 
 sn_mapping = {}
