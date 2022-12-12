@@ -681,21 +681,21 @@ class TabNet(AbstractModel):
 class TorchModel(AbstractModel):
     def __init__(self, trainer=None):
         super(TorchModel, self).__init__(trainer)
+        self.params = cp(trainer.chosen_params)
 
     def _new_model(self):
         raise NotImplementedError
 
-    def _bayes(self) -> dict:
+    def _bayes(self):
         """
         Running Gaussian process bayesian optimization on hyperparameters. Configurations are given in the configfile.
         chosen_params will be optimized.
-        :return: A dict of optimized hyperparameters, which can be assigned to Trainer.params.
         """
         if not self.trainer.bayes_opt:
             print(
-                "Bayes optimization not activated in configuration file. Return preset chosen_params."
+                "Bayes optimization not activated in configuration file. Using preset chosen_params."
             )
-            return self.trainer.chosen_params
+            return None
 
         # If def is not global, pickle will raise 'Can't get local attribute ...'
         # IT IS NOT SAFE, BUT I DID NOT FIND A BETTER SOLUTION
@@ -723,7 +723,7 @@ class TorchModel(AbstractModel):
         postfix = {
             "Current loss": 1e8,
             "Minimum": 1e8,
-            "Params": list(self.trainer.chosen_params.values()),
+            "Params": list(self.params.values()),
             "Minimum at call": 0,
         }
 
@@ -751,16 +751,16 @@ class TorchModel(AbstractModel):
             self.trainer.SPACE,
             n_calls=self.trainer.n_calls,
             random_state=0,
-            x0=list(self.trainer.chosen_params.values()),
+            x0=list(self.params.values()),
             callback=_trainer_bayes_callback,
         )
         print(result.func_vals.min())
 
         params = {}
-        for key, value in zip(self.trainer.chosen_params.keys(), result.x):
+        for key, value in zip(self.params.keys(), result.x):
             params[key] = value
 
-        return params
+        self.params = params
 
     def _predict_all(self, verbose=True, test_data_only=False):
         self._check_train_status()
@@ -901,7 +901,7 @@ class TorchModel(AbstractModel):
             verbose=verbose,
             verbose_per_epoch=verbose_per_epoch,
             warm_start=warm_start,
-            **{**self.trainer.params, **self.trainer.static_params},
+            **{**self.params, **self.trainer.static_params},
         )
 
         self.model.load_state_dict(torch.load(self.trainer.project_root + "fatigue.pt"))

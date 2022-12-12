@@ -150,8 +150,6 @@ class Trainer:
         else:
             raise Exception(f"Loss function {self.loss} not implemented.")
 
-        self.params = self.chosen_params
-
         self.bayes_epoch = self.args["bayes_epoch"]
 
         from src.core.datasplitter import get_data_splitter
@@ -411,7 +409,7 @@ class Trainer:
 
         for modelbase in modelbases_to_train:
             if issubclass(type(modelbase), TorchModel) and self.bayes_opt:
-                self.params = modelbase._bayes()
+                modelbase._bayes()
             modelbase._train(verbose=verbose, debug_mode=debug_mode)
 
     def random_cross_validation(self, n_random=5, verbose=True, test_data_only=False):
