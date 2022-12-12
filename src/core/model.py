@@ -935,10 +935,22 @@ class ThisWork(TorchModel):
         return "ThisWork"
 
     def _new_model(self):
-        return NN(
+        from src.core.sn_formulas import sn_mapping
+
+        if self.activated_sn is None:
+            self.activated_sn = []
+            for key, sn in sn_mapping.items():
+                if sn.test_sn_vars(self.trainer):
+                    self.activated_sn.append(sn(self.trainer))
+            print(
+                f"Activated SN models: {[sn.__class__.__name__ for sn in self.activated_sn]}"
+            )
+
+        return ThisWorkNN(
             len(self.trainer.feature_names),
             len(self.trainer.label_name),
             self.trainer.layers,
+            activated_sn=self.activated_sn,
         ).to(self.trainer.device)
 
     def _get_model_names(self):
