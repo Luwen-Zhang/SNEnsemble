@@ -86,6 +86,22 @@ class linlogSN(AbstractSN):
         return self.params[0] * var_slices[0] + self.params[1]
 
 
+class loglogSN(AbstractSN):
+    def __init__(self, trainer: Trainer):
+        super(loglogSN, self).__init__(trainer)
+
+    @staticmethod
+    def _get_sn_vars():
+        return ["Absolute Maximum Stress"]
+
+    def _register_variable(self):
+        self.params = nn.Parameter(torch.Tensor([0, 0]), requires_grad=True)
+
+    def forward(self, x, additional_tensors):
+        var_slices = self._get_var_slices(x, additional_tensors)
+        return self.params[0] * torch.log10(torch.abs(var_slices[0])) + self.params[1]
+
+
 sn_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:
