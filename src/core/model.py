@@ -10,7 +10,8 @@ class AbstractModel:
             trainer.load_config(default_configfile="base_config")
         self.model = None
         self.leaderboard = None
-        self.program = None
+        self.program = self._get_program_name()
+        self._mkdir()
 
     def fit(
         self,
@@ -121,6 +122,9 @@ class AbstractModel:
     def _get_model_names(self):
         raise NotImplementedError
 
+    def _get_program_name(self):
+        raise NotImplementedError
+
     def _check_train_status(self):
         if not self._trained:
             raise Exception(
@@ -143,8 +147,9 @@ class AbstractModel:
 class AutoGluon(AbstractModel):
     def __init__(self, trainer=None):
         super(AutoGluon, self).__init__(trainer)
-        self.program = "AutoGluon"
-        self._mkdir()
+
+    def _get_program_name(self):
+        return "AutoGluon"
 
     def _train(
         self,
@@ -199,8 +204,9 @@ class AutoGluon(AbstractModel):
 class PytorchTabular(AbstractModel):
     def __init__(self, trainer=None):
         super(PytorchTabular, self).__init__(trainer)
-        self.program = "PytorchTabular"
-        self._mkdir()
+
+    def _get_program_name(self):
+        return "PytorchTabular"
 
     def _train(
         self,
@@ -535,8 +541,9 @@ class PytorchTabular(AbstractModel):
 class TabNet(AbstractModel):
     def __init__(self, trainer=None):
         super(TabNet, self).__init__(trainer)
-        self.program = "TabNet"
-        self._mkdir()
+
+    def _get_program_name(self):
+        return "TabNet"
 
     def _train(
         self,
@@ -922,8 +929,10 @@ class TorchModel(AbstractModel):
 class ThisWork(TorchModel):
     def __init__(self, trainer=None):
         super(ThisWork, self).__init__(trainer)
-        self.program = "ThisWork"
-        self._mkdir()
+        self.activated_sn = None
+
+    def _get_program_name(self):
+        return "ThisWork"
 
     def _new_model(self):
         return NN(
@@ -940,8 +949,9 @@ class ThisWork(TorchModel):
 class MLP(TorchModel):
     def __init__(self, trainer=None):
         super(MLP, self).__init__(trainer)
-        self.program = "MLP"
-        self._mkdir()
+
+    def _get_program_name(self):
+        return "MLP"
 
     def _new_model(self):
         return NN(
@@ -957,11 +967,14 @@ class MLP(TorchModel):
 
 class ModelAssembly(AbstractModel):
     def __init__(self, trainer=None, models=None, program=None):
+        self.program = "ModelAssembly" if program is None else program
         super(ModelAssembly, self).__init__(trainer)
         self.models = (
             [TabNet(self.trainer), MLP(self.trainer)] if models is None else models
         )
-        self.program = "ModelAssembly" if program is None else program
+
+    def _get_program_name(self):
+        return self.program
 
     def fit(self, **kwargs):
         for submodel in self.models:
