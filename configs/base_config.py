@@ -8,7 +8,6 @@ class BaseConfig:
         self.data = {
             "project": "FACT_fatigue",
             "loss": "mse",
-            "split_by": "random",
             "bayes_opt": False,
             "bayes_epoch": 3,
             "patience": 50,
@@ -38,6 +37,7 @@ class BaseConfig:
                     "categories": [32, 64, 128, 256, 512, 1024, 2048, 4096],
                 },
             },
+            "data_splitter": "RandomSplitter",
             "data_processors": [
                 "IQRRemover",
                 "MeanImputer",

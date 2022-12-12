@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker
 import seaborn as sns
 import matplotlib
-from sklearn.model_selection import train_test_split
 from src.core.nn_models import *
 import logging
 
@@ -110,46 +109,6 @@ def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_
     )
 
 
-def split_by_material(mat_lay, mat_lay_set, train_val_test):
-    def mat_lay_index(chosen_mat_lay, mat_lay):
-        index = []
-        for material in chosen_mat_lay:
-            where_material = np.where(mat_lay == material)[0]
-            index += list(where_material)
-        return np.array(index)
-
-    train_mat_lay, test_mat_lay = train_test_split(
-        mat_lay_set, test_size=train_val_test[2], shuffle=True
-    )
-    train_mat_lay, val_mat_lay = train_test_split(
-        train_mat_lay,
-        test_size=train_val_test[1] / np.sum(train_val_test[0:2]),
-        shuffle=True,
-    )
-    # train_dataset = Subset(dataset, mat_lay_index(train_mat_lay, mat_lay))
-    # val_dataset = Subset(dataset, mat_lay_index(val_mat_lay, mat_lay))
-    # test_dataset = Subset(dataset, mat_lay_index(test_mat_lay, mat_lay))
-
-    return (
-        mat_lay_index(train_mat_lay, mat_lay),
-        mat_lay_index(val_mat_lay, mat_lay),
-        mat_lay_index(test_mat_lay, mat_lay),
-    )
-
-
-def split_by_random(length, train_val_test):
-    train_indices, test_indices = train_test_split(
-        np.arange(length), test_size=train_val_test[2], shuffle=True
-    )
-    train_indices, val_indices = train_test_split(
-        train_indices,
-        test_size=train_val_test[1] / np.sum(train_val_test[0:2]),
-        shuffle=True,
-    )
-
-    return train_indices, val_indices, test_indices
-
-
 def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
     df = pd.DataFrame(columns=["feature", "attr", "clr"])
     df["feature"] = features
@@ -187,28 +146,6 @@ def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
 
     legend.get_frame().set_alpha(None)
     legend.get_frame().set_facecolor([1, 1, 1, 0.4])
-
-
-def calculate_pdp(model, feature_data, additional_tensors, feature_idx, grid_size=100):
-    x_values = np.linspace(
-        np.percentile(feature_data[:, feature_idx].cpu().numpy(), 10),
-        np.percentile(feature_data[:, feature_idx].cpu().numpy(), 90),
-        grid_size,
-    )
-
-    model_predictions = []
-
-    for n in x_values:
-        X_pdp = feature_data.clone().detach()
-        # X_pdp = resample(X_pdp)
-        X_pdp[:, feature_idx] = n
-        model_predictions.append(
-            np.mean(model(X_pdp, additional_tensors).cpu().detach().numpy())
-        )
-
-    model_predictions = np.array(model_predictions)
-
-    return x_values, model_predictions
 
 
 def plot_pdp(

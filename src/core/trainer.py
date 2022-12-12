@@ -116,8 +116,6 @@ class Trainer:
 
         self.args = arg_loaded
 
-        self.split_by = self.args["split_by"]  # 'random' or 'material'
-
         self.loss = self.args["loss"]
         self.bayes_opt = self.args["bayes_opt"]
 
@@ -155,6 +153,10 @@ class Trainer:
         self.params = self.chosen_params
 
         self.bayes_epoch = self.args["bayes_epoch"]
+
+        from src.core.datasplitter import get_data_splitter
+
+        self.datasplitter = get_data_splitter(self.args["data_splitter"])
 
         from src.core.dataprocessor import get_data_processor
 
@@ -280,24 +282,11 @@ class Trainer:
         original_length = len(data)
 
         if train_indices is None or val_indices is None or test_indices is None:
-            train_val_test = np.array([0.6, 0.2, 0.2])
-            if self.split_by == "random":
-                (
-                    self.train_indices,
-                    self.val_indices,
-                    self.test_indices,
-                ) = split_by_random(len(data), train_val_test)
-            elif self.split_by == "material":
-                mat_lay = [str(x) for x in self.df["Material_Code"].copy()]
-                mat_lay_set = list(sorted(set(mat_lay)))
-
-                (
-                    self.train_indices,
-                    self.val_indices,
-                    self.test_indices,
-                ) = split_by_material(mat_lay, mat_lay_set, train_val_test)
-            else:
-                raise Exception("Split type not implemented")
+            (
+                self.train_indices,
+                self.val_indices,
+                self.test_indices,
+            ) = self.datasplitter.split(data, self.df, feature_names, label_name)
         else:
             self.train_indices, self.val_indices, self.test_indices = (
                 train_indices,
