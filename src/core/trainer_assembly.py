@@ -4,8 +4,12 @@ import os
 
 
 class TrainerAssembly:
-    def __init__(self, trainer_paths: list, projects=None):
-        self.trainers = [load_trainer(path) for path in trainer_paths]
+    def __init__(self, trainer_paths: list, projects=None, trainers=None):
+        self.trainers = (
+            [load_trainer(path) for path in trainer_paths]
+            if trainers is None
+            else trainers
+        )
         self.projects = (
             [trainer.project for trainer in self.trainers]
             if projects is None
