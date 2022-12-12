@@ -686,22 +686,19 @@ class TorchModel(AbstractModel):
     def _new_model(self):
         raise NotImplementedError
 
-    def _bayes(self):
+    def _bayes(self, verbose=True):
         """
         Running Gaussian process bayesian optimization on hyperparameters. Configurations are given in the configfile.
         chosen_params will be optimized.
         """
         if not self.trainer.bayes_opt:
-            print(
-                "Bayes optimization not activated in configuration file. Using preset chosen_params."
-            )
             return None
 
         # If def is not global, pickle will raise 'Can't get local attribute ...'
         # IT IS NOT SAFE, BUT I DID NOT FIND A BETTER SOLUTION
         global _trainer_bayes_objective, _trainer_bayes_callback
 
-        bar = tqdm(total=self.trainer.n_calls)
+        bar = tqdm(total=self.trainer.n_calls, disable=not verbose)
 
         from copy import deepcopy as cp
 
@@ -746,15 +743,17 @@ class TorchModel(AbstractModel):
             bar.set_postfix(**postfix)
             bar.update(1)
 
-        result = gp_minimize(
-            _trainer_bayes_objective,
-            self.trainer.SPACE,
-            n_calls=self.trainer.n_calls,
-            random_state=0,
-            x0=list(self.params.values()),
-            callback=_trainer_bayes_callback,
-        )
-        print(result.func_vals.min())
+        with warnings.catch_warnings():
+            # To obtain clean progress bar.
+            warnings.simplefilter("ignore")
+            result = gp_minimize(
+                _trainer_bayes_objective,
+                self.trainer.SPACE,
+                n_calls=self.trainer.n_calls,
+                random_state=0,
+                x0=list(self.params.values()),
+                callback=_trainer_bayes_callback,
+            )
         bar.close()
 
         params = {}
