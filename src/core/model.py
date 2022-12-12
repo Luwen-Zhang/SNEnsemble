@@ -896,6 +896,8 @@ class TorchModel(AbstractModel):
         if not warm_start or (warm_start and not self._trained):
             self.model = self._new_model()
 
+        self._bayes(verbose=verbose)
+
         min_loss, self.train_ls, self.val_ls = self._model_train(
             model=self.model,
             verbose=verbose,

@@ -405,11 +405,7 @@ class Trainer:
         else:
             modelbases_to_train = [self.get_modelbase(x) for x in programs]
 
-        from src.core.model import TorchModel
-
         for modelbase in modelbases_to_train:
-            if issubclass(type(modelbase), TorchModel) and self.bayes_opt:
-                modelbase._bayes()
             modelbase._train(verbose=verbose, debug_mode=debug_mode)
 
     def random_cross_validation(self, n_random=5, verbose=True, test_data_only=False):
