@@ -2,6 +2,7 @@ import sys, inspect
 from src.core.trainer import Trainer
 import torch.nn as nn
 import torch
+import numpy as np
 
 
 class AbstractSN(nn.Module):
@@ -79,27 +80,47 @@ class linlogSN(AbstractSN):
         return ["Absolute Maximum Stress"]
 
     def _register_variable(self):
-        self.params = nn.Parameter(torch.Tensor([0, 0]), requires_grad=True)
+        material_features = np.array(
+            list(self.trainer.args["feature_names_type"].keys())
+        )[
+            np.array(list(self.trainer.args["feature_names_type"].values()))
+            == self.trainer.args["feature_types"].index("Material")
+        ]
+        self.material_features_idx = np.array(
+            [self.trainer.feature_names.index(name) for name in material_features]
+        )
+
+        from src.core.nn_models import get_sequential
+
+        self.a = get_sequential(
+            n_inputs=len(material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
+        self.b = get_sequential(
+            n_inputs=len(material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
 
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
-        return self.params[0] * var_slices[0] + self.params[1]
+        return self.a(x[:, self.material_features_idx]) * var_slices[0] + self.b(
+            x[:, self.material_features_idx]
+        )
 
 
-class loglogSN(AbstractSN):
+class loglogSN(linlogSN):
     def __init__(self, trainer: Trainer):
         super(loglogSN, self).__init__(trainer)
 
-    @staticmethod
-    def _get_sn_vars():
-        return ["Absolute Maximum Stress"]
-
-    def _register_variable(self):
-        self.params = nn.Parameter(torch.Tensor([0, 0]), requires_grad=True)
-
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
-        return self.params[0] * torch.log10(torch.abs(var_slices[0])) + self.params[1]
+        return self.a(x[:, self.material_features_idx]) * torch.log10(
+            torch.abs(var_slices[0])
+        ) + self.b(x[:, self.material_features_idx])
 
 
 sn_mapping = {}
