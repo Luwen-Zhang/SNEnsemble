@@ -159,7 +159,7 @@ class AutoGluon(AbstractModel):
         warm_start=False,
         **kwargs,
     ):
-        print("\n-------------Run AutoGluon Tests-------------\n")
+        print("\n-------------Run AutoGluon-------------\n")
         disable_tqdm()
         import warnings
 
@@ -190,7 +190,7 @@ class AutoGluon(AbstractModel):
         warnings.simplefilter(action="default", category=UserWarning)
         if dump_trainer:
             save_trainer(self.trainer)
-        print("\n-------------AutoGluon Tests End-------------\n")
+        print("\n-------------AutoGluon End-------------\n")
 
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         return self.model.predict(
@@ -216,7 +216,7 @@ class PytorchTabular(AbstractModel):
         warm_start=False,
         **kwargs,
     ):
-        print("\n-------------Run Pytorch-tabular Tests-------------\n")
+        print("\n-------------Run Pytorch-tabular-------------\n")
         disable_tqdm()
         import warnings
 
@@ -527,7 +527,7 @@ class PytorchTabular(AbstractModel):
         warnings.simplefilter(action="default", category=UserWarning)
         if dump_trainer:
             save_trainer(self.trainer)
-        print("\n-------------Pytorch-tabular Tests End-------------\n")
+        print("\n-------------Pytorch-tabular End-------------\n")
 
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         model = self.model[model_name]
@@ -553,7 +553,7 @@ class TabNet(AbstractModel):
         warm_start=False,
         **kwargs,
     ):
-        print("\n-------------Run TabNet Test-------------\n")
+        print("\n-------------Run TabNet-------------\n")
         train_indices = self.trainer.train_dataset.indices
         val_indices = self.trainer.val_dataset.indices
         test_indices = self.trainer.test_dataset.indices
@@ -665,7 +665,7 @@ class TabNet(AbstractModel):
         self.model = model
         if dump_trainer:
             save_trainer(self.trainer)
-        print("\n-------------TabNet Tests End-------------\n")
+        print("\n-------------TabNet End-------------\n")
 
     def _predict(
         self, df: pd.DataFrame, model_name=None, additional_data=None, **kwargs
@@ -893,6 +893,7 @@ class TorchModel(AbstractModel):
         warm_start=False,
         **kwargs,
     ):
+        print(f"\n-------------Run {self.program}-------------\n")
         if not warm_start or (warm_start and not self._trained):
             self.model = self._new_model()
 
@@ -926,6 +927,8 @@ class TorchModel(AbstractModel):
 
         if dump_trainer:
             save_trainer(self.trainer, verbose=verbose)
+
+        print(f"\n-------------{self.program} End-------------\n")
 
 
 class ThisWork(TorchModel):
