@@ -22,7 +22,30 @@ class AbstractSplitter:
         raise NotImplementedError
 
     def _check_split(self, train_indices, val_indices, test_indices):
-        pass
+        def individual_check(indices, name):
+            if not issubclass(type(indices), np.ndarray):
+                raise Exception(
+                    f"The class of {name}_indices {type(indices)} is not the subclass of numpy.ndarray."
+                )
+            if len(indices.shape) != 1:
+                raise Exception(
+                    f"{name}_indices is not one dimensional. Use numpy.ndarray.flatten() to convert."
+                )
+
+        def intersect_check(a_indices, b_indices, a_name, b_name):
+            if len(np.intersect1d(a_indices, b_indices)) != 0:
+                raise Exception(
+                    f"There exists intersection {np.intersect1d(a_indices, b_indices)} between {a_name}_indices "
+                    f"and {b_name}_indices."
+                )
+
+        individual_check(train_indices, "train")
+        individual_check(val_indices, "val")
+        individual_check(test_indices, "test")
+
+        intersect_check(train_indices, val_indices, "train", "val")
+        intersect_check(train_indices, test_indices, "train", "test")
+        intersect_check(val_indices, test_indices, "val", "test")
 
 
 class RandomSplitter(AbstractSplitter):
