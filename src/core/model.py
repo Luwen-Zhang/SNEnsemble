@@ -472,9 +472,14 @@ class PytorchTabular(AbstractModel):
                     except Exception as e:
                         exceptions.append(e)
                         return 1e3
-                    res = tabular_model.evaluate(
-                        tabular_dataset.loc[self.trainer.val_dataset.indices, :]
-                    )[0]["test_mean_squared_error"]
+                    res = (
+                        tabular_model.evaluate(
+                            tabular_dataset.loc[self.trainer.val_dataset.indices, :]
+                        )[0]["test_mean_squared_error"]
+                        + tabular_model.evaluate(
+                            tabular_dataset.loc[self.trainer.train_dataset.indices, :]
+                        )[0]["test_mean_squared_error"]
+                    )
                 if verbose:
                     print(res)
                 return res
@@ -626,6 +631,8 @@ class TabNet(AbstractModel):
 
                 res = self.trainer._metric_sklearn(
                     model.predict(val_x).reshape(-1, 1), val_y, self.trainer.loss
+                ) + self.trainer._metric_sklearn(
+                    model.predict(train_x).reshape(-1, 1), train_y, self.trainer.loss
                 )
             if verbose:
                 print(res)
@@ -716,13 +723,13 @@ class TorchModel(AbstractModel):
 
         @skopt.utils.use_named_args(self.trainer.SPACE)
         def _trainer_bayes_objective(**params):
-            res, _, _ = self._model_train(
+            _, train_ls, val_ls = self._model_train(
                 model=self._new_model(),
                 verbose=False,
                 **{**params, **tmp_static_params},
             )
 
-            return res
+            return np.min(train_ls) + np.min(val_ls)
 
         postfix = {
             "Current loss": 1e8,
