@@ -463,14 +463,15 @@ class Trainer:
 
         return tabular_dataset, feature_names, label_name
 
-    def _cross_validation(self, programs, cross_validation, verbose, test_data_only):
+    def cross_validation(self, programs, cross_validation, verbose, test_data_only):
         programs_predictions = {}
         for program in programs:
             programs_predictions[program] = {}
         for i in range(cross_validation):
-            print(
-                f"----------------------------{i + 1}/{cross_validation} random cross validation----------------------------"
-            )
+            if verbose:
+                print(
+                    f"----------------------------{i + 1}/{cross_validation} random cross validation----------------------------"
+                )
             self.load_data()
             for program in programs:
                 modelbase = self.get_modelbase(program)
@@ -500,9 +501,10 @@ class Trainer:
                             append_once("Validation")
                     else:
                         programs_predictions[program][model_name] = value
-            print(
-                f"--------------------------End {i + 1}/{cross_validation} random cross validation--------------------------"
-            )
+            if verbose:
+                print(
+                    f"--------------------------End {i + 1}/{cross_validation} random cross validation--------------------------"
+                )
         return programs_predictions
 
     def get_leaderboard(
@@ -521,7 +523,7 @@ class Trainer:
         metrics = ["rmse", "mse", "mae", "mape", "r2"]
 
         if cross_validation != 0:
-            programs_predictions = self._cross_validation(
+            programs_predictions = self.cross_validation(
                 programs=self.modelbases_names,
                 cross_validation=cross_validation,
                 verbose=verbose,
