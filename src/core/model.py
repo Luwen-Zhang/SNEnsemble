@@ -21,6 +21,7 @@ class AbstractModel:
         derived_data: dict = None,
         verbose=True,
         warm_start=False,
+        bayes_opt=False,
     ):
         self.trainer.df = df
         self.trainer.feature_names = feature_names
@@ -36,6 +37,12 @@ class AbstractModel:
             verbose=verbose,
         )
         self.trainer._update_dataset_auto()
+        if bayes_opt != self.trainer.bayes_opt:
+            self.trainer.bayes_opt = bayes_opt
+            if verbose:
+                print(
+                    f"The argument bayes_opt of fit() conflicts with Trainer.bayes_opt. Use the former one."
+                )
         self._train(
             dump_trainer=False,
             verbose=verbose,
@@ -893,7 +900,8 @@ class TorchModel(AbstractModel):
         warm_start=False,
         **kwargs,
     ):
-        print(f"\n-------------Run {self.program}-------------\n")
+        if verbose:
+            print(f"\n-------------Run {self.program}-------------\n")
         if not warm_start or (warm_start and not self._trained):
             self.model = self._new_model()
 
@@ -928,7 +936,8 @@ class TorchModel(AbstractModel):
         if dump_trainer:
             save_trainer(self.trainer, verbose=verbose)
 
-        print(f"\n-------------{self.program} End-------------\n")
+        if verbose:
+            print(f"\n-------------{self.program} End-------------\n")
 
 
 class ThisWork(TorchModel):
