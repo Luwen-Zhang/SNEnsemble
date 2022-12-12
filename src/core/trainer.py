@@ -408,42 +408,6 @@ class Trainer:
         for modelbase in modelbases_to_train:
             modelbase._train(verbose=verbose, debug_mode=debug_mode)
 
-    def random_cross_validation(self, n_random=5, verbose=True, test_data_only=False):
-        leaderboards = []
-        for i in range(n_random):
-            print(
-                f"----------------------------{i + 1}/{n_random} random cross validation----------------------------"
-            )
-            self.load_data()
-            self.train(verbose=verbose)
-            leaderboards.append(self.get_leaderboard(test_data_only=test_data_only))
-
-        final_leaderboard = leaderboards[0].copy()
-        model_col_idx = list(final_leaderboard.columns).index("Model")
-        metrics_cols = final_leaderboard.columns[model_col_idx + 1 :]
-        model_rep = [
-            str(x) + str(y)
-            for x, y in zip(final_leaderboard["Program"], final_leaderboard["Model"])
-        ]
-        for model_idx, model_name in enumerate(model_rep):
-            for df in leaderboards[1:]:
-                tmp_model_rep = [
-                    str(x) + str(y) for x, y in zip(df["Program"], df["Model"])
-                ]
-                final_leaderboard.loc[model_idx, metrics_cols] += df.loc[
-                    tmp_model_rep.index(model_name), metrics_cols
-                ]
-        final_leaderboard.loc[:, metrics_cols] /= n_random
-
-        final_leaderboard.sort_values(
-            "Testing RMSE" if not test_data_only else "RMSE", inplace=True
-        )
-        final_leaderboard.reset_index(drop=True, inplace=True)
-        final_leaderboard.to_csv(
-            self.project_root + f"{n_random}_random_cross_val_leaderboard.csv"
-        )
-        return final_leaderboard, leaderboards
-
     def _get_derived_data_sizes(self):
         return [x.shape for x in self.derived_data.values()]
 
@@ -499,8 +463,54 @@ class Trainer:
 
         return tabular_dataset, feature_names, label_name
 
+    def _cross_validation(self, programs, cross_validation, verbose, test_data_only):
+        programs_predictions = {}
+        for program in programs:
+            programs_predictions[program] = {}
+        for i in range(cross_validation):
+            print(
+                f"----------------------------{i + 1}/{cross_validation} random cross validation----------------------------"
+            )
+            self.load_data()
+            for program in programs:
+                modelbase = self.get_modelbase(program)
+                modelbase._train(dump_trainer=False, verbose=verbose)
+                predictions = modelbase._predict_all(
+                    verbose=verbose, test_data_only=test_data_only
+                )
+                for model_name, value in predictions.items():
+                    if model_name in programs_predictions[program].keys():
+                        current_predictions = programs_predictions[program][model_name]
+
+                        def append_once(key):
+                            current_predictions[key] = (
+                                np.append(
+                                    current_predictions[key][0],
+                                    value[key][0],
+                                ),
+                                np.append(
+                                    current_predictions[key][1],
+                                    value[key][1],
+                                ),
+                            )
+
+                        append_once("Testing")
+                        if not test_data_only:
+                            append_once("Training")
+                            append_once("Validation")
+                    else:
+                        programs_predictions[program][model_name] = value
+            print(
+                f"--------------------------End {i + 1}/{cross_validation} random cross validation--------------------------"
+            )
+        return programs_predictions
+
     def get_leaderboard(
-        self, test_data_only: bool = True, dump_trainer=True
+        self,
+        test_data_only: bool = True,
+        dump_trainer=True,
+        cross_validation=0,
+        verbose=False,
     ) -> pd.DataFrame:
         """
         Run all baseline models and the model in this work for a leaderboard.
@@ -510,14 +520,32 @@ class Trainer:
         dfs = []
         metrics = ["rmse", "mse", "mae", "mape", "r2"]
 
-        for modelbase in self.modelbases:
-            print(f"{modelbase.program} metrics")
-            predictions = modelbase._predict_all(
-                verbose=False, test_data_only=test_data_only
+        if cross_validation != 0:
+            programs_predictions = self._cross_validation(
+                programs=self.modelbases_names,
+                cross_validation=cross_validation,
+                verbose=verbose,
+                test_data_only=test_data_only,
             )
-            df = Trainer._metrics(predictions, metrics, test_data_only=test_data_only)
-            df["Program"] = modelbase.program
-            dfs.append(df)
+            for modelbase_name in self.modelbases_names:
+                df = Trainer._metrics(
+                    programs_predictions[modelbase_name],
+                    metrics,
+                    test_data_only=test_data_only,
+                )
+                df["Program"] = modelbase_name
+                dfs.append(df)
+        else:
+            for modelbase in self.modelbases:
+                print(f"{modelbase.program} metrics")
+                predictions = modelbase._predict_all(
+                    verbose=False, test_data_only=test_data_only
+                )
+                df = Trainer._metrics(
+                    predictions, metrics, test_data_only=test_data_only
+                )
+                df["Program"] = modelbase.program
+                dfs.append(df)
 
         df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
         df_leaderboard.sort_values(
