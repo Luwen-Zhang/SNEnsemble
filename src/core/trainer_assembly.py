@@ -4,7 +4,7 @@ import os
 
 
 class TrainerAssembly:
-    def __init__(self, trainer_paths: list, projects=None, trainers=None):
+    def __init__(self, trainer_paths: list = None, projects=None, trainers=None):
         self.trainers = (
             [load_trainer(path) for path in trainer_paths]
             if trainers is None
@@ -68,6 +68,7 @@ class TrainerAssembly:
         programs=None,
         log_trans: bool = True,
         upper_lim=9,
+        cross_validation=0,
     ):
         """
         Plot all truth_pred plots and get the leaderboard.
@@ -84,9 +85,30 @@ class TrainerAssembly:
             if programs is None
             else programs
         )
+
         selected_projects = (
             project_subset if project_subset is not None else self.projects
         )
+
+        projects_program_predictions = {}
+        if cross_validation == 0:
+            for project in selected_projects:
+                projects_program_predictions[project] = {}
+                trainer = self.trainers[self.projects.index(project)]
+                for program in programs:
+                    modelbase = trainer.get_modelbase(program)
+                    predictions = modelbase._predict_all(verbose=True)
+                    projects_program_predictions[project][program] = predictions
+        else:
+            for project in selected_projects:
+                projects_program_predictions[project] = {}
+                trainer = self.trainers[self.projects.index(project)]
+                projects_program_predictions[project] = trainer.cross_validation(
+                    programs=programs,
+                    cross_validation=cross_validation,
+                    verbose=True,
+                    test_data_only=False,
+                )
 
         for program in programs:
             print(f"\n-------------------- Program: {program} --------------------\n")
@@ -94,13 +116,10 @@ class TrainerAssembly:
             all_model_names = []
             all_predictions = []
             for project in selected_projects:
-                print(f"Program: {program}, project: {project}")
                 trainer = self.trainers[self.projects.index(project)]
-
                 modelbase = trainer.get_modelbase(program)
                 model_names = modelbase._get_model_names()
-                predictions = modelbase._predict_all(verbose=True)
-
+                predictions = projects_program_predictions[project][program]
                 unique_model_names += model_names
                 all_model_names.append(model_names)
                 all_predictions.append(predictions)
