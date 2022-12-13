@@ -1,29 +1,39 @@
-from src.core.trainer_assembly import TrainerAssembly
+from src.core.trainer import *
+from src.core.model import *
+from src.core.trainer_assembly import TrainerAssembly, save_trainer_assem
 
-trainer_paths = [
-    "output/SNL_MSU_DOE_avg_fatigue/2022-11-23-20-39-50_base_SNL_MSU_DOE_avg_fatigue/trainer.pkl",
-    "output/OptiMat_avg_fatigue/2022-11-23-21-24-39_base_OptiMat_avg_fatigue/trainer.pkl",
-    "output/Upwind_avg_fatigue/2022-11-23-21-59-12_base_Upwind_avg_fatigue/trainer.pkl",
-    "output/FACT_avg_fatigue/2022-11-23-22-33-35_base_FACT_avg_fatigue/trainer.pkl",
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print("Using {} device".format(device))
+
+trainers = []
+models = []
+
+configfiles = [
+    "base_SNL_MSU_DOE_fatigue",
+    "base_OptiMat_fatigue",
+    "base_Upwind_fatigue",
+    "base_FACT_fatigue",
 ]
 
-ta = TrainerAssembly(
-    trainer_paths=trainer_paths, projects=["SNL-MSU-DOE", "OptiMat", "Upwind", "FACT"]
-)
+for configfile in configfiles:
+    trainer = Trainer(device=device)
+    trainer.load_config(configfile)
 
-ta.plot_loss(metric="MSE")
-ta.eval_all()
+    models = [
+        AutoGluon(trainer),
+        PytorchTabular(trainer),
+        ModelAssembly(
+            trainer, models=[TabNet(trainer), MLP(trainer)], program="ThisWorkBaselines"
+        ),
+        ThisWork(trainer),
+    ]
 
-trainer_paths = [
-    "output/SNL_MSU_DOE_avg_static/2022-11-23-20-18-19_base_SNL_MSU_DOE_avg_static/trainer.pkl",
-    "output/OptiMat_avg_static/2022-11-23-21-07-01_base_OptiMat_avg_static/trainer.pkl",
-    "output/Upwind_avg_static/2022-11-23-21-43-19_base_Upwind_avg_static/trainer.pkl",
-    "output/FACT_avg_static/2022-11-23-22-19-00_base_FACT_avg_static/trainer.pkl",
-]
+    trainer.add_modelbases(models)
 
-ta = TrainerAssembly(
-    trainer_paths=trainer_paths, projects=["SNL-MSU-DOE", "OptiMat", "Upwind", "FACT"]
-)
+    trainers.append(trainer)
 
-ta.plot_loss(metric="MSE")
-ta.eval_all(log_trans=False)
+trainer_assem = TrainerAssembly(trainers=trainers)
+trainer_assem.plot_loss(metric="MSE")
+trainer_assem.eval_all(programs=[model.program for model in models], cross_validation=5)
+
+save_trainer_assem(trainer_assem)
