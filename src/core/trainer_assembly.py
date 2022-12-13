@@ -20,6 +20,7 @@ class TrainerAssembly:
             + "_".join([trainer.configfile for trainer in self.trainers])
             + "/"
         )
+        self.leaderboard = None
         if not os.path.exists("output/assembly/"):
             os.mkdir("output/assembly/")
         if not os.path.exists(self.project_root):
@@ -269,3 +270,24 @@ class TrainerAssembly:
 
         df_leaderboard = df_leaderboard[columns_ahead + columns_back]
         df_leaderboard.to_csv(self.project_root + "leaderboard.csv")
+        self.leaderboard = df_leaderboard
+
+
+def save_trainer_assem(trainer_assem, path=None, verbose=True):
+    import pickle
+
+    path = trainer_assem.project_root + "trainer_assem.pkl" if path is None else path
+    if verbose:
+        print(
+            f"TrainerAssembly saved. To load the trainer_assem, run trainer_assem = load_trainer_assem(path='{path}')"
+        )
+    with open(path, "wb") as outp:
+        pickle.dump(trainer_assem, outp, pickle.HIGHEST_PROTOCOL)
+
+
+def load_trainer_assem(path=None):
+    import pickle
+
+    with open(path, "rb") as inp:
+        trainer_assem = pickle.load(inp)
+    return trainer_assem
