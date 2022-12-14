@@ -945,6 +945,7 @@ class Trainer:
         n_bootstrap=1,
         CI=0.95,
         method="statistical",
+        verbose=True,
     ):
         if s_col not in self.df.columns:
             raise Exception(f"{s_col} not in features.")
@@ -1011,6 +1012,7 @@ class Trainer:
             x_max=np.max(all_s) + np.abs(np.max(all_s) - np.min(all_s)) * 0.5,
             CI=CI,
             average=False,
+            verbose=verbose,
         )
 
         CL, CR = self._psn(
