@@ -33,7 +33,7 @@ for configfile in configfiles:
     trainers.append(trainer)
 
 trainer_assem = TrainerAssembly(trainers=trainers)
-trainer_assem.plot_loss(metric="MSE")
 trainer_assem.eval_all(programs=[model.program for model in models], cross_validation=5)
+trainer_assem.plot_loss(metric="MSE")
 
 save_trainer_assem(trainer_assem)
