@@ -106,7 +106,7 @@ class TrainerAssembly:
                 trainer = self.trainers[self.projects.index(project)]
                 projects_program_predictions[project] = trainer.cross_validation(
                     programs=programs,
-                    cross_validation=cross_validation,
+                    n_random=cross_validation,
                     verbose=True,
                     test_data_only=False,
                 )

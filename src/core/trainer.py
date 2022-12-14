@@ -463,14 +463,14 @@ class Trainer:
 
         return tabular_dataset, feature_names, label_name
 
-    def cross_validation(self, programs, cross_validation, verbose, test_data_only):
+    def cross_validation(self, programs, n_random, verbose, test_data_only):
         programs_predictions = {}
         for program in programs:
             programs_predictions[program] = {}
-        for i in range(cross_validation):
+        for i in range(n_random):
             if verbose:
                 print(
-                    f"----------------------------{i + 1}/{cross_validation} random cross validation----------------------------"
+                    f"----------------------------{i + 1}/{n_random} random cross validation----------------------------"
                 )
             self.load_data()
             for program in programs:
@@ -503,7 +503,7 @@ class Trainer:
                         programs_predictions[program][model_name] = value
             if verbose:
                 print(
-                    f"--------------------------End {i + 1}/{cross_validation} random cross validation--------------------------"
+                    f"--------------------------End {i + 1}/{n_random} random cross validation--------------------------"
                 )
         return programs_predictions
 
@@ -525,7 +525,7 @@ class Trainer:
         if cross_validation != 0:
             programs_predictions = self.cross_validation(
                 programs=self.modelbases_names,
-                cross_validation=cross_validation,
+                n_random=cross_validation,
                 verbose=verbose,
                 test_data_only=test_data_only,
             )
