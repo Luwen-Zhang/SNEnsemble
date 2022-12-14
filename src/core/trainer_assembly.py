@@ -115,8 +115,19 @@ class TrainerAssembly:
                         test_data_only=False,
                     )
             self.projects_program_predictions = projects_program_predictions
+            self.selected_programs = cp(programs)
+            self.selected_projects = cp(selected_projects)
+            self.selected_metrics = cp(metrics)
         else:
             projects_program_predictions = self.projects_program_predictions
+            programs = self.selected_programs
+            selected_projects = self.selected_projects
+            metrics = self.selected_metrics
+            print(f"Restore loaded setting:")
+
+        print(f"Programs:\n{pretty(programs)}")
+        print(f"Projects:\n{pretty(selected_projects)}")
+        print(f"Metrics:\n{pretty(metrics)}")
 
         for program in programs:
             print(f"\n-------------------- Program: {program} --------------------\n")
