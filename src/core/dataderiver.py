@@ -156,57 +156,48 @@ class SuppStressDeriver(AbstractDeriver):
 
         df_tmp = df.copy()
 
-        df_tmp["Absolute Maximum Stress"] = np.nan
-        df_tmp["Absolute Peak-to-peak Stress"] = np.nan
-        df_tmp["Absolute Mean Stress"] = np.nan
-        df_tmp["Relative Maximum Stress"] = np.nan
-        df_tmp["Relative Peak-to-peak Stress"] = np.nan
-        df_tmp["Relative Mean Stress"] = np.nan
-
-        for idx in df_tmp.index:
-            s = np.array(
-                [df_tmp.loc[idx, max_stress_col], df_tmp.loc[idx, min_stress_col]]
-            )
-            which_max_stress = np.where(np.abs(s) == np.max(np.abs(s)))[0]
-            if len(which_max_stress) == 0:
-                which_max_stress = 1 - int(np.isnan(s[1]))  # when nan appears in s
-            else:
-                which_max_stress = which_max_stress[0]
-
-            relative_to = (
-                np.abs(df_tmp.loc[idx, "Static Maximum Tensile Stress"])
-                if s[which_max_stress] > 0
-                else np.abs(df_tmp.loc[idx, "Static Maximum Compressive Stress"])
-            )
-            if np.isnan(relative_to) and s[0] + s[1] < 1e-5 and s[which_max_stress] > 0:
-                relative_to = np.abs(
-                    df_tmp.loc[idx, "Static Maximum Compressive Stress"]
-                )
-
-            df_tmp.loc[idx, "Absolute Maximum Stress"] = s[which_max_stress]
-            p2p = np.abs(s[0] - s[1])
-            if np.isnan(p2p):
-                p2p = np.abs(s[1 - int(np.isnan(s[1]))])
-            df_tmp.loc[idx, "Absolute Peak-to-peak Stress"] = p2p
-            df_tmp.loc[idx, "Absolute Mean Stress"] = (
-                s[which_max_stress] - np.sign(s[which_max_stress]) * p2p / 2
-            )
-
-            if (
-                np.abs(s[which_max_stress] / relative_to) <= 1.1
-            ):  # otherwise static data is not correct
-                df_tmp.loc[idx, "Relative Maximum Stress"] = np.abs(
-                    s[which_max_stress] / relative_to
-                )
-                df_tmp.loc[idx, "Relative Peak-to-peak Stress"] = np.abs(
-                    p2p / relative_to
-                )
-                df_tmp.loc[idx, "Relative Mean Stress"] = np.abs(
-                    df_tmp.loc[idx, "Absolute Mean Stress"] / relative_to
-                )
-            else:
-                df_tmp.loc[idx, "Static Maximum Tensile Stress"] = np.nan
-                df_tmp.loc[idx, "Static Maximum Compressive Stress"] = np.nan
+        df_tmp["Absolute Maximum Stress"] = np.maximum(
+            np.abs(df_tmp[max_stress_col]), np.abs(df_tmp[min_stress_col])
+        )
+        where_max = df_tmp.index[
+            np.where(
+                df_tmp["Absolute Maximum Stress"].values
+                == np.abs(df_tmp[max_stress_col])
+            )[0]
+        ]
+        df_tmp.loc[where_max, "Absolute Maximum Stress"] *= np.sign(
+            df_tmp.loc[where_max, max_stress_col]
+        )
+        which_min = np.setdiff1d(df_tmp.index, where_max)
+        df_tmp.loc[which_min, "Absolute Maximum Stress"] *= np.sign(
+            df_tmp.loc[which_min, min_stress_col]
+        )
+        where_g0 = df_tmp.index[np.where(df_tmp["Absolute Maximum Stress"] > 0)[0]]
+        df_tmp["rt"] = np.abs(df_tmp["Static Maximum Compressive Stress"])
+        df_tmp.loc[where_g0, "rt"] = np.abs(
+            df_tmp.loc[where_g0, "Static Maximum Tensile Stress"]
+        )
+        df_tmp["Absolute Peak-to-peak Stress"] = np.abs(
+            df_tmp[max_stress_col] - df_tmp[min_stress_col]
+        )
+        df_tmp["Absolute Mean Stress"] = (
+            df_tmp[max_stress_col] + df_tmp[min_stress_col]
+        ) / 2
+        df_tmp["Relative Maximum Stress"] = np.abs(
+            df_tmp["Absolute Maximum Stress"] / df_tmp["rt"]
+        )
+        df_tmp["Relative Peak-to-peak Stress"] = np.abs(
+            df_tmp["Absolute Peak-to-peak Stress"] / df_tmp["rt"]
+        )
+        df_tmp["Relative Mean Stress"] = np.abs(
+            df_tmp["Absolute Mean Stress"] / df_tmp["rt"]
+        )
+        where_invalid = df_tmp.index[
+            np.where(df_tmp["Relative Maximum Stress"] > 1.1)[0]
+        ]
+        df_tmp.loc[where_invalid, "Relative Maximum Stress"] = np.nan
+        df_tmp.loc[where_invalid, "Relative Peak-to-peak Stress"] = np.nan
+        df_tmp.loc[where_invalid, "Relative Mean Stress"] = np.nan
 
         names = (
             [
