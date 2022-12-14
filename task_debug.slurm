@@ -12,4 +12,4 @@ module load cuda/11.5.0
 source activate pytorch-env
 cd ~/lxl/ML-fracture
 
-bash run.sh
+bash run.sh |& tee out.txt
