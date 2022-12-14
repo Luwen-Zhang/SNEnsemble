@@ -232,7 +232,8 @@ class PytorchTabular(AbstractModel):
         from pytorch_tabular.config import ExperimentRunManager
 
         ExperimentRunManager.__init__ = partialmethod(
-            ExperimentRunManager.__init__, self.root + "exp_version_manager.yml"
+            ExperimentRunManager.__init__,
+            exp_version_manager=self.root + "exp_version_manager.yml",
         )
         from pytorch_tabular import TabularModel
         from pytorch_tabular.models import (
