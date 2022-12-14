@@ -1028,7 +1028,7 @@ class Trainer:
 
         def in_fill_between(x_arr, y_arr, xvals, cl, cr):
             def point_in_fill_between(x, y):
-                which_x = np.where(np.abs(x - xvals) == np.min(np.abs(x - xvals)))[0]
+                which_x = np.where(np.abs(x - xvals) == np.min(np.abs(x - xvals)))[0][0]
                 cl_x = cl[which_x]
                 cr_x = cr[which_x]
                 return True if cl_x <= y <= cr_x else False
