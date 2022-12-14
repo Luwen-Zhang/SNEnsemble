@@ -25,6 +25,7 @@ class TrainerAssembly:
             os.mkdir("output/assembly/")
         if not os.path.exists(self.project_root):
             os.mkdir(self.project_root)
+        self.projects_program_predictions = None
 
     def plot_loss(self, metric=None):
         plt.figure()
@@ -70,6 +71,8 @@ class TrainerAssembly:
         log_trans: bool = True,
         upper_lim=9,
         cross_validation=0,
+        plots=False,
+        re_eval=False,
     ):
         """
         Plot all truth_pred plots and get the leaderboard.
@@ -91,25 +94,29 @@ class TrainerAssembly:
             project_subset if project_subset is not None else self.projects
         )
 
-        projects_program_predictions = {}
-        if cross_validation == 0:
-            for project in selected_projects:
-                projects_program_predictions[project] = {}
-                trainer = self.trainers[self.projects.index(project)]
-                for program in programs:
-                    modelbase = trainer.get_modelbase(program)
-                    predictions = modelbase._predict_all(verbose=True)
-                    projects_program_predictions[project][program] = predictions
+        if self.projects_program_predictions is None or re_eval:
+            projects_program_predictions = {}
+            if cross_validation == 0:
+                for project in selected_projects:
+                    projects_program_predictions[project] = {}
+                    trainer = self.trainers[self.projects.index(project)]
+                    for program in programs:
+                        modelbase = trainer.get_modelbase(program)
+                        predictions = modelbase._predict_all(verbose=True)
+                        projects_program_predictions[project][program] = predictions
+            else:
+                for project in selected_projects:
+                    projects_program_predictions[project] = {}
+                    trainer = self.trainers[self.projects.index(project)]
+                    projects_program_predictions[project] = trainer.cross_validation(
+                        programs=programs,
+                        n_random=cross_validation,
+                        verbose=True,
+                        test_data_only=False,
+                    )
+            self.projects_program_predictions = projects_program_predictions
         else:
-            for project in selected_projects:
-                projects_program_predictions[project] = {}
-                trainer = self.trainers[self.projects.index(project)]
-                projects_program_predictions[project] = trainer.cross_validation(
-                    programs=programs,
-                    n_random=cross_validation,
-                    verbose=True,
-                    test_data_only=False,
-                )
+            projects_program_predictions = self.projects_program_predictions
 
         for program in programs:
             print(f"\n-------------------- Program: {program} --------------------\n")
@@ -128,9 +135,6 @@ class TrainerAssembly:
             unique_model_names = list(set(unique_model_names))
 
             for model_name in unique_model_names:
-                plt.figure()
-                plt.rcParams["font.size"] = 14
-                ax = plt.subplot(111)
                 predictions_model = {model_name: {}}
                 y_train_pred = []
                 y_train_true = []
@@ -194,51 +198,56 @@ class TrainerAssembly:
                 df["Program"] = program
                 dfs.append(df)
 
-                self.trainers[0]._plot_truth_pred(
-                    predictions_model,
-                    ax,
-                    model_name,
-                    "Training",
-                    clr[0],
-                    log_trans=log_trans,
-                    verbose=False,
-                )
-                if "Validation" in predictions_model[model_name].keys():
+                if plots:
+                    plt.figure()
+                    plt.rcParams["font.size"] = 14
+                    ax = plt.subplot(111)
+
                     self.trainers[0]._plot_truth_pred(
                         predictions_model,
                         ax,
                         model_name,
-                        "Validation",
-                        clr[2],
+                        "Training",
+                        clr[0],
                         log_trans=log_trans,
                         verbose=False,
                     )
-                self.trainers[0]._plot_truth_pred(
-                    predictions_model,
-                    ax,
-                    model_name,
-                    "Testing",
-                    clr[1],
-                    log_trans=log_trans,
-                    verbose=False,
-                )
+                    if "Validation" in predictions_model[model_name].keys():
+                        self.trainers[0]._plot_truth_pred(
+                            predictions_model,
+                            ax,
+                            model_name,
+                            "Validation",
+                            clr[2],
+                            log_trans=log_trans,
+                            verbose=False,
+                        )
+                    self.trainers[0]._plot_truth_pred(
+                        predictions_model,
+                        ax,
+                        model_name,
+                        "Testing",
+                        clr[1],
+                        log_trans=log_trans,
+                        verbose=False,
+                    )
 
-                plt.legend(
-                    loc="upper left",
-                    markerscale=1.5,
-                    handlelength=0.2,
-                    handleheight=0.9,
-                )
+                    plt.legend(
+                        loc="upper left",
+                        markerscale=1.5,
+                        handlelength=0.2,
+                        handleheight=0.9,
+                    )
 
-                set_truth_pred(ax, log_trans, upper_lim=upper_lim)
+                    set_truth_pred(ax, log_trans, upper_lim=upper_lim)
 
-                # plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
-                s = model_name.replace("/", "_")
-                plt.savefig(self.project_root + f"{program}_{s}_truth_pred.pdf")
-                if is_notebook():
-                    plt.show()
+                    # plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
+                    s = model_name.replace("/", "_")
+                    plt.savefig(self.project_root + f"{program}_{s}_truth_pred.pdf")
+                    if is_notebook():
+                        plt.show()
 
-                plt.close()
+                    plt.close()
 
         df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
         df_leaderboard.sort_values("Testing RMSE", inplace=True)
