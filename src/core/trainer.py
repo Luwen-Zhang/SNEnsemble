@@ -475,7 +475,7 @@ class Trainer:
             self.load_data()
             for program in programs:
                 modelbase = self.get_modelbase(program)
-                modelbase._train(dump_trainer=False, verbose=verbose)
+                modelbase._train(dump_trainer=True, verbose=verbose)
                 predictions = modelbase._predict_all(
                     verbose=verbose, test_data_only=test_data_only
                 )
