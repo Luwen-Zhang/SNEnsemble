@@ -34,6 +34,5 @@ for configfile in configfiles:
 
 trainer_assem = TrainerAssembly(trainers=trainers)
 trainer_assem.eval_all(programs=[model.program for model in models], cross_validation=5)
-trainer_assem.plot_loss(metric="MSE")
 
 save_trainer_assem(trainer_assem)
