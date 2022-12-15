@@ -311,6 +311,7 @@ class WideDeep(AbstractModel):
                     EarlyStopping(
                         patience=self.trainer.static_params["patience"],
                         verbose=1 if verbose else 0,
+                        restore_best_weights=True,
                     ),
                     _WideDeepCallback(),
                 ],
