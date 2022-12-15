@@ -146,13 +146,19 @@ class SuppStressDeriver(AbstractDeriver):
         intermediate=False,
         max_stress_col=None,
         min_stress_col=None,
+        ucs_col=None,
+        uts_col=None,
         relative=False,
     ):
         self._check_arg(derived_name, "derived_name")
         self._check_arg(max_stress_col, "max_stress_col")
         self._check_arg(min_stress_col, "min_stress_col")
+        self._check_arg(ucs_col, "ucs_col")
+        self._check_arg(uts_col, "uts_col")
         self._check_exist(df, max_stress_col, "max_stress_col")
         self._check_exist(df, min_stress_col, "min_stress_col")
+        self._check_exist(df, ucs_col, "ucs_col")
+        self._check_exist(df, uts_col, "uts_col")
 
         df_tmp = df.copy()
 
@@ -173,10 +179,8 @@ class SuppStressDeriver(AbstractDeriver):
             df_tmp.loc[which_min, min_stress_col]
         )
         where_g0 = df_tmp.index[np.where(df_tmp["Absolute Maximum Stress"] > 0)[0]]
-        df_tmp["rt"] = np.abs(df_tmp["Static Maximum Compressive Stress"])
-        df_tmp.loc[where_g0, "rt"] = np.abs(
-            df_tmp.loc[where_g0, "Static Maximum Tensile Stress"]
-        )
+        df_tmp["rt"] = np.abs(df_tmp[ucs_col])
+        df_tmp.loc[where_g0, "rt"] = np.abs(df_tmp.loc[where_g0, uts_col])
         df_tmp["Absolute Peak-to-peak Stress"] = np.abs(
             df_tmp[max_stress_col] - df_tmp[min_stress_col]
         )
@@ -216,7 +220,7 @@ class SuppStressDeriver(AbstractDeriver):
             ]
         )
         stresses = df_tmp[names].values
-        related_columns = [max_stress_col, min_stress_col]
+        related_columns = [max_stress_col, min_stress_col, ucs_col, uts_col]
 
         return stresses, derived_name, names, stacked, intermediate, related_columns
 

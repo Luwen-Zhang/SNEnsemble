@@ -42,6 +42,8 @@ class config(BaseConfig):
                     "stacked": True,
                     "max_stress_col": "Maximum Stress",
                     "min_stress_col": "Minimum Stress",
+                    "ucs_col": "Static Maximum Compressive Stress",
+                    "uts_col": "Static Maximum Tensile Stress",
                     "relative": False,
                 },
                 "DegLayerDeriver": {
