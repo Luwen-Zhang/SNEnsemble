@@ -229,12 +229,17 @@ class WideDeep(AbstractModel):
         from pytorch_widedeep.preprocessing import TabPreprocessor
         from pytorch_widedeep.callbacks import Callback, EarlyStopping
         from pytorch_widedeep.models import (
-            TabMlp,
             WideDeep,
+            TabMlp,
             TabResnet,
             TabTransformer,
             TabNet,
             SAINT,
+            ContextAttentionMLP,
+            SelfAttentionMLP,
+            FTTransformer,
+            TabPerceiver,
+            TabFastFormer,
         )
         from typing import Optional, Dict
 
@@ -260,14 +265,22 @@ class WideDeep(AbstractModel):
             "TabTransformer": TabTransformer(embed_continuous=True, **args),
             "TabNet": TabNet(**args),
             "SAINT": SAINT(**args),
+            "ContextAttentionMLP": ContextAttentionMLP(**args),
+            "SelfAttentionMLP": SelfAttentionMLP(**args),
+            "FTTransformer": FTTransformer(**args),
+            "TabPerceiver": TabPerceiver(**args),
+            "TabFastFormer": TabFastFormer(**args),
         }
 
         total_epoch = self.trainer.static_params["epoch"]
 
-        class MyCallback(Callback):
+        global _WideDeepCallback
+
+        class _WideDeepCallback(Callback):
             def __init__(self):
-                super(MyCallback, self).__init__()
+                super(_WideDeepCallback, self).__init__()
                 self.val_ls = []
+                self.bar = tqdm(total=total_epoch, disable=not verbose)
 
             def on_epoch_end(
                 self,
@@ -278,11 +291,17 @@ class WideDeep(AbstractModel):
                 train_loss = logs["train_loss"]
                 val_loss = logs["val_loss"]
                 self.val_ls.append(val_loss)
-                if epoch % 100 == 0:
-                    print(
-                        f"Epoch: {epoch + 1}/{total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
-                        f"Min val loss: {np.min(self.val_ls):.4f}"
-                    )
+                self.bar.set_postfix(
+                    {
+                        "train_loss": train_loss,
+                        "val_loss": val_loss,
+                        "min_val_loss": np.min(self.val_ls),
+                    }
+                )
+                self.bar.update(1)
+
+            def on_train_end(self, logs: Optional[Dict] = None):
+                self.bar.close()
 
         self.model = {}
         for name, tab_model in tab_models.items():
@@ -300,8 +319,10 @@ class WideDeep(AbstractModel):
                         patience=self.trainer.static_params["patience"],
                         verbose=1 if verbose else 0,
                     ),
-                    MyCallback(),
+                    _WideDeepCallback(),
                 ],
+                num_workers=16,
+                device=self.trainer.device,
             )
 
             wd_trainer.fit(
@@ -323,7 +344,18 @@ class WideDeep(AbstractModel):
         return self.model[model_name].predict(X_tab=X_df)
 
     def _get_model_names(self):
-        return ["TabMlp", "TabResnet", "TabTransformer", "TabNet", "SAINT"]
+        return [
+            "TabMlp",
+            "TabResnet",
+            "TabTransformer",
+            "TabNet",
+            "SAINT",
+            "ContextAttentionMLP",
+            "SelfAttentionMLP",
+            "FTTransformer",
+            "TabPerceiver",
+            "TabFastFormer",
+        ]
 
 
 # class PytorchTabular(AbstractModel):
