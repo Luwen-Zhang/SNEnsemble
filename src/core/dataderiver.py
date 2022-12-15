@@ -35,6 +35,12 @@ class AbstractDeriver:
                 f"Derivation: {name} is not a valid column in df for deriver {self.__class__.__name__}."
             )
 
+    def _check_values(self, values):
+        if len(values.shape) == 1:
+            raise Exception(
+                f"Derivation: {name} returns a one dimensional numpy.ndarray. Use reshape(-1, 1) to transform into 2D."
+            )
+
 
 class DegLayerDeriver(AbstractDeriver):
     def __init__(self):
@@ -73,7 +79,7 @@ class DegLayerDeriver(AbstractDeriver):
         names = self._generate_col_names(derived_name, deg_layers.shape[1], col_names)
 
         related_columns = [sequence_column]
-
+        self._check_values(deg_layers)
         return deg_layers, derived_name, names, stacked, intermediate, related_columns
 
 
@@ -98,11 +104,11 @@ class RelativeDeriver(AbstractDeriver):
         self._check_exist(df, relative2_col, "relative2_col")
 
         relative = df[absolute_col] / df[relative2_col]
-        relative = relative.values
+        relative = relative.values.reshape(-1, 1)
 
         names = self._generate_col_names(derived_name, 1, col_names)
         related_columns = [absolute_col, relative2_col]
-
+        self._check_values(relative)
         return relative, derived_name, names, stacked, intermediate, related_columns
 
 
@@ -126,10 +132,11 @@ class MinStressDeriver(AbstractDeriver):
         self._check_exist(df, max_stress_col, "max_stress_col")
         self._check_exist(df, r_value_col, "r_value_col")
 
-        value = (df[max_stress_col] * df[r_value_col]).values
+        value = (df[max_stress_col] * df[r_value_col]).values.reshape(-1, 1)
 
         related_columns = [max_stress_col, r_value_col]
         names = self._generate_col_names(derived_name, 1, col_names)
+        self._check_values(value)
         return value, derived_name, names, stacked, intermediate, related_columns
 
 
@@ -221,7 +228,7 @@ class SuppStressDeriver(AbstractDeriver):
         )
         stresses = df_tmp[names].values
         related_columns = [max_stress_col, min_stress_col, ucs_col, uts_col]
-
+        self._check_values(stresses)
         return stresses, derived_name, names, stacked, intermediate, related_columns
 
 
