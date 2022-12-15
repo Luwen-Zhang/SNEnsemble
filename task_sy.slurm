@@ -8,7 +8,6 @@
 #SBATCH --gres=gpu:1
 
 module load miniconda3
-module load cuda/11.5.0
 source activate pytorch-env
 cd ~/lxl/ML-fracture
 
