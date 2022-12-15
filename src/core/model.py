@@ -280,7 +280,6 @@ class WideDeep(AbstractModel):
             def __init__(self):
                 super(_WideDeepCallback, self).__init__()
                 self.val_ls = []
-                self.bar = tqdm(total=total_epoch, disable=not verbose)
 
             def on_epoch_end(
                 self,
@@ -291,17 +290,11 @@ class WideDeep(AbstractModel):
                 train_loss = logs["train_loss"]
                 val_loss = logs["val_loss"]
                 self.val_ls.append(val_loss)
-                self.bar.set_postfix(
-                    {
-                        "train_loss": train_loss,
-                        "val_loss": val_loss,
-                        "min_val_loss": np.min(self.val_ls),
-                    }
-                )
-                self.bar.update(1)
-
-            def on_train_end(self, logs: Optional[Dict] = None):
-                self.bar.close()
+                if epoch % 20 == 0 and verbose:
+                    print(
+                        f"Epoch: {epoch + 1}/{total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
+                        f"Min val loss: {np.min(self.val_ls):.4f}"
+                    )
 
         self.model = {}
         for name, tab_model in tab_models.items():
@@ -328,10 +321,9 @@ class WideDeep(AbstractModel):
             wd_trainer.fit(
                 X_train={"X_tab": X_tab_train, "target": y_train},
                 X_val={"X_tab": X_tab_val, "target": y_val},
-                n_epochs=self.trainer.static_params["epoch"],
+                n_epochs=total_epoch,
                 batch_size=self.trainer.chosen_params["batch_size"],
             )
-
             self.model[name] = wd_trainer
 
         # enable_tqdm()
