@@ -11,7 +11,7 @@ trainer.describe()
 
 models = [
     AutoGluon(trainer),
-    PytorchTabular(trainer),
+    WideDeep(trainer),
     ModelAssembly(
         trainer, models=[TabNet(trainer), MLP(trainer)], program="ThisWorkBaselines"
     ),
