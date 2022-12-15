@@ -208,6 +208,124 @@ class AutoGluon(AbstractModel):
         return list(self.leaderboard["model"])
 
 
+class WideDeep(AbstractModel):
+    def __init__(self, trainer=None):
+        super(WideDeep, self).__init__(trainer)
+
+    def _get_program_name(self):
+        return "WideDeep"
+
+    def _train(
+        self,
+        verbose: bool = False,
+        debug_mode: bool = False,
+        dump_trainer=True,
+        warm_start=False,
+        **kwargs,
+    ):
+        print("\n-------------Run WideDeep-------------\n")
+        # disable_tqdm()
+        from pytorch_widedeep import Trainer
+        from pytorch_widedeep.preprocessing import TabPreprocessor
+        from pytorch_widedeep.callbacks import Callback, EarlyStopping
+        from pytorch_widedeep.models import (
+            TabMlp,
+            WideDeep,
+            TabResnet,
+            TabTransformer,
+            TabNet,
+            SAINT,
+        )
+        from typing import Optional, Dict
+
+        tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
+        tab_preprocessor = TabPreprocessor(continuous_cols=feature_names)
+        X_tab_train = tab_preprocessor.fit_transform(
+            tabular_dataset.loc[self.trainer.train_indices, :]
+        )
+        y_train = tabular_dataset.loc[self.trainer.train_indices, label_name].values
+        X_tab_val = tab_preprocessor.transform(
+            tabular_dataset.loc[self.trainer.val_indices, :]
+        )
+        y_val = tabular_dataset.loc[self.trainer.val_indices, label_name].values
+        self.tab_preprocessor = tab_preprocessor
+
+        args = dict(
+            column_idx=tab_preprocessor.column_idx,
+            continuous_cols=feature_names,
+        )
+        tab_models = {
+            "TabMlp": TabMlp(**args),
+            "TabResnet": TabResnet(**args),
+            "TabTransformer": TabTransformer(embed_continuous=True, **args),
+            "TabNet": TabNet(**args),
+            "SAINT": SAINT(**args),
+        }
+
+        total_epoch = self.trainer.static_params["epoch"]
+
+        class MyCallback(Callback):
+            def __init__(self):
+                super(MyCallback, self).__init__()
+                self.val_ls = []
+
+            def on_epoch_end(
+                self,
+                epoch: int,
+                logs: Optional[Dict] = None,
+                metric: Optional[float] = None,
+            ):
+                train_loss = logs["train_loss"]
+                val_loss = logs["val_loss"]
+                self.val_ls.append(val_loss)
+                if epoch % 100 == 0:
+                    print(
+                        f"Epoch: {epoch + 1}/{total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
+                        f"Min val loss: {np.min(self.val_ls):.4f}"
+                    )
+
+        self.model = {}
+        for name, tab_model in tab_models.items():
+            if verbose:
+                print(f"Training {name}")
+
+            model = WideDeep(deeptabular=tab_model)
+
+            wd_trainer = Trainer(
+                model,
+                objective="regression",
+                verbose=0,
+                callbacks=[
+                    EarlyStopping(
+                        patience=self.trainer.static_params["patience"],
+                        verbose=1 if verbose else 0,
+                    ),
+                    MyCallback(),
+                ],
+            )
+
+            wd_trainer.fit(
+                X_train={"X_tab": X_tab_train, "target": y_train},
+                X_val={"X_tab": X_tab_val, "target": y_val},
+                n_epochs=self.trainer.static_params["epoch"],
+                batch_size=self.trainer.chosen_params["batch_size"],
+            )
+
+            self.model[name] = wd_trainer
+
+        # enable_tqdm()
+        if dump_trainer:
+            save_trainer(self.trainer)
+        print("\n-------------WideDeep End-------------\n")
+
+    def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
+        X_df = self.tab_preprocessor.transform(df)
+        return self.model[model_name].predict(X_tab=X_df)
+
+    def _get_model_names(self):
+        return ["TabMlp", "TabResnet", "TabTransformer", "TabNet", "SAINT"]
+
+
 # class PytorchTabular(AbstractModel):
 #     def __init__(self, trainer=None):
 #         super(PytorchTabular, self).__init__(trainer)
