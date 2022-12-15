@@ -10,7 +10,7 @@ This repository aims to build a universal and extensible benchmark platform for 
 
 ## Requirements
 
-See `requirement.txt` for details. Besides, we assume that `torch` is already installed and it's not included in `requirement.txt` because customized installation is prefered. For reproducibility, we use `torch==1.10.2+cu102` and `python 3.7` on cpu to produce our results.
+See `requirement.txt` for details. Besides, we assume that `torch` is already installed and it's not included in `requirement.txt` because customized installation is prefered. For reproducibility, we use `torch==1.12.0+cu102` and `python 3.7` on cpu to produce our results.
 
 ## Our environment
 
@@ -21,7 +21,19 @@ To produce our results presented in the paper, we run our experiments on a perso
 The respository merges following well-established modelbases as baselines:
 
 * [AutoGluon](https://github.com/autogluon/autogluon)
+
+* WideDeep
+
 * [Pytorch-Tabular](https://github.com/manujosephv/pytorch_tabular)
+
+  * Most models of `Pytorch-Tabular` are contained in `WideDeep`.
+
+  * Note that the installation of `Pytorch-Tabular` easily fall into the dependency hell. Therefore, it is not included in the `requirement.txt`, but its corresponding codes are retained. If one wants to test its capacity, we suggest using the following command to ignore (and fix) its dependency:
+
+    ```shell
+    pip install --no-deps pytorch_tabular==0.7.0 torchmetrics==0.7.0 pytorch-lightning==1.3.6 torch==1.10.2
+    ```
+
 
 ## Implementing new features
 
