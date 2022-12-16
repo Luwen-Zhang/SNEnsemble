@@ -878,7 +878,7 @@ class TabNet(AbstractModel):
             params, optim_params, batch_size = extract_params(param_names, defaults)
 
         model = TabNetRegressor(
-            verbose=100 if verbose else 0, optimizer_params=optim_params
+            verbose=20 if verbose else 0, optimizer_params=optim_params
         )
         model.set_params(**params)
         model.fit(
