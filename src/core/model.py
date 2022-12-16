@@ -772,6 +772,8 @@ class TabNet(AbstractModel):
         **kwargs,
     ):
         print("\n-------------Run TabNet-------------\n")
+        # Basic components in _train():
+        # 1. Prepare training, validation, and testing dataset.
         train_indices = self.trainer.train_dataset.indices
         val_indices = self.trainer.val_dataset.indices
         test_indices = self.trainer.test_dataset.indices
@@ -803,6 +805,7 @@ class TabNet(AbstractModel):
 
         from pytorch_tabnet.tab_model import TabNetRegressor
 
+        # 2. Setup a scikit-optimize search space and its initial values.
         SPACE = [
             Integer(low=4, high=64, prior="uniform", name="n_d", dtype=int),  # 8
             Integer(low=4, high=64, prior="uniform", name="n_a", dtype=int),  # 8
@@ -831,17 +834,23 @@ class TabNet(AbstractModel):
                     batch_size = int(value)
             return params, optim_params, batch_size
 
+        # 3. Define a objective function that receives parameters, generates a new model, sets parameters, fits the
+        # model, predicts on validation dataset, and returns a scalar metric.
         global _tabnet_bayes_objective
 
         @skopt.utils.use_named_args(SPACE)
         def _tabnet_bayes_objective(**params):
+            # 3.1 Receive parameters to be set.
             params, optim_params, batch_size = extract_params(
                 params.keys(), params.values()
             )
 
             with HiddenPrints(disable_logging=True):
+                # 3.2 Generate a new model
                 model = TabNetRegressor(verbose=0, optimizer_params=optim_params)
+                # 3.3 Set parameters
                 model.set_params(**params)
+                # 3.4 Fits the model
                 model.fit(
                     train_x,
                     train_y,
@@ -852,17 +861,19 @@ class TabNet(AbstractModel):
                     eval_metric=[self.trainer.loss],
                     batch_size=batch_size,
                 )
-
+                # 3.5 Predicts on the validation dataset.
                 res = self.trainer._metric_sklearn(
                     model.predict(val_x).reshape(-1, 1), val_y, self.trainer.loss
                 )
+            # 3.6 Returns a scalar metric.
             return res
 
+        # 4. If trainer.bayes_opt is True, run bayesian hyperparameter searching.
         if not debugger_is_active() and self.trainer.bayes_opt:
+            # debugger_is_active() otherwise: AssertionError: can only test a child process
             callback = BayesCallback(
                 tqdm(total=self.trainer.n_calls, disable=not verbose)
             )
-            # otherwise: AssertionError: can only test a child process
             result = gp_minimize(
                 _tabnet_bayes_objective,
                 SPACE,
@@ -879,6 +890,7 @@ class TabNet(AbstractModel):
             param_names = [x.name for x in SPACE]
             params, optim_params, batch_size = extract_params(param_names, defaults)
 
+        # 5. Generate a new model, set parameters based on chosen_params or results from bayesopt, and train the model.
         model = TabNetRegressor(
             verbose=20 if verbose else 0, optimizer_params=optim_params
         )
@@ -894,6 +906,7 @@ class TabNet(AbstractModel):
             batch_size=batch_size,
         )
 
+        # Optional: Get some instant results.
         y_test_pred = model.predict(test_x).reshape(-1, 1)
         print(
             "MSE Loss:",
@@ -901,7 +914,9 @@ class TabNet(AbstractModel):
             "RMSE Loss:",
             self.trainer._metric_sklearn(y_test_pred, test_y, "rmse"),
         )
+        # 6. Record the model
         self.model = model
+        # Optional: Dump the trainer.
         if dump_trainer:
             save_trainer(self.trainer)
         print("\n-------------TabNet End-------------\n")
@@ -909,6 +924,8 @@ class TabNet(AbstractModel):
     def _predict(
         self, df: pd.DataFrame, model_name=None, additional_data=None, **kwargs
     ):
+        # Basic components in _predict():
+        # Return a ndarray with shape (len(df), 1) of predictions by the model_name.
         return self.model.predict(
             df[self.trainer.feature_names].values.astype(np.float32)
         ).reshape(-1, 1)
