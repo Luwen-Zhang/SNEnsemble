@@ -1,3 +1,5 @@
+import torch.optim
+
 from .trainer import *
 import skopt
 from skopt import gp_minimize
@@ -809,9 +811,24 @@ class TabNet(AbstractModel):
                 low=1, high=5, prior="uniform", name="n_independent", dtype=int
             ),  # 2
             Integer(low=1, high=5, prior="uniform", name="n_shared", dtype=int),  # 2
-        ]
+        ] + self.trainer.SPACE
 
-        defaults = [8, 8, 3, 1.3, 2, 2]
+        defaults = [8, 8, 3, 1.3, 2, 2] + list(self.trainer.chosen_params.values())
+        self.params = cp(self.trainer.chosen_params)
+
+        def extract_params(keys, values):
+            params = {}
+            optim_params = {}
+            batch_size = 32
+            for key, value in zip(keys, values):
+                if key in self.params.keys():
+                    if key != "batch_size":
+                        optim_params[key] = value
+                else:
+                    params[key] = value
+                if key == "batch_size":
+                    batch_size = int(value)
+            return params, optim_params, batch_size
 
         global _tabnet_bayes_objective
 
@@ -819,8 +836,13 @@ class TabNet(AbstractModel):
         def _tabnet_bayes_objective(**params):
             if verbose:
                 print(params, end=" ")
+
+            params, optim_params, batch_size = extract_params(
+                params.keys(), params.values()
+            )
+
             with HiddenPrints(disable_logging=True):
-                model = TabNetRegressor(verbose=0)
+                model = TabNetRegressor(verbose=0, optimizer_params=optim_params)
                 model.set_params(**params)
                 model.fit(
                     train_x,
@@ -830,6 +852,7 @@ class TabNet(AbstractModel):
                     patience=self.trainer.bayes_epoch,
                     loss_fn=self.trainer.loss_fn,
                     eval_metric=[self.trainer.loss],
+                    batch_size=batch_size,
                 )
 
                 res = self.trainer._metric_sklearn(
@@ -849,16 +872,14 @@ class TabNet(AbstractModel):
                 random_state=0,
             )
             param_names = [x.name for x in SPACE]
-            params = {}
-            for key, value in zip(param_names, result.x):
-                params[key] = value
+            params, optim_params, batch_size = extract_params(param_names, result.x)
         else:
             param_names = [x.name for x in SPACE]
-            params = {}
-            for key, value in zip(param_names, defaults):
-                params[key] = value
+            params, optim_params, batch_size = extract_params(param_names, defaults)
 
-        model = TabNetRegressor(verbose=100 if verbose else 0)
+        model = TabNetRegressor(
+            verbose=100 if verbose else 0, optimizer_params=optim_params
+        )
         model.set_params(**params)
         model.fit(
             train_x,
@@ -868,6 +889,7 @@ class TabNet(AbstractModel):
             patience=self.trainer.static_params["patience"],
             loss_fn=self.trainer.loss_fn,
             eval_metric=[self.trainer.loss],
+            batch_size=batch_size,
         )
 
         y_test_pred = model.predict(test_x).reshape(-1, 1)
