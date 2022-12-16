@@ -331,13 +331,13 @@ class WideDeep(AbstractModel):
             )
 
             if self.trainer.bayes_opt:
+                callback = BayesCallback(
+                    tqdm(total=self.trainer.n_calls, disable=not verbose)
+                )
                 global _widedeep_bayes_objective
 
                 @skopt.utils.use_named_args(self.trainer.SPACE)
                 def _widedeep_bayes_objective(**params):
-                    if verbose:
-                        print(params, end=" ")
-
                     with HiddenPrints(disable_logging=True):
                         tmp_model = cp(model)
                         tmp_wd_trainer = wd_Trainer(
@@ -364,8 +364,6 @@ class WideDeep(AbstractModel):
 
                     pred = tmp_wd_trainer.predict(X_tab=X_tab_val)
                     res = Trainer._metric_sklearn(pred, y_val, self.trainer.loss)
-                    if verbose:
-                        print(res)
                     return res
 
                 with warnings.catch_warnings():
@@ -375,6 +373,7 @@ class WideDeep(AbstractModel):
                         _widedeep_bayes_objective,
                         self.trainer.SPACE,
                         n_calls=self.trainer.n_calls,
+                        callback=callback.call,
                         random_state=0,
                         x0=list(self.params.values()),
                     )
@@ -384,6 +383,8 @@ class WideDeep(AbstractModel):
                     if key in optimizer.defaults.keys():
                         optimizer.defaults[key] = value
                 self.params = params
+                callback.close()
+                skopt.dump(result, self.trainer.project_root + "skopt.pt")
 
             wd_trainer.fit(
                 X_train={"X_tab": X_tab_train, "target": y_train},
@@ -834,9 +835,6 @@ class TabNet(AbstractModel):
 
         @skopt.utils.use_named_args(SPACE)
         def _tabnet_bayes_objective(**params):
-            if verbose:
-                print(params, end=" ")
-
             params, optim_params, batch_size = extract_params(
                 params.keys(), params.values()
             )
@@ -858,11 +856,12 @@ class TabNet(AbstractModel):
                 res = self.trainer._metric_sklearn(
                     model.predict(val_x).reshape(-1, 1), val_y, self.trainer.loss
                 )
-            if verbose:
-                print(res)
             return res
 
         if not debugger_is_active() and self.trainer.bayes_opt:
+            callback = BayesCallback(
+                tqdm(total=self.trainer.n_calls, disable=not verbose)
+            )
             # otherwise: AssertionError: can only test a child process
             result = gp_minimize(
                 _tabnet_bayes_objective,
@@ -870,9 +869,12 @@ class TabNet(AbstractModel):
                 x0=defaults,
                 n_calls=self.trainer.n_calls if not debug_mode else 11,
                 random_state=0,
+                callback=callback.call,
             )
             param_names = [x.name for x in SPACE]
             params, optim_params, batch_size = extract_params(param_names, result.x)
+            callback.close()
+            skopt.dump(result, self.trainer.project_root + "skopt.pt")
         else:
             param_names = [x.name for x in SPACE]
             params, optim_params, batch_size = extract_params(param_names, defaults)
@@ -933,9 +935,9 @@ class TorchModel(AbstractModel):
 
         # If def is not global, pickle will raise 'Can't get local attribute ...'
         # IT IS NOT SAFE, BUT I DID NOT FIND A BETTER SOLUTION
-        global _trainer_bayes_objective, _trainer_bayes_callback
+        global _trainer_bayes_objective, _trainerBayesCallback
 
-        bar = tqdm(total=self.trainer.n_calls, disable=not verbose)
+        callback = BayesCallback(tqdm(total=self.trainer.n_calls, disable=not verbose))
 
         from copy import deepcopy as cp
 
@@ -954,32 +956,6 @@ class TorchModel(AbstractModel):
 
             return res
 
-        postfix = {
-            "Current loss": 1e8,
-            "Minimum": 1e8,
-            "Params": list(self.params.values()),
-            "Minimum at call": 0,
-        }
-
-        def _trainer_bayes_callback(result):
-            postfix["Current loss"] = result.func_vals[-1]
-
-            if result.fun < postfix["Minimum"]:
-                postfix["Minimum"] = result.fun
-                postfix["Params"] = result.x
-                postfix["Minimum at call"] = len(result.func_vals)
-            skopt.dump(result, self.trainer.project_root + "skopt.pt")
-
-            # if len(result.func_vals) % 5 == 0:
-            #     plt.figure()
-            #     ax = plt.subplot(111)
-            #     ax = plot_convergence(result, ax)
-            #     plt.savefig(self.project_root + 'skopt_convergence.pdf')
-            #     plt.close()
-
-            bar.set_postfix(**postfix)
-            bar.update(1)
-
         with warnings.catch_warnings():
             # To obtain clean progress bar.
             warnings.simplefilter("ignore")
@@ -989,9 +965,10 @@ class TorchModel(AbstractModel):
                 n_calls=self.trainer.n_calls,
                 random_state=0,
                 x0=list(self.params.values()),
-                callback=_trainer_bayes_callback,
+                callback=callback.call,
             )
-        bar.close()
+        callback.close()
+        skopt.dump(result, self.trainer.project_root + "skopt.pt")
 
         params = {}
         for key, value in zip(self.params.keys(), result.x):
@@ -1294,3 +1271,30 @@ class ModelAssembly(AbstractModel):
             raise Exception(
                 f"Multiple {model_name} in the ModelAssembly (in {available_program})."
             )
+
+
+class BayesCallback:
+    def __init__(self, bar):
+        self.bar = bar
+        self.postfix = {
+            "Current loss": 1e8,
+            "Minimum": 1e8,
+            "Params": [],
+            "Minimum at call": 0,
+        }
+        self.bar.set_postfix(**self.postfix)
+
+    def call(self, result):
+        self.postfix["Current loss"] = result.func_vals[-1]
+
+        if result.fun < self.postfix["Minimum"]:
+            self.postfix["Minimum"] = result.fun
+            self.postfix["Params"] = [round(x, 8) for x in result.x]
+            self.postfix["Minimum at call"] = len(result.func_vals)
+
+        self.bar.set_postfix(**self.postfix)
+        self.bar.update(1)
+
+    def close(self):
+        self.bar.close()
+        del self.bar
