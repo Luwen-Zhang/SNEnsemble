@@ -6,6 +6,7 @@ import sys
 import warnings
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
+warnings.simplefilter(action="ignore", category=DeprecationWarning)
 
 import numpy as np
 import pandas as pd
