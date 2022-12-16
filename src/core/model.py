@@ -296,12 +296,11 @@ class WideDeep(AbstractModel):
                         f"Min val loss: {np.min(self.val_ls):.4f}"
                     )
 
-        self.params = cp(self.trainer.chosen_params)
         self.model = {}
         for name, tab_model in tab_models.items():
             if verbose:
                 print(f"Training {name}")
-
+            self.params = cp(self.trainer.chosen_params)
             model = WideDeep(deeptabular=tab_model)
 
             optimizer = torch.optim.Adam(
