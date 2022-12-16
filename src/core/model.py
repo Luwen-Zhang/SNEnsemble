@@ -225,7 +225,7 @@ class WideDeep(AbstractModel):
     ):
         print("\n-------------Run WideDeep-------------\n")
         # disable_tqdm()
-        from pytorch_widedeep import Trainer
+        from pytorch_widedeep import Trainer as wd_Trainer
         from pytorch_widedeep.preprocessing import TabPreprocessor
         from pytorch_widedeep.callbacks import Callback, EarlyStopping
         from pytorch_widedeep.models import (
@@ -296,6 +296,7 @@ class WideDeep(AbstractModel):
                         f"Min val loss: {np.min(self.val_ls):.4f}"
                     )
 
+        self.params = cp(self.trainer.chosen_params)
         self.model = {}
         for name, tab_model in tab_models.items():
             if verbose:
@@ -303,7 +304,13 @@ class WideDeep(AbstractModel):
 
             model = WideDeep(deeptabular=tab_model)
 
-            wd_trainer = Trainer(
+            optimizer = torch.optim.Adam(
+                model.deeptabular.parameters(),
+                lr=self.params["lr"],
+                weight_decay=self.params["weight_decay"],
+            )
+
+            wd_trainer = wd_Trainer(
                 model,
                 objective="regression",
                 verbose=0,
@@ -315,15 +322,73 @@ class WideDeep(AbstractModel):
                     ),
                     _WideDeepCallback(),
                 ],
+                optimizers={"deeptabular": optimizer}
+                if self.trainer.bayes_opt
+                else None,
                 num_workers=16,
                 device=self.trainer.device,
             )
+
+            if self.trainer.bayes_opt:
+                global _widedeep_bayes_objective
+
+                @skopt.utils.use_named_args(self.trainer.SPACE)
+                def _widedeep_bayes_objective(**params):
+                    if verbose:
+                        print(params, end=" ")
+
+                    with HiddenPrints(disable_logging=True):
+                        tmp_model = cp(model)
+                        tmp_wd_trainer = wd_Trainer(
+                            tmp_model,
+                            objective="regression",
+                            verbose=0,
+                            optimizers={
+                                "deeptabular": torch.optim.Adam(
+                                    tmp_model.deeptabular.parameters(),
+                                    lr=params["lr"],
+                                    weight_decay=params["weight_decay"],
+                                )
+                            },
+                            num_workers=16,
+                            device=self.trainer.device,
+                        )
+
+                    tmp_wd_trainer.fit(
+                        X_train={"X_tab": X_tab_train, "target": y_train},
+                        X_val={"X_tab": X_tab_val, "target": y_val},
+                        n_epochs=self.trainer.bayes_epoch,
+                        batch_size=int(params["batch_size"]),
+                    )
+
+                    pred = tmp_wd_trainer.predict(X_tab=X_tab_val)
+                    res = Trainer._metric_sklearn(pred, y_val, self.trainer.loss)
+                    if verbose:
+                        print(res)
+                    return res
+
+                with warnings.catch_warnings():
+                    # To obtain clean progress bar.
+                    warnings.simplefilter("ignore")
+                    result = gp_minimize(
+                        _widedeep_bayes_objective,
+                        self.trainer.SPACE,
+                        n_calls=self.trainer.n_calls,
+                        random_state=0,
+                        x0=list(self.params.values()),
+                    )
+                params = {}
+                for key, value in zip(self.params.keys(), result.x):
+                    params[key] = value
+                    if key in optimizer.defaults.keys():
+                        optimizer.defaults[key] = value
+                self.params = params
 
             wd_trainer.fit(
                 X_train={"X_tab": X_tab_train, "target": y_train},
                 X_val={"X_tab": X_tab_val, "target": y_val},
                 n_epochs=total_epoch,
-                batch_size=self.trainer.chosen_params["batch_size"],
+                batch_size=int(self.params["batch_size"]),
             )
             self.model[name] = wd_trainer
 
