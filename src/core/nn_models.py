@@ -31,13 +31,13 @@ class ThisWorkNN(nn.Module):
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
         self.activated_sn = nn.ModuleList(activated_sn)
         self.component_weights = nn.Parameter(
-            torch.Tensor([1] + [0 for x in activated_sn]).view(-1, 1),
+            torch.Tensor([0 for x in activated_sn]).view(-1, 1),
             requires_grad=True,
         )
 
     def forward(self, x, additional_tensors):
         preds = torch.concat(
-            [self.net(x)] + [sn(x, additional_tensors) for sn in self.activated_sn],
+            [sn(x, additional_tensors) for sn in self.activated_sn],
             dim=1,
         )
 
