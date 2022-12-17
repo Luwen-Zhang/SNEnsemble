@@ -145,6 +145,57 @@ class loglogSN(linlogSN):
     def activated(cls):
         return True
 
+
+class KohoutSN(loglogSN):
+    def get_tex(self):
+        raise NotImplementedError
+
+    def forward(self, x, additional_tensors):
+        var_slices = self._get_var_slices(x, additional_tensors)
+        s = torch.abs(var_slices[0] - self.s_zero_slip) + 1
+        mat = x[:, self.material_features_idx]
+        a, b, B = (
+            torch.abs(self.a(mat)) + 1,
+            -torch.abs(self.b(mat)) - 0.1,
+            torch.abs(self.B(mat)),
+        )
+        C = B + torch.abs(self.C(mat))
+        tmp = torch.pow(torch.abs(s / a), 1 / b)
+        return torch.log10(torch.abs((B - tmp) / (tmp / C - 1)) + 1)
+
+    def _register_variable(self):
+        from src.core.nn_models import get_sequential
+
+        self.a = get_sequential(
+            n_inputs=len(self.material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
+        self.b = get_sequential(
+            n_inputs=len(self.material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
+        self.B = get_sequential(
+            n_inputs=len(self.material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
+        self.C = get_sequential(
+            n_inputs=len(self.material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
+
+    @classmethod
+    def activated(cls):
+        return False
+
+
 sn_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:
