@@ -112,7 +112,7 @@ class linlogSN(AbstractSN):
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
         mat = x[:, self.material_features_idx]
-        a, b = self.a(mat), self.b(mat)
+        a, b = -torch.abs(self.a(mat)), torch.abs(self.b(mat))
         return a * var_slices[0] + b
 
     def get_tex(self):
@@ -131,10 +131,9 @@ class loglogSN(linlogSN):
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
         s = var_slices[0] - self.s_zero_slip
-        sgn = torch.sign(s)
         mat = x[:, self.material_features_idx]
-        a, b = self.a(mat), self.b(mat)
-        return a * torch.log10(torch.abs(s) + 1) * sgn + b
+        a, b = -torch.abs(self.a(mat)), torch.abs(self.b(mat))
+        return a * torch.log10(torch.abs(s) + 1) + b
 
     def get_tex(self):
         return r"\mathrm{sgn}(\sigma_{max})a\mathrm{log}\left(\left|\sigma_{max}/\mathrm{std}(\sigma_{max})\right|+1\right)+b"
