@@ -148,5 +148,5 @@ class loglogSN(linlogSN):
 sn_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:
-    if issubclass(cls, AbstractSN) and cls != AbstractSN:
+    if issubclass(cls, AbstractSN) and cls != AbstractSN and cls.activated():
         sn_mapping[name] = cls
