@@ -1014,6 +1014,11 @@ class Trainer:
             ]
         )
 
+        s_min = np.min(all_s) - np.abs(np.max(all_s) - np.min(all_s)) * 0.5
+        s_max = np.max(all_s) + np.abs(np.max(all_s) - np.min(all_s)) * 0.5
+        s_min = np.max([s_min, 0]) if sgn > 0 else s_min
+        s_max = s_max if sgn > 0 else np.min([s_max, 0])
+
         model = self.get_modelbase(program="ThisWork")
 
         x_value, mean_pred, ci_left, ci_right = self._bootstrap(
@@ -1022,8 +1027,8 @@ class Trainer:
             focus_feature=s_col,
             n_bootstrap=n_bootstrap,
             grid_size=grid_size,
-            x_min=np.min(all_s) - np.abs(np.max(all_s) - np.min(all_s)) * 0.5,
-            x_max=np.max(all_s) + np.abs(np.max(all_s) - np.min(all_s)) * 0.5,
+            x_min=s_min,
+            x_max=s_max,
             CI=CI,
             average=False,
             verbose=verbose,
