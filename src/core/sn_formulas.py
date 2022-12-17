@@ -146,7 +146,58 @@ class loglogSN(linlogSN):
         return True
 
 
-class KohoutSN(loglogSN):
+class KohoutTrivial(linlogSN):
+    def __init__(self, trainer: Trainer):
+        super(KohoutTrivial, self).__init__(trainer)
+        self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
+
+    def _register_variable(self):
+        from src.core.nn_models import get_sequential
+
+        self.a = get_sequential(
+            n_inputs=len(self.material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
+        self.b = get_sequential(
+            n_inputs=len(self.material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
+        self.c = get_sequential(
+            n_inputs=len(self.material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
+
+    def get_tex(self):
+        raise NotImplementedError
+
+    def forward(self, x, additional_tensors):
+        var_slices = self._get_var_slices(x, additional_tensors)
+        s = torch.abs(var_slices[0] - self.s_zero_slip)
+
+        mat = x[:, self.material_features_idx]
+        a, b, c = (
+            torch.clamp(torch.abs(self.a(mat)), 1, 5),
+            -torch.abs(self.b(mat)),
+            torch.clamp(torch.abs(self.c(mat)), 0, 10),
+        )
+        return torch.pow(s - a, 3) * b + c
+
+    @classmethod
+    def activated(cls):
+        return False
+
+
+class KohoutSN(linlogSN):
+    def __init__(self, trainer: Trainer):
+        super(KohoutSN, self).__init__(trainer)
+        self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
+
     def get_tex(self):
         raise NotImplementedError
 
