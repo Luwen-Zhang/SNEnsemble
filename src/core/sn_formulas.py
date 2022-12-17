@@ -16,6 +16,15 @@ class AbstractSN(nn.Module):
         self.tabular_feature_indices = {}
         self.derived_feature_indices = {}
         self.to(trainer.device)
+        self.material_features = np.array(
+            list(self.trainer.args["feature_names_type"].keys())
+        )[
+            np.array(list(self.trainer.args["feature_names_type"].values()))
+            == self.trainer.args["feature_types"].index("Material")
+        ]
+        self.material_features_idx = np.array(
+            [self.trainer.feature_names.index(name) for name in self.material_features]
+        )
         self._register_variable()
         self._check_sn_vars()
         self._get_sn_vars_idx()
@@ -83,26 +92,16 @@ class linlogSN(AbstractSN):
         return ["Absolute Maximum Stress"]
 
     def _register_variable(self):
-        material_features = np.array(
-            list(self.trainer.args["feature_names_type"].keys())
-        )[
-            np.array(list(self.trainer.args["feature_names_type"].values()))
-            == self.trainer.args["feature_types"].index("Material")
-        ]
-        self.material_features_idx = np.array(
-            [self.trainer.feature_names.index(name) for name in material_features]
-        )
-
         from src.core.nn_models import get_sequential
 
         self.a = get_sequential(
-            n_inputs=len(material_features),
+            n_inputs=len(self.material_features),
             n_outputs=1,
             layers=[16, 32, 16],
             act_func=nn.ReLU,
         )
         self.b = get_sequential(
-            n_inputs=len(material_features),
+            n_inputs=len(self.material_features),
             n_outputs=1,
             layers=[16, 32, 16],
             act_func=nn.ReLU,
@@ -110,9 +109,9 @@ class linlogSN(AbstractSN):
 
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
-        return self.a(x[:, self.material_features_idx]) * var_slices[0] + self.b(
-            x[:, self.material_features_idx]
-        )
+        mat = x[:, self.material_features_idx]
+        a, b = self.a(mat), self.b(mat)
+        return a * var_slices[0] + b
 
     def get_tex(self):
         return r"a\sigma_{max}+b"
@@ -125,10 +124,11 @@ class loglogSN(linlogSN):
 
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
-        sgn = torch.sign(var_slices[0] - self.s_zero_slip)
-        return self.a(x[:, self.material_features_idx]) * torch.log10(
-            torch.abs(var_slices[0] - self.s_zero_slip) + 1
-        ) * sgn + self.b(x[:, self.material_features_idx])
+        s = var_slices[0] - self.s_zero_slip
+        sgn = torch.sign(s)
+        mat = x[:, self.material_features_idx]
+        a, b = self.a(mat), self.b(mat)
+        return a * torch.log10(torch.abs(s) + 1) * sgn + b
 
     def get_tex(self):
         return r"\mathrm{sgn}(\sigma_{max})a\mathrm{log}\left(\left|\sigma_{max}/\mathrm{std}(\sigma_{max})\right|+1\right)+b"
