@@ -3,6 +3,7 @@ from src.core.trainer import Trainer
 import torch.nn as nn
 import torch
 import numpy as np
+from copy import deepcopy as cp
 
 
 class AbstractSN(nn.Module):
@@ -25,6 +26,15 @@ class AbstractSN(nn.Module):
         self.material_features_idx = np.array(
             [self.trainer.feature_names.index(name) for name in self.material_features]
         )
+        from src.core.nn_models import get_sequential
+
+        self.template_sequential = get_sequential(
+            n_inputs=len(self.material_features),
+            n_outputs=1,
+            layers=[16, 32, 16],
+            act_func=nn.ReLU,
+        )
+
         self._register_variable()
         self._check_sn_vars()
         self._get_sn_vars_idx()
@@ -96,20 +106,8 @@ class linlogSN(AbstractSN):
         return ["Absolute Maximum Stress"]
 
     def _register_variable(self):
-        from src.core.nn_models import get_sequential
-
-        self.a = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
-        self.b = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
+        self.a = cp(self.template_sequential)
+        self.b = cp(self.template_sequential)
 
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
@@ -154,32 +152,10 @@ class KohoutTrivial(linlogSN):
         self.s_max = -1e8
 
     def _register_variable(self):
-        from src.core.nn_models import get_sequential
-
-        self.a = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
-        self.b = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
-        self.c = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
-        self.d = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
+        self.a = cp(self.template_sequential)
+        self.b = cp(self.template_sequential)
+        self.c = cp(self.template_sequential)
+        self.d = cp(self.template_sequential)
 
     def get_tex(self):
         raise NotImplementedError
@@ -232,32 +208,10 @@ class KohoutSN(linlogSN):
         return torch.log10(torch.abs((B - tmp) / (tmp / C - 1)) + 1)
 
     def _register_variable(self):
-        from src.core.nn_models import get_sequential
-
-        self.a = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
-        self.b = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
-        self.B = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
-        self.C = get_sequential(
-            n_inputs=len(self.material_features),
-            n_outputs=1,
-            layers=[16, 32, 16],
-            act_func=nn.ReLU,
-        )
+        self.a = cp(self.template_sequential)
+        self.b = cp(self.template_sequential)
+        self.B = cp(self.template_sequential)
+        self.C = cp(self.template_sequential)
 
     @classmethod
     def activated(cls):
