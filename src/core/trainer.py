@@ -370,6 +370,20 @@ class Trainer:
         self.test_dataset = Subset(dataset, self.test_indices)
         self.tensors = (X, *D, y) if len(D) > 0 else (X, None, y)
 
+    def get_zero_slip(self, feature_name):
+        if not hasattr(self, "dataprocessors"):
+            raise Exception(f"Run load_config first.")
+        elif len(self.dataprocessors) == 0 and feature_name in self.feature_names:
+            return 0
+        if feature_name not in self.dataprocessors[-1].record_features:
+            raise Exception(f"Feature {feature_name} not available.")
+
+        x = 0
+        for processor in self.dataprocessors:
+            if hasattr(processor, "transformer"):
+                x = processor.zero_slip(feature_name, x)
+        return x
+
     def describe(self, transformed=False, save=True):
         tabular = self._get_tabular_dataset(transformed=transformed)[0]
         desc = tabular.describe()

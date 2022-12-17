@@ -125,6 +125,20 @@ class AbstractTransformer(AbstractProcessor):
         super(AbstractTransformer, self).__init__()
         self.transformer = None
 
+    def zero_slip(self, feature_name, x):
+        trans_res = self.transformer.transform(
+            pd.DataFrame(
+                data=np.array(
+                    [
+                        0 if feature_name != record_feature else x
+                        for record_feature in self.record_features
+                    ]
+                ).reshape(1, -1),
+                columns=self.record_features,
+            )
+        )
+        return trans_res[0, self.record_features.index(feature_name)]
+
 
 class MeanImputer(AbstractTransformer):
     def __init__(self):
