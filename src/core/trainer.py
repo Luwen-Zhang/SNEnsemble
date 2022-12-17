@@ -1034,10 +1034,21 @@ class Trainer:
             verbose=verbose,
         )
 
+        df_train, derived_data = self.derive(self.df.loc[m_train_indices, :])
+        psn_model = cp(model)
+        psn_model.fit(
+            df_train,
+            self.dataprocessors[0].record_features,
+            self.label_name,
+            derived_data,
+            verbose=False,
+            warm_start=True,
+        )
+
         CL, CR = self._psn(
             method=method,
             y=n_train.values,
-            y_pred=model.predict(
+            y_pred=psn_model.predict(
                 self.df.loc[m_train_indices, :], model_name="ThisWork"
             ),
             x=s_train.values,
