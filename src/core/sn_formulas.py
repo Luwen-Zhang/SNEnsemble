@@ -40,6 +40,10 @@ class AbstractSN(nn.Module):
         else:
             return True
 
+    @classmethod
+    def activated(cls):
+        return True
+
     def _check_sn_vars(self):
         if not self.test_sn_vars(self.trainer):
             raise Exception(
@@ -116,6 +120,10 @@ class linlogSN(AbstractSN):
     def get_tex(self):
         return r"a\sigma_{max}+b"
 
+    @classmethod
+    def activated(cls):
+        return True
+
 
 class loglogSN(linlogSN):
     def __init__(self, trainer: Trainer):
@@ -133,6 +141,9 @@ class loglogSN(linlogSN):
     def get_tex(self):
         return r"\mathrm{sgn}(\sigma_{max})a\mathrm{log}\left(\left|\sigma_{max}/\mathrm{std}(\sigma_{max})\right|+1\right)+b"
 
+    @classmethod
+    def activated(cls):
+        return True
 
 sn_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
