@@ -70,6 +70,9 @@ class AbstractSN(nn.Module):
     def forward(self, x, additional_tensors):
         raise NotImplementedError
 
+    def get_tex(self):
+        raise NotImplementedError
+
 
 class linlogSN(AbstractSN):
     def __init__(self, trainer: Trainer):
@@ -111,17 +114,24 @@ class linlogSN(AbstractSN):
             x[:, self.material_features_idx]
         )
 
+    def get_tex(self):
+        return r"a\sigma_{max}+b"
 
-# class loglogSN(linlogSN):
-#     def __init__(self, trainer: Trainer):
-#         super(loglogSN, self).__init__(trainer)
-#
-#     def forward(self, x, additional_tensors):
-#         var_slices = self._get_var_slices(x, additional_tensors)
-#         sgn = torch.sign(var_slices[0])
-#         return self.a(x[:, self.material_features_idx]) * torch.log10(
-#             var_slices[0] * sgn + 1
-#         ) * sgn + self.b(x[:, self.material_features_idx])
+
+class loglogSN(linlogSN):
+    def __init__(self, trainer: Trainer):
+        super(loglogSN, self).__init__(trainer)
+        self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
+
+    def forward(self, x, additional_tensors):
+        var_slices = self._get_var_slices(x, additional_tensors)
+        sgn = torch.sign(var_slices[0] - self.s_zero_slip)
+        return self.a(x[:, self.material_features_idx]) * torch.log10(
+            torch.abs(var_slices[0] - self.s_zero_slip) + 1
+        ) * sgn + self.b(x[:, self.material_features_idx])
+
+    def get_tex(self):
+        return r"\mathrm{sgn}(\sigma_{max})a\mathrm{log}\left(\left|\sigma_{max}/\mathrm{std}(\sigma_{max})\right|+1\right)+b"
 
 
 sn_mapping = {}
