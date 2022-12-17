@@ -1166,6 +1166,27 @@ class Trainer:
         else:
             raise Exception(f"P-S-N curve type {method} not implemented.")
 
+    def derive(self, df):
+        data = df.copy()
+        derived_data = {}
+        for deriver, kwargs in self.dataderivers:
+            try:
+                (
+                    value,
+                    name,
+                    col_names,
+                    stacked,
+                    intermediate,
+                    related_columns,
+                ) = deriver.derive(data, **kwargs)
+            except Exception as e:
+                continue
+            if stacked:
+                data[col_names] = value
+            else:
+                derived_data[name] = value
+        return data, derived_data
+
     def _bootstrap(
         self,
         model,
@@ -1204,23 +1225,7 @@ class Trainer:
                 in self.stacked_derivation_related_cols + self.derivation_related_cols
                 and rederive
             ):
-                derived_data = {}
-                for deriver, kwargs in self.dataderivers:
-                    try:
-                        (
-                            value,
-                            name,
-                            col_names,
-                            stacked,
-                            intermediate,
-                            related_columns,
-                        ) = deriver.derive(data, **kwargs)
-                    except Exception as e:
-                        continue
-                    if stacked:
-                        data[col_names] = value
-                    else:
-                        derived_data[name] = value
+                data, derived_data = self.derive(data)
             else:
                 derived_data = cp(self.derived_data)
             return data, derived_data
