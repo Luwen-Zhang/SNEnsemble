@@ -1129,6 +1129,8 @@ class Trainer:
     @staticmethod
     def _psn(method, y, y_pred, x, xvals, CI):
         if method == "statistical":
+            # According to ASTM E739-10(2015). x can be stress, log(stress), strain, log(strain), etc.
+            # It is valid when y and x follow the linear assumption.
             # Schneider, C. R. A., and S. J. Maddox. "Best practice guide on statistical analysis of fatigue data."
             # Weld Inst Stat Rep (2003).
             # Barbosa, Joelton Fonseca, et al. "Probabilistic SN fields based on statistical distributions applied to
