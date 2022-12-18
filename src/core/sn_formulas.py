@@ -143,9 +143,9 @@ class loglogSN(linlogSN):
         return True
 
 
-class KohoutTrivial(linlogSN):
+class TrivialSN(linlogSN):
     def __init__(self, trainer: Trainer):
-        super(KohoutTrivial, self).__init__(trainer)
+        super(TrivialSN, self).__init__(trainer)
         self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
         self.s_min = 1e8
         self.s_max = -1e8
