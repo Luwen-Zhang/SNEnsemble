@@ -1230,7 +1230,7 @@ class ThisWork(TorchModel):
             print(
                 f"Activated SN models: {[sn.__class__.__name__ for sn in self.activated_sn]}"
             )
-
+        set_torch_random(0)
         return ThisWorkNN(
             len(self.trainer.feature_names),
             len(self.trainer.label_name),
@@ -1250,6 +1250,7 @@ class MLP(TorchModel):
         return "MLP"
 
     def _new_model(self):
+        set_torch_random(0)
         return NN(
             len(self.trainer.feature_names),
             len(self.trainer.label_name),

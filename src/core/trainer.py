@@ -23,9 +23,7 @@ from copy import deepcopy as cp
 from sklearn.utils import resample
 import scipy.stats as st
 
-np.random.seed(0)
-torch.manual_seed(0)
-random.seed(0)
+set_random_seed(0)
 
 sys.path.append("configs/")
 

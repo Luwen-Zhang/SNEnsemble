@@ -16,6 +16,7 @@ import seaborn as sns
 import matplotlib
 from src.core.nn_models import *
 import logging
+import random
 
 clr = sns.color_palette("deep")
 
@@ -58,6 +59,16 @@ def r2_loss(output, target):
     ss_res = torch.sum((target - output) ** 2)
     r2 = 1 - ss_res / ss_tot
     return 1 - r2
+
+
+def set_random_seed(seed=0):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    random.seed(seed)
+
+
+def set_torch_random(seed=0):
+    torch.manual_seed(seed)
 
 
 def train(model, train_loader, optimizer, loss_fn):
