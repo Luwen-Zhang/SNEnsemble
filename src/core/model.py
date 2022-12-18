@@ -13,6 +13,7 @@ class AbstractModel:
         self.model = None
         self.leaderboard = None
         self.program = self._get_program_name()
+        self.params = None
         self._mkdir()
 
     def fit(
@@ -140,6 +141,17 @@ class AbstractModel:
                 f"{self.program} not trained, run {self.__class__.__name__}._train() first."
             )
 
+    def _get_params(self, verbose=True):
+        if self.params is None:
+            return self._get_initial_params()
+        else:
+            if verbose:
+                print(f"Previous params loaded: {self.params}")
+            return self.params
+
+    def _get_initial_params(self):
+        return cp(self.trainer.chosen_params)
+
     @property
     def _trained(self):
         if self.model is None:
@@ -213,9 +225,18 @@ class AutoGluon(AbstractModel):
 class WideDeep(AbstractModel):
     def __init__(self, trainer=None):
         super(WideDeep, self).__init__(trainer)
+        self.model_params = {}
 
     def _get_program_name(self):
         return "WideDeep"
+
+    def _get_model_params(self, model_name, verbose=True):
+        if model_name not in self.model_params.keys():
+            return self._get_initial_params()
+        else:
+            if verbose:
+                print(f"Previous params loaded: {self.model_params[model_name]}.")
+            return self.model_params[model_name]
 
     def _train(
         self,
@@ -302,7 +323,7 @@ class WideDeep(AbstractModel):
         for name, tab_model in tab_models.items():
             if verbose:
                 print(f"Training {name}")
-            self.params = cp(self.trainer.chosen_params)
+            self.params = self._get_model_params(name, verbose=verbose)
             model = WideDeep(deeptabular=tab_model)
 
             optimizer = torch.optim.Adam(
@@ -383,8 +404,12 @@ class WideDeep(AbstractModel):
                     if key in optimizer.defaults.keys():
                         optimizer.defaults[key] = value
                 self.params = params
+                self.model_params[name] = cp(params)
                 callback.close()
                 skopt.dump(result, self.trainer.project_root + "skopt.pt")
+                self.params = self._get_model_params(
+                    model_name=name, verbose=verbose
+                )  # to announce the optimized params.
 
             wd_trainer.fit(
                 X_train={"X_tab": X_tab_train, "target": y_train},
@@ -759,9 +784,18 @@ class WideDeep(AbstractModel):
 class TabNet(AbstractModel):
     def __init__(self, trainer=None):
         super(TabNet, self).__init__(trainer)
+        self.additional_params = None
 
     def _get_program_name(self):
         return "TabNet"
+
+    def _get_additional_params(self, verbose=True):
+        if self.additional_params is None:
+            return [8, 8, 3, 1.3, 2, 2]
+        else:
+            if verbose:
+                print(f"Previous additional params loaded: {self.additional_params}.")
+            return list(self.additional_params.values())
 
     def _train(
         self,
@@ -816,9 +850,7 @@ class TabNet(AbstractModel):
             ),  # 2
             Integer(low=1, high=5, prior="uniform", name="n_shared", dtype=int),  # 2
         ] + self.trainer.SPACE
-
-        defaults = [8, 8, 3, 1.3, 2, 2] + list(self.trainer.chosen_params.values())
-        self.params = cp(self.trainer.chosen_params)
+        param_names = [x.name for x in SPACE]
 
         def extract_params(keys, values):
             params = {}
@@ -871,6 +903,10 @@ class TabNet(AbstractModel):
         # 4. If trainer.bayes_opt is True, run bayesian hyperparameter searching.
         if not debugger_is_active() and self.trainer.bayes_opt:
             # debugger_is_active() otherwise: AssertionError: can only test a child process
+            self.params = self._get_params(verbose=verbose)
+            defaults = self._get_additional_params(verbose=verbose) + list(
+                self.params.values()
+            )
             callback = BayesCallback(
                 tqdm(total=self.trainer.n_calls, disable=not verbose)
             )
@@ -882,13 +918,21 @@ class TabNet(AbstractModel):
                 random_state=0,
                 callback=callback.call,
             )
-            param_names = [x.name for x in SPACE]
             params, optim_params, batch_size = extract_params(param_names, result.x)
             callback.close()
             skopt.dump(result, self.trainer.project_root + "skopt.pt")
-        else:
-            param_names = [x.name for x in SPACE]
-            params, optim_params, batch_size = extract_params(param_names, defaults)
+
+            # Note: Set params for later usage, i.e. self._get_params().
+            for name, value in zip(param_names, result.x):
+                if name in self.params.keys():
+                    self.params[name] = value
+            self.additional_params = params
+        # Note: Set initial chosen_params if bayes has not been run, otherwise optimized params are loaded.
+        self.params = self._get_params(verbose=verbose)
+        defaults = self._get_additional_params(verbose=verbose) + list(
+            self.params.values()
+        )
+        params, optim_params, batch_size = extract_params(param_names, defaults)
 
         # 5. Generate a new model, set parameters based on chosen_params or results from bayesopt, and train the model.
         model = TabNetRegressor(
@@ -937,7 +981,6 @@ class TabNet(AbstractModel):
 class TorchModel(AbstractModel):
     def __init__(self, trainer=None):
         super(TorchModel, self).__init__(trainer)
-        self.params = cp(trainer.chosen_params)
 
     def _new_model(self):
         raise NotImplementedError
@@ -949,6 +992,8 @@ class TorchModel(AbstractModel):
         """
         if not self.trainer.bayes_opt:
             return None
+
+        self.params = self._get_params(verbose=verbose)
 
         # If def is not global, pickle will raise 'Can't get local attribute ...'
         # IT IS NOT SAFE, BUT I DID NOT FIND A BETTER SOLUTION
@@ -1136,7 +1181,7 @@ class TorchModel(AbstractModel):
             verbose=verbose,
             verbose_per_epoch=verbose_per_epoch,
             warm_start=warm_start,
-            **{**self.params, **self.trainer.static_params},
+            **{**self._get_params(verbose=verbose), **self.trainer.static_params},
         )
 
         self.model.load_state_dict(torch.load(self.trainer.project_root + "fatigue.pt"))
