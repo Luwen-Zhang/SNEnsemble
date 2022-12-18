@@ -173,12 +173,50 @@ class TrivialSN(linlogSN):
             -torch.abs(self.b(mat)),
             -torch.clamp(
                 torch.abs(self.c(mat)),
-                (self.s_max - self.s_min) / 10,
+                (self.s_max - self.s_min) / 100,
                 (self.s_max - self.s_min) / 1,
             ),
             torch.clamp(torch.abs(self.d(mat)), 0, 10),
         )
         return torch.pow(s - a, 3) * b + c * (s - a) + d
+
+    @classmethod
+    def activated(cls):
+        return True
+
+
+class SigmoidSN(linlogSN):
+    def __init__(self, trainer: Trainer):
+        super(SigmoidSN, self).__init__(trainer)
+        self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
+        self.s_min = 1e8
+        self.s_max = -1e8
+
+    def _register_variable(self):
+        self.a = cp(self.template_sequential)
+        self.b = cp(self.template_sequential)
+        self.c = cp(self.template_sequential)
+        self.d = cp(self.template_sequential)
+
+    def get_tex(self):
+        raise NotImplementedError
+
+    def forward(self, x, additional_tensors):
+        var_slices = self._get_var_slices(x, additional_tensors)
+        s = torch.abs(var_slices[0] - self.s_zero_slip)
+
+        if self.training:
+            self.s_min = np.min([self.s_min, torch.min(s).cpu().numpy()])
+            self.s_max = np.max([self.s_max, torch.max(s).cpu().numpy()])
+
+        mat = x[:, self.material_features_idx]
+        a, b, c, d = (
+            -torch.abs(self.a(mat)),
+            torch.abs(self.b(mat)).clamp(self.s_min, self.s_max),
+            torch.abs(self.c(mat)),
+            torch.abs(self.d(mat)),
+        )
+        return torch.log(1 / (a * (s - b)).clamp(1e-5, 1 - 1e-5) - 1) * c + d
 
     @classmethod
     def activated(cls):
