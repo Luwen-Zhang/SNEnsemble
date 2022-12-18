@@ -484,7 +484,8 @@ class Trainer:
                 print(
                     f"----------------------------{i + 1}/{n_random} random cross validation----------------------------"
                 )
-            self.load_data()
+            with HiddenPrints(disable_std=not verbose):
+                self.load_data()
             for program in programs:
                 modelbase = self.get_modelbase(program)
                 modelbase._train(dump_trainer=True, verbose=verbose)
