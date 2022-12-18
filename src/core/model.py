@@ -1176,12 +1176,14 @@ class TorchModel(AbstractModel):
 
         self._bayes(verbose=verbose)
 
+        self.params = self._get_params(verbose=verbose)
+
         min_loss, self.train_ls, self.val_ls = self._model_train(
             model=self.model,
             verbose=verbose,
             verbose_per_epoch=verbose_per_epoch,
             warm_start=warm_start,
-            **{**self._get_params(verbose=verbose), **self.trainer.static_params},
+            **{**self.params, **self.trainer.static_params},
         )
 
         self.model.load_state_dict(torch.load(self.trainer.project_root + "fatigue.pt"))
