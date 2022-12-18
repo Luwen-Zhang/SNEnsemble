@@ -31,7 +31,7 @@ class AbstractSN(nn.Module):
         self.template_sequential = get_sequential(
             n_inputs=len(self.material_features),
             n_outputs=1,
-            layers=[16, 32, 16],
+            layers=[16, 32, 64, 32, 16],
             act_func=nn.ReLU,
         )
 
