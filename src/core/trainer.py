@@ -45,7 +45,12 @@ class Trainer:
             raise Exception(f"Program {program} not added to the trainer.")
         return self.modelbases[self.modelbases_names.index(program)]
 
-    def load_config(self, default_configfile: str = None, verbose: bool = True) -> None:
+    def load_config(
+        self,
+        default_configfile: str = None,
+        verbose: bool = True,
+        manual_config: dict = None,
+    ) -> None:
         """
         Load a configfile.
         :param default_configfile: The path to a configfile. If in notebook environment, this parameter is required.
@@ -91,6 +96,15 @@ class Trainer:
             for key, value in parse_res.items():
                 if value is not None:
                     arg_loaded[key] = value
+
+        if manual_config is not None:
+            for key, value in manual_config.items():
+                if key in arg_loaded.keys():
+                    arg_loaded[key] = value
+                else:
+                    raise Exception(
+                        f"Manual configuration argument {key} not available."
+                    )
 
         # Preprocess configs
         tmp_static_params = {}
