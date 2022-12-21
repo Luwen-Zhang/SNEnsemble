@@ -6,13 +6,13 @@ from skopt import gp_minimize
 
 
 class AbstractModel:
-    def __init__(self, trainer: Trainer = None):
+    def __init__(self, trainer: Trainer = None, program=None):
         self.trainer = trainer
         if not hasattr(trainer, "project"):
             trainer.load_config(default_configfile="base_config")
         self.model = None
         self.leaderboard = None
-        self.program = self._get_program_name()
+        self.program = self._get_program_name() if program is None else program
         self.params = None
         self._mkdir()
 
@@ -166,8 +166,8 @@ class AbstractModel:
 
 
 class AutoGluon(AbstractModel):
-    def __init__(self, trainer=None):
-        super(AutoGluon, self).__init__(trainer)
+    def __init__(self, trainer=None, program=None):
+        super(AutoGluon, self).__init__(trainer, program=program)
 
     def _get_program_name(self):
         return "AutoGluon"
@@ -223,8 +223,8 @@ class AutoGluon(AbstractModel):
 
 
 class WideDeep(AbstractModel):
-    def __init__(self, trainer=None):
-        super(WideDeep, self).__init__(trainer)
+    def __init__(self, trainer=None, program=None):
+        super(WideDeep, self).__init__(trainer, program=program)
         self.model_params = {}
 
     def _get_program_name(self):
@@ -782,8 +782,8 @@ class WideDeep(AbstractModel):
 
 
 class TabNet(AbstractModel):
-    def __init__(self, trainer=None):
-        super(TabNet, self).__init__(trainer)
+    def __init__(self, trainer=None, program=None):
+        super(TabNet, self).__init__(trainer, program=program)
         self.additional_params = None
 
     def _get_program_name(self):
@@ -979,8 +979,8 @@ class TabNet(AbstractModel):
 
 
 class TorchModel(AbstractModel):
-    def __init__(self, trainer=None):
-        super(TorchModel, self).__init__(trainer)
+    def __init__(self, trainer=None, program=None):
+        super(TorchModel, self).__init__(trainer, program=program)
 
     def _new_model(self):
         raise NotImplementedError
@@ -1212,8 +1212,8 @@ class TorchModel(AbstractModel):
 
 
 class ThisWork(TorchModel):
-    def __init__(self, trainer=None):
-        super(ThisWork, self).__init__(trainer)
+    def __init__(self, trainer=None, manual_activate=None, program=None):
+        super(ThisWork, self).__init__(trainer, program=program)
         self.activated_sn = None
 
     def _get_program_name(self):
@@ -1243,8 +1243,8 @@ class ThisWork(TorchModel):
 
 
 class MLP(TorchModel):
-    def __init__(self, trainer=None):
-        super(MLP, self).__init__(trainer)
+    def __init__(self, trainer=None, program=None):
+        super(MLP, self).__init__(trainer, program=program)
 
     def _get_program_name(self):
         return "MLP"
@@ -1264,7 +1264,7 @@ class MLP(TorchModel):
 class ModelAssembly(AbstractModel):
     def __init__(self, trainer=None, models=None, program=None):
         self.program = "ModelAssembly" if program is None else program
-        super(ModelAssembly, self).__init__(trainer)
+        super(ModelAssembly, self).__init__(trainer, program=self.program)
         self.models = (
             [TabNet(self.trainer), MLP(self.trainer)] if models is None else models
         )

@@ -37,6 +37,8 @@ class Trainer:
     def add_modelbases(self, models: list):
         self.modelbases += models
         self.modelbases_names = [x.program for x in self.modelbases]
+        if len(self.modelbases_names) != len(list(set(self.modelbases_names))):
+            raise Exception(f"Conflicted modelbase names: {self.modelbases_names}")
 
     def get_modelbase(self, program: str):
         if program not in self.modelbases_names:
