@@ -459,6 +459,21 @@ class HiddenPrints:
             logging.disable(logging.NOTSET)
 
 
+class HiddenPltShow:
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        def nullfunc(*args, **kwargs):
+            pass
+
+        self.original = plt.show
+        plt.show = nullfunc
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        plt.show = self.original
+
+
 def disable_tqdm():
     from functools import partialmethod
     from tqdm import tqdm
