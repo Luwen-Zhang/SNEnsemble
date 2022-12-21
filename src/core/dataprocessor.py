@@ -24,6 +24,8 @@ class IQRRemover(AbstractProcessor):
         print(f"Removing outliers by IQR. Original size: {len(input_data)}, ", end="")
         data = input_data.copy()
         for feature in trainer.feature_names:
+            if pd.isna(data[feature]).all():
+                raise Exception(f"All values of {feature} are NaN.")
             Q1 = np.percentile(
                 data[feature].dropna(axis=0), 25, interpolation="midpoint"
             )
@@ -55,6 +57,8 @@ class StdRemover(AbstractProcessor):
         print(f"Removing outliers by std. Original size: {len(input_data)}, ", end="")
         data = input_data.copy()
         for feature in trainer.feature_names:
+            if pd.isna(data[feature]).all():
+                raise Exception(f"All values of {feature} are NaN.")
             m = np.mean(data[feature].dropna(axis=0))
             std = np.std(data[feature].dropna(axis=0))
             if std == 0:
