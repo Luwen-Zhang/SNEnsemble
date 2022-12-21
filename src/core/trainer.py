@@ -985,6 +985,7 @@ class Trainer:
         verbose=True,
         program="ThisWork",
         model_name="ThisWork",
+        refit=True,
     ):
         if s_col not in self.df.columns:
             raise Exception(f"{s_col} not in features.")
@@ -1058,6 +1059,7 @@ class Trainer:
             average=False,
             verbose=verbose,
             model_name=model_name,
+            refit=refit,
         )
 
         CL, CR = self._psn(
@@ -1221,6 +1223,7 @@ class Trainer:
         grid_size,
         verbose=True,
         rederive=True,
+        refit=True,
         percentile=100,
         x_min=None,
         x_max=None,
@@ -1263,14 +1266,15 @@ class Trainer:
             df_bootstrap = resample(df).reset_index(drop=True)
             df_bootstrap, derived_data = _derive(df_bootstrap)
             bootstrap_model = cp(model)
-            bootstrap_model.fit(
-                df_bootstrap,
-                self.dataprocessors[0].record_features,
-                self.label_name,
-                derived_data,
-                verbose=False,
-                warm_start=True,
-            )
+            if refit:
+                bootstrap_model.fit(
+                    df_bootstrap,
+                    self.dataprocessors[0].record_features,
+                    self.label_name,
+                    derived_data,
+                    verbose=False,
+                    warm_start=True,
+                )
             bootstrap_model_predictions = []
             for value in x_value:
                 df_perm = df_bootstrap.copy()
