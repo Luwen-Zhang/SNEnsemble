@@ -1215,6 +1215,13 @@ class ThisWork(TorchModel):
     def __init__(self, trainer=None, manual_activate=None, program=None):
         super(ThisWork, self).__init__(trainer, program=program)
         self.activated_sn = None
+        self.manual_activate = manual_activate
+        from src.core.sn_formulas import sn_mapping
+
+        if self.manual_activate is not None:
+            for sn in self.manual_activate:
+                if sn not in sn_mapping.keys():
+                    raise Exception(f"SN model {sn} is not implemented or activated.")
 
     def _get_program_name(self):
         return "ThisWork"
@@ -1225,7 +1232,9 @@ class ThisWork(TorchModel):
         if self.activated_sn is None:
             self.activated_sn = []
             for key, sn in sn_mapping.items():
-                if sn.test_sn_vars(self.trainer):
+                if sn.test_sn_vars(self.trainer) and (
+                    self.manual_activate is None or key in self.manual_activate
+                ):
                     self.activated_sn.append(sn(self.trainer))
             print(
                 f"Activated SN models: {[sn.__class__.__name__ for sn in self.activated_sn]}"
