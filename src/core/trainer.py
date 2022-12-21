@@ -947,6 +947,10 @@ class Trainer:
             raise Exception(f"Material code {m_code} not available.")
         return code_df.index[np.where(code_df["Material_Code"] == m_code)[0]]
 
+    def plot_multiple_S_N(self, m_codes, **kwargs):
+        for m_code in m_codes:
+            self.plot_S_N(m_code=m_code, **kwargs)
+
     def plot_S_N(
         self,
         s_col,
