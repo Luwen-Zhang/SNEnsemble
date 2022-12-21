@@ -965,6 +965,8 @@ class Trainer:
         CI=0.95,
         method="statistical",
         verbose=True,
+        program="ThisWork",
+        model_name="ThisWork",
     ):
         if s_col not in self.df.columns:
             raise Exception(f"{s_col} not in features.")
@@ -1024,7 +1026,7 @@ class Trainer:
         s_min = np.max([s_min, 0]) if sgn > 0 else s_min
         s_max = s_max if sgn > 0 else np.min([s_max, 0])
 
-        model = self.get_modelbase(program="ThisWork")
+        model = self.get_modelbase(program=program)
 
         x_value, mean_pred, ci_left, ci_right = self._bootstrap(
             model=model,
@@ -1037,6 +1039,7 @@ class Trainer:
             CI=CI,
             average=False,
             verbose=verbose,
+            model_name=model_name,
         )
 
         CL, CR = self._psn(
@@ -1138,10 +1141,11 @@ class Trainer:
         ax.set_ylabel(s_col)
         ax.set_title(f"{m_code} R-value: {r_value}")
 
-        if not os.path.exists(self.project_root + "SN_curves"):
-            os.mkdir(path=self.project_root + "SN_curves")
+        path = f"{self.project_root}SN_curves_{program}_{model_name}"
+        if not os.path.exists(path):
+            os.mkdir(path=path)
         fig_name = m_code.replace("/", "_") + f"_r_{r_value}.pdf"
-        plt.savefig(self.project_root + "SN_curves/" + fig_name)
+        plt.savefig(path + "/" + fig_name)
 
         if is_notebook() and new_ax:
             plt.show()
@@ -1204,6 +1208,7 @@ class Trainer:
         x_max=None,
         CI=0.95,
         average=True,
+        model_name="ThisWork",
     ):
         # Cook, Thomas R., et al. Explaining Machine Learning by Bootstrapping Partial Dependence Functions and Shapley
         # Values. No. RWP 21-12. 2021.
@@ -1255,7 +1260,7 @@ class Trainer:
                 df_perm, derived_data = _derive(df_perm)
                 bootstrap_model_predictions.append(
                     bootstrap_model.predict(
-                        df_perm, derived_data=derived_data, model_name="ThisWork"
+                        df_perm, derived_data=derived_data, model_name=model_name
                     )
                 )
             if average:
