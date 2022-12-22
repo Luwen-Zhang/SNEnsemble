@@ -1180,8 +1180,6 @@ class Trainer:
         ) ** 0.5
         DEVSQ = ((x - np.mean(x)) ** 2).sum().reshape(1, -1)
         if method == "statistical":
-            # According to ASTM E739-10(2015). x can be stress, log(stress), strain, log(strain), etc.
-            # It is valid when y and x follow the linear assumption.
             # Schneider, C. R. A., and S. J. Maddox. "Best practice guide on statistical analysis of fatigue data."
             # Weld Inst Stat Rep (2003).
             # The two-sided prediction limits are symmetrical, so we calculate one-sided limit instead; therefore, in
@@ -1189,12 +1187,39 @@ class Trainer:
             # Because, for example for two-sided CI=95%, the lower limit is equivalent to one-sided 97.5% limit.
             tinv = st.t.ppf((CI + 1) / 2, n - 2)
             CL = tinv * STEYX * (1 + 1 / n + (xvals - np.mean(x)) ** 2 / DEVSQ) ** 0.5
+            return CL.flatten(), CL.flatten()
+        elif method == "astm":
+            # According to ASTM E739-10(2015). x can be stress, log(stress), strain, log(strain), etc.
+            # It is valid when y and x follow the linear assumption.
             # Barbosa, Joelton Fonseca, et al. "Probabilistic SN fields based on statistical distributions applied to
             # metallic and composite materials: State of the art." Advances in Mechanical Engineering 11.8 (2019):
             # 1687814019870395.
+            # The first parameter is CI instead of (CI+1)/2 according to the ASTM standard. We verified have verified
+            # this point by reproducing its given example in Section 8.3 using the following code:
+            # from src.core.trainer import Trainer
+            # import numpy as np
+            # import scipy.stats as st
+            # from sklearn.linear_model import LinearRegression
+            # x = np.array([-1.78622, -1.79344, -2.17070, -2.16622, -2.74715, -2.79588, -2.78252, -3.27252, -3.26761])
+            # y = np.array([2.22531, 2.30103, 3., 3.07188, 3.67486, 3.90499, 3.72049, 4.45662, 4.51388])
+            # lr = LinearRegression()
+            # lr.fit(x.reshape(-1, 1), y.reshape(-1,1))
+            # y_pred = lr.predict(x.reshape(-1,1))
+            # xvals = np.linspace(np.min(x), np.max(x), 100)
+            # cl, cr = Trainer._sn_interval("ASTM", y, y_pred, x, xvals, 0.95)
+            # print(xvals[-15]) #-1.9964038383838383
+            # print(cl[-15]) #0.15220609531569082, comparable with given 0.15215. Differences might come from the
+            # # regression coefficients.
+            tinv = st.f.ppf(CI, 2, n - 2)
+            CL = (
+                np.sqrt(2 * tinv)
+                * STEYX
+                * (1 / n + (xvals - np.mean(x)) ** 2 / DEVSQ) ** 0.5
+            )
             return CL.flatten(), CL.flatten()
         else:
-            raise Exception(f"P-S-N curve type {method} not implemented.")
+            raise Exception(f"S-N interval type {method} not implemented.")
+
 
     def derive(self, df):
         data = df.copy()
