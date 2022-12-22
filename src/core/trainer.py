@@ -1069,33 +1069,42 @@ class Trainer:
         )
 
         # Defining a series of utilities.
-        def get_interval_psn(s, n, xvals):
+        def get_interval_psn(s, n, xvals, n_pred_vals=None):
             # Calculate predictions, intervals, and psn from lin-log or log-log S and N.
             from sklearn.linear_model import LinearRegression
 
             lr = LinearRegression()
             lr.fit(s.reshape(-1, 1), n.reshape(-1, 1))
-            pred = lr.predict(xvals.reshape(-1, 1)).flatten()
+            n_pred_interp = (
+                lr.predict(xvals.reshape(-1, 1)).flatten()
+                if n_pred_vals is None
+                else n_pred_vals
+            )
+            n_pred = (
+                lr.predict(s.reshape(-1, 1))
+                if n_pred_vals is None
+                else np.interp(s, xvals, n_pred_vals).reshape(-1, 1)
+            )
             CL, CR = self._sn_interval(
                 method=method,
                 y=n,
-                y_pred=lr.predict(s.reshape(-1, 1)),
+                y_pred=n_pred,
                 x=s,
                 xvals=xvals,
                 CI=CI,
             )
-            ci_left, ci_right = pred - CL, pred + CR
+            ci_left, ci_right = n_pred_interp - CL, n_pred_interp + CR
             psn_CL = self._psn(
                 method="iso",
                 y=n,
-                y_pred=lr.predict(s.reshape(-1, 1)),
+                y_pred=n_pred,
                 x=s,
                 xvals=xvals,
                 CI=CI,
                 p=0.95,
             )
-            psn_pred = pred - psn_CL
-            return pred, ci_left, ci_right, psn_pred
+            psn_pred = n_pred_interp - psn_CL
+            return n_pred_interp, ci_left, ci_right, psn_pred
 
         def scatter_plot_func(x, y, color, name):
             # Plot training, validation, and testing sets.
@@ -1170,12 +1179,22 @@ class Trainer:
         scatter_plot_func(n_test, s_test, clr[2], "Testing")
 
         # Plot predictions and intervals.
-        if not (np.isnan(ci_left).any() or np.isnan(ci_right).any()):
-            interval_plot_func(
-                mean_pred, ci_left, ci_right, clr[1], f"Bootstrap CI {CI*100:.1f}\%"
-            )
-        else:
-            ax.plot(mean_pred, x_value, color=clr[1], zorder=10)
+        # if not (np.isnan(ci_left).any() or np.isnan(ci_right).any()):
+        #     interval_plot_func(
+        #         mean_pred, ci_left, ci_right, clr[1], f"Bootstrap CI {CI*100:.1f}\%"
+        #     )
+        # else:
+        #     ax.plot(mean_pred, x_value, color=clr[1], zorder=10)
+
+        _, ci_left, ci_right, psn_pred = get_interval_psn(
+            s_train.values,
+            n_train.values,
+            x_value,
+            n_pred_vals=mean_pred,
+        )
+
+        interval_plot_func(mean_pred, ci_left, ci_right, clr[1], f"ThisWork CI")
+        psn_plot_func(psn_pred, color=clr[1], name=f"ThisWork 5\% PoF")
 
         # Get predictions, intervals and psn for lin-log and log-log SN.
         lin_pred, lin_ci_left, lin_ci_right, lin_psn_pred = get_interval_psn(
@@ -1186,25 +1205,17 @@ class Trainer:
         )
 
         # Plot predictions, intervals and psn.
-        interval_plot_func(
-            lin_pred, lin_ci_left, lin_ci_right, clr[0], f"Lin-log CI {CI*100:.1f}\%"
-        )
+        interval_plot_func(lin_pred, lin_ci_left, lin_ci_right, clr[0], f"Lin-log CI")
 
-        interval_plot_func(
-            log_pred, log_ci_left, log_ci_right, clr[2], f"Log-log CI {CI * 100:.1f}\%"
-        )
+        interval_plot_func(log_pred, log_ci_left, log_ci_right, clr[2], f"Log-log CI")
 
-        psn_plot_func(
-            lin_psn_pred, color=clr[0], name=f"Lin-log 5\% PoF at CI {CI*100:.1f}\%"
-        )
-        psn_plot_func(
-            log_psn_pred, color=clr[2], name=f"Log-log 5\% PoF at CI {CI * 100:.1f}\%"
-        )
+        psn_plot_func(lin_psn_pred, color=clr[0], name=f"Lin-log 5\% PoF")
+        psn_plot_func(log_psn_pred, color=clr[2], name=f"Log-log 5\% PoF")
 
         ax.legend(loc="upper right", markerscale=1.5, handlelength=1, handleheight=0.9)
         ax.set_xlabel(n_col)
         ax.set_ylabel(s_col)
-        ax.set_title(f"{m_code} R-value: {r_value}")
+        ax.set_title(f"{m_code} R={r_value} CI={CI * 100:.1f}\%")
 
         path = f"{self.project_root}SN_curves_{program}_{model_name}"
         if not os.path.exists(path):
