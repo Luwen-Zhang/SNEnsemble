@@ -1174,21 +1174,24 @@ class Trainer:
 
     @staticmethod
     def _psn(method, y, y_pred, x, xvals, CI):
+        n = len(x)
+        STEYX = (
+            ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
+        ) ** 0.5
+        DEVSQ = ((x - np.mean(x)) ** 2).sum().reshape(1, -1)
         if method == "statistical":
             # According to ASTM E739-10(2015). x can be stress, log(stress), strain, log(strain), etc.
             # It is valid when y and x follow the linear assumption.
             # Schneider, C. R. A., and S. J. Maddox. "Best practice guide on statistical analysis of fatigue data."
             # Weld Inst Stat Rep (2003).
+            # The two-sided prediction limits are symmetrical, so we calculate one-sided limit instead; therefore, in
+            # st.t.ppf or st.f.ppf, the first probability argument is (CI+1)/2 instead of CI for one-sided prediction limit.
+            # Because, for example for two-sided CI=95%, the lower limit is equivalent to one-sided 97.5% limit.
+            tinv = st.t.ppf((CI + 1) / 2, n - 2)
+            CL = tinv * STEYX * (1 + 1 / n + (xvals - np.mean(x)) ** 2 / DEVSQ) ** 0.5
             # Barbosa, Joelton Fonseca, et al. "Probabilistic SN fields based on statistical distributions applied to
             # metallic and composite materials: State of the art." Advances in Mechanical Engineering 11.8 (2019):
             # 1687814019870395.
-            n = len(x)
-            STEYX = (
-                ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
-            ) ** 0.5
-            tinv = st.t.ppf((CI + 1) / 2, n - 2)
-            DEVSQ = ((x - np.mean(x)) ** 2).sum().reshape(1, -1)
-            CL = tinv * STEYX * (1 / n + (xvals - np.mean(x)) ** 2 / DEVSQ) ** 0.5
             return CL.flatten(), CL.flatten()
         else:
             raise Exception(f"P-S-N curve type {method} not implemented.")
