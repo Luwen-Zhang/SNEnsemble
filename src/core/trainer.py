@@ -987,10 +987,13 @@ class Trainer:
         model_name="ThisWork",
         refit=True,
     ):
+        # Check whether columns exist.
         if s_col not in self.df.columns:
             raise Exception(f"{s_col} not in features.")
         if n_col not in self.label_name:
             raise Exception(f"{n_col} is not the target.")
+
+        # Find the selected material.
         m_train_indices = self._select_by_material_code(m_code, partition="train")
         m_test_indices = self._select_by_material_code(m_code, partition="test")
         m_val_indices = self._select_by_material_code(m_code, partition="val")
@@ -1009,6 +1012,7 @@ class Trainer:
             & ((self.df.loc[m_val_indices, r_col] - r_value).__abs__() < 1e-3)
         ]
 
+        # If no training points available, raise an exception.
         if len(m_train_indices) == 0:
             unique_r = np.unique(self.df.loc[original_train_indices, r_col])
             available_r = []
@@ -1025,6 +1029,7 @@ class Trainer:
                 f"R-value {r_value} not available. Choose among {available_r}."
             )
 
+        # Extract S and N.
         s_train = self.df.loc[m_train_indices, s_col]
         n_train = self.df.loc[m_train_indices, n_col]
         s_val = self.df.loc[m_val_indices, s_col]
@@ -1040,13 +1045,14 @@ class Trainer:
             ]
         )
 
+        # Determine the prediction range.
         s_min = np.min(all_s) - np.abs(np.max(all_s) - np.min(all_s)) * 0.5
         s_max = np.max(all_s) + np.abs(np.max(all_s) - np.min(all_s)) * 0.5
         s_min = np.max([s_min, 0]) if sgn > 0 else s_min
         s_max = s_max if sgn > 0 else np.min([s_max, 0])
 
+        # Get bootstrap predictions and confidence intervals from program-model_name
         model = self.get_modelbase(program=program)
-
         x_value, mean_pred, ci_left, ci_right = self._bootstrap(
             model=model,
             df=self.df.loc[m_train_indices, :],
@@ -1062,36 +1068,37 @@ class Trainer:
             refit=refit,
         )
 
-        CL, CR = self._psn(
-            method=method,
-            y=n_train.values,
-            y_pred=np.interp(s_train.values, x_value, mean_pred),
-            x=s_train.values,
-            xvals=x_value,
-            CI=CI,
-        )
+        # Defining a series of utilities.
+        def get_interval_psn(s, n, xvals):
+            # Calculate predictions, intervals, and psn from lin-log or log-log S and N.
+            from sklearn.linear_model import LinearRegression
 
-        def in_fill_between(x_arr, y_arr, xvals, cl, cr):
-            def point_in_fill_between(x, y):
-                which_x = np.where(np.abs(x - xvals) == np.min(np.abs(x - xvals)))[0][0]
-                cl_x = cl[which_x]
-                cr_x = cr[which_x]
-                return True if cl_x <= y <= cr_x else False
+            lr = LinearRegression()
+            lr.fit(s.reshape(-1, 1), n.reshape(-1, 1))
+            pred = lr.predict(xvals.reshape(-1, 1)).flatten()
+            CL, CR = self._sn_interval(
+                method=method,
+                y=n,
+                y_pred=lr.predict(s.reshape(-1, 1)),
+                x=s,
+                xvals=xvals,
+                CI=CI,
+            )
+            ci_left, ci_right = pred - CL, pred + CR
+            psn_CL = self._psn(
+                method="iso",
+                y=n,
+                y_pred=lr.predict(s.reshape(-1, 1)),
+                x=s,
+                xvals=xvals,
+                CI=CI,
+                p=0.95,
+            )
+            psn_pred = pred - psn_CL
+            return pred, ci_left, ci_right, psn_pred
 
-            res = []
-            for x, y in zip(x_arr, y_arr):
-                res.append(point_in_fill_between(x, y))
-            return np.count_nonzero(np.array(res))
-
-        if ax is None:
-            new_ax = True
-            plt.figure()
-            plt.rcParams["font.size"] = 14
-            ax = plt.subplot(111)
-        else:
-            new_ax = False
-
-        def scatter_func(x, y, color, name):
+        def scatter_plot_func(x, y, color, name):
+            # Plot training, validation, and testing sets.
             ax.scatter(
                 x,
                 y,
@@ -1104,59 +1111,97 @@ class Trainer:
                 zorder=20,
             )
 
-        scatter_func(n_train, s_train, clr[0], "Training")
-        scatter_func(n_val, s_val, clr[1], "Validation")
-        scatter_func(n_test, s_test, clr[2], "Testing")
+        def in_fill_between(x_arr, y_arr, xvals, cl, cr):
+            # Calculate the number of points that are in the interval.
+            def point_in_fill_between(x, y):
+                which_x = np.where(np.abs(x - xvals) == np.min(np.abs(x - xvals)))[0][0]
+                cl_x = cl[which_x]
+                cr_x = cr[which_x]
+                return True if cl_x <= y <= cr_x else False
 
-        ax.plot(mean_pred, x_value, zorder=10)
+            res = []
+            for x, y in zip(x_arr, y_arr):
+                res.append(point_in_fill_between(x, y))
+            return np.count_nonzero(np.array(res))
 
-        if not (np.isnan(ci_left).any() or np.isnan(ci_right).any()):
+        def report(interv_left, interv_right):
+            # Report the number of points that are in the interval for three sets.
+            print(
+                f"Training {in_fill_between(s_train, n_train, x_value, interv_left, interv_right)}/{len(s_train)}"
+            )
+            print(
+                f"Validation {in_fill_between(s_val, n_val, x_value, interv_left, interv_right)}/{len(s_val)}"
+            )
+            print(
+                f"Testing {in_fill_between(s_test, n_test, x_value, interv_left, interv_right)}/{len(s_test)}"
+            )
+
+        def interval_plot_func(pred, interv_left, interv_right, color, name):
+            # Plot predictions and intervals.
+            ax.plot(pred, x_value, color=color, zorder=10)
             ax.fill_betweenx(
                 x_value,
-                ci_left,
-                ci_right,
+                interv_left,
+                interv_right,
                 alpha=0.4,
-                color=clr[1],
+                color=color,
                 edgecolor=None,
-                label=f"Bootstrap CI {CI*100:.1f}\%",
+                label=name,
                 zorder=0,
             )
-            print("In bootstrap CI:")
-            print(
-                f"Training {in_fill_between(s_train, n_train, x_value, ci_left, ci_right)}/{len(s_train)}"
-            )
-            print(
-                f"Validation {in_fill_between(s_val, n_val, x_value, ci_left, ci_right)}/{len(s_val)}"
-            )
-            print(
-                f"Testing {in_fill_between(s_test, n_test, x_value, ci_left, ci_right)}/{len(s_test)}"
-            )
+            print(name)
+            report(interv_left, interv_right)
 
-        ax.fill_betweenx(
-            x_value,
-            mean_pred - CL,
-            mean_pred + CR,
-            alpha=0.4,
-            color=clr[0],
-            edgecolor=None,
-            label=f"Statistical CI {CI*100:.1f}\%",
-            zorder=0,
+        def psn_plot_func(pred, color, name):
+            # Plot psn
+            ax.plot(pred, x_value, "--", color=color, label=name)
+
+        if ax is None:
+            new_ax = True
+            plt.figure()
+            plt.rcParams["font.size"] = 14
+            ax = plt.subplot(111)
+        else:
+            new_ax = False
+
+        # Plot datasets.
+        scatter_plot_func(n_train, s_train, clr[0], "Training")
+        scatter_plot_func(n_val, s_val, clr[1], "Validation")
+        scatter_plot_func(n_test, s_test, clr[2], "Testing")
+
+        # Plot predictions and intervals.
+        if not (np.isnan(ci_left).any() or np.isnan(ci_right).any()):
+            interval_plot_func(
+                mean_pred, ci_left, ci_right, clr[1], f"Bootstrap CI {CI*100:.1f}\%"
+            )
+        else:
+            ax.plot(mean_pred, x_value, color=clr[1], zorder=10)
+
+        # Get predictions, intervals and psn for lin-log and log-log SN.
+        lin_pred, lin_ci_left, lin_ci_right, lin_psn_pred = get_interval_psn(
+            s_train.values, n_train.values, x_value
+        )
+        log_pred, log_ci_left, log_ci_right, log_psn_pred = get_interval_psn(
+            np.log10(s_train.values), n_train.values, np.log10(x_value)
         )
 
-        print("In statistical CI:")
-        print(
-            f"Training {in_fill_between(s_train, n_train, x_value, mean_pred-CL, mean_pred+CL)}/{len(s_train)}"
-        )
-        print(
-            f"Validation {in_fill_between(s_val, n_val, x_value, mean_pred-CL, mean_pred+CL)}/{len(s_val)}"
-        )
-        print(
-            f"Testing {in_fill_between(s_test, n_test, x_value, mean_pred-CL, mean_pred+CL)}/{len(s_test)}"
+        # Plot predictions, intervals and psn.
+        interval_plot_func(
+            lin_pred, lin_ci_left, lin_ci_right, clr[0], f"Lin-log CI {CI*100:.1f}\%"
         )
 
-        ax.legend(
-            loc="upper right", markerscale=1.5, handlelength=0.6, handleheight=0.9
+        interval_plot_func(
+            log_pred, log_ci_left, log_ci_right, clr[2], f"Log-log CI {CI * 100:.1f}\%"
         )
+
+        psn_plot_func(
+            lin_psn_pred, color=clr[0], name=f"Lin-log 5\% PoF at CI {CI*100:.1f}\%"
+        )
+        psn_plot_func(
+            log_psn_pred, color=clr[2], name=f"Log-log 5\% PoF at CI {CI * 100:.1f}\%"
+        )
+
+        ax.legend(loc="upper right", markerscale=1.5, handlelength=1, handleheight=0.9)
         ax.set_xlabel(n_col)
         ax.set_ylabel(s_col)
         ax.set_title(f"{m_code} R-value: {r_value}")
@@ -1173,7 +1218,7 @@ class Trainer:
             plt.close()
 
     @staticmethod
-    def _psn(method, y, y_pred, x, xvals, CI):
+    def _sn_interval(method, y, y_pred, x, xvals, CI):
         n = len(x)
         STEYX = (
             ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
