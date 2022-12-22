@@ -1220,6 +1220,38 @@ class Trainer:
         else:
             raise Exception(f"S-N interval type {method} not implemented.")
 
+    @staticmethod
+    def _psn(method, y, y_pred, x, xvals, CI, p):
+        n = len(x)
+        STEYX = (
+            ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
+        ) ** 0.5
+        DEVSQ = ((x - np.mean(x)) ** 2).sum().reshape(1, -1)
+        if method == "iso":
+            # ISO 12107
+            def oneside_normal(p, CI, sample_size, n_random=100000, ddof=1):
+                # The one-sided tolerance limits of normal distribution in ISO are given in a table. We find that the
+                # analytical calculation is difficult to implement (https://statpages.info/tolintvl.html gives a
+                # interactive implementation and a .xls file). We use Monte Carlo simulation to get a more precise
+                # value. Since the value is calculated once per plot, the cost is affordable.
+                # Refs:
+                # https://stackoverflow.com/questions/63698305/how-to-calculate-one-sided-tolerance-interval-with-scipy
+                # (or https://jekel.me/tolerance_interval_py/oneside/oneside.html)
+                from scipy.stats import norm, nct
+
+                p = 1 - p if p < 0.5 else p
+                x_tmp = np.random.randn(n_random, sample_size)
+                sigma_est = x_tmp.std(axis=1, ddof=ddof)
+                zp = norm.ppf(p)
+                t = nct.ppf(CI, df=sample_size - ddof, nc=np.sqrt(sample_size) * zp)
+                k = t / np.sqrt(sample_size)
+                return np.mean(k * sigma_est)
+
+            k = oneside_normal(p=p, CI=CI, sample_size=n - 2)
+            CL = k * STEYX * (1 + 1 / n + (xvals - np.mean(x)) ** 2 / DEVSQ) ** 0.5
+            return CL.flatten()
+        else:
+            raise Exception(f"P-S-N type {method} not implemented.")
 
     def derive(self, df):
         data = df.copy()
