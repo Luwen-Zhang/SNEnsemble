@@ -133,7 +133,7 @@ class loglogSN(linlogSN):
         s = var_slices[0] - self.s_zero_slip
         mat = x[:, self.material_features_idx]
         a, b = -torch.abs(self.a(mat)), torch.abs(self.b(mat))
-        return a * torch.log10(torch.abs(s) + 1) + b
+        return a * torch.log10(torch.abs(s) * 1e3 + 1) + b
 
     def get_tex(self):
         return r"\mathrm{sgn}(\sigma_{max})a\mathrm{log}\left(\left|\sigma_{max}/\mathrm{std}(\sigma_{max})\right|+1\right)+b"
