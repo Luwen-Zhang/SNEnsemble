@@ -434,7 +434,7 @@ class Trainer:
             modelbases_to_train = [self.get_modelbase(x) for x in programs]
 
         for modelbase in modelbases_to_train:
-            modelbase._train(verbose=verbose, debug_mode=debug_mode)
+            modelbase.train(verbose=verbose, debug_mode=debug_mode)
 
     def _get_derived_data_sizes(self):
         return [x.shape for x in self.derived_data.values()]
@@ -504,7 +504,7 @@ class Trainer:
                 self.load_data()
             for program in programs:
                 modelbase = self.get_modelbase(program)
-                modelbase._train(dump_trainer=True, verbose=verbose)
+                modelbase.train(dump_trainer=True, verbose=verbose)
                 predictions = modelbase._predict_all(
                     verbose=verbose, test_data_only=test_data_only
                 )

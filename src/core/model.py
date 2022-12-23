@@ -46,11 +46,16 @@ class AbstractModel:
                 print(
                     f"The argument bayes_opt of fit() conflicts with Trainer.bayes_opt. Use the former one."
                 )
-        self._train(
+        self.train(
             dump_trainer=False,
             verbose=verbose,
             warm_start=warm_start if self._trained else False,
         )
+
+    def train(self, *args, **kwargs):
+        # Training the model using data in the trainer directly.
+        # The method can be rewritten to implement other training strategies.
+        self._train(*args, **kwargs)
 
     def predict(
         self, df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
@@ -138,7 +143,7 @@ class AbstractModel:
     def _check_train_status(self):
         if not self._trained:
             raise Exception(
-                f"{self.program} not trained, run {self.__class__.__name__}._train() first."
+                f"{self.program} not trained, run {self.__class__.__name__}.train() first."
             )
 
     def _get_params(self, verbose=True):
@@ -1292,13 +1297,14 @@ class ModelAssembly(AbstractModel):
             df=df, model_name=model_name, derived_data=derived_data, **kwargs
         )
 
-    def _train(
+    def train(
         self,
+        *args,
         **kwargs,
     ):
         print(f"\n-------------Run {self.program}-------------\n")
         for submodel in self.models:
-            submodel._train(**kwargs)
+            submodel.train(*args, **kwargs)
         print(f"\n-------------{self.program} End-------------\n")
 
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
@@ -1327,7 +1333,7 @@ class ModelAssembly(AbstractModel):
                 submodel._check_train_status()
             except:
                 raise Exception(
-                    f"{self.program} not trained, run {self.__class__.__name__}._train() first."
+                    f"{self.program} not trained, run {self.__class__.__name__}.train() first."
                 )
 
     def _get_model_idx(self, model_name):
