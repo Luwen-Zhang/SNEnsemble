@@ -26,10 +26,17 @@ class AbstractSN(nn.Module):
         self.material_features_idx = np.array(
             [self.trainer.feature_names.index(name) for name in self.material_features]
         )
+        self.stress_unrelated_features_idx = np.array(
+            [
+                idx
+                for idx, name in enumerate(self.tabular_feature_names)
+                if "Stress" not in name
+            ]
+        )
         from src.core.nn_models import get_sequential
 
         self.template_sequential = get_sequential(
-            n_inputs=len(self.material_features),
+            n_inputs=len(self.stress_unrelated_features_idx),
             n_outputs=1,
             layers=[16, 32, 64, 32, 16],
             act_func=nn.ReLU,
@@ -111,7 +118,7 @@ class linlogSN(AbstractSN):
 
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
-        mat = x[:, self.material_features_idx]
+        mat = x[:, self.stress_unrelated_features_idx]
         a, b = -torch.abs(self.a(mat)), torch.abs(self.b(mat))
         return a * var_slices[0] + b
 
@@ -131,7 +138,7 @@ class loglogSN(linlogSN):
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
         s = var_slices[0] - self.s_zero_slip
-        mat = x[:, self.material_features_idx]
+        mat = x[:, self.stress_unrelated_features_idx]
         a, b = -torch.abs(self.a(mat)), torch.abs(self.b(mat))
         return a * torch.log10(torch.abs(s) + 1e-5) + b
 
@@ -167,7 +174,7 @@ class TrivialSN(linlogSN):
             self.s_min = np.min([self.s_min, torch.min(s).cpu().numpy()])
             self.s_max = np.max([self.s_max, torch.max(s).cpu().numpy()])
 
-        mat = x[:, self.material_features_idx]
+        mat = x[:, self.stress_unrelated_features_idx]
         a, b, c, d = (
             torch.clamp(torch.abs(self.a(mat)), self.s_min, self.s_max),
             -torch.abs(self.b(mat)),
@@ -209,7 +216,7 @@ class SigmoidSN(linlogSN):
             self.s_min = np.min([self.s_min, torch.min(s).cpu().numpy()])
             self.s_max = np.max([self.s_max, torch.max(s).cpu().numpy()])
 
-        mat = x[:, self.material_features_idx]
+        mat = x[:, self.stress_unrelated_features_idx]
         a, b, c, d = (
             -torch.abs(self.a(mat)),
             torch.abs(self.b(mat)).clamp(self.s_min, self.s_max),
@@ -234,7 +241,7 @@ class KohoutSN(linlogSN):
     def forward(self, x, additional_tensors):
         var_slices = self._get_var_slices(x, additional_tensors)
         s = torch.abs(var_slices[0] - self.s_zero_slip) + 1
-        mat = x[:, self.material_features_idx]
+        mat = x[:, self.stress_unrelated_features_idx]
         a, b, B = (
             torch.abs(self.a(mat)) + 1,
             -torch.abs(self.b(mat)) - 0.1,
