@@ -962,6 +962,7 @@ class Trainer:
 
     def plot_multiple_S_N(self, m_codes, hide_plt_show=True, **kwargs):
         for m_code in m_codes:
+            print(m_code)
             if hide_plt_show:
                 with HiddenPltShow():
                     self.plot_S_N(m_code=m_code, **kwargs)
@@ -1214,6 +1215,7 @@ class Trainer:
         ax.legend(loc="upper right", markerscale=1.5, handlelength=1, handleheight=0.9)
         ax.set_xlabel(n_col)
         ax.set_ylabel(s_col)
+        ax.set_xlim([0, 10])
         ax.set_title(f"{m_code} R={r_value} CI={CI * 100:.1f}\%")
 
         path = f"{self.project_root}SN_curves_{program}_{model_name}"
