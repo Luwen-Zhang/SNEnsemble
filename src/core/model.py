@@ -1,3 +1,4 @@
+import numpy as np
 import torch.optim
 
 from .trainer import *
@@ -50,7 +51,12 @@ class AbstractModel:
     def train(self, *args, **kwargs):
         # Training the model using data in the trainer directly.
         # The method can be rewritten to implement other training strategies.
+        verbose = "verbose" not in kwargs.keys() or kwargs["verbose"]
+        if verbose:
+            print(f"\n-------------Run {self.program}-------------\n")
         self._train(*args, **kwargs)
+        if verbose:
+            print(f"\n-------------{self.program} End-------------\n")
 
     def predict(
         self, df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
@@ -183,7 +189,6 @@ class AutoGluon(AbstractModel):
         warm_start=False,
         **kwargs,
     ):
-        print("\n-------------Run AutoGluon-------------\n")
         disable_tqdm()
         import warnings
 
@@ -214,7 +219,6 @@ class AutoGluon(AbstractModel):
         warnings.simplefilter(action="default", category=UserWarning)
         if dump_trainer:
             save_trainer(self.trainer)
-        print("\n-------------AutoGluon End-------------\n")
 
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         return self.model.predict(
@@ -249,7 +253,6 @@ class WideDeep(AbstractModel):
         warm_start=False,
         **kwargs,
     ):
-        print("\n-------------Run WideDeep-------------\n")
         # disable_tqdm()
         from pytorch_widedeep import Trainer as wd_Trainer
         from pytorch_widedeep.preprocessing import TabPreprocessor
@@ -425,7 +428,6 @@ class WideDeep(AbstractModel):
         # enable_tqdm()
         if dump_trainer:
             save_trainer(self.trainer)
-        print("\n-------------WideDeep End-------------\n")
 
     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
         X_df = self.tab_preprocessor.transform(df)
@@ -808,7 +810,6 @@ class TabNet(AbstractModel):
         warm_start=False,
         **kwargs,
     ):
-        print("\n-------------Run TabNet-------------\n")
         # Basic components in _train():
         # 1. Prepare training, validation, and testing dataset.
         train_indices = self.trainer.train_dataset.indices
@@ -966,7 +967,6 @@ class TabNet(AbstractModel):
         # Optional: Dump the trainer.
         if dump_trainer:
             save_trainer(self.trainer)
-        print("\n-------------TabNet End-------------\n")
 
     def _predict(
         self, df: pd.DataFrame, model_name=None, additional_data=None, **kwargs
@@ -1172,8 +1172,6 @@ class TorchModel(AbstractModel):
         warm_start=False,
         **kwargs,
     ):
-        if verbose:
-            print(f"\n-------------Run {self.program}-------------\n")
         if not warm_start or (warm_start and not self._trained):
             self.model = self._new_model()
 
@@ -1209,9 +1207,6 @@ class TorchModel(AbstractModel):
 
         if dump_trainer:
             save_trainer(self.trainer, verbose=verbose)
-
-        if verbose:
-            print(f"\n-------------{self.program} End-------------\n")
 
 
 class ThisWork(TorchModel):
@@ -1252,6 +1247,83 @@ class ThisWork(TorchModel):
 
     def _get_model_names(self):
         return ["ThisWork"]
+
+
+class ThisWorkPretrain(ThisWork):
+    def __init__(self, trainer=None, manual_activate=None, program=None):
+        super(ThisWorkPretrain, self).__init__(
+            trainer=trainer, manual_activate=manual_activate, program=program
+        )
+
+    def train(self, *args, **kwargs):
+        tmp_kwargs = cp(kwargs)
+        verbose = "verbose" not in kwargs.keys() or kwargs["verbose"]
+        if verbose:
+            print(f"\n-------------Run {self.program}-------------\n")
+        original_df = cp(self.trainer.df)
+        train_indices = cp(self.trainer.train_indices)
+        val_indices = cp(self.trainer.val_indices)
+        test_indices = cp(self.trainer.test_indices)
+        if not ("warm_start" in kwargs.keys() and kwargs["warm_start"]):
+            if verbose:
+                print("Pretraining...")
+            mat_cnt = self.trainer.get_material_code(unique=True, partition="train")
+            mat_cnt.sort_values(by=["Count"], ascending=False, inplace=True)
+            selected = len(mat_cnt) // 10 + 1
+            abundant_mat = mat_cnt["Material_Code"][:selected].values
+            abundant_mat_indices = np.concatenate(
+                [
+                    self.trainer._select_by_material_code(
+                        m_code=code, partition="train"
+                    ).values
+                    for code in abundant_mat
+                ]
+            )
+            selected_df = (
+                self.trainer.df.loc[abundant_mat_indices, :]
+                .copy()
+                .reset_index(drop=True)
+            )
+            self.trainer.set_data(
+                selected_df,
+                feature_names=self.trainer.feature_names,
+                label_name=self.trainer.label_name,
+                warm_start=True,
+                verbose=verbose,
+                all_training=True,
+            )
+            if verbose:
+                print(
+                    f"{selected} materials ({len(abundant_mat_indices)} records) are selected for pretraining."
+                )
+            tmp_kwargs["warm_start"] = False
+            tmp_kwargs["verbose"] = False
+            self._train(*args, **tmp_kwargs)
+
+        if verbose:
+            print("Finetunning...")
+        self.trainer.set_data(
+            original_df,
+            feature_names=self.trainer.feature_names,
+            label_name=self.trainer.label_name,
+            warm_start=True,
+            verbose=verbose,
+            train_indices=train_indices,
+            val_indices=val_indices,
+            test_indices=test_indices,
+        )
+        tmp_kwargs["warm_start"] = True
+        tmp_kwargs["verbose"] = verbose
+        tmp_bayes_opt = cp(self.trainer.bayes_opt)
+        self.trainer.bayes_opt = False
+        self._train(*args, **tmp_kwargs)
+        self.trainer.bayes_opt = tmp_bayes_opt
+
+        if verbose:
+            print(f"\n-------------{self.program} End-------------\n")
+
+    def _get_program_name(self):
+        return "ThisWorkPretrain"
 
 
 class MLP(TorchModel):
