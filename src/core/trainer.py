@@ -235,6 +235,9 @@ class Trainer:
         warm_start=False,
         verbose=True,
         all_training=False,
+        train_indices=None,
+        val_indices=None,
+        test_indices=None,
     ):
         self.feature_names = feature_names
         self.label_name = label_name
@@ -255,7 +258,6 @@ class Trainer:
         if all_training:
             indices = np.arange(len(df))
             self._data_process(
-                preprocess=True,
                 train_indices=indices,
                 val_indices=indices,
                 test_indices=indices,
@@ -263,7 +265,13 @@ class Trainer:
                 verbose=verbose,
             )
         else:
-            self._data_process(warm_start=warm_start, verbose=verbose)
+            self._data_process(
+                train_indices=train_indices,
+                val_indices=val_indices,
+                test_indices=test_indices,
+                warm_start=warm_start,
+                verbose=verbose,
+            )
         self._rederive_unstacked()
         self._update_dataset_auto()
         self._material_code = pd.DataFrame(self.df["Material_Code"])
@@ -952,7 +960,7 @@ class Trainer:
             return pd.DataFrame(
                 {
                     "Material_Code": unique_list,
-                    "Count": [val_cnt[x].values[0] for x in unique_list],
+                    "Count": [val_cnt[x] for x in unique_list],
                 }
             )
         else:
@@ -1401,7 +1409,7 @@ class Trainer:
                     df_bootstrap,
                     self.dataprocessors[0].record_features,
                     self.label_name,
-                    verbose=True,
+                    verbose=False,
                     warm_start=True,
                 )
             bootstrap_model_predictions = []
