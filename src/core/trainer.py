@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patches
 from captum.attr import FeaturePermutation
 import sys
-import random
 from importlib import import_module, reload
 from skopt.space import Real, Integer, Categorical
 import torch.utils.data as Data
@@ -1048,8 +1047,8 @@ class Trainer:
         # Determine the prediction range.
         s_min = np.min(all_s) - np.abs(np.max(all_s) - np.min(all_s)) * 0.5
         s_max = np.max(all_s) + np.abs(np.max(all_s) - np.min(all_s)) * 0.5
-        s_min = np.max([s_min, 0]) if sgn > 0 else s_min
-        s_max = s_max if sgn > 0 else np.min([s_max, 0])
+        s_min = np.max([s_min, 1e-5]) if sgn > 0 else s_min
+        s_max = s_max if sgn > 0 else np.min([s_max, -1e-5])
 
         # Get bootstrap predictions and confidence intervals from program-model_name
         model = self.get_modelbase(program=program)
