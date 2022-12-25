@@ -215,54 +215,58 @@ class Trainer:
             self.df = pd.read_excel(data_path, engine="openpyxl")
             self.data_path = data_path
 
-        self.feature_names = list(self.args["feature_names_type"].keys())
-        self.label_name = self.args["label_name"]
+        feature_names = list(self.args["feature_names_type"].keys())
+        label_name = self.args["label_name"]
 
-        self.derived_data = {}
-        self.derived_data_col_names = {}
-        self.derivation_related_cols = []
-        self.stacked_derivation_related_cols = []
-        for deriver, kwargs in self.dataderivers:
-            try:
-                (
-                    value,
-                    name,
-                    col_names,
-                    stacked,
-                    intermediate,
-                    related_columns,
-                ) = deriver.derive(self.df, **kwargs)
-            except Exception as e:
-                print(
-                    f"Skip deriver {deriver.__class__.__name__} because of the following exception:"
-                )
-                print(f"\t{e}")
-                continue
-            if not stacked:
-                self.derived_data[name] = value
-                self.derived_data_col_names[name] = col_names
-                self.derivation_related_cols += related_columns
-            else:
-                if not intermediate:
-                    for col_name in col_names:
-                        if col_name not in self.feature_names:
-                            self.feature_names.append(col_name)
-                self.df[col_names] = value
-                self.stacked_derivation_related_cols += related_columns
-
-        self.df = self.df.copy().dropna(
-            axis=0, subset=self.label_name + self.derivation_related_cols
-        )
-        self._data_process()
-        self._rederive_unstacked()
-        self._update_dataset_auto()
-        self._material_code = pd.DataFrame(self.df["Material_Code"])
+        self.set_data(self.df, feature_names, label_name)
         print(
             "Dataset size:",
             len(self.train_dataset),
             len(self.val_dataset),
             len(self.test_dataset),
         )
+
+    def set_data(
+        self,
+        df,
+        feature_names,
+        label_name,
+        derived_data=None,
+        warm_start=False,
+        verbose=True,
+        all_training=False,
+    ):
+        self.feature_names = feature_names
+        self.label_name = label_name
+        if derived_data is None:
+            (
+                df,
+                derived_data,
+                self.feature_names,
+                self.derived_data_col_names,
+                self.derivation_related_cols,
+                self.stacked_derivation_related_cols,
+            ) = self.derive(df)
+        self.df = df
+        self.derived_data = derived_data
+        self.df = self.df.copy().dropna(
+            axis=0, subset=self.label_name + self.derivation_related_cols
+        )
+        if all_training:
+            indices = np.arange(len(df))
+            self._data_process(
+                preprocess=True,
+                train_indices=indices,
+                val_indices=indices,
+                test_indices=indices,
+                warm_start=warm_start,
+                verbose=verbose,
+            )
+        else:
+            self._data_process(warm_start=warm_start, verbose=verbose)
+        self._rederive_unstacked()
+        self._update_dataset_auto()
+        self._material_code = pd.DataFrame(self.df["Material_Code"])
 
     def _rederive_unstacked(self):
         for deriver, kwargs in self.dataderivers:
@@ -1311,8 +1315,11 @@ class Trainer:
             raise Exception(f"P-S-N type {method} not implemented.")
 
     def derive(self, df):
-        data = df.copy()
+        feature_names = cp(self.feature_names)
         derived_data = {}
+        derived_data_col_names = {}
+        derivation_related_cols = []
+        stacked_derivation_related_cols = []
         for deriver, kwargs in self.dataderivers:
             try:
                 (
@@ -1322,14 +1329,33 @@ class Trainer:
                     stacked,
                     intermediate,
                     related_columns,
-                ) = deriver.derive(data, **kwargs)
+                ) = deriver.derive(df, **kwargs)
             except Exception as e:
+                print(
+                    f"Skip deriver {deriver.__class__.__name__} because of the following exception:"
+                )
+                print(f"\t{e}")
                 continue
-            if stacked:
-                data[col_names] = value
-            else:
+            if not stacked:
                 derived_data[name] = value
-        return data, derived_data
+                derived_data_col_names[name] = col_names
+                derivation_related_cols += related_columns
+            else:
+                if not intermediate:
+                    for col_name in col_names:
+                        if col_name not in feature_names:
+                            feature_names.append(col_name)
+                df[col_names] = value
+                stacked_derivation_related_cols += related_columns
+
+        return (
+            df,
+            derived_data,
+            feature_names,
+            derived_data_col_names,
+            derivation_related_cols,
+            stacked_derivation_related_cols,
+        )
 
     def _bootstrap(
         self,
@@ -1364,43 +1390,26 @@ class Trainer:
             grid_size,
         )
 
-        def _derive(df):
-            data = df.copy()
-            if (
-                focus_feature
-                in self.stacked_derivation_related_cols + self.derivation_related_cols
-                and rederive
-            ):
-                data, derived_data = self.derive(data)
-            else:
-                derived_data = cp(self.derived_data)
-            return data, derived_data
-
         expected_value_bootstrap_replications = []
         for i_bootstrap in range(n_bootstrap):
             if n_bootstrap != 1 and verbose:
                 print(f"Bootstrap: {i_bootstrap + 1}/{n_bootstrap}")
             df_bootstrap = resample(df).reset_index(drop=True)
-            df_bootstrap, derived_data = _derive(df_bootstrap)
             bootstrap_model = cp(model)
             if refit:
                 bootstrap_model.fit(
                     df_bootstrap,
                     self.dataprocessors[0].record_features,
                     self.label_name,
-                    derived_data,
-                    verbose=False,
+                    verbose=True,
                     warm_start=True,
                 )
             bootstrap_model_predictions = []
             for value in x_value:
                 df_perm = df_bootstrap.copy()
                 df_perm[focus_feature] = value
-                df_perm, derived_data = _derive(df_perm)
                 bootstrap_model_predictions.append(
-                    bootstrap_model.predict(
-                        df_perm, derived_data=derived_data, model_name=model_name
-                    )
+                    bootstrap_model.predict(df_perm, model_name=model_name)
                 )
             if average:
                 expected_value_bootstrap_replications.append(

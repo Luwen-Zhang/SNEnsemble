@@ -26,20 +26,15 @@ class AbstractModel:
         warm_start=False,
         bayes_opt=False,
     ):
-        self.trainer.df = df
-        self.trainer.feature_names = feature_names
-        self.trainer.label_name = label_name
-        self.trainer.derived_data = derived_data
-        indices = np.arange(len(df))
-        self.trainer._data_process(
-            preprocess=True,
-            train_indices=indices,
-            val_indices=indices,
-            test_indices=indices,
+        self.trainer.set_data(
+            df,
+            feature_names=feature_names,
+            label_name=label_name,
+            derived_data=derived_data,
             warm_start=warm_start if self._trained else False,
             verbose=verbose,
+            all_training=True,
         )
-        self.trainer._update_dataset_auto()
         if bayes_opt != self.trainer.bayes_opt:
             self.trainer.bayes_opt = bayes_opt
             if verbose:
@@ -72,6 +67,9 @@ class AbstractModel:
                 absent_features.append(feature_name)
         if len(absent_features) > 0:
             raise Exception(f"Feature {absent_features} not in the input dataframe.")
+
+        if derived_data is None:
+            df, derived_data, _, _, _, _ = self.trainer.derive(df)
 
         additional_data = []
         absent_keys = []
