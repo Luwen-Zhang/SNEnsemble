@@ -1024,6 +1024,31 @@ class Trainer:
             & ((self.df.loc[m_val_indices, r_col] - r_value).__abs__() < 1e-3)
         ]
 
+        # If other parameters are not consistent, raise Warning.
+        stress_unrelated_cols = [
+            name for name in self.feature_names if "Stress" not in name
+        ]
+        other_params = self.df.loc[
+            np.concatenate(
+                [m_train_indices.values, m_test_indices.values, m_val_indices.values]
+            ),
+            stress_unrelated_cols,
+        ].copy()
+        not_unique_cols = [
+            (col, list(other_params[col].value_counts().index))
+            for col in stress_unrelated_cols
+            if len(other_params[col].value_counts()) > 1
+        ]
+        if len(not_unique_cols) != 0:
+            message = (
+                f"More than one values of each stress unrelated column are found {not_unique_cols}. Bootstrapped "
+                f"prediction of SN curves may be incorrect."
+            )
+            if is_notebook():
+                print(message)
+            else:
+                warnings.warn(message, UserWarning)
+
         # If no training points available, raise an exception.
         if len(m_train_indices) == 0:
             unique_r = np.unique(self.df.loc[original_train_indices, r_col])
