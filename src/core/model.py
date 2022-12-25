@@ -1106,7 +1106,7 @@ class TorchModel(AbstractModel):
         self,
         model,
         verbose=True,
-        verbose_per_epoch=100,
+        verbose_per_epoch=20,
         warm_start=False,
         **params,
     ):
@@ -1165,7 +1165,7 @@ class TorchModel(AbstractModel):
 
     def _train(
         self,
-        verbose_per_epoch=100,
+        verbose_per_epoch=20,
         verbose: bool = True,
         debug_mode: bool = False,
         dump_trainer=True,
