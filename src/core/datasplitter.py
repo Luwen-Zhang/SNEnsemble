@@ -47,6 +47,12 @@ class AbstractSplitter:
         intersect_check(train_indices, test_indices, "train", "test")
         intersect_check(val_indices, test_indices, "val", "test")
 
+    def _check_exist(self, df, arg, name):
+        if arg not in df.columns:
+            raise Exception(
+                f"Splitter: {name} is not a valid column in df for splitter {self.__class__.__name__}."
+            )
+
 
 class RandomSplitter(AbstractSplitter):
     def __int__(self, train_val_test=None):
@@ -71,6 +77,7 @@ class MaterialSplitter(AbstractSplitter):
         super(MaterialSplitter, self).__init__(train_val_test)
 
     def _split(self, data, df, feature_names, label_name):
+        self._check_exist(df, "Material_Code", "Material_Code")
         mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
         mat_lay_set = list(sorted(set(mat_lay)))
 
@@ -102,6 +109,7 @@ class MaterialCycleSplitter(AbstractSplitter):
         super(MaterialCycleSplitter, self).__init__(train_val_test)
 
     def _split(self, data, df, feature_names, label_name):
+        self._check_exist(df, "Material_Code", "Material_Code")
         mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
         mat_lay_set = list(sorted(set(mat_lay)))
         cycle = df[label_name].values.flatten()

@@ -274,7 +274,11 @@ class Trainer:
             )
         self._rederive_unstacked()
         self._update_dataset_auto()
-        self._material_code = pd.DataFrame(self.df["Material_Code"])
+        self._material_code = (
+            pd.DataFrame(self.df["Material_Code"])
+            if "Material_Code" in self.df.columns
+            else None
+        )
 
     def _rederive_unstacked(self):
         for deriver, kwargs in self.dataderivers:
@@ -951,6 +955,10 @@ class Trainer:
         return indices_map[partition]
 
     def get_material_code(self, unique=False, partition="all"):
+        if self._material_code is None:
+            raise Exception(
+                f"The column Material_Code is not available in the dataset."
+            )
         indices = self._get_indices(partition=partition)
         if unique:
             unique_list = list(
