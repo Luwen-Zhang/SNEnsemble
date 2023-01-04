@@ -1250,12 +1250,12 @@ class Trainer:
         )
 
         # Plot predictions, intervals and psn.
-        interval_plot_func(lin_pred, lin_ci_left, lin_ci_right, clr[0], f"Lin-log CI")
+        # interval_plot_func(lin_pred, lin_ci_left, lin_ci_right, clr[0], f"Lin-log CI")
 
-        interval_plot_func(log_pred, log_ci_left, log_ci_right, clr[2], f"Log-log CI")
+        # interval_plot_func(log_pred, log_ci_left, log_ci_right, clr[2], f"Log-log CI")
 
-        psn_plot_func(lin_psn_pred, color=clr[0], name=f"Lin-log 5\% PoF")
-        psn_plot_func(log_psn_pred, color=clr[2], name=f"Log-log 5\% PoF")
+        # psn_plot_func(lin_psn_pred, color=clr[0], name=f"Lin-log 5\% PoF")
+        # psn_plot_func(log_psn_pred, color=clr[2], name=f"Log-log 5\% PoF")
 
         ax.legend(loc="upper right", markerscale=1.5, handlelength=1, handleheight=0.9)
         ax.set_xlabel(n_col)
