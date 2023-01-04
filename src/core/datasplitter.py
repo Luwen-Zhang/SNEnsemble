@@ -123,21 +123,21 @@ class MaterialCycleSplitter(AbstractSplitter):
             material_cycle = cycle[where_material]
             m_train_indices = where_material[
                 material_cycle
-                <= np.percentile(material_cycle, self.train_val_test[0] * 100)
+                <= np.percentile(material_cycle, np.sum(self.train_val_test[0:2]) * 100)
             ]
-            m_val_indices = np.setdiff1d(
-                where_material[
-                    material_cycle
-                    <= np.percentile(
-                        material_cycle, np.sum(self.train_val_test[0:2]) * 100
-                    )
-                ],
-                m_train_indices,
-            )
             m_test_indices = where_material[
                 material_cycle
                 > np.percentile(material_cycle, np.sum(self.train_val_test[0:2]) * 100)
             ]
+            m_train_indices, m_val_indices = (
+                train_test_split(
+                    m_train_indices,
+                    test_size=self.train_val_test[1] / np.sum(self.train_val_test[0:2]),
+                    shuffle=True,
+                )
+                if len(m_train_indices) > 1
+                else (m_train_indices, [])
+            )
 
             train_indices += list(m_train_indices)
             val_indices += list(m_val_indices)
@@ -158,17 +158,16 @@ class CycleSplitter(AbstractSplitter):
         cycle = df[label_name].values.flatten()
 
         train_indices = np.where(
-            cycle <= np.percentile(cycle, self.train_val_test[0] * 100)
+            cycle <= np.percentile(cycle, np.sum(self.train_val_test[0:2]) * 100)
         )[0]
-        val_indices = np.setdiff1d(
-            np.where(
-                cycle <= np.percentile(cycle, np.sum(self.train_val_test[0:2]) * 100)
-            )[0],
-            train_indices,
-        )
         test_indices = np.where(
             cycle > np.percentile(cycle, np.sum(self.train_val_test[0:2]) * 100)
         )[0]
+        train_indices, val_indices = train_test_split(
+            train_indices,
+            test_size=self.train_val_test[1] / np.sum(self.train_val_test[0:2]),
+            shuffle=True,
+        )
 
         np.random.shuffle(train_indices)
         np.random.shuffle(val_indices)
