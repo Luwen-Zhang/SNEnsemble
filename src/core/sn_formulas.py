@@ -243,8 +243,8 @@ class KohoutSN(linlogSN):
         s = torch.abs(var_slices[0] - self.s_zero_slip) + 1
         mat = x[:, self.stress_unrelated_features_idx]
         a, b, B = (
-            torch.abs(self.a(mat)) + 1,
-            -torch.abs(self.b(mat)) - 0.1,
+            torch.abs(self.a(mat)) + 1e-4,
+            -torch.abs(self.b(mat)) - 1e-4,
             torch.abs(self.B(mat)),
         )
         C = B + torch.abs(self.C(mat))
