@@ -506,17 +506,23 @@ class Trainer:
 
         return tabular_dataset, feature_names, label_name
 
-    def cross_validation(self, programs, n_random, verbose, test_data_only):
+    def cross_validation(
+        self, programs, n_random, verbose, test_data_only, type="random"
+    ):
         programs_predictions = {}
         for program in programs:
             programs_predictions[program] = {}
+        if type == "random":
+            set_data_handler = self.load_data
+        else:
+            raise Exception(f"{type} cross validation not implemented.")
         for i in range(n_random):
             if verbose:
                 print(
-                    f"----------------------------{i + 1}/{n_random} random cross validation----------------------------"
+                    f"----------------------------{i + 1}/{n_random} {type} cross validation----------------------------"
                 )
             with HiddenPrints(disable_std=not verbose):
-                self.load_data()
+                set_data_handler()
             for program in programs:
                 modelbase = self.get_modelbase(program)
                 modelbase.train(dump_trainer=True, verbose=verbose)
@@ -547,7 +553,7 @@ class Trainer:
                         programs_predictions[program][model_name] = value
             if verbose:
                 print(
-                    f"--------------------------End {i + 1}/{n_random} random cross validation--------------------------"
+                    f"--------------------------End {i + 1}/{n_random} {type} cross validation--------------------------"
                 )
         return programs_predictions
 
