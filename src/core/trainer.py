@@ -295,7 +295,6 @@ class Trainer:
         train_indices=None,
         val_indices=None,
         test_indices=None,
-        preprocess=True,
         warm_start=False,
         verbose=True,
     ):
@@ -321,12 +320,11 @@ class Trainer:
                 test_indices,
             )
 
-        if preprocess:
-            if verbose:
+        if verbose:
+            data = self._data_preprocess(data, warm_start=warm_start)
+        else:
+            with HiddenPrints():
                 data = self._data_preprocess(data, warm_start=warm_start)
-            else:
-                with HiddenPrints():
-                    data = self._data_preprocess(data, warm_start=warm_start)
 
         # Reset indices
         self.retained_indices = np.array(data.index)
