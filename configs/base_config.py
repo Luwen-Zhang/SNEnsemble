@@ -40,6 +40,7 @@ class BaseConfig:
             "data_splitter": "RandomSplitter",
             "data_processors": [
                 "IQRRemover",
+                # "LackDataMaterialRemover",
                 "MeanImputer",
                 "SingleValueFeatureRemover",
                 "UnscaledDataRecorder",

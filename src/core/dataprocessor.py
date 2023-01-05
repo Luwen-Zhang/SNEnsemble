@@ -16,6 +16,27 @@ class AbstractProcessor:
         raise NotImplementedError
 
 
+class LackDataMaterialRemover(AbstractProcessor):
+    def __init__(self):
+        super(LackDataMaterialRemover, self).__init__()
+
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+        data = input_data.copy()
+        m_codes = trainer.df.loc[np.array(data.index), "Material_Code"].copy()
+        m_cnts_index = list(m_codes.value_counts(ascending=False).index)
+        lack_data_mat = m_cnts_index[len(m_cnts_index) // 10 * 8 :]
+        for m_code in lack_data_mat:
+            m_codes = trainer.df.loc[np.array(data.index), "Material_Code"].copy()
+            where_material = m_codes.index[np.where(m_codes == m_code)[0]]
+            data = data.drop(where_material)
+        self.record_features = cp(trainer.feature_names)
+        return data
+
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+        trainer.feature_names = cp(self.record_features)
+        return input_data[self.record_features + trainer.label_name].copy()
+
+
 class IQRRemover(AbstractProcessor):
     def __init__(self):
         super(IQRRemover, self).__init__()
