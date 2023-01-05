@@ -1297,7 +1297,7 @@ class ThisWorkPretrain(ThisWork):
                     f"{selected} materials ({len(abundant_mat_indices)} records) are selected for pretraining."
                 )
             tmp_kwargs["warm_start"] = False
-            tmp_kwargs["verbose"] = False
+            tmp_kwargs["verbose"] = verbose
             self._train(*args, **tmp_kwargs)
 
         if verbose:
