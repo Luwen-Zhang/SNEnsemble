@@ -37,7 +37,7 @@ class BaseConfig:
                     "categories": [32, 64, 128, 256, 512, 1024, 2048, 4096],
                 },
             },
-            "data_splitter": "RandomSplitter",
+            "data_splitter": "MaterialCycleSplitter",
             "data_processors": [
                 # ("IQRRemover", {}),
                 # ("MaterialSelector", {"m_code": "MD-DD5P-UP2[0/±45/0]S"}),
