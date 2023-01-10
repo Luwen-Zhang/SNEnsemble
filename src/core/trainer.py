@@ -171,12 +171,14 @@ class Trainer:
 
         from src.core.dataprocessor import get_data_processor
 
-        if "UnscaledDataRecorder" not in self.args["data_processors"]:
+        if "UnscaledDataRecorder" not in [
+            name for name, _ in self.args["data_processors"]
+        ]:
             if verbose:
                 print(
                     "UnscaledDataRecorder not in the data_processors pipeline. Only scaled data will be recorded."
                 )
-            self.args.append("UnscaledDataRecorder")
+            self.args["data_processors"].append(("UnscaledDataRecorder", {}))
         self.dataprocessors = [
             (get_data_processor(name), kwargs)
             for name, kwargs in self.args["data_processors"]
