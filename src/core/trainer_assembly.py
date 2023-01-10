@@ -15,10 +15,9 @@ class TrainerAssembly:
             if projects is None
             else projects
         )
+        t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         self.project_root = (
-            "output/assembly/"
-            + "_".join([trainer.configfile for trainer in self.trainers])
-            + "/"
+            f'output/assembly/{t}-{"".join([x[0] for x in self.projects])}/'
         )
         self.leaderboard = None
         if not os.path.exists("output/assembly/"):
@@ -130,7 +129,7 @@ class TrainerAssembly:
         print(f"Metrics:\n{pretty(metrics)}")
 
         for program in programs:
-            print(f"\n-------------------- Program: {program} --------------------\n")
+            print(f"Evaluate program: {program}")
             unique_model_names = []
             all_model_names = []
             all_predictions = []
