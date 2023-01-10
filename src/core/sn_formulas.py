@@ -24,7 +24,11 @@ class AbstractSN(nn.Module):
             == self.trainer.args["feature_types"].index("Material")
         ]
         self.material_features_idx = np.array(
-            [self.trainer.feature_names.index(name) for name in self.material_features]
+            [
+                self.tabular_feature_names.index(name)
+                for name in self.material_features
+                if name in self.tabular_feature_names
+            ]
         )
         self.stress_unrelated_features_idx = np.array(
             [
