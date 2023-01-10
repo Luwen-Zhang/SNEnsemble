@@ -180,13 +180,13 @@ splitter_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:
     if issubclass(cls, AbstractSplitter):
-        splitter_mapping[name] = cls()
+        splitter_mapping[name] = cls
 
 
 def get_data_splitter(name: str):
     if name not in splitter_mapping.keys():
         raise Exception(f"Data splitter {name} not implemented.")
-    elif not issubclass(type(splitter_mapping[name]), AbstractSplitter):
+    elif not issubclass(splitter_mapping[name], AbstractSplitter):
         raise Exception(f"{name} is not the subclass of AbstractSplitter.")
     else:
         return splitter_mapping[name]

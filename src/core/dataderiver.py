@@ -236,13 +236,13 @@ deriver_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:
     if issubclass(cls, AbstractDeriver):
-        deriver_mapping[name] = cls()
+        deriver_mapping[name] = cls
 
 
 def get_data_deriver(name: str):
     if name not in deriver_mapping.keys():
         raise Exception(f"Data deriver {name} not implemented.")
-    elif not issubclass(type(deriver_mapping[name]), AbstractDeriver):
+    elif not issubclass(deriver_mapping[name], AbstractDeriver):
         raise Exception(f"{name} is not the subclass of AbstractDeriver.")
     else:
         return deriver_mapping[name]

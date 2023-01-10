@@ -196,7 +196,7 @@ class Trainer:
     def set_data_splitter(self, name, verbose=True):
         from src.core.datasplitter import get_data_splitter
 
-        self.datasplitter = get_data_splitter(name)
+        self.datasplitter = get_data_splitter(name)()
 
     def set_data_processors(self, config: List[Tuple], verbose=True):
         from src.core.dataprocessor import get_data_processor
@@ -208,14 +208,14 @@ class Trainer:
                 )
             self.args["data_processors"].append(("UnscaledDataRecorder", {}))
         self.dataprocessors = [
-            (get_data_processor(name), kwargs) for name, kwargs in config
+            (get_data_processor(name)(), kwargs) for name, kwargs in config
         ]
 
     def set_data_derivers(self, config: List[Tuple], verbose=True):
         from src.core.dataderiver import get_data_deriver
 
         self.dataderivers = [
-            (get_data_deriver(name), kwargs) for name, kwargs in config
+            (get_data_deriver(name)(), kwargs) for name, kwargs in config
         ]
 
     def load_data(self, data_path: str = None) -> None:

@@ -328,13 +328,13 @@ processor_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:
     if issubclass(cls, AbstractProcessor):
-        processor_mapping[name] = cls()
+        processor_mapping[name] = cls
 
 
 def get_data_processor(name: str):
     if name not in processor_mapping.keys():
         raise Exception(f"Data processor {name} not implemented.")
-    elif not issubclass(type(processor_mapping[name]), AbstractProcessor):
+    elif not issubclass(processor_mapping[name], AbstractProcessor):
         raise Exception(f"{name} is not the subclass of AbstractProcessor.")
     else:
         return processor_mapping[name]
