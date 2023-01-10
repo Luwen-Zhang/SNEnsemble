@@ -14,7 +14,7 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            "project": "FACT_fatigue",
+            "database": "FACT_fatigue",
             "feature_names_type": {
                 # 'Lay-up': 1,
                 "Percentage of Fibre in 0-deg Direction": 1,

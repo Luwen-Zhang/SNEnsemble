@@ -28,8 +28,9 @@ sys.path.append("configs/")
 
 
 class Trainer:
-    def __init__(self, device="cpu"):
+    def __init__(self, device="cpu", project=None):
         self.device = device
+        self.project = project
         self.modelbases = []
         self.modelbases_names = []
 
@@ -132,7 +133,7 @@ class Trainer:
         self.loss = self.args["loss"]
         self.bayes_opt = self.args["bayes_opt"]
 
-        self.project = self.args["project"]
+        self.database = self.args["database"]
 
         self.static_params = self.args["static_params"]
         self.chosen_params = self.args["chosen_params"]
@@ -173,7 +174,7 @@ class Trainer:
             time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + "_" + self.configfile
         )
 
-        self.data_path = f"data/{self.project}.xlsx"
+        self.project = self.database if self.project is None else self.project
         self.project_root = f"output/{self.project}/{folder_name}/"
 
         if not os.path.exists(f"output/{self.project}"):
@@ -216,10 +217,11 @@ class Trainer:
         :return: None
         """
         if data_path is None:
-            self.df = pd.read_excel(self.data_path, engine="openpyxl")
+            data_path = f"data/{self.database}.xlsx"
+            self.df = pd.read_excel(data_path, engine="openpyxl")
         else:
             self.df = pd.read_excel(data_path, engine="openpyxl")
-            self.data_path = data_path
+        self.data_path = data_path
 
         feature_names = list(self.args["feature_names_type"].keys())
         label_name = self.args["label_name"]

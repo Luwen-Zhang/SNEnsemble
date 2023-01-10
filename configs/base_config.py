@@ -6,7 +6,7 @@ This is a base of all other configuration files. It is not a file for the input 
 class BaseConfig:
     def __init__(self):
         self.data = {
-            "project": "FACT_fatigue",
+            "database": "FACT_fatigue",
             "loss": "mse",
             "bayes_opt": False,
             "bayes_epoch": 3,

@@ -14,7 +14,7 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            "project": "Upwind_avg_static",
+            "database": "Upwind_avg_static",
             "feature_names_type": {
                 "Thickness": 1,
                 "Width": 1,

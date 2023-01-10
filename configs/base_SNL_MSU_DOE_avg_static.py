@@ -14,7 +14,7 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            "project": "SNL_MSU_DOE_avg_static",
+            "database": "SNL_MSU_DOE_avg_static",
             "feature_names_type": {
                 "Percentage of Fibre in 0-deg Direction": 1,
                 "Percentage of Fibre in 45-deg Direction": 1,

@@ -14,7 +14,7 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            "project": "Upwind_fatigue",
+            "database": "Upwind_fatigue",
             "feature_names_type": {
                 "Thickness": 1,
                 "Width": 1,

@@ -9,7 +9,7 @@ from skopt import gp_minimize
 class AbstractModel:
     def __init__(self, trainer: Trainer = None, program=None):
         self.trainer = trainer
-        if not hasattr(trainer, "project"):
+        if not hasattr(trainer, "database"):
             trainer.load_config(default_configfile="base_config")
         self.model = None
         self.leaderboard = None

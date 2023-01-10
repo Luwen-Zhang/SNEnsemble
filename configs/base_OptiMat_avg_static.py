@@ -14,7 +14,7 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            "project": "OptiMat_avg_static",
+            "database": "OptiMat_avg_static",
             "feature_names_type": {
                 "Width": 1,
                 "Area": 1,

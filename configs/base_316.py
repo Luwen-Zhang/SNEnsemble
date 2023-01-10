@@ -14,7 +14,7 @@ class config(BaseConfig):
             super(config, self).__init__()
 
         cfg = {
-            "project": "316_creep_fatigue_life_prediction",
+            "database": "316_creep_fatigue_life_prediction",
             "feature_names_type": {
                 "wt.C": 1,
                 "wt.Si": 1,
