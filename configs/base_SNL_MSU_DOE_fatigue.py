@@ -22,7 +22,7 @@ class config(BaseConfig):
                 "Percentage of Fibre in Other Direction": 1,
                 # "Absolute Maximum Stress": 0,
                 # "Absolute Peak-to-peak Stress": 0,
-                "Frequency": 0,
+                # "Frequency": 0,
                 "Fibre Volumn Fraction": 1,
                 # "Relative Maximum Stress": 0,
                 # "Relative Peak-to-peak Stress": 0,
