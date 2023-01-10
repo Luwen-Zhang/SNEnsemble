@@ -1246,8 +1246,8 @@ class Trainer:
             n_pred_vals=mean_pred,
         )
 
-        interval_plot_func(mean_pred, ci_left, ci_right, clr[1], f"ThisWork CI")
-        psn_plot_func(psn_pred, color=clr[1], name=f"ThisWork 5\% PoF")
+        interval_plot_func(mean_pred, ci_left, ci_right, clr[1], f"{model_name} CI")
+        psn_plot_func(psn_pred, color=clr[1], name=f"{model_name} 5\% PoF")
 
         # Get predictions, intervals and psn for lin-log and log-log SN.
         lin_pred, lin_ci_left, lin_ci_right, lin_psn_pred = get_interval_psn(
