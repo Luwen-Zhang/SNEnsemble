@@ -53,6 +53,8 @@ class MaterialSelector(AbstractProcessor):
             raise Exception('MaterialSelector requires the argument "m_code".')
         data = input_data.copy()
         m_codes = trainer.df.loc[np.array(data.index), "Material_Code"].copy()
+        if m_code not in list(m_codes):
+            raise Exception(f"m_code {m_code} not available.")
         where_material = m_codes.index[np.where(m_codes == m_code)[0]]
         data = data.loc[where_material, :]
         self.record_features = cp(trainer.feature_names)
@@ -63,6 +65,8 @@ class MaterialSelector(AbstractProcessor):
         trainer.feature_names = cp(self.record_features)
         data = input_data.copy()
         m_codes = data.loc[:, "Material_Code"].copy()
+        if self.m_code not in list(m_codes):
+            raise Exception(f"m_code {self.m_code} not available.")
         where_material = m_codes.index[np.where(m_codes == self.m_code)[0]]
         data = data.loc[where_material, :]
         return data
