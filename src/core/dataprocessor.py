@@ -37,6 +37,27 @@ class LackDataMaterialRemover(AbstractProcessor):
         return input_data[self.record_features + trainer.label_name].copy()
 
 
+class MaterialSelector(AbstractProcessor):
+    def __init__(self):
+        super(MaterialSelector, self).__init__()
+
+    def fit_transform(
+        self, input_data: pd.DataFrame, trainer: Trainer, m_code=None, **kwargs
+    ):
+        if m_code is None:
+            raise Exception('MaterialSelector requires the argument "m_code".')
+        data = input_data.copy()
+        m_codes = trainer.df.loc[np.array(data.index), "Material_Code"].copy()
+        where_material = m_codes.index[np.where(m_codes == m_code)[0]]
+        data = data.loc[where_material, :]
+        self.record_features = cp(trainer.feature_names)
+        return data
+
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        trainer.feature_names = cp(self.record_features)
+        return input_data[self.record_features + trainer.label_name].copy()
+
+
 class IQRRemover(AbstractProcessor):
     def __init__(self):
         super(IQRRemover, self).__init__()
