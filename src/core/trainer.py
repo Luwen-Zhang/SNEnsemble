@@ -351,6 +351,21 @@ class Trainer:
             drop=True
         )
 
+        if (
+            len(self.train_indices) == 0
+            or len(self.val_indices) == 0
+            or len(self.test_indices) == 0
+        ):
+            print(
+                f"No sufficient data after preprocessing. Splitting datasets again which might make data transformation"
+                f" not reasonable."
+            )
+            (
+                self.train_indices,
+                self.val_indices,
+                self.test_indices,
+            ) = self.datasplitter.split(self.df, feature_names, label_name)
+
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
 
