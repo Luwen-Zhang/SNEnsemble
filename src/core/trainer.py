@@ -368,6 +368,7 @@ class Trainer:
                 data = processor.transform(data, self, **kwargs)
             else:
                 data = processor.fit_transform(data, self, **kwargs)
+        data = data[self.feature_names + self.label_name]
         return data
 
     def _data_transform(self, input_data: pd.DataFrame):
@@ -377,6 +378,7 @@ class Trainer:
         for processor, kwargs in self.dataprocessors:
             if issubclass(type(processor), AbstractTransformer):
                 data = processor.transform(data, self, **kwargs)
+        data = data[self.feature_names + self.label_name]
         return data
 
     def _update_dataset_auto(self):

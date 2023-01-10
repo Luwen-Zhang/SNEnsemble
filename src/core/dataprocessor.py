@@ -34,7 +34,7 @@ class LackDataMaterialRemover(AbstractProcessor):
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
-        return input_data[self.record_features + trainer.label_name].copy()
+        return input_data.copy()
 
 
 class MaterialSelector(AbstractProcessor):
@@ -55,7 +55,7 @@ class MaterialSelector(AbstractProcessor):
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
-        return input_data[self.record_features + trainer.label_name].copy()
+        return input_data.copy()
 
 
 class IQRRemover(AbstractProcessor):
@@ -88,7 +88,7 @@ class IQRRemover(AbstractProcessor):
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
-        return input_data[self.record_features + trainer.label_name].copy()
+        return input_data.copy()
 
 
 class StdRemover(AbstractProcessor):
@@ -116,7 +116,7 @@ class StdRemover(AbstractProcessor):
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
-        return input_data[self.record_features + trainer.label_name].copy()
+        return input_data.copy()
 
 
 class SingleValueFeatureRemover(AbstractProcessor):
@@ -143,7 +143,7 @@ class SingleValueFeatureRemover(AbstractProcessor):
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
-        return input_data[self.record_features + trainer.label_name].copy()
+        return input_data.copy()
 
 
 class UnscaledDataRecorder(AbstractProcessor):
@@ -163,7 +163,7 @@ class UnscaledDataRecorder(AbstractProcessor):
         feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
         trainer.unscaled_feature_data = feature_data
         trainer.unscaled_label_data = label_data
-        return input_data[self.record_features + trainer.label_name].copy()
+        return input_data.copy()
 
 
 class AbstractTransformer(AbstractProcessor):
@@ -214,15 +214,11 @@ class MeanImputer(AbstractTransformer):
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
-        return pd.DataFrame(
-            data=np.hstack(
-                (
-                    self.transformer.transform(input_data[self.record_features]),
-                    input_data[trainer.label_name].values,
-                )
-            ),
-            columns=self.record_features + trainer.label_name,
+        data = input_data.copy()
+        data.loc[:, trainer.feature_names] = self.transformer.transform(
+            data.loc[:, trainer.feature_names]
         ).astype(np.float32)
+        return data
 
 
 class NaNImputer(AbstractTransformer):
@@ -268,15 +264,11 @@ class StandardScaler(AbstractTransformer):
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
-        return pd.DataFrame(
-            data=np.hstack(
-                (
-                    self.transformer.transform(input_data[self.record_features]),
-                    input_data[trainer.label_name].values,
-                )
-            ),
-            columns=self.record_features + trainer.label_name,
+        data = input_data.copy()
+        data.loc[:, trainer.feature_names] = self.transformer.transform(
+            data.loc[:, trainer.feature_names]
         ).astype(np.float32)
+        return data
 
 
 processor_mapping = {}
