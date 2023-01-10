@@ -264,23 +264,27 @@ class TrainerAssembly:
         df_leaderboard.sort_values("Testing RMSE", inplace=True)
         df_leaderboard.reset_index(drop=True, inplace=True)
 
-        model_existence = df_leaderboard["Model"]
+        model_existence = df_leaderboard[["Program", "Model"]]
         model_existence = pd.concat(
             [model_existence, pd.DataFrame(columns=selected_projects)], axis=1
         )
+        all_model_names = [
+            program + model
+            for program, model in zip(
+                df_leaderboard["Program"], df_leaderboard["Model"]
+            )
+        ]
         for project in selected_projects:
-            all_model_names = []
+            all_exist_model_names = []
             trainer = self.trainers[self.projects.index(project)]
             for program in programs:
                 modelbase = trainer.get_modelbase(program)
                 model_names = modelbase._get_model_names()
-                all_model_names += model_names
+                all_exist_model_names += [program + name for name in model_names]
 
-            unique_exist_model_names = list(set(all_model_names))
+            unique_exist_model_names = list(set(all_exist_model_names))
             for model_name in unique_exist_model_names:
-                model_existence.loc[
-                    list(model_existence["Model"]).index(model_name), project
-                ] = 1
+                model_existence.loc[all_model_names.index(model_name), project] = 1
 
         df_leaderboard = pd.concat(
             [df_leaderboard, model_existence[selected_projects]], axis=1
