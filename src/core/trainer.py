@@ -333,27 +333,19 @@ class Trainer:
         self.dropped_indices = np.setdiff1d(
             np.arange(original_length), self.retained_indices
         )
-        self.train_indices = np.array(
-            [
-                x - np.count_nonzero(self.dropped_indices < x)
-                for x in self.train_indices
-                if x in data.index
-            ]
-        )
-        self.val_indices = np.array(
-            [
-                x - np.count_nonzero(self.dropped_indices < x)
-                for x in self.val_indices
-                if x in data.index
-            ]
-        )
-        self.test_indices = np.array(
-            [
-                x - np.count_nonzero(self.dropped_indices < x)
-                for x in self.test_indices
-                if x in data.index
-            ]
-        )
+
+        def update_indices(indices):
+            return np.array(
+                [
+                    x - np.count_nonzero(self.dropped_indices < x)
+                    for x in indices
+                    if x in data.index
+                ]
+            )
+
+        self.train_indices = update_indices(self.train_indices)
+        self.test_indices = update_indices(self.test_indices)
+        self.val_indices = update_indices(self.val_indices)
 
         self.df = pd.DataFrame(self.df.loc[self.retained_indices, :]).reset_index(
             drop=True
