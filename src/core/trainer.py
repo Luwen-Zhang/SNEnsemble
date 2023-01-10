@@ -305,10 +305,9 @@ class Trainer:
         self.label_data = self.df[self.label_name]
         self.unscaled_feature_data = cp(self.feature_data)
         self.unscaled_label_data = cp(self.label_data)
-        data, feature_names, label_name = self._get_tabular_dataset()
-        data.reset_index(drop=True, inplace=True)
+        _, feature_names, label_name = self._get_tabular_dataset()
         self.df.reset_index(drop=True, inplace=True)
-        original_length = len(data)
+        original_length = len(self.df)
 
         if train_indices is None or val_indices is None or test_indices is None:
             (
@@ -324,10 +323,10 @@ class Trainer:
             )
 
         if verbose:
-            data = self._data_preprocess(data, warm_start=warm_start)
+            data = self._data_preprocess(self.df, warm_start=warm_start)
         else:
             with HiddenPrints():
-                data = self._data_preprocess(data, warm_start=warm_start)
+                data = self._data_preprocess(self.df, warm_start=warm_start)
 
         # Reset indices
         self.retained_indices = np.array(data.index)
