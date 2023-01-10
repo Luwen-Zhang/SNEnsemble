@@ -29,35 +29,44 @@ class config(BaseConfig):
                 # 'Load Length': 1,
                 # 'Fibre Volumn Fraction': 1,
             },
-            "data_derivers": {
-                "MinStressDeriver": {
-                    "derived_name": "Minimum Stress",
-                    "stacked": True,
-                    "intermediate": True,
-                    "max_stress_col": "Maximum Stress",
-                    "r_value_col": "R-value",
-                },
-                "SuppStressDeriver": {
-                    "derived_name": "Support Stress",
-                    "stacked": True,
-                    "max_stress_col": "Maximum Stress",
-                    "min_stress_col": "Minimum Stress",
-                    "ucs_col": "Static Maximum Compressive Stress",
-                    "uts_col": "Static Maximum Tensile Stress",
-                    "relative": False,
-                },
-                "DegLayerDeriver": {
-                    "sequence_column": "Sequence",
-                    "derived_name": "deg_layers",
-                    "col_names": [
-                        "0-deg layers",
-                        "45-deg layers",
-                        "90-deg layers",
-                        "Other-deg layers",
-                    ],
-                    "stacked": True,
-                },
-            },
+            "data_derivers": [
+                (
+                    "MinStressDeriver",
+                    {
+                        "derived_name": "Minimum Stress",
+                        "stacked": True,
+                        "intermediate": True,
+                        "max_stress_col": "Maximum Stress",
+                        "r_value_col": "R-value",
+                    },
+                ),
+                (
+                    "SuppStressDeriver",
+                    {
+                        "derived_name": "Support Stress",
+                        "stacked": True,
+                        "max_stress_col": "Maximum Stress",
+                        "min_stress_col": "Minimum Stress",
+                        "ucs_col": "Static Maximum Compressive Stress",
+                        "uts_col": "Static Maximum Tensile Stress",
+                        "relative": False,
+                    },
+                ),
+                (
+                    "DegLayerDeriver",
+                    {
+                        "sequence_column": "Sequence",
+                        "derived_name": "deg_layers",
+                        "col_names": [
+                            "0-deg layers",
+                            "45-deg layers",
+                            "90-deg layers",
+                            "Other-deg layers",
+                        ],
+                        "stacked": True,
+                    },
+                ),
+            ],
             "feature_types": ["Fatigue loading", "Material", "Derived"],
             "label_name": ["log(Cycles to Failure)"],
         }

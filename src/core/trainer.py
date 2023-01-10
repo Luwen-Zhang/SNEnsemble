@@ -179,14 +179,14 @@ class Trainer:
             self.args.append("UnscaledDataRecorder")
         self.dataprocessors = [
             (get_data_processor(name), kwargs)
-            for name, kwargs in self.args["data_processors"].items()
+            for name, kwargs in self.args["data_processors"]
         ]
 
         from src.core.dataderiver import get_data_deriver
 
         self.dataderivers = [
             (get_data_deriver(name), kwargs)
-            for name, kwargs in self.args["data_derivers"].items()
+            for name, kwargs in self.args["data_derivers"]
         ]
 
         folder_name = (
