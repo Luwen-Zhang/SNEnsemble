@@ -51,6 +51,7 @@ class Trainer:
         default_configfile: str = None,
         verbose: bool = True,
         manual_config: dict = None,
+        project_root_subfolder: str = None,
     ) -> None:
         """
         Load a configfile.
@@ -172,20 +173,28 @@ class Trainer:
         self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
 
         self.project = self.database if self.project is None else self.project
-        self.create_dir()
+        self.create_dir(project_root_subfolder=project_root_subfolder)
 
-    def create_dir(self, verbose=True):
+    def create_dir(self, verbose=True, project_root_subfolder=None):
+        if project_root_subfolder is not None:
+            if not os.path.exists(f"output/{project_root_subfolder}"):
+                os.mkdir(f"output/{project_root_subfolder}")
+        subfolder = (
+            self.project
+            if project_root_subfolder is None
+            else f"{project_root_subfolder}/{self.project}"
+        )
         t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         folder_name = t + "-0" + "_" + self.configfile
-        self.project_root = f"output/{self.project}/{folder_name}/"
-        if not os.path.exists(f"output/{self.project}"):
-            os.mkdir(f"output/{self.project}")
+        self.project_root = f"output/{subfolder}/{folder_name}/"
+        if not os.path.exists(f"output/{subfolder}"):
+            os.mkdir(f"output/{subfolder}")
         postfix_iter = itertools.count()
         while os.path.exists(self.project_root):
             tmp_folder_name = (
                 t + "-" + str(postfix_iter.__next__()) + "_" + self.configfile
             )
-            self.project_root = f"output/{self.project}/{tmp_folder_name}/"
+            self.project_root = f"output/{subfolder}/{tmp_folder_name}/"
         if not os.path.exists(self.project_root):
             os.mkdir(self.project_root)
 
