@@ -9,10 +9,10 @@ class AbstractProcessor:
     def __init__(self):
         self.record_features = None
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         raise NotImplementedError
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         raise NotImplementedError
 
 
@@ -20,7 +20,7 @@ class LackDataMaterialRemover(AbstractProcessor):
     def __init__(self):
         super(LackDataMaterialRemover, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         data = input_data.copy()
         m_codes = trainer.df.loc[np.array(data.index), "Material_Code"].copy()
         m_cnts_index = list(m_codes.value_counts(ascending=False).index)
@@ -32,7 +32,7 @@ class LackDataMaterialRemover(AbstractProcessor):
         self.record_features = cp(trainer.feature_names)
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
         return input_data[self.record_features + trainer.label_name].copy()
 
@@ -41,7 +41,7 @@ class IQRRemover(AbstractProcessor):
     def __init__(self):
         super(IQRRemover, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         print(f"Removing outliers by IQR. Original size: {len(input_data)}, ", end="")
         data = input_data.copy()
         for feature in trainer.feature_names:
@@ -65,7 +65,7 @@ class IQRRemover(AbstractProcessor):
         self.record_features = cp(trainer.feature_names)
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
         return input_data[self.record_features + trainer.label_name].copy()
 
@@ -74,7 +74,7 @@ class StdRemover(AbstractProcessor):
     def __init__(self):
         super(StdRemover, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         print(f"Removing outliers by std. Original size: {len(input_data)}, ", end="")
         data = input_data.copy()
         for feature in trainer.feature_names:
@@ -93,7 +93,7 @@ class StdRemover(AbstractProcessor):
         self.record_features = cp(trainer.feature_names)
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
         return input_data[self.record_features + trainer.label_name].copy()
 
@@ -102,7 +102,7 @@ class SingleValueFeatureRemover(AbstractProcessor):
     def __init__(self):
         super(SingleValueFeatureRemover, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         data = input_data.copy()
         retain_features = []
         removed_features = []
@@ -120,7 +120,7 @@ class SingleValueFeatureRemover(AbstractProcessor):
         self.record_features = cp(trainer.feature_names)
         return data[retain_features + trainer.label_name]
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
         return input_data[self.record_features + trainer.label_name].copy()
 
@@ -129,7 +129,7 @@ class UnscaledDataRecorder(AbstractProcessor):
     def __init__(self):
         super(UnscaledDataRecorder, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
 
         trainer.unscaled_feature_data = feature_data
@@ -137,7 +137,7 @@ class UnscaledDataRecorder(AbstractProcessor):
         self.record_features = cp(trainer.feature_names)
         return input_data.copy()
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
         feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
         trainer.unscaled_feature_data = feature_data
@@ -169,7 +169,7 @@ class MeanImputer(AbstractTransformer):
     def __init__(self):
         super(MeanImputer, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         data = input_data.copy()
         from sklearn.impute import SimpleImputer
 
@@ -191,7 +191,7 @@ class MeanImputer(AbstractTransformer):
         self.record_features = cp(trainer.feature_names)
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
         return pd.DataFrame(
             data=np.hstack(
@@ -208,12 +208,12 @@ class NaNImputer(AbstractTransformer):
     def __init__(self):
         super(NaNImputer, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         data = input_data.copy()
         self.record_features = cp(trainer.feature_names)
         return data.dropna(axis=0, subset=trainer.feature_names)
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
         data = input_data.copy()
         return data.dropna(axis=0, subset=self.record_features)
@@ -223,7 +223,7 @@ class StandardScaler(AbstractTransformer):
     def __init__(self):
         super(StandardScaler, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         data = input_data.copy()
         from sklearn.preprocessing import StandardScaler as ss
 
@@ -245,7 +245,7 @@ class StandardScaler(AbstractTransformer):
         self.record_features = cp(trainer.feature_names)
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer):
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
         return pd.DataFrame(
             data=np.hstack(

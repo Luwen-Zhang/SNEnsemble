@@ -178,7 +178,8 @@ class Trainer:
                 )
             self.args.append("UnscaledDataRecorder")
         self.dataprocessors = [
-            get_data_processor(name) for name in self.args["data_processors"]
+            (get_data_processor(name), kwargs)
+            for name, kwargs in self.args["data_processors"].items()
         ]
 
         from src.core.dataderiver import get_data_deriver
@@ -362,20 +363,20 @@ class Trainer:
 
     def _data_preprocess(self, input_data: pd.DataFrame, warm_start=False):
         data = input_data.copy()
-        for processor in self.dataprocessors:
+        for processor, kwargs in self.dataprocessors:
             if warm_start:
-                data = processor.transform(data, self)
+                data = processor.transform(data, self, **kwargs)
             else:
-                data = processor.fit_transform(data, self)
+                data = processor.fit_transform(data, self, **kwargs)
         return data
 
     def _data_transform(self, input_data: pd.DataFrame):
         data = input_data.copy()
         from src.core.dataprocessor import AbstractTransformer
 
-        for processor in self.dataprocessors:
+        for processor, kwargs in self.dataprocessors:
             if issubclass(type(processor), AbstractTransformer):
-                data = processor.transform(data, self)
+                data = processor.transform(data, self, **kwargs)
         return data
 
     def _update_dataset_auto(self):
@@ -402,11 +403,11 @@ class Trainer:
             raise Exception(f"Run load_config first.")
         elif len(self.dataprocessors) == 0 and feature_name in self.feature_names:
             return 0
-        if feature_name not in self.dataprocessors[-1].record_features:
+        if feature_name not in self.dataprocessors[-1][0].record_features:
             raise Exception(f"Feature {feature_name} not available.")
 
         x = 0
-        for processor in self.dataprocessors:
+        for processor, _ in self.dataprocessors:
             if hasattr(processor, "transformer"):
                 x = processor.zero_slip(feature_name, x)
         return x
@@ -1444,7 +1445,7 @@ class Trainer:
             if refit:
                 bootstrap_model.fit(
                     df_bootstrap,
-                    self.dataprocessors[0].record_features,
+                    self.dataprocessors[0][0].record_features,
                     self.label_name,
                     verbose=False,
                     warm_start=True,
