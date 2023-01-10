@@ -199,6 +199,36 @@ class SingleValueFeatureRemover(AbstractProcessor):
         return input_data.copy()
 
 
+class NaNFeatureRemover(AbstractProcessor):
+    def __init__(self):
+        super(NaNFeatureRemover, self).__init__()
+
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        data = input_data.copy()
+        retain_features = []
+        removed_features = []
+        all_missing_idx = np.where(
+            np.isnan(data[trainer.feature_names].values).all(axis=0)
+        )[0]
+        for idx, feature in enumerate(trainer.feature_names):
+            if idx in all_missing_idx:
+                removed_features.append(feature)
+            else:
+                retain_features.append(feature)
+
+        if len(removed_features) > 0:
+            trainer.feature_names = retain_features
+            print(
+                f"{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features retained: {retain_features}."
+            )
+        self.record_features = cp(trainer.feature_names)
+        return data[retain_features + trainer.label_name]
+
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        trainer.feature_names = cp(self.record_features)
+        return input_data.copy()
+
+
 class UnscaledDataRecorder(AbstractProcessor):
     def __init__(self):
         super(UnscaledDataRecorder, self).__init__()
@@ -253,6 +283,10 @@ class MeanImputer(AbstractTransformer):
             np.array(data.index),
         )
         trans_indices = np.setdiff1d(np.array(data.index), fit_indices)
+        # https://github.com/scikit-learn/scikit-learn/issues/16426
+        # SimpleImputer reduces the number of features without giving messages. The issue is fixed in
+        # scikit-learn==1.2.0 by an argument "keep_empty_features"; however, autogluon==0.6.1 requires
+        # scikit-learn<1.2.0.
         data.loc[fit_indices, trainer.feature_names] = imputer.fit_transform(
             data.loc[fit_indices, trainer.feature_names]
         ).astype(np.float32)

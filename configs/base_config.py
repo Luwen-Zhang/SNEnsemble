@@ -42,6 +42,8 @@ class BaseConfig:
                 # ("IQRRemover", {}),
                 # ("MaterialSelector", {"m_code": "MD-DD5P-UP2[0/±45/0]S"}),
                 # ("LackDataMaterialRemover", {}),
+                # ("FeatureValueSelector", {"feature": "R-value", "value": 0.1}),
+                ("NaNFeatureRemover", {}),
                 ("MeanImputer", {}),
                 # ("SingleValueFeatureRemover", {}),
                 ("UnscaledDataRecorder", {}),
