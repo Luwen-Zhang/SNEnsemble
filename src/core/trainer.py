@@ -21,6 +21,7 @@ import json
 from copy import deepcopy as cp
 from sklearn.utils import resample
 import scipy.stats as st
+import itertools
 
 set_random_seed(0)
 
@@ -170,19 +171,27 @@ class Trainer:
         self.set_data_processors(self.args["data_processors"], verbose=verbose)
         self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
 
-        folder_name = (
-            time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + "_" + self.configfile
-        )
-
         self.project = self.database if self.project is None else self.project
-        self.project_root = f"output/{self.project}/{folder_name}/"
+        self.create_dir()
 
+    def create_dir(self, verbose=True):
+        t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+        folder_name = t + "-0" + "_" + self.configfile
+        self.project_root = f"output/{self.project}/{folder_name}/"
         if not os.path.exists(f"output/{self.project}"):
             os.mkdir(f"output/{self.project}")
+        postfix_iter = itertools.count()
+        while os.path.exists(self.project_root):
+            tmp_folder_name = (
+                t + "-" + str(postfix_iter.__next__()) + "_" + self.configfile
+            )
+            self.project_root = f"output/{self.project}/{tmp_folder_name}/"
         if not os.path.exists(self.project_root):
             os.mkdir(self.project_root)
 
-        json.dump(arg_loaded, open(self.project_root + "args.json", "w"), indent=4)
+        json.dump(self.args, open(self.project_root + "args.json", "w"), indent=4)
+        if verbose:
+            print(f"Project will be saved to {self.project_root}")
 
     def set_data_splitter(self, name, verbose=True):
         from src.core.datasplitter import get_data_splitter
