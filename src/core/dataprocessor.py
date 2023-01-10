@@ -68,6 +68,45 @@ class MaterialSelector(AbstractProcessor):
         return data
 
 
+class FeatureValueSelector(AbstractProcessor):
+    def __init__(self):
+        super(FeatureValueSelector, self).__init__()
+
+    def fit_transform(
+        self,
+        input_data: pd.DataFrame,
+        trainer: Trainer,
+        feature=None,
+        value=None,
+        **kwargs,
+    ):
+        if feature is None or value is None:
+            raise Exception(
+                'FeatureValueSelector requires arguments "feature" and "value".'
+            )
+        data = input_data.copy()
+        if value not in list(data[feature]):
+            raise Exception(
+                f"Value {value} not available for feature {feature}. Select from {data[feature].unique()}"
+            )
+        where_value = data.index[np.where(data[feature] == value)[0]]
+        data = data.loc[where_value, :]
+        self.record_features = cp(trainer.feature_names)
+        self.feature, self.value = feature, value
+        return data
+
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        trainer.feature_names = cp(self.record_features)
+        data = input_data.copy()
+        if self.value not in list(data[self.feature]):
+            raise Exception(
+                f"Value {self.value} not available for feature {self.feature}. Select from {data[self.feature].unique()}"
+            )
+        where_value = data.index[np.where(data[self.feature] == self.value)[0]]
+        data = data.loc[where_value, :]
+        return data
+
+
 class IQRRemover(AbstractProcessor):
     def __init__(self):
         super(IQRRemover, self).__init__()
