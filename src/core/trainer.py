@@ -2,7 +2,7 @@
 The basic class for the project. It includes configuration, data processing, plotting,
 and comparing baseline models.
 """
-from typing import Tuple
+from typing import *
 import os.path
 from ..utils.utils import *
 import torch
@@ -165,31 +165,9 @@ class Trainer:
 
         self.bayes_epoch = self.args["bayes_epoch"]
 
-        from src.core.datasplitter import get_data_splitter
-
-        self.datasplitter = get_data_splitter(self.args["data_splitter"])
-
-        from src.core.dataprocessor import get_data_processor
-
-        if "UnscaledDataRecorder" not in [
-            name for name, _ in self.args["data_processors"]
-        ]:
-            if verbose:
-                print(
-                    "UnscaledDataRecorder not in the data_processors pipeline. Only scaled data will be recorded."
-                )
-            self.args["data_processors"].append(("UnscaledDataRecorder", {}))
-        self.dataprocessors = [
-            (get_data_processor(name), kwargs)
-            for name, kwargs in self.args["data_processors"]
-        ]
-
-        from src.core.dataderiver import get_data_deriver
-
-        self.dataderivers = [
-            (get_data_deriver(name), kwargs)
-            for name, kwargs in self.args["data_derivers"]
-        ]
+        self.set_data_splitter(name=self.args["data_splitter"], verbose=verbose)
+        self.set_data_processors(self.args["data_processors"], verbose=verbose)
+        self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
 
         folder_name = (
             time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + "_" + self.configfile
@@ -204,6 +182,31 @@ class Trainer:
             os.mkdir(self.project_root)
 
         json.dump(arg_loaded, open(self.project_root + "args.json", "w"), indent=4)
+
+    def set_data_splitter(self, name, verbose=True):
+        from src.core.datasplitter import get_data_splitter
+
+        self.datasplitter = get_data_splitter(name)
+
+    def set_data_processors(self, config: List[Tuple], verbose=True):
+        from src.core.dataprocessor import get_data_processor
+
+        if "UnscaledDataRecorder" not in [name for name, _ in config]:
+            if verbose:
+                print(
+                    "UnscaledDataRecorder not in the data_processors pipeline. Only scaled data will be recorded."
+                )
+            self.args["data_processors"].append(("UnscaledDataRecorder", {}))
+        self.dataprocessors = [
+            (get_data_processor(name), kwargs) for name, kwargs in config
+        ]
+
+    def set_data_derivers(self, config: List[Tuple], verbose=True):
+        from src.core.dataderiver import get_data_deriver
+
+        self.dataderivers = [
+            (get_data_deriver(name), kwargs) for name, kwargs in config
+        ]
 
     def load_data(self, data_path: str = None) -> None:
         """
