@@ -313,7 +313,7 @@ class Trainer:
                 self.train_indices,
                 self.val_indices,
                 self.test_indices,
-            ) = self.datasplitter.split(data, self.df, feature_names, label_name)
+            ) = self.datasplitter.split(self.df, feature_names, label_name)
         else:
             self.train_indices, self.val_indices, self.test_indices = (
                 train_indices,
