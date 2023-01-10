@@ -26,6 +26,7 @@ class config(BaseConfig):
                 "Fibre Volumn Fraction": 1,
                 # "Relative Maximum Stress": 0,
                 # "Relative Peak-to-peak Stress": 0,
+                "R-value": 1,
                 "Thickness": 1,
                 "Static Maximum Tensile Stress": 1,
                 "Static Maximum Tensile Strain": 1,
