@@ -35,7 +35,7 @@ class config(BaseConfig):
                     "stacked": True,
                     "intermediate": True,
                     "max_stress_col": "Maximum Stress",
-                    "r_value_col": "Minimum/Maximum Stress",
+                    "r_value_col": "R-value",
                 },
                 "SuppStressDeriver": {
                     "derived_name": "Support Stress",

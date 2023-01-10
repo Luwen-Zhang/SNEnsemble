@@ -20,7 +20,7 @@ class config(BaseConfig):
                 "Width": 1,
                 "Area": 1,
                 "Length(gauge)": 1,
-                # 'R-value': 'Minimum/Maximum Stress',
+                # 'R-value': 'R-value',
                 # 'load (max)[kN]': 'Maximum Load',
                 # 'average_emax': 'Average Strain',
                 # 'poissonaverage': 'Average Poisson Ratio',

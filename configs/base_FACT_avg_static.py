@@ -31,7 +31,7 @@ class config(BaseConfig):
                 "Length": 1,
                 # 'Load Length',
                 # 'Radius of Waist',
-                # 'Minimum/Maximum Stress',
+                # 'R-value',
                 # 'Static Maximum Tensile Stress',
                 # 'Static Maximum Compressive Stress',
                 # 'Static Maximum Tensile Strain',

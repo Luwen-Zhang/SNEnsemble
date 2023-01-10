@@ -20,7 +20,7 @@ class config(BaseConfig):
                 "Width": 1,
                 "Area": 1,
                 "Length(gauge)": 1,
-                # 'R-value': 'Minimum/Maximum Stress',
+                # 'R-value': 'R-value',
                 # 'load (max)[kN]': 'Maximum Load',
                 # 'average_emax': 'Average Strain',
                 # 'poissonaverage': 'Average Poisson Ratio',
@@ -61,7 +61,7 @@ class config(BaseConfig):
                     "stacked": True,
                     "intermediate": True,
                     "max_stress_col": "Maximum Stress",
-                    "r_value_col": "Minimum/Maximum Stress",
+                    "r_value_col": "R-value",
                 },
                 "SuppStressDeriver": {
                     "derived_name": "Support Stress",
