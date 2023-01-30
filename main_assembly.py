@@ -48,9 +48,40 @@ for m_code in selected_m_codes:
 
     trainer.add_modelbases(models)
 
+    trainer.train(verbose=True)
+    leaderboard = trainer.get_leaderboard(test_data_only=True)
+
+    trainer.plot_S_N(
+        m_code=m_code,
+        s_col="Maximum Stress",
+        n_col="log(Cycles to Failure)",
+        r_col="R-value",
+        n_bootstrap=10,
+        r_value=0.1,
+        load_dir="tension",
+        verbose=False,
+        program="MLP",
+        model_name="MLP",
+        refit=False,
+    )
+    trainer.plot_S_N(
+        m_code=m_code,
+        s_col="Maximum Stress",
+        n_col="log(Cycles to Failure)",
+        r_col="R-value",
+        n_bootstrap=10,
+        r_value=0.1,
+        load_dir="tension",
+        verbose=False,
+        program=leaderboard["Program"][0]
+        if leaderboard["Program"][0] != "MLP"
+        else leaderboard["Program"][1],
+        refit=False,
+    )
+
     trainers.append(cp(trainer))
 
 trainer_assem = TrainerAssembly(trainers=trainers)
-trainer_assem.eval_all(programs=[model.program for model in models], cross_validation=5)
+trainer_assem.eval_all(programs=[model.program for model in models], cross_validation=0)
 
 save_trainer_assem(trainer_assem)
