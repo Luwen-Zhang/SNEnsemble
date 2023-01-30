@@ -605,7 +605,7 @@ class Trainer:
 
     def get_leaderboard(
         self,
-        test_data_only: bool = True,
+        test_data_only: bool = False,
         dump_trainer=True,
         cross_validation=0,
         verbose=False,
