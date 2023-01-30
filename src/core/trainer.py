@@ -252,6 +252,8 @@ class Trainer:
             len(self.test_dataset),
         )
 
+        self.save_data()
+
     def set_data(
         self,
         df,
@@ -305,6 +307,18 @@ class Trainer:
             if "Material_Code" in self.df.columns
             else None
         )
+
+    def save_data(self, path: str = None):
+        if path is None:
+            path = self.project_root
+
+        self.df.to_csv(os.path.join(path, "data.csv"), encoding="utf-8", index=False)
+        tabular_data, _, _ = self._get_tabular_dataset()
+        tabular_data.to_csv(
+            os.path.join(path, "tabular_data.csv"), encoding="utf-8", index=False
+        )
+
+        print(f"Data saved to {path} (data.csv and tabular_data.csv).")
 
     def _rederive_unstacked(self):
         for deriver, kwargs in self.dataderivers:
