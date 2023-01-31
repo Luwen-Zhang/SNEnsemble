@@ -1254,6 +1254,69 @@ class ThisWork(TorchModel):
         return ["ThisWork"]
 
 
+class ThisWorkRidge(ThisWork):
+    def __init__(self, trainer=None, manual_activate=None, program=None):
+        super(ThisWorkRidge, self).__init__(
+            trainer=trainer, manual_activate=manual_activate, program=program
+        )
+
+    def _get_program_name(self):
+        return "ThisWorkRidge"
+
+    def _new_model(self):
+        from src.core.sn_formulas import sn_mapping
+
+        if self.activated_sn is None:
+            self.activated_sn = []
+            for key, sn in sn_mapping.items():
+                if sn.test_sn_vars(self.trainer) and (
+                    self.manual_activate is None or key in self.manual_activate
+                ):
+                    self.activated_sn.append(sn(self.trainer))
+            print(
+                f"Activated SN models: {[sn.__class__.__name__ for sn in self.activated_sn]}"
+            )
+        set_torch_random(0)
+        return ThisWorkRidgeNN(
+            len(self.trainer.feature_names),
+            len(self.trainer.label_name),
+            self.trainer.layers,
+            activated_sn=self.activated_sn,
+        ).to(self.trainer.device)
+
+    def _train_step(self, model, train_loader, optimizer, loss_fn):
+        model.train()
+        avg_loss = 0
+        for idx, tensors in enumerate(train_loader):
+            optimizer.zero_grad()
+            yhat = tensors[-1]
+            data = tensors[0]
+            additional_tensors = tensors[1 : len(tensors) - 1]
+            y = model(data, additional_tensors)
+            loss = loss_fn(yhat, y)
+            loss.backward()
+            optimizer.step()
+            avg_loss += loss.item() * len(y)
+            self.ridge(model, yhat)
+
+        avg_loss /= len(train_loader.dataset)
+        return avg_loss
+
+    def ridge(self, model, yhat, alpha=0):
+        # https://gist.github.com/myazdani/3d8a00cf7c9793e9fead1c89c1398f12
+        X = model.preds
+        y = yhat.view(-1, 1)
+        assert X.shape[0] == y.shape[0], "Number of X and y rows don't match"
+        # Solving X*w = y with Normal equations:
+        # X^{T}*X*w = X^{T}*y
+        lhs = X.T @ X
+        rhs = X.T @ y
+        ridge = alpha * torch.eye(lhs.shape[0])
+        w = torch.linalg.lstsq(rhs, lhs + ridge).solution
+        model.component_weights = w.T
+        # print(model.component_weights)
+
+
 class ThisWorkPretrain(ThisWork):
     def __init__(self, trainer=None, manual_activate=None, program=None):
         super(ThisWorkPretrain, self).__init__(

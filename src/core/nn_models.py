@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from copy import copy as cp
 
 
 def init_weights(m):
@@ -57,6 +58,33 @@ class ThisWorkNN(nn.Module):
             ),
         )  # element wise multiplication
         output = torch.sum(output, dim=1).view(-1, 1)
+        return output
+
+
+class ThisWorkRidgeNN(nn.Module):
+    def __init__(self, n_inputs, n_outputs, layers, activated_sn):
+        super(ThisWorkRidgeNN, self).__init__()
+        num_inputs = n_inputs
+        num_outputs = n_outputs
+
+        self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
+        self.activated_sn = nn.ModuleList(activated_sn)
+        self.stress_unrelated_features_idx = activated_sn[
+            0
+        ].stress_unrelated_features_idx
+        self.component_weights = torch.ones(
+            [len(self.activated_sn), 1], requires_grad=False
+        )
+        self.preds = None
+
+    def forward(self, x, additional_tensors):
+        preds = torch.concat(
+            [sn(x, additional_tensors) for sn in self.activated_sn],
+            dim=1,
+        )
+        self.preds = cp(preds)
+        # print(preds.shape, self.component_weights.shape)
+        output = torch.matmul(preds, self.component_weights)
         return output
 
 
