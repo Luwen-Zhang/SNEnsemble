@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from copy import copy as cp
 
 
 def init_weights(m):
@@ -82,7 +81,7 @@ class ThisWorkRidgeNN(nn.Module):
             [sn(x, additional_tensors) for sn in self.activated_sn],
             dim=1,
         )
-        self.preds = cp(preds)
+        self.preds = preds
         # print(preds.shape, self.component_weights.shape)
         output = torch.matmul(preds, self.component_weights)
         return output

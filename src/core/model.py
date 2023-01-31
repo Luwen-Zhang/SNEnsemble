@@ -1293,11 +1293,11 @@ class ThisWorkRidge(ThisWork):
             data = tensors[0]
             additional_tensors = tensors[1 : len(tensors) - 1]
             y = model(data, additional_tensors)
+            self.ridge(model, yhat)
             loss = loss_fn(yhat, y)
             loss.backward()
             optimizer.step()
             avg_loss += loss.item() * len(y)
-            self.ridge(model, yhat)
 
         avg_loss /= len(train_loader.dataset)
         return avg_loss
@@ -1313,7 +1313,9 @@ class ThisWorkRidge(ThisWork):
         rhs = X.T @ y
         ridge = alpha * torch.eye(lhs.shape[0])
         w = torch.linalg.lstsq(rhs, lhs + ridge).solution
-        model.component_weights = w.T
+        from copy import copy
+
+        model.component_weights = copy(w.T)
         # print(model.component_weights)
 
 
