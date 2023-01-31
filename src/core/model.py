@@ -1138,7 +1138,9 @@ class TorchModel(AbstractModel):
         )
 
         for epoch in range(params["epoch"]):
-            train_loss = train(model, train_loader, optimizer, self.trainer.loss_fn)
+            train_loss = self._train_step(
+                model, train_loader, optimizer, self.trainer.loss_fn
+            )
             train_ls.append(train_loss)
             _, _, val_loss = test(model, val_loader, self.trainer.loss_fn)
             val_ls.append(val_loss)
@@ -1162,6 +1164,9 @@ class TorchModel(AbstractModel):
         min_loss = val_ls[idx]
 
         return min_loss, train_ls, val_ls
+
+    def _train_step(self, model, train_loader, optimizer, loss_fn):
+        return train(model, train_loader, optimizer, loss_fn)
 
     def _train(
         self,
