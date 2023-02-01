@@ -48,9 +48,13 @@ for m_code in selected_m_codes:
 
     trainer.add_modelbases(models)
 
-    trainer.train(verbose=True)
-    leaderboard = trainer.get_leaderboard(test_data_only=True)
+    trainers.append(cp(trainer))
 
+trainer_assem = TrainerAssembly(trainers=trainers)
+trainer_assem.eval_all(programs=[model.program for model in models], cross_validation=5)
+
+for m_code, trainer in zip(selected_m_codes, trainers):
+    leaderboard = trainer.leaderboard
     trainer.plot_S_N(
         m_code=m_code,
         s_col="Maximum Stress",
@@ -78,10 +82,5 @@ for m_code in selected_m_codes:
         else leaderboard["Program"][1],
         refit=False,
     )
-
-    trainers.append(cp(trainer))
-
-trainer_assem = TrainerAssembly(trainers=trainers)
-trainer_assem.eval_all(programs=[model.program for model in models], cross_validation=0)
 
 save_trainer_assem(trainer_assem)
