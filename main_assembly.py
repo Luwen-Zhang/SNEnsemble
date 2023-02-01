@@ -51,7 +51,9 @@ for m_code in selected_m_codes:
     trainers.append(cp(trainer))
 
 trainer_assem = TrainerAssembly(trainers=trainers)
-trainer_assem.eval_all(programs=[model.program for model in models], cross_validation=5)
+trainer_assem.eval_all(
+    programs=[model.program for model in models], cross_validation=10
+)
 
 for m_code, trainer in zip(selected_m_codes, trainers):
     leaderboard = trainer.leaderboard
