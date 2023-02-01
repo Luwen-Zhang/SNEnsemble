@@ -103,7 +103,9 @@ class TrainerAssembly:
                         modelbase = trainer.get_modelbase(program)
                         predictions = modelbase._predict_all(verbose=True)
                         projects_program_predictions[project][program] = predictions
-                    trainer._cal_leaderboard(projects_program_predictions[project])
+                    trainer._cal_leaderboard(
+                        projects_program_predictions[project], test_data_only=True
+                    )
             else:
                 for project in selected_projects:
                     projects_program_predictions[project] = {}
@@ -114,7 +116,9 @@ class TrainerAssembly:
                         verbose=True,
                         test_data_only=False,
                     )
-                    trainer._cal_leaderboard(projects_program_predictions[project])
+                    trainer._cal_leaderboard(
+                        projects_program_predictions[project], test_data_only=True
+                    )
             self.projects_program_predictions = projects_program_predictions
             self.selected_programs = cp(programs)
             self.selected_projects = cp(selected_projects)
