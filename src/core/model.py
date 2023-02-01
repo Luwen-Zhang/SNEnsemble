@@ -1302,7 +1302,7 @@ class ThisWorkRidge(ThisWork):
         avg_loss /= len(train_loader.dataset)
         return avg_loss
 
-    def ridge(self, model, yhat, alpha=0):
+    def ridge(self, model, yhat, alpha=0.2):
         # https://gist.github.com/myazdani/3d8a00cf7c9793e9fead1c89c1398f12
         X = model.preds
         y = yhat.view(-1, 1)
