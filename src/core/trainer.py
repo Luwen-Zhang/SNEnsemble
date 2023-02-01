@@ -615,9 +615,6 @@ class Trainer:
         :param test_data_only: False to get metrics on training and validation datasets. Default to True.
         :return: The leaderboard dataframe.
         """
-        dfs = []
-        metrics = ["rmse", "mse", "mae", "mape", "r2"]
-
         if cross_validation != 0:
             programs_predictions = self.cross_validation(
                 programs=self.modelbases_names,
@@ -625,25 +622,36 @@ class Trainer:
                 verbose=verbose,
                 test_data_only=test_data_only,
             )
-            for modelbase_name in self.modelbases_names:
-                df = Trainer._metrics(
-                    programs_predictions[modelbase_name],
-                    metrics,
-                    test_data_only=test_data_only,
-                )
-                df["Program"] = modelbase_name
-                dfs.append(df)
         else:
+            programs_predictions = {}
             for modelbase in self.modelbases:
                 print(f"{modelbase.program} metrics")
-                predictions = modelbase._predict_all(
+                programs_predictions[modelbase.program] = modelbase._predict_all(
                     verbose=False, test_data_only=test_data_only
                 )
-                df = Trainer._metrics(
-                    predictions, metrics, test_data_only=test_data_only
-                )
-                df["Program"] = modelbase.program
-                dfs.append(df)
+
+        df_leaderboard = self._cal_leaderboard(
+            programs_predictions, test_data_only=test_data_only
+        )
+        if dump_trainer:
+            save_trainer(self)
+        return df_leaderboard
+
+    def _cal_leaderboard(
+        self,
+        programs_predictions,
+        metrics=["rmse", "mse", "mae", "mape", "r2"],
+        test_data_only=False,
+    ):
+        dfs = []
+        for modelbase_name in self.modelbases_names:
+            df = Trainer._metrics(
+                programs_predictions[modelbase_name],
+                metrics,
+                test_data_only=test_data_only,
+            )
+            df["Program"] = modelbase_name
+            dfs.append(df)
 
         df_leaderboard = pd.concat(dfs, axis=0, ignore_index=True)
         df_leaderboard.sort_values(
@@ -653,8 +661,6 @@ class Trainer:
         df_leaderboard = df_leaderboard[["Program"] + list(df_leaderboard.columns)[:-1]]
         df_leaderboard.to_csv(self.project_root + "leaderboard.csv")
         self.leaderboard = df_leaderboard
-        if dump_trainer:
-            save_trainer(self)
         return df_leaderboard
 
     def plot_loss(self, train_ls, val_ls):
