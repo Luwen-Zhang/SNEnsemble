@@ -41,6 +41,10 @@ for m_code in selected_m_codes:
             manual_activate=["linlogSN", "loglogSN"],
             program="ThisWorklinlog+loglog",
         ),
+        ThisWorkRidge(
+            trainer,
+            manual_activate=["linlogSN", "loglogSN"],
+        ),
         ThisWork(trainer, manual_activate=["linlogSN"], program="ThisWorklinlog"),
         ThisWork(trainer, manual_activate=["loglogSN"], program="ThisWorkloglog"),
         # ThisWorkPretrain(trainer),
