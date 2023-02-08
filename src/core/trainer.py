@@ -819,6 +819,7 @@ class Trainer:
     def plot_partial_dependence(
         self,
         modelbase,
+        model_name,
         log_trans: bool = True,
         lower_lim=2,
         upper_lim=7,
@@ -848,6 +849,7 @@ class Trainer:
 
             x_value, model_predictions, ci_left, ci_right = self._bootstrap(
                 model=modelbase,
+                model_name=model_name,
                 df=self.df.loc[self.train_indices, :],
                 focus_feature=feature_name,
                 n_bootstrap=n_bootstrap,
