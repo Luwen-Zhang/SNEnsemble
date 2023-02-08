@@ -1418,6 +1418,7 @@ class Trainer:
             raise Exception(f"P-S-N type {method} not implemented.")
 
     def derive(self, df):
+        df_tmp = df.copy()
         feature_names = cp(self.feature_names)
         derived_data = {}
         derived_data_col_names = {}
@@ -1432,7 +1433,7 @@ class Trainer:
                     stacked,
                     intermediate,
                     related_columns,
-                ) = deriver.derive(df, **kwargs)
+                ) = deriver.derive(df_tmp, **kwargs)
             except Exception as e:
                 print(
                     f"Skip deriver {deriver.__class__.__name__} because of the following exception:"
@@ -1448,11 +1449,11 @@ class Trainer:
                     for col_name in col_names:
                         if col_name not in feature_names:
                             feature_names.append(col_name)
-                df[col_names] = value
+                df_tmp[col_names] = value
                 stacked_derivation_related_cols += related_columns
 
         return (
-            df,
+            df_tmp,
             derived_data,
             feature_names,
             derived_data_col_names,
