@@ -1516,8 +1516,13 @@ class Trainer:
             for value in x_value:
                 df_perm = df_bootstrap.copy()
                 df_perm[focus_feature] = value
+                _, derived_data, _, _, _, _ = self.derive(df_perm)
                 bootstrap_model_predictions.append(
-                    bootstrap_model.predict(df_perm, model_name=model_name)
+                    bootstrap_model.predict(
+                        df_perm,
+                        model_name=model_name,
+                        derived_data=derived_data,
+                    )
                 )
             if average:
                 expected_value_bootstrap_replications.append(
