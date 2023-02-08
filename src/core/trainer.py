@@ -19,7 +19,7 @@ import torch.utils.data as Data
 import time
 import json
 from copy import deepcopy as cp
-from sklearn.utils import resample
+from sklearn.utils import resample as skresample
 import scipy.stats as st
 import itertools
 
@@ -1466,6 +1466,7 @@ class Trainer:
         verbose=True,
         rederive=True,
         refit=True,
+        resample=True,
         percentile=100,
         x_min=None,
         x_max=None,
@@ -1493,7 +1494,10 @@ class Trainer:
         for i_bootstrap in range(n_bootstrap):
             if n_bootstrap != 1 and verbose:
                 print(f"Bootstrap: {i_bootstrap + 1}/{n_bootstrap}")
-            df_bootstrap = resample(df).reset_index(drop=True)
+            if resample:
+                df_bootstrap = skresample(df).reset_index(drop=True)
+            else:
+                df_bootstrap = df.reset_index(drop=True)
             bootstrap_model = cp(model)
             if refit:
                 bootstrap_model.fit(
