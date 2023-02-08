@@ -853,6 +853,8 @@ class Trainer:
                 df=self.df.loc[self.train_indices, :],
                 focus_feature=feature_name,
                 n_bootstrap=n_bootstrap,
+                resample=False,
+                refit=False,
                 grid_size=grid_size,
                 verbose=False,
                 rederive=True,
