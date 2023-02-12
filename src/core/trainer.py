@@ -758,6 +758,7 @@ class Trainer:
 
         def forward_func(data):
             ground_truth = self.label_data.loc[self.test_indices, :].values.flatten()
+            # Maybe D should be re-derived?
             D = self._get_additional_tensors_slice(self.test_dataset.indices)
             y = self.tensors[-1][self.test_dataset.indices, :]
             loader = Data.DataLoader(
