@@ -843,33 +843,24 @@ class Trainer:
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
 
-        x_values_list = []
-        mean_pdp_list = []
-        ci_left_list = []
-        ci_right_list = []
-
-        for feature_idx, feature_name in enumerate(self.feature_names):
-            print("Calculate PDP: ", feature_name)
-
-            x_value, model_predictions, ci_left, ci_right = self._bootstrap(
-                model=modelbase,
-                model_name=model_name,
-                df=self.df.loc[self.train_indices, :],
-                focus_feature=feature_name,
-                n_bootstrap=n_bootstrap,
-                refit=refit,
-                grid_size=grid_size,
-                verbose=False,
-                rederive=True,
-                percentile=80,
-                CI=CI,
-                average=True,
-            )
-
-            x_values_list.append(x_value)
-            mean_pdp_list.append(model_predictions)
-            ci_left_list.append(ci_left)
-            ci_right_list.append(ci_right)
+        (
+            x_values_list,
+            mean_pdp_list,
+            ci_left_list,
+            ci_right_list,
+        ) = self.cal_partial_dependence(
+            model=modelbase,
+            model_name=model_name,
+            df=self.df.loc[self.train_indices, :],
+            n_bootstrap=n_bootstrap,
+            refit=refit,
+            grid_size=grid_size,
+            verbose=False,
+            rederive=True,
+            percentile=80,
+            CI=CI,
+            average=True,
+        )
 
         fig = plot_pdp(
             self.feature_names,
@@ -887,6 +878,28 @@ class Trainer:
         if is_notebook():
             plt.show()
         plt.close()
+
+    def cal_partial_dependence(self, feature_subset=None, **kwargs):
+        x_values_list = []
+        mean_pdp_list = []
+        ci_left_list = []
+        ci_right_list = []
+
+        for feature_idx, feature_name in enumerate(
+            self.feature_names if feature_subset is None else feature_subset
+        ):
+            print("Calculate PDP: ", feature_name)
+
+            x_value, model_predictions, ci_left, ci_right = self._bootstrap(
+                focus_feature=feature_name, **kwargs
+            )
+
+            x_values_list.append(x_value)
+            mean_pdp_list.append(model_predictions)
+            ci_left_list.append(ci_left)
+            ci_right_list.append(ci_right)
+
+        return x_values_list, mean_pdp_list, ci_left_list, ci_right_list
 
     def plot_partial_err(self, modelbase, model_name, thres=0.8):
         """
