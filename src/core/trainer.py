@@ -757,13 +757,16 @@ class Trainer:
             raise Exception("A TorchModel should be passed.")
 
         def forward_func(data):
-            prediction, ground_truth, loss = test_tensor(
-                data,
-                self._get_additional_tensors_slice(self.test_dataset.indices),
-                self.tensors[-1][self.test_dataset.indices, :],
-                modelbase.model,
-                self.loss_fn,
+            ground_truth = self.label_data.loc[self.test_indices, :].values.flatten()
+            D = self._get_additional_tensors_slice(self.test_dataset.indices)
+            y = self.tensors[-1][self.test_dataset.indices, :]
+            loader = Data.DataLoader(
+                Data.TensorDataset(data, *D, y), batch_size=len(y), shuffle=False
             )
+            prediction, _, _ = modelbase._test_step(
+                modelbase.model, loader, self.loss_fn
+            )
+            loss = float(self._metric_sklearn(ground_truth, prediction, self.loss))
             return loss
 
         feature_perm = FeaturePermutation(forward_func)
@@ -885,7 +888,7 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_partial_err(self, modelbase, thres=0.8):
+    def plot_partial_err(self, modelbase, model_name, thres=0.8):
         """
         Calculate and plot partial error dependency for each feature.
         :param thres: Points with loss higher than thres will be marked.
@@ -895,13 +898,10 @@ class Trainer:
 
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
-        prediction, ground_truth, loss = test_tensor(
-            self.tensors[0][self.test_dataset.indices, :],
-            self._get_additional_tensors_slice(self.test_dataset.indices),
-            self.tensors[-1][self.test_dataset.indices, :],
-            modelbase.model,
-            self.loss_fn,
-        )
+        ground_truth = self.label_data.loc[self.test_indices, :].values.flatten()
+        prediction = modelbase.predict(
+            df=self.df.loc[self.test_indices], model_name=model_name
+        ).flatten()
         plot_partial_err(
             self.feature_data.loc[np.array(self.test_dataset.indices), :].reset_index(
                 drop=True

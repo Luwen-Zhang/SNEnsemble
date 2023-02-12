@@ -109,18 +109,6 @@ def test(model, test_loader, loss_fn):
     return np.array(pred), np.array(truth), avg_loss
 
 
-def test_tensor(test_tensor, additional_tensors, test_label_tensor, model, loss_fn):
-    model.eval()
-    with torch.no_grad():
-        y = model(test_tensor, additional_tensors)
-        loss = loss_fn(test_label_tensor, y)
-    return (
-        y.cpu().detach().numpy(),
-        test_label_tensor.cpu().detach().numpy(),
-        loss.item(),
-    )
-
-
 def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
     df = pd.DataFrame(columns=["feature", "attr", "clr"])
     df["feature"] = features
