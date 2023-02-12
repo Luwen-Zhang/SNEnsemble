@@ -1061,14 +1061,18 @@ class TorchModel(AbstractModel):
         )
 
         if not test_data_only:
-            y_train_pred, y_train, _ = test(
+            y_train_pred, y_train, _ = self._test_step(
                 self.model, train_loader, self.trainer.loss_fn
             )
-            y_val_pred, y_val, _ = test(self.model, val_loader, self.trainer.loss_fn)
+            y_val_pred, y_val, _ = self._test_step(
+                self.model, val_loader, self.trainer.loss_fn
+            )
         else:
             y_train_pred = y_train = None
             y_val_pred = y_val = None
-        y_test_pred, y_test, _ = test(self.model, test_loader, self.trainer.loss_fn)
+        y_test_pred, y_test, _ = self._test_step(
+            self.model, test_loader, self.trainer.loss_fn
+        )
 
         predictions = {}
         predictions[self._get_model_names()[0]] = {
@@ -1099,7 +1103,7 @@ class TorchModel(AbstractModel):
             Data.TensorDataset(X, *D, y), batch_size=len(df), shuffle=False
         )
 
-        pred, _, _ = test(self.model, loader, self.trainer.loss_fn)
+        pred, _, _ = self._test_step(self.model, loader, self.trainer.loss_fn)
         return pred
 
     def _model_train(
@@ -1142,7 +1146,7 @@ class TorchModel(AbstractModel):
                 model, train_loader, optimizer, self.trainer.loss_fn
             )
             train_ls.append(train_loss)
-            _, _, val_loss = test(model, val_loader, self.trainer.loss_fn)
+            _, _, val_loss = self._test_step(model, val_loader, self.trainer.loss_fn)
             val_ls.append(val_loss)
 
             if verbose and ((epoch + 1) % verbose_per_epoch == 0 or epoch == 0):
@@ -1167,6 +1171,9 @@ class TorchModel(AbstractModel):
 
     def _train_step(self, model, train_loader, optimizer, loss_fn):
         return train(model, train_loader, optimizer, loss_fn)
+
+    def _test_step(self, model, test_loader, loss_fn):
+        return test(model, test_loader, loss_fn)
 
     def _train(
         self,
@@ -1203,7 +1210,7 @@ class TorchModel(AbstractModel):
             generator=torch.Generator().manual_seed(0),
         )
 
-        _, _, mse = test(self.model, test_loader, torch.nn.MSELoss())
+        _, _, mse = self._test_step(self.model, test_loader, torch.nn.MSELoss())
         rmse = np.sqrt(mse)
         self.metrics = {"mse": mse, "rmse": rmse}
 
