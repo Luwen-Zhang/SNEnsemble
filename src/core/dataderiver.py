@@ -153,6 +153,40 @@ class MinStressDeriver(AbstractDeriver):
         return value, derived_name, names, stacked, intermediate, related_columns
 
 
+class WalkerStressDeriver(AbstractDeriver):
+    def __init__(self):
+        super(WalkerStressDeriver, self).__init__()
+
+    def derive(
+        self,
+        df,
+        trainer,
+        derived_name=None,
+        col_names=None,
+        stacked=True,
+        intermediate=False,
+        max_stress_col=None,
+        r_value_col=None,
+        power_index=None,
+        **kwargs,
+    ):
+        self._check_arg(derived_name, "derived_name")
+        self._check_arg(max_stress_col, "max_stress_col")
+        self._check_arg(r_value_col, "r_value_col")
+        self._check_arg(power_index, "power_index")
+        self._check_exist(df, max_stress_col, "max_stress_col")
+        self._check_exist(df, r_value_col, "r_value_col")
+
+        value = (
+            df[max_stress_col] * ((1 - df[r_value_col]) / 2) ** power_index
+        ).values.reshape(-1, 1)
+
+        related_columns = [max_stress_col, r_value_col]
+        names = self._generate_col_names(derived_name, 1, col_names)
+        self._check_values(value)
+        return value, derived_name, names, stacked, intermediate, related_columns
+
+
 class SuppStressDeriver(AbstractDeriver):
     def __init__(self):
         super(SuppStressDeriver, self).__init__()
