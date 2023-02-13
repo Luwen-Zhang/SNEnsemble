@@ -323,7 +323,9 @@ class Trainer:
     def _rederive_unstacked(self):
         for deriver, kwargs in self.dataderivers:
             if kwargs["derived_name"] in self.derived_data.keys():
-                value, name, col_names, _, _, _ = deriver.derive(self.df, **kwargs)
+                value, name, col_names, _, _, _ = deriver.derive(
+                    self.df, trainer=self, **kwargs
+                )
                 self.derived_data[name] = value
                 self.derived_data_col_names[name] = col_names
                 if len(self.derived_data[name]) == 0:
@@ -1447,7 +1449,7 @@ class Trainer:
                     stacked,
                     intermediate,
                     related_columns,
-                ) = deriver.derive(df_tmp, **kwargs)
+                ) = deriver.derive(df_tmp, trainer=self, **kwargs)
             except Exception as e:
                 print(
                     f"Skip deriver {deriver.__class__.__name__} because of the following exception:"

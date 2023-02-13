@@ -7,7 +7,14 @@ class AbstractDeriver:
         pass
 
     def derive(
-        self, df, derived_name, col_names, stacked, intermediate=False, **kwargs
+        self,
+        df,
+        trainer,
+        derived_name,
+        col_names,
+        stacked,
+        intermediate=False,
+        **kwargs,
     ):
         raise NotImplementedError
 
@@ -49,11 +56,13 @@ class DegLayerDeriver(AbstractDeriver):
     def derive(
         self,
         df,
+        trainer,
         derived_name=None,
         col_names=None,
         stacked=True,
         intermediate=False,
         sequence_column=None,
+        **kwargs,
     ):
         self._check_arg(derived_name, "derived_name")
         self._check_arg(sequence_column, "sequence_column")
@@ -90,12 +99,14 @@ class RelativeDeriver(AbstractDeriver):
     def derive(
         self,
         df,
+        trainer,
         derived_name=None,
         col_names=None,
         stacked=True,
         intermediate=False,
         absolute_col=None,
         relative2_col=None,
+        **kwargs,
     ):
         self._check_arg(derived_name, "derived_name")
         self._check_arg(absolute_col, "absolute_col")
@@ -119,12 +130,14 @@ class MinStressDeriver(AbstractDeriver):
     def derive(
         self,
         df,
+        trainer,
         derived_name=None,
         col_names=None,
         stacked=True,
         intermediate=False,
         max_stress_col=None,
         r_value_col=None,
+        **kwargs,
     ):
         self._check_arg(derived_name, "derived_name")
         self._check_arg(max_stress_col, "max_stress_col")
@@ -147,6 +160,7 @@ class SuppStressDeriver(AbstractDeriver):
     def derive(
         self,
         df,
+        trainer,
         derived_name=None,
         col_names=None,
         stacked=True,
@@ -156,6 +170,7 @@ class SuppStressDeriver(AbstractDeriver):
         ucs_col=None,
         uts_col=None,
         relative=False,
+        **kwargs,
     ):
         self._check_arg(derived_name, "derived_name")
         self._check_arg(max_stress_col, "max_stress_col")
