@@ -71,44 +71,6 @@ def set_torch_random(seed=0):
     torch.manual_seed(seed)
 
 
-def train(model, train_loader, optimizer, loss_fn):
-    model.train()
-    avg_loss = 0
-    for idx, tensors in enumerate(train_loader):
-        optimizer.zero_grad()
-        yhat = tensors[-1]
-        data = tensors[0]
-        additional_tensors = tensors[1 : len(tensors) - 1]
-        y = model(data, additional_tensors)
-        loss = loss_fn(yhat, y)
-        loss.backward()
-        optimizer.step()
-        avg_loss += loss.item() * len(y)
-
-    avg_loss /= len(train_loader.dataset)
-    return avg_loss
-
-
-def test(model, test_loader, loss_fn):
-    model.eval()
-    pred = []
-    truth = []
-    with torch.no_grad():
-        # print(test_dataset)
-        avg_loss = 0
-        for idx, tensors in enumerate(test_loader):
-            yhat = tensors[-1]
-            data = tensors[0]
-            additional_tensors = tensors[1 : len(tensors) - 1]
-            y = model(data, additional_tensors)
-            loss = loss_fn(yhat, y)
-            avg_loss += loss.item() * len(y)
-            pred += list(y.cpu().detach().numpy())
-            truth += list(yhat.cpu().detach().numpy())
-        avg_loss /= len(test_loader.dataset)
-    return np.array(pred), np.array(truth), avg_loss
-
-
 def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
     df = pd.DataFrame(columns=["feature", "attr", "clr"])
     df["feature"] = features

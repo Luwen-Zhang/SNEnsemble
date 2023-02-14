@@ -1170,10 +1170,50 @@ class TorchModel(AbstractModel):
         return min_loss, train_ls, val_ls
 
     def _train_step(self, model, train_loader, optimizer, loss_fn):
-        return train(model, train_loader, optimizer, loss_fn)
+        model.train()
+        avg_loss = 0
+        for idx, tensors in enumerate(train_loader):
+            optimizer.zero_grad()
+            yhat = tensors[-1]
+            data = tensors[0]
+            additional_tensors = tensors[1 : len(tensors) - 1]
+            derived_tensors = {}
+            for tensor, name in zip(
+                additional_tensors, self.trainer.derived_data.keys()
+            ):
+                derived_tensors[name] = tensor
+            y = model(data, derived_tensors)
+            loss = loss_fn(yhat, y)
+            loss.backward()
+            optimizer.step()
+            avg_loss += loss.item() * len(y)
+
+        avg_loss /= len(train_loader.dataset)
+        return avg_loss
 
     def _test_step(self, model, test_loader, loss_fn):
-        return test(model, test_loader, loss_fn)
+        model.eval()
+        pred = []
+        truth = []
+        with torch.no_grad():
+            # print(test_dataset)
+            avg_loss = 0
+            for idx, tensors in enumerate(test_loader):
+                yhat = tensors[-1]
+                data = tensors[0]
+                additional_tensors = tensors[1 : len(tensors) - 1]
+                derived_tensors = {}
+                for tensor, name in zip(
+                    additional_tensors, self.trainer.derived_data.keys()
+                ):
+                    derived_tensors[name] = tensor
+                y = model(data, derived_tensors)
+                loss = loss_fn(yhat, y)
+                avg_loss += loss.item() * len(y)
+                pred += list(y.cpu().detach().numpy())
+                truth += list(yhat.cpu().detach().numpy())
+            avg_loss /= len(test_loader.dataset)
+        return np.array(pred), np.array(truth), avg_loss
 
     def _train(
         self,
@@ -1299,7 +1339,12 @@ class ThisWorkRidge(ThisWork):
             yhat = tensors[-1]
             data = tensors[0]
             additional_tensors = tensors[1 : len(tensors) - 1]
-            y = model(data, additional_tensors)
+            derived_tensors = {}
+            for tensor, name in zip(
+                additional_tensors, self.trainer.derived_data.keys()
+            ):
+                derived_tensors[name] = tensor
+            y = model(data, derived_tensors)
             self.ridge(model, yhat)
             loss = loss_fn(yhat, y)
             loss.backward()
