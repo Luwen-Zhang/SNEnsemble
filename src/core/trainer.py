@@ -447,6 +447,12 @@ class Trainer:
         self.test_dataset = Subset(dataset, self.test_indices)
         self.tensors = (X, *D, y) if len(D) > 0 else (X, None, y)
 
+    def get_derived_data_slice(self, derived_data, indices):
+        tmp_derived_data = {}
+        for key, value in derived_data.items():
+            tmp_derived_data[key] = value[indices, :]
+        return tmp_derived_data
+
     def get_zero_slip(self, feature_name):
         if not hasattr(self, "dataprocessors"):
             raise Exception(f"Run load_config first.")
@@ -855,6 +861,9 @@ class Trainer:
             model=modelbase,
             model_name=model_name,
             df=self.df.loc[self.train_indices, :],
+            derived_data=self.get_derived_data_slice(
+                self.derived_data, self.train_indices
+            ),
             n_bootstrap=n_bootstrap,
             refit=refit,
             grid_size=grid_size,
@@ -1179,6 +1188,9 @@ class Trainer:
         x_value, mean_pred, ci_left, ci_right = self._bootstrap(
             model=model,
             df=self.df.loc[m_train_indices, :],
+            derived_data=self.get_derived_data_slice(
+                self.derived_data, m_train_indices
+            ),
             focus_feature=s_col,
             n_bootstrap=n_bootstrap,
             grid_size=grid_size,
@@ -1437,6 +1449,7 @@ class Trainer:
         self,
         model,
         df,
+        derived_data,
         focus_feature,
         n_bootstrap,
         grid_size,
@@ -1466,15 +1479,17 @@ class Trainer:
             else x_max,
             grid_size,
         )
-
+        df = df.reset_index(drop=True)
         expected_value_bootstrap_replications = []
         for i_bootstrap in range(n_bootstrap):
-            if n_bootstrap != 1 and verbose:
-                print(f"Bootstrap: {i_bootstrap + 1}/{n_bootstrap}")
             if resample:
-                df_bootstrap = skresample(df).reset_index(drop=True)
+                df_bootstrap = skresample(df)
             else:
-                df_bootstrap = df.reset_index(drop=True)
+                df_bootstrap = df
+            tmp_derived_data = self.get_derived_data_slice(
+                derived_data, list(df_bootstrap.index)
+            )
+            df_bootstrap = df_bootstrap.reset_index(drop=True)
             bootstrap_model = cp(model)
             if refit:
                 bootstrap_model.fit(
@@ -1488,12 +1503,11 @@ class Trainer:
             for value in x_value:
                 df_perm = df_bootstrap.copy()
                 df_perm[focus_feature] = value
-                _, _, derived_data = self.derive(df_perm)
                 bootstrap_model_predictions.append(
                     bootstrap_model.predict(
                         df_perm,
                         model_name=model_name,
-                        derived_data=derived_data,
+                        derived_data=tmp_derived_data,  # To avoid rederiving stacked data
                     )
                 )
             if average:
