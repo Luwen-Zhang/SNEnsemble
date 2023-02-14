@@ -1450,8 +1450,9 @@ class ThisWorkPretrain(ThisWork):
 
 
 class MLP(TorchModel):
-    def __init__(self, trainer=None, program=None):
+    def __init__(self, trainer=None, program=None, layers=None):
         super(MLP, self).__init__(trainer, program=program)
+        self.layers = layers
 
     def _get_program_name(self):
         return "MLP"
@@ -1461,7 +1462,7 @@ class MLP(TorchModel):
         return NN(
             len(self.trainer.feature_names),
             len(self.trainer.label_name),
-            self.trainer.layers,
+            self.trainer.layers if self.layers is None else self.layers,
         ).to(self.trainer.device)
 
     def _get_model_names(self):
