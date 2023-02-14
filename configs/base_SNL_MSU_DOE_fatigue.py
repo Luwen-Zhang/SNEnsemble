@@ -79,6 +79,13 @@ class config(BaseConfig):
                         "stacked": True,
                     },
                 ),
+                # (
+                #     "DriveCoeffDeriver",
+                #     {
+                #         "derived_name": "Drive Coefficient",
+                #         "stacked": False,
+                #     },
+                # ),
             ],
             "feature_types": ["Fatigue loading", "Material", "Derived"],
             "label_name": ["log(Cycles to Failure)"],
