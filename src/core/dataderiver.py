@@ -1,5 +1,7 @@
 import numpy as np
 import sys, inspect
+from ..utils.utils import *
+from copy import deepcopy as cp
 
 
 class AbstractDeriver:
@@ -223,6 +225,132 @@ class WalkerStressDeriver(AbstractDeriver):
         ).values.reshape(-1, 1)
 
         return value
+
+
+class DriveCoeffDeriver(AbstractDeriver):
+    def __init__(self):
+        super(DriveCoeffDeriver, self).__init__()
+
+    def _required_cols(self, **kwargs):
+        return []
+
+    def _required_params(self, **kwargs):
+        return []
+
+    def _derived_size(self, **kwargs):
+        return 1
+
+    def _defaults(self):
+        return dict(stacked=False, intermediate=False)
+
+    def _derive(
+        self,
+        df,
+        trainer,
+        **kwargs,
+    ):
+        data = df.copy()
+
+        mlp_trainer = cp(trainer)
+        mlp_trainer.dataderivers = [
+            x for x in mlp_trainer.dataderivers if not isinstance(x[0], self.__class__)
+        ]
+        mlp_trainer.set_data_splitter(name="RandomSplitter")
+        mlp_trainer.set_data(
+            trainer.df,
+            feature_names=trainer.feature_names,
+            label_name=trainer.label_name,
+            verbose=False,
+            warm_start=True,
+            all_training=True,
+        )
+
+        from src.core.model import MLP
+
+        mlp = MLP(mlp_trainer)
+        mlp_trainer.modelbases = []
+        mlp_trainer.bayes_opt = False
+        mlp_trainer.add_modelbases([mlp])
+        mlp.train(verbose=False)
+        with HiddenPrints():
+            x_values_list, mean_pdp_list, _, _ = mlp_trainer.cal_partial_dependence(
+                model=mlp,
+                model_name="MLP",
+                df=mlp_trainer.df,
+                derived_data=mlp_trainer.derived_data,
+                n_bootstrap=1,
+                refit=False,
+                resample=False,
+                grid_size=5,
+                verbose=False,
+                rederive=True,
+                percentile=80,
+            )
+        self.avg_pred = data[trainer.label_name].values.mean()
+
+        from scipy.interpolate import CubicSpline
+        import itertools
+
+        interpolator = {}
+        plt.figure(figsize=(10, 10))
+        cmap = plt.cm.get_cmap("hsv", len(trainer.feature_names))
+        marker = itertools.cycle(("^", "<", ">", "+", "o", "*", "s"))
+        ax = plt.subplot(111)
+
+        for i, (x_value, mean_pdp, feature_name) in enumerate(
+            zip(x_values_list, mean_pdp_list, trainer.feature_names)
+        ):
+            # print(
+            #     f"{feature_name}, diff_y:{mean_pdp[-1] - mean_pdp[1]:.5f}, diff_x:{x_value[-1] - x_value[0]}"
+            # )
+            interpolator[feature_name] = (
+                CubicSpline(x_value, mean_pdp, bc_type="natural")
+                if np.sum(np.abs(x_value)) != 0
+                else None
+            )
+            m = next(marker)
+            ax.plot(
+                np.linspace(0, 4, 100),
+                interpolator[feature_name](np.linspace(x_value[0], x_value[-1], 100))
+                if interpolator[feature_name] is not None
+                else np.repeat(self.avg_pred, 100),
+                linestyle="-",
+                c=cmap(i),
+                marker=m,
+                label=feature_name,
+                markevery=1000,
+            )
+            ax.scatter(
+                np.arange(len(x_value)),
+                mean_pdp
+                if interpolator[feature_name] is not None
+                else np.repeat(self.avg_pred, 5),
+                c=[cmap(i) for x in x_value],
+                marker=m,
+            )
+        ax.set_xticks([0, 1, 2, 3, 4])
+        plt.legend(fontsize="small")
+        plt.savefig(os.path.join(trainer.project_root, "trend.pdf"))
+        plt.close()
+        self.interpolator = interpolator
+
+        _, drive_coeff = self._cal_drive_coeff(df)
+        value = drive_coeff.reshape(-1, 1)
+
+        return value
+
+    def _cal_drive_coeff(self, df):
+        drive_coeff_feature = {}
+        drive_coeff = np.ones((len(df),))
+        for feature_name, interpolator in self.interpolator.items():
+            drive_coeff_feature[feature_name] = (
+                (interpolator(df[feature_name].values).flatten() / self.avg_pred)
+                if interpolator is not None
+                else np.repeat(1, len(df))
+            )
+
+            drive_coeff *= drive_coeff_feature[feature_name]
+        return drive_coeff_feature, drive_coeff
 
 
 class SuppStressDeriver(AbstractDeriver):
