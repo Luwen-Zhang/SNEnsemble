@@ -335,24 +335,19 @@ class DriveCoeffDeriver(AbstractDeriver):
         plt.savefig(os.path.join(trainer.project_root, "trend.pdf"))
         plt.close()
         self.interpolator = interpolator
-
-        _, drive_coeff = self._cal_drive_coeff(df)
-        value = drive_coeff.reshape(-1, 1)
-
-        return value
+        drive_coeff = self._cal_drive_coeff(df)
+        return drive_coeff
 
     def _cal_drive_coeff(self, df):
-        drive_coeff_feature = {}
-        drive_coeff = np.ones((len(df),))
-        for feature_name, interpolator in self.interpolator.items():
-            drive_coeff_feature[feature_name] = (
+        drive_coeff = np.zeros((len(df), len(self.interpolator)))
+        for idx, (feature_name, interpolator) in enumerate(self.interpolator.items()):
+            drive_coeff[:, idx] = (
                 (interpolator(df[feature_name].values).flatten() / self.avg_pred)
                 if interpolator is not None
                 else np.repeat(1, len(df))
             )
 
-            drive_coeff *= drive_coeff_feature[feature_name]
-        return drive_coeff_feature, drive_coeff
+        return drive_coeff
 
 
 class SuppStressDeriver(AbstractDeriver):
