@@ -87,9 +87,8 @@ class DegLayerDeriver(AbstractDeriver):
 
         names = self._generate_col_names(derived_name, deg_layers.shape[1], col_names)
 
-        related_columns = [sequence_column]
         self._check_values(deg_layers)
-        return deg_layers, derived_name, names, stacked, intermediate, related_columns
+        return deg_layers, derived_name, names, intermediate
 
 
 class RelativeDeriver(AbstractDeriver):
@@ -118,9 +117,8 @@ class RelativeDeriver(AbstractDeriver):
         relative = relative.values.reshape(-1, 1)
 
         names = self._generate_col_names(derived_name, 1, col_names)
-        related_columns = [absolute_col, relative2_col]
         self._check_values(relative)
-        return relative, derived_name, names, stacked, intermediate, related_columns
+        return relative, derived_name, names, intermediate
 
 
 class MinStressDeriver(AbstractDeriver):
@@ -147,10 +145,9 @@ class MinStressDeriver(AbstractDeriver):
 
         value = (df[max_stress_col] * df[r_value_col]).values.reshape(-1, 1)
 
-        related_columns = [max_stress_col, r_value_col]
         names = self._generate_col_names(derived_name, 1, col_names)
         self._check_values(value)
-        return value, derived_name, names, stacked, intermediate, related_columns
+        return value, derived_name, names, intermediate
 
 
 class WalkerStressDeriver(AbstractDeriver):
@@ -181,10 +178,9 @@ class WalkerStressDeriver(AbstractDeriver):
             df[max_stress_col] * ((1 - df[r_value_col]) / 2) ** power_index
         ).values.reshape(-1, 1)
 
-        related_columns = [max_stress_col, r_value_col]
         names = self._generate_col_names(derived_name, 1, col_names)
         self._check_values(value)
-        return value, derived_name, names, stacked, intermediate, related_columns
+        return value, derived_name, names, intermediate
 
 
 class SuppStressDeriver(AbstractDeriver):
@@ -276,9 +272,8 @@ class SuppStressDeriver(AbstractDeriver):
             ]
         )
         stresses = df_tmp[names].values
-        related_columns = [max_stress_col, min_stress_col, ucs_col, uts_col]
         self._check_values(stresses)
-        return stresses, derived_name, names, stacked, intermediate, related_columns
+        return stresses, derived_name, names, intermediate
 
 
 deriver_mapping = {}

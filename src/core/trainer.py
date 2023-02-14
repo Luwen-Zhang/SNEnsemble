@@ -276,18 +276,12 @@ class Trainer:
         self.feature_names = feature_names
         self.label_name = label_name
         self.df = self.dataimputer.fit_transform(df, trainer=self)
-        if derived_data is None:
-            (
-                self.df,
-                derived_data,
-                self.feature_names,
-                self.derived_data_col_names,
-                self.derivation_related_cols,
-                self.stacked_derivation_related_cols,
-            ) = self.derive(self.df)
+        (
+            self.df,
+            self.feature_names,
+        ) = self.derive_stacked(self.df)
         # There may exist nan in stacked features.
         self.df = self.dataimputer.fit_transform(self.df, trainer=self)
-        self.derived_data = derived_data
         self.df = self.df.copy().dropna(
             axis=0, subset=self.label_name + self.derivation_related_cols
         )
@@ -331,8 +325,9 @@ class Trainer:
                 "indices or warm_start of set_data(). Set warm_start to True might help."
             )
 
-        if derived_data is None:
-            self._rederive_unstacked()
+        self.derived_data = (
+            self.derive_unstacked(self.df) if derived_data is None else derived_data
+        )
         self._update_dataset_auto()
         self._material_code = (
             pd.DataFrame(self.df["Material_Code"])
@@ -352,17 +347,34 @@ class Trainer:
 
         print(f"Data saved to {path} (data.csv and tabular_data.csv).")
 
-    def _rederive_unstacked(self):
+    def derive(self, df):
+        df_tmp, feature_names = self.derive_stacked(df)
+        derived_data = self.derive_unstacked(df_tmp)
+
+        return (df_tmp, feature_names, derived_data)
+
+    def derive_stacked(self, df):
+        df_tmp = df.copy()
+        feature_names = cp(self.feature_names)
         for deriver, kwargs in self.dataderivers:
-            if kwargs["derived_name"] in self.derived_data.keys():
-                value, name, col_names, _, _, _ = deriver.derive(
-                    self.df, trainer=self, **kwargs
+            if kwargs["stacked"]:
+                value, name, col_names, intermediate = deriver.derive(
+                    df_tmp, trainer=self, **kwargs
                 )
-                self.derived_data[name] = value
-                self.derived_data_col_names[name] = col_names
-                if len(self.derived_data[name]) == 0:
-                    self.derived_data_col_names.pop(name, None)
-                    self.derived_data.pop(name, None)
+                if not intermediate:
+                    for col_name in col_names:
+                        if col_name not in feature_names:
+                            feature_names.append(col_name)
+                df_tmp[col_names] = value
+        return df_tmp, feature_names
+
+    def derive_unstacked(self, df):
+        derived_data = {}
+        for deriver, kwargs in self.dataderivers:
+            if not kwargs["stacked"]:
+                value, name, _, _ = deriver.derive(df, trainer=self, **kwargs)
+                derived_data[name] = value
+        return derived_data
 
     def _data_process(
         self,
@@ -1420,50 +1432,6 @@ class Trainer:
         else:
             raise Exception(f"P-S-N type {method} not implemented.")
 
-    def derive(self, df):
-        df_tmp = df.copy()
-        feature_names = cp(self.feature_names)
-        derived_data = {}
-        derived_data_col_names = {}
-        derivation_related_cols = []
-        stacked_derivation_related_cols = []
-        for deriver, kwargs in self.dataderivers:
-            try:
-                (
-                    value,
-                    name,
-                    col_names,
-                    stacked,
-                    intermediate,
-                    related_columns,
-                ) = deriver.derive(df_tmp, trainer=self, **kwargs)
-            except Exception as e:
-                print(
-                    f"Skip deriver {deriver.__class__.__name__} because of the following exception:"
-                )
-                print(f"\t{e}")
-                continue
-            if not stacked:
-                derived_data[name] = value
-                derived_data_col_names[name] = col_names
-                derivation_related_cols += related_columns
-            else:
-                if not intermediate:
-                    for col_name in col_names:
-                        if col_name not in feature_names:
-                            feature_names.append(col_name)
-                df_tmp[col_names] = value
-                stacked_derivation_related_cols += related_columns
-
-        return (
-            df_tmp,
-            derived_data,
-            feature_names,
-            derived_data_col_names,
-            derivation_related_cols,
-            stacked_derivation_related_cols,
-        )
-
     def _bootstrap(
         self,
         model,
@@ -1519,7 +1487,7 @@ class Trainer:
             for value in x_value:
                 df_perm = df_bootstrap.copy()
                 df_perm[focus_feature] = value
-                _, derived_data, _, _, _, _ = self.derive(df_perm)
+                _, _, derived_data = self.derive(df_perm)
                 bootstrap_model_predictions.append(
                     bootstrap_model.predict(
                         df_perm,
