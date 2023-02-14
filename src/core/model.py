@@ -75,7 +75,7 @@ class AbstractModel:
             raise Exception(f"Feature {absent_features} not in the input dataframe.")
 
         if derived_data is None:
-            df, derived_data, _, _, _, _ = self.trainer.derive(df)
+            df, _, derived_data = self.trainer.derive(df)
 
         additional_data = []
         absent_keys = []
