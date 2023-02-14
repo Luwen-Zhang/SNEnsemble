@@ -45,7 +45,7 @@ class BaseConfig:
                 # ("LackDataMaterialRemover", {}),
                 # ("FeatureValueSelector", {"feature": "R-value", "value": 0.1}),
                 ("NaNFeatureRemover", {}),
-                # ("SingleValueFeatureRemover", {}),
+                ("SingleValueFeatureRemover", {}),
                 ("UnscaledDataRecorder", {}),
                 ("StandardScaler", {}),
             ],
