@@ -1038,7 +1038,7 @@ class Trainer:
 
         if partition not in indices_map.keys():
             raise Exception(
-                f"Partition {train} not available. Select among {list(indices_map.keys())}"
+                f"Partition {partition} not available. Select among {list(indices_map.keys())}"
             )
 
         return indices_map[partition]
