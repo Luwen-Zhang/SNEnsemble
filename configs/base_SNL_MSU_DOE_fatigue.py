@@ -44,6 +44,16 @@ class config(BaseConfig):
                     },
                 ),
                 (
+                    "WalkerStressDeriver",
+                    {
+                        "derived_name": "Walker Eq Stress",
+                        "stacked": True,
+                        "max_stress_col": "Maximum Stress",
+                        "r_value_col": "R-value",
+                        "power_index": 0.5,
+                    },
+                ),
+                (
                     "SuppStressDeriver",
                     {
                         "derived_name": "Support Stress",
