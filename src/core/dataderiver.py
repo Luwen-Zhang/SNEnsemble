@@ -115,6 +115,7 @@ class DegLayerDeriver(AbstractDeriver):
 
         sequence = [
             [int(y) if y != "nan" else np.nan for y in str(x).split("/")]
+            for x in df[sequence_column].values
         ]
 
         deg_layers = np.zeros(
@@ -167,6 +168,7 @@ class MinStressDeriver(AbstractDeriver):
     def __init__(self):
         super(MinStressDeriver, self).__init__()
 
+    def _required_cols(self, **kwargs):
         return ["max_stress_col", "r_value_col"]
 
     def _required_params(self, **kwargs):
