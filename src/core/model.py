@@ -1086,7 +1086,8 @@ class TorchModel(AbstractModel):
     def _predict(
         self, input_df: pd.DataFrame, model_name, additional_data: list = None, **kwargs
     ):
-        df = self.trainer._data_transform(input_df.copy())
+        df = self.trainer.dataimputer.fit_transform(input_df.copy(), self.trainer)
+        df = self.trainer._data_transform(df)
         X = torch.tensor(
             df[self.trainer.feature_names].values.astype(np.float32),
             dtype=torch.float32,
