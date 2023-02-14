@@ -261,7 +261,9 @@ class DriveCoeffDeriver(AbstractDeriver):
             feature_names=trainer.feature_names,
             label_name=trainer.label_name,
             verbose=False,
-            warm_start=True,
+            warm_start=True
+            if not kwargs["stacked"]
+            else False,  # if is stacked, processors are not fit.
             all_training=True,
         )
 
@@ -286,7 +288,7 @@ class DriveCoeffDeriver(AbstractDeriver):
                 rederive=True,
                 percentile=80,
             )
-        self.avg_pred = data[trainer.label_name].values.mean()
+        self.avg_pred = mlp_trainer.label_data.values.mean()
 
         from scipy.interpolate import CubicSpline
         import itertools
