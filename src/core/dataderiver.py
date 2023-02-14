@@ -11,33 +11,73 @@ class AbstractDeriver:
         df,
         trainer,
         derived_name,
-        col_names,
-        stacked,
-        intermediate=False,
+        **kwargs,
+    ):
+        kwargs = self.make_defaults(**kwargs)
+        for arg_name in self._required_cols(**kwargs):
+            self._check_arg(arg_name, **kwargs)
+            self._check_exist(df, arg_name, **kwargs)
+        for arg_name in self._required_params(**kwargs) + ["stacked", "intermediate"]:
+            self._check_arg(arg_name, **kwargs)
+        values = self._derive(df, trainer, **kwargs)
+        self._check_values(values)
+        names = (
+            self._generate_col_names(
+                derived_name, self._derived_size(**kwargs), **kwargs
+            )
+            if "col_names" not in kwargs
+            else kwargs["col_names"]
+        )
+        return values, derived_name, names
+
+    def make_defaults(self, **kwargs):
+        for key, value in self._defaults().items():
+            if key not in kwargs.keys():
+                kwargs[key] = value
+        return kwargs
+
+    def _derive(
+        self,
+        df,
+        trainer,
         **kwargs,
     ):
         raise NotImplementedError
 
-    @staticmethod
-    def _generate_col_names(derived_name, length, col_names):
-        if col_names is None or len(col_names) != length:
+    def _derived_size(self, **kwargs):
+        raise NotImplementedError
+
+    def _defaults(self):
+        return {}
+
+    def _derived_names(self, **kwargs):
+        raise NotImplementedError
+
+    def _generate_col_names(self, derived_name, length, **kwargs):
+        try:
+            names = self._derived_names(**kwargs)
+        except:
             names = (
                 [f"{derived_name}-{idx}" for idx in range(length)]
                 if length > 1
                 else [derived_name]
             )
-        else:
-            names = col_names
         return names
 
-    def _check_arg(self, arg, name):
-        if arg is None:
+    def _required_cols(self, **kwargs):
+        raise NotImplementedError
+
+    def _required_params(self, **kwargs):
+        raise NotImplementedError
+
+    def _check_arg(self, name, **kwargs):
+        if name not in kwargs.keys():
             raise Exception(
                 f"Derivation: {name} should be specified for deriver {self.__class__.__name__}"
             )
 
-    def _check_exist(self, df, arg, name):
-        if arg not in df.columns:
+    def _check_exist(self, df, name, **kwargs):
+        if kwargs[name] not in df.columns:
             raise Exception(
                 f"Derivation: {name} is not a valid column in df for deriver {self.__class__.__name__}."
             )
@@ -53,24 +93,28 @@ class DegLayerDeriver(AbstractDeriver):
     def __init__(self):
         super(DegLayerDeriver, self).__init__()
 
-    def derive(
+    def _required_cols(self, **kwargs):
+        return ["sequence_column"]
+
+    def _required_params(self, **kwargs):
+        return []
+
+    def _derived_size(self, **kwargs):
+        return 4
+
+    def _defaults(self):
+        return dict(stacked=True, intermediate=False)
+
+    def _derive(
         self,
         df,
         trainer,
-        derived_name=None,
-        col_names=None,
-        stacked=True,
-        intermediate=False,
-        sequence_column=None,
         **kwargs,
     ):
-        self._check_arg(derived_name, "derived_name")
-        self._check_arg(sequence_column, "sequence_column")
-        self._check_exist(df, sequence_column, "sequence_column")
+        sequence_column = kwargs["sequence_column"]
 
         sequence = [
             [int(y) if y != "nan" else np.nan for y in str(x).split("/")]
-            for x in df["Sequence"].values
         ]
 
         deg_layers = np.zeros(
@@ -85,132 +129,145 @@ class DegLayerDeriver(AbstractDeriver):
                 len(seq) - seq.count(np.nan) - np.sum(deg_layers[idx, :3])
             )
 
-        names = self._generate_col_names(derived_name, deg_layers.shape[1], col_names)
-
-        self._check_values(deg_layers)
-        return deg_layers, derived_name, names, intermediate
+        return deg_layers
 
 
 class RelativeDeriver(AbstractDeriver):
     def __init__(self):
         super(RelativeDeriver, self).__init__()
 
-    def derive(
+    def _required_cols(self, **kwargs):
+        return ["absolute_col", "relative2_col"]
+
+    def _required_params(self, **kwargs):
+        return []
+
+    def _derived_size(self, **kwargs):
+        return 1
+
+    def _defaults(self):
+        return dict(stacked=True, intermediate=False)
+
+    def _derive(
         self,
         df,
         trainer,
-        derived_name=None,
-        col_names=None,
-        stacked=True,
-        intermediate=False,
-        absolute_col=None,
-        relative2_col=None,
         **kwargs,
     ):
-        self._check_arg(derived_name, "derived_name")
-        self._check_arg(absolute_col, "absolute_col")
-        self._check_arg(relative2_col, "relative2_col")
-        self._check_exist(df, absolute_col, "absolute_col")
-        self._check_exist(df, relative2_col, "relative2_col")
+        absolute_col = kwargs["absolute_col"]
+        relative2_col = kwargs["relative2_col"]
 
         relative = df[absolute_col] / df[relative2_col]
         relative = relative.values.reshape(-1, 1)
 
-        names = self._generate_col_names(derived_name, 1, col_names)
-        self._check_values(relative)
-        return relative, derived_name, names, intermediate
+        return relative
 
 
 class MinStressDeriver(AbstractDeriver):
     def __init__(self):
         super(MinStressDeriver, self).__init__()
 
-    def derive(
+        return ["max_stress_col", "r_value_col"]
+
+    def _required_params(self, **kwargs):
+        return []
+
+    def _derived_size(self, **kwargs):
+        return 1
+
+    def _defaults(self):
+        return dict(stacked=True, intermediate=False)
+
+    def _derive(
         self,
         df,
         trainer,
-        derived_name=None,
-        col_names=None,
-        stacked=True,
-        intermediate=False,
-        max_stress_col=None,
-        r_value_col=None,
         **kwargs,
     ):
-        self._check_arg(derived_name, "derived_name")
-        self._check_arg(max_stress_col, "max_stress_col")
-        self._check_arg(r_value_col, "r_value_col")
-        self._check_exist(df, max_stress_col, "max_stress_col")
-        self._check_exist(df, r_value_col, "r_value_col")
-
+        max_stress_col = kwargs["max_stress_col"]
+        r_value_col = kwargs["r_value_col"]
         value = (df[max_stress_col] * df[r_value_col]).values.reshape(-1, 1)
 
-        names = self._generate_col_names(derived_name, 1, col_names)
-        self._check_values(value)
-        return value, derived_name, names, intermediate
+        return value
 
 
 class WalkerStressDeriver(AbstractDeriver):
     def __init__(self):
         super(WalkerStressDeriver, self).__init__()
 
-    def derive(
+    def _required_cols(self, **kwargs):
+        return ["max_stress_col", "r_value_col"]
+
+    def _required_params(self, **kwargs):
+        return ["power_index"]
+
+    def _derived_size(self, **kwargs):
+        return 1
+
+    def _defaults(self):
+        return dict(stacked=True, intermediate=False)
+
+    def _derive(
         self,
         df,
         trainer,
-        derived_name=None,
-        col_names=None,
-        stacked=True,
-        intermediate=False,
-        max_stress_col=None,
-        r_value_col=None,
-        power_index=None,
         **kwargs,
     ):
-        self._check_arg(derived_name, "derived_name")
-        self._check_arg(max_stress_col, "max_stress_col")
-        self._check_arg(r_value_col, "r_value_col")
-        self._check_arg(power_index, "power_index")
-        self._check_exist(df, max_stress_col, "max_stress_col")
-        self._check_exist(df, r_value_col, "r_value_col")
-
+        max_stress_col = kwargs["max_stress_col"]
+        r_value_col = kwargs["r_value_col"]
+        power_index = kwargs["power_index"]
         value = (
             df[max_stress_col] * ((1 - df[r_value_col]) / 2) ** power_index
         ).values.reshape(-1, 1)
 
-        names = self._generate_col_names(derived_name, 1, col_names)
-        self._check_values(value)
-        return value, derived_name, names, intermediate
+        return value
 
 
 class SuppStressDeriver(AbstractDeriver):
     def __init__(self):
         super(SuppStressDeriver, self).__init__()
 
-    def derive(
+    def _required_cols(self, **kwargs):
+        return ["max_stress_col", "min_stress_col", "ucs_col", "uts_col"]
+
+    def _required_params(self, **kwargs):
+        return ["relative"]
+
+    def _defaults(self):
+        return dict(stacked=True, intermediate=False, relative=False)
+
+    def _derived_size(self, **kwargs):
+        return 6 if kwargs["relative"] else 3
+
+    def _derived_names(self, **kwargs):
+        names = (
+            [
+                "Absolute Maximum Stress",
+                "Absolute Peak-to-peak Stress",
+                "Absolute Mean Stress",
+                "Relative Maximum Stress",
+                "Relative Peak-to-peak Stress",
+                "Relative Mean Stress",
+            ]
+            if kwargs["relative"]
+            else [
+                "Absolute Maximum Stress",
+                "Absolute Peak-to-peak Stress",
+                "Absolute Mean Stress",
+            ]
+        )
+        return names
+
+    def _derive(
         self,
         df,
         trainer,
-        derived_name=None,
-        col_names=None,
-        stacked=True,
-        intermediate=False,
-        max_stress_col=None,
-        min_stress_col=None,
-        ucs_col=None,
-        uts_col=None,
-        relative=False,
         **kwargs,
     ):
-        self._check_arg(derived_name, "derived_name")
-        self._check_arg(max_stress_col, "max_stress_col")
-        self._check_arg(min_stress_col, "min_stress_col")
-        self._check_arg(ucs_col, "ucs_col")
-        self._check_arg(uts_col, "uts_col")
-        self._check_exist(df, max_stress_col, "max_stress_col")
-        self._check_exist(df, min_stress_col, "min_stress_col")
-        self._check_exist(df, ucs_col, "ucs_col")
-        self._check_exist(df, uts_col, "uts_col")
+        max_stress_col = kwargs["max_stress_col"]
+        min_stress_col = kwargs["min_stress_col"]
+        ucs_col = kwargs["ucs_col"]
+        uts_col = kwargs["uts_col"]
 
         df_tmp = df.copy()
 
@@ -255,25 +312,9 @@ class SuppStressDeriver(AbstractDeriver):
         df_tmp.loc[where_invalid, "Relative Peak-to-peak Stress"] = np.nan
         df_tmp.loc[where_invalid, "Relative Mean Stress"] = np.nan
 
-        names = (
-            [
-                "Absolute Maximum Stress",
-                "Absolute Peak-to-peak Stress",
-                "Absolute Mean Stress",
-                "Relative Maximum Stress",
-                "Relative Peak-to-peak Stress",
-                "Relative Mean Stress",
-            ]
-            if relative
-            else [
-                "Absolute Maximum Stress",
-                "Absolute Peak-to-peak Stress",
-                "Absolute Mean Stress",
-            ]
-        )
+        names = self._derived_names(**kwargs)
         stresses = df_tmp[names].values
-        self._check_values(stresses)
-        return stresses, derived_name, names, intermediate
+        return stresses
 
 
 deriver_mapping = {}

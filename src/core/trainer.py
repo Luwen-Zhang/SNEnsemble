@@ -358,11 +358,10 @@ class Trainer:
         df_tmp = df.copy()
         feature_names = cp(self.feature_names)
         for deriver, kwargs in self.dataderivers:
+            kwargs = deriver.make_defaults(**kwargs)
             if kwargs["stacked"]:
-                value, name, col_names, intermediate = deriver.derive(
-                    df_tmp, trainer=self, **kwargs
-                )
-                if not intermediate:
+                value, name, col_names = deriver.derive(df_tmp, trainer=self, **kwargs)
+                if not kwargs["intermediate"]:
                     for col_name in col_names:
                         if col_name not in feature_names:
                             feature_names.append(col_name)
@@ -372,8 +371,9 @@ class Trainer:
     def derive_unstacked(self, df):
         derived_data = {}
         for deriver, kwargs in self.dataderivers:
+            kwargs = deriver.make_defaults(**kwargs)
             if not kwargs["stacked"]:
-                value, name, _, _ = deriver.derive(df, trainer=self, **kwargs)
+                value, name, _ = deriver.derive(df, trainer=self, **kwargs)
                 derived_data[name] = value
         return derived_data
 
