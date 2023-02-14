@@ -24,9 +24,7 @@ class AbstractDeriver:
         values = self._derive(df, trainer, **kwargs)
         self._check_values(values)
         names = (
-            self._generate_col_names(
-                derived_name, self._derived_size(**kwargs), **kwargs
-            )
+            self._generate_col_names(derived_name, values.shape[-1], **kwargs)
             if "col_names" not in kwargs
             else kwargs["col_names"]
         )
@@ -44,9 +42,6 @@ class AbstractDeriver:
         trainer,
         **kwargs,
     ):
-        raise NotImplementedError
-
-    def _derived_size(self, **kwargs):
         raise NotImplementedError
 
     def _defaults(self):
@@ -101,9 +96,6 @@ class DegLayerDeriver(AbstractDeriver):
     def _required_params(self, **kwargs):
         return []
 
-    def _derived_size(self, **kwargs):
-        return 4
-
     def _defaults(self):
         return dict(stacked=True, intermediate=False)
 
@@ -145,9 +137,6 @@ class RelativeDeriver(AbstractDeriver):
     def _required_params(self, **kwargs):
         return []
 
-    def _derived_size(self, **kwargs):
-        return 1
-
     def _defaults(self):
         return dict(stacked=True, intermediate=False)
 
@@ -176,9 +165,6 @@ class MinStressDeriver(AbstractDeriver):
     def _required_params(self, **kwargs):
         return []
 
-    def _derived_size(self, **kwargs):
-        return 1
-
     def _defaults(self):
         return dict(stacked=True, intermediate=False)
 
@@ -204,9 +190,6 @@ class WalkerStressDeriver(AbstractDeriver):
 
     def _required_params(self, **kwargs):
         return ["power_index"]
-
-    def _derived_size(self, **kwargs):
-        return 1
 
     def _defaults(self):
         return dict(stacked=True, intermediate=False)
@@ -236,9 +219,6 @@ class DriveCoeffDeriver(AbstractDeriver):
 
     def _required_params(self, **kwargs):
         return []
-
-    def _derived_size(self, **kwargs):
-        return 1
 
     def _defaults(self):
         return dict(stacked=False, intermediate=False)
@@ -362,9 +342,6 @@ class SuppStressDeriver(AbstractDeriver):
 
     def _defaults(self):
         return dict(stacked=True, intermediate=False, relative=False)
-
-    def _derived_size(self, **kwargs):
-        return 6 if kwargs["relative"] else 3
 
     def _derived_names(self, **kwargs):
         names = (
