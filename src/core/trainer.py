@@ -281,9 +281,10 @@ class Trainer:
             self.feature_names,
         ) = self.derive_stacked(self.df)
         # There may exist nan in stacked features.
-        self.df = self.dataimputer.fit_transform(self.df, trainer=self)
-        self.df = self.df.copy().dropna(
-            axis=0, subset=self.label_name + self.derivation_related_cols
+        self.df = (
+            self.dataimputer.fit_transform(self.df, trainer=self)
+            .copy()
+            .dropna(axis=0, subset=self.label_name)
         )
 
         self._data_process(
