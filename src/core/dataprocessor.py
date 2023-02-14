@@ -269,60 +269,6 @@ class AbstractTransformer(AbstractProcessor):
         return trans_res[0, self.record_features.index(feature_name)]
 
 
-class MeanImputer(AbstractTransformer):
-    def __init__(self):
-        super(MeanImputer, self).__init__()
-
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
-        from sklearn.impute import SimpleImputer
-
-        imputer = SimpleImputer(strategy="mean")
-        fit_indices = np.intersect1d(
-            np.array(list(trainer.train_indices) + list(trainer.val_indices)),
-            np.array(data.index),
-        )
-        trans_indices = np.setdiff1d(np.array(data.index), fit_indices)
-        # https://github.com/scikit-learn/scikit-learn/issues/16426
-        # SimpleImputer reduces the number of features without giving messages. The issue is fixed in
-        # scikit-learn==1.2.0 by an argument "keep_empty_features"; however, autogluon==0.6.1 requires
-        # scikit-learn<1.2.0.
-        data.loc[fit_indices, trainer.feature_names] = imputer.fit_transform(
-            data.loc[fit_indices, trainer.feature_names]
-        ).astype(np.float32)
-        if len(trans_indices) > 0:
-            data.loc[trans_indices, trainer.feature_names] = imputer.transform(
-                data.loc[trans_indices, trainer.feature_names]
-            ).astype(np.float32)
-
-        self.transformer = imputer
-        self.record_features = cp(trainer.feature_names)
-        return data
-
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
-        data.loc[:, trainer.feature_names] = self.transformer.transform(
-            data.loc[:, trainer.feature_names]
-        ).astype(np.float32)
-        return data
-
-
-class NaNImputer(AbstractTransformer):
-    def __init__(self):
-        super(NaNImputer, self).__init__()
-
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
-        self.record_features = cp(trainer.feature_names)
-        return data.dropna(axis=0, subset=trainer.feature_names)
-
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
-        return data.dropna(axis=0, subset=self.record_features)
-
-
 class StandardScaler(AbstractTransformer):
     def __init__(self):
         super(StandardScaler, self).__init__()

@@ -169,6 +169,7 @@ class Trainer:
         self.bayes_epoch = self.args["bayes_epoch"]
 
         self.set_data_splitter(name=self.args["data_splitter"], verbose=verbose)
+        self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
         self.set_data_processors(self.args["data_processors"], verbose=verbose)
         self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
 
@@ -206,6 +207,11 @@ class Trainer:
         from src.core.datasplitter import get_data_splitter
 
         self.datasplitter = get_data_splitter(name)()
+
+    def set_data_imputer(self, name, verbose=True):
+        from src.core.dataimputer import get_data_imputer
+
+        self.dataimputer = get_data_imputer(name)()
 
     def set_data_processors(self, config: List[Tuple], verbose=True):
         from src.core.dataprocessor import get_data_processor
@@ -269,16 +275,18 @@ class Trainer:
     ):
         self.feature_names = feature_names
         self.label_name = label_name
+        self.df = self.dataimputer.fit_transform(df, trainer=self)
         if derived_data is None:
             (
-                df,
+                self.df,
                 derived_data,
                 self.feature_names,
                 self.derived_data_col_names,
                 self.derivation_related_cols,
                 self.stacked_derivation_related_cols,
-            ) = self.derive(df)
-        self.df = df
+            ) = self.derive(self.df)
+        # There may exist nan in stacked features.
+        self.df = self.dataimputer.fit_transform(self.df, trainer=self)
         self.derived_data = derived_data
         self.df = self.df.copy().dropna(
             axis=0, subset=self.label_name + self.derivation_related_cols
