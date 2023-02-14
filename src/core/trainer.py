@@ -291,24 +291,48 @@ class Trainer:
         self.df = self.df.copy().dropna(
             axis=0, subset=self.label_name + self.derivation_related_cols
         )
+
+        self._data_process(
+            warm_start=warm_start,
+            verbose=verbose,
+        )
+
+        def update_indices(indices):
+            return np.array(
+                [
+                    x - np.count_nonzero(self.dropped_indices < x)
+                    for x in indices
+                    if x in self.retained_indices
+                ]
+            )
+
         if all_training:
-            indices = np.arange(len(df))
-            self._data_process(
-                train_indices=indices,
-                val_indices=indices,
-                test_indices=indices,
-                warm_start=warm_start,
-                verbose=verbose,
+            self.train_indices = self.test_indices = self.val_indices = np.arange(
+                len(self.df)
             )
+        elif train_indices is None or val_indices is None or test_indices is None:
+            (
+                self.train_indices,
+                self.val_indices,
+                self.test_indices,
+            ) = self.datasplitter.split(self.df, feature_names, label_name)
         else:
-            self._data_process(
-                train_indices=train_indices,
-                val_indices=val_indices,
-                test_indices=test_indices,
-                warm_start=warm_start,
-                verbose=verbose,
+            self.train_indices = update_indices(train_indices)
+            self.test_indices = update_indices(test_indices)
+            self.val_indices = update_indices(val_indices)
+
+        if (
+            len(self.train_indices) == 0
+            or len(self.val_indices) == 0
+            or len(self.test_indices) == 0
+        ):
+            raise Exception(
+                "No sufficient data after preprocessing. This is caused by arguments train/val/test_"
+                "indices or warm_start of set_data(). Set warm_start to True might help."
             )
-        self._rederive_unstacked()
+
+        if derived_data is None:
+            self._rederive_unstacked()
         self._update_dataset_auto()
         self._material_code = (
             pd.DataFrame(self.df["Material_Code"])
@@ -342,9 +366,6 @@ class Trainer:
 
     def _data_process(
         self,
-        train_indices=None,
-        val_indices=None,
-        test_indices=None,
         warm_start=False,
         verbose=True,
     ):
@@ -355,19 +376,6 @@ class Trainer:
         _, feature_names, label_name = self._get_tabular_dataset()
         self.df.reset_index(drop=True, inplace=True)
         original_length = len(self.df)
-
-        if train_indices is None or val_indices is None or test_indices is None:
-            (
-                self.train_indices,
-                self.val_indices,
-                self.test_indices,
-            ) = self.datasplitter.split(self.df, feature_names, label_name)
-        else:
-            self.train_indices, self.val_indices, self.test_indices = (
-                train_indices,
-                val_indices,
-                test_indices,
-            )
 
         if verbose:
             data = self._data_preprocess(self.df, warm_start=warm_start)
@@ -380,38 +388,9 @@ class Trainer:
         self.dropped_indices = np.setdiff1d(
             np.arange(original_length), self.retained_indices
         )
-
-        def update_indices(indices):
-            return np.array(
-                [
-                    x - np.count_nonzero(self.dropped_indices < x)
-                    for x in indices
-                    if x in data.index
-                ]
-            )
-
-        self.train_indices = update_indices(self.train_indices)
-        self.test_indices = update_indices(self.test_indices)
-        self.val_indices = update_indices(self.val_indices)
-
         self.df = pd.DataFrame(self.df.loc[self.retained_indices, :]).reset_index(
             drop=True
         )
-
-        if (
-            len(self.train_indices) == 0
-            or len(self.val_indices) == 0
-            or len(self.test_indices) == 0
-        ):
-            print(
-                f"No sufficient data after preprocessing. Splitting datasets again which might make data transformation"
-                f" not reasonable."
-            )
-            (
-                self.train_indices,
-                self.val_indices,
-                self.test_indices,
-            ) = self.datasplitter.split(self.df, feature_names, label_name)
 
         # feature_data and label_data does not contain derived data.
         self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
