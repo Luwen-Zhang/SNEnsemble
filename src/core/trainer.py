@@ -839,6 +839,7 @@ class Trainer:
         n_bootstrap=1,
         grid_size=30,
         CI=0.95,
+        verbose=True,
     ):
         """
         Calculate and plot partial dependence plots.
@@ -867,7 +868,7 @@ class Trainer:
             n_bootstrap=n_bootstrap,
             refit=refit,
             grid_size=grid_size,
-            verbose=False,
+            verbose=verbose,
             rederive=True,
             percentile=80,
             CI=CI,
@@ -900,7 +901,8 @@ class Trainer:
         for feature_idx, feature_name in enumerate(
             self.feature_names if feature_subset is None else feature_subset
         ):
-            print("Calculate PDP: ", feature_name)
+            if kwargs["verbose"]:
+                print("Calculate PDP: ", feature_name)
 
             x_value, model_predictions, ci_left, ci_right = self._bootstrap(
                 focus_feature=feature_name, **kwargs
