@@ -42,7 +42,7 @@ class config(BaseConfig):
                 # 'Plate-Fibre Weight Percentage': 'Fibre Weight Fraction',
                 # 'Plate-Prepared Resin Mixture-Mix': 'Resin Mixture Weight',
                 # 'Plate-Prepared Resin Mixture-Ratio': 'Resin Mixture Hardener Fraction',
-                # 'Fibre Volumn Fraction': 'Fibre Volumn Fraction',
+                # 'Fibre Volume Fraction': 'Fibre Volume Fraction',
                 # 'Maximum Tensile Stress': 'Maximum Tensile Stress',
                 # 'Maximum Compressive Stress': 'Maximum Compressive Stress',
                 # 'Static Maximum Tensile Stress': 'Static Maximum Tensile Stress',

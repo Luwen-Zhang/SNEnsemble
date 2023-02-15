@@ -27,7 +27,7 @@ class config(BaseConfig):
                 "Thickness": 1,
                 # 'Frequency': 0,
                 # 'Load Length': 1,
-                # 'Fibre Volumn Fraction': 1,
+                # 'Fibre Volume Fraction': 1,
             },
             "data_derivers": [
                 (

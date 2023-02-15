@@ -20,7 +20,7 @@ class config(BaseConfig):
                 "Percentage of Fibre in 45-deg Direction": 1,
                 "Percentage of Fibre in 90-deg Direction": 1,
                 "Percentage of Fibre in Other Direction": 1,
-                "Fibre Volumn Fraction": 1,
+                "Fibre Volume Fraction": 1,
                 "Thickness": 1,
                 "Initial Elastic Modulus": 1,
             },

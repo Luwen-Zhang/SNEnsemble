@@ -23,7 +23,7 @@ class config(BaseConfig):
                 # "Absolute Maximum Stress": 0,
                 # "Absolute Peak-to-peak Stress": 0,
                 # "Frequency": 0,
-                "Fibre Volumn Fraction": 1,
+                "Fibre Volume Fraction": 1,
                 # "Relative Maximum Stress": 0,
                 # "Relative Peak-to-peak Stress": 0,
                 # "R-value": 1,
