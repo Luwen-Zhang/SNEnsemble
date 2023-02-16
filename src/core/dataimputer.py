@@ -31,10 +31,8 @@ class MeanImputer(AbstractImputer):
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         data = input_data.copy()
-        from sklearn.impute import SimpleImputer
-
         impute_features = self._get_impute_features(trainer.feature_names, data)
-        imputer = SimpleImputer(strategy="mean")
+        imputer = self._new_imputer()
         # https://github.com/scikit-learn/scikit-learn/issues/16426
         # SimpleImputer reduces the number of features without giving messages. The issue is fixed in
         # scikit-learn==1.2.0 by an argument "keep_empty_features"; however, autogluon==0.6.1 requires
@@ -54,6 +52,31 @@ class MeanImputer(AbstractImputer):
             data.loc[:, self.record_imputed_features]
         ).astype(np.float32)
         return data
+
+    def _new_imputer(self):
+        from sklearn.impute import SimpleImputer
+
+        return SimpleImputer(strategy="mean")
+
+
+class MedianImputer(MeanImputer):
+    def __init__(self):
+        super(MedianImputer, self).__init__()
+
+    def _new_imputer(self):
+        from sklearn.impute import SimpleImputer
+
+        return SimpleImputer(strategy="median")
+
+
+class ModeImputer(MeanImputer):
+    def __init__(self):
+        super(ModeImputer, self).__init__()
+
+    def _new_imputer(self):
+        from sklearn.impute import SimpleImputer
+
+        return SimpleImputer(strategy="most_frequent")
 
 
 class NaNImputer(AbstractImputer):
