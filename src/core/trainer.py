@@ -233,7 +233,7 @@ class Trainer:
             (get_data_deriver(name)(), kwargs) for name, kwargs in config
         ]
 
-    def load_data(self, data_path: str = None) -> None:
+    def load_data(self, data_path: str = None, file_type: str = "csv") -> None:
         """
         Load the data file in ../data directory specified by the 'project' argument in configfile. Data will be splitted
          into training, validation, and testing datasets.
@@ -241,10 +241,11 @@ class Trainer:
         :return: None
         """
         if data_path is None:
-            data_path = f"data/{self.database}.xlsx"
+            data_path = f"data/{self.database}.{file_type}"
+        if file_type == "xlsx":
             self.df = pd.read_excel(data_path, engine="openpyxl")
         else:
-            self.df = pd.read_excel(data_path, engine="openpyxl")
+            self.df = pd.read_csv(data_path)
         self.data_path = data_path
 
         feature_names = list(self.args["feature_names_type"].keys())

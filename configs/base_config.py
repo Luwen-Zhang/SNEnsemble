@@ -40,7 +40,7 @@ class BaseConfig:
             "data_splitter": "MaterialCycleSplitter",
             "data_imputer": "MeanImputer",
             "data_processors": [
-                ("IQRRemover", {}),
+                # ("IQRRemover", {}),
                 # ("MaterialSelector", {"m_code": "MD-DD5P-UP2[0/±45/0]S"}),
                 # ("LackDataMaterialRemover", {}),
                 # ("FeatureValueSelector", {"feature": "R-value", "value": 0.1}),
