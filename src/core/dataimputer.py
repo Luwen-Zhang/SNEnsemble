@@ -25,6 +25,36 @@ class AbstractImputer:
         return impute_features
 
 
+class MiceImputer(AbstractImputer):
+    def __init__(self):
+        super(MiceImputer, self).__init__()
+
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        data = input_data.copy()
+        import miceforest as mf
+
+        impute_features = self._get_impute_features(trainer.feature_names, data)
+        imputer = mf.ImputationKernel(data.loc[:, impute_features], random_state=0)
+        imputer.mice(iterations=2, n_estimators=1)
+        data.loc[:, impute_features] = imputer.complete_data().values.astype(np.float32)
+        imputer.compile_candidate_preds()
+        self.transformer = imputer
+        self.record_features = cp(trainer.feature_names)
+        return data
+
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        trainer.feature_names = cp(self.record_features)
+        data = input_data.copy()
+        data.loc[:, self.record_imputed_features] = (
+            self.transformer.impute_new_data(
+                new_data=data.loc[:, self.record_imputed_features]
+            )
+            .complete_data()
+            .values.astype(np.float32)
+        )
+        return data
+
+
 class MeanImputer(AbstractImputer):
     def __init__(self):
         super(MeanImputer, self).__init__()
