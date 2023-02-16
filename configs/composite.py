@@ -98,6 +98,20 @@ class config(BaseConfig):
                 #     },
                 # ),
             ],
+            "data_processors": [
+                # ("IQRRemover", {}),
+                # ("MaterialSelector", {"m_code": "MD-DD5P-UP2[0/±45/0]S"}),
+                # ("LackDataMaterialRemover", {}),
+                # ("FeatureValueSelector", {"feature": "R-value", "value": 0.1}),
+                # (
+                #     "FeatureValueSelector",
+                #     {"feature": "Data source", "value": "SNL/MSU/DOE"},
+                # ),
+                ("NaNFeatureRemover", {}),
+                ("SingleValueFeatureRemover", {}),
+                ("UnscaledDataRecorder", {}),
+                ("StandardScaler", {}),
+            ],
             "feature_types": ["Fatigue loading", "Material", "Derived"],
             "label_name": ["log(Cycles to Failure)"],
         }
