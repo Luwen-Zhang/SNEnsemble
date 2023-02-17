@@ -67,15 +67,31 @@ class AbstractModel:
             raise Exception(
                 f"Model {model_name} is not available. Select among {self._get_model_names()}"
             )
-        absent_features = []
-        for feature_name in self.trainer.feature_names:
-            if feature_name not in df.columns:
-                absent_features.append(feature_name)
+        absent_features = [
+            x
+            for x in np.setdiff1d(
+                self.trainer.feature_names, self.trainer.derived_stacked_features
+            )
+            if x not in df.columns
+        ]
+        absent_derived_features = [
+            x for x in self.trainer.derived_stacked_features if x not in df.columns
+        ]
         if len(absent_features) > 0:
             raise Exception(f"Feature {absent_features} not in the input dataframe.")
 
-        if derived_data is None:
+        if derived_data is None or len(absent_derived_features) > 0:
             df, _, derived_data = self.trainer.derive(df)
+        else:
+            absent_keys = [
+                key
+                for key in self.trainer.derived_data.keys()
+                if key not in derived_data.keys()
+            ]
+            if len(absent_keys) > 0:
+                raise Exception(
+                    f"Additional feature {absent_keys} not in the input derived_data."
+                )
 
         return self._predict(df, model_name, derived_data, **kwargs)
 
