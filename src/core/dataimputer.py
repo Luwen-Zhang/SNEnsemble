@@ -25,6 +25,22 @@ class AbstractImputer:
         return impute_features
 
 
+class NaNImputer(AbstractImputer):
+    def __init__(self):
+        super(NaNImputer, self).__init__()
+
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        data = input_data.copy()
+        self.record_features = cp(trainer.feature_names)
+        impute_features = self._get_impute_features(trainer.feature_names, data)
+        return data.dropna(axis=0, subset=impute_features)
+
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        trainer.feature_names = cp(self.record_features)
+        data = input_data.copy()
+        return data.dropna(axis=0, subset=self.record_imputed_features)
+
+
 class MiceImputer(AbstractImputer):
     def __init__(self):
         super(MiceImputer, self).__init__()
@@ -55,9 +71,9 @@ class MiceImputer(AbstractImputer):
         return data
 
 
-class MeanImputer(AbstractImputer):
+class AbstractSklearnImputer(AbstractImputer):
     def __init__(self):
-        super(MeanImputer, self).__init__()
+        super(AbstractSklearnImputer, self).__init__()
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         data = input_data.copy()
@@ -67,9 +83,10 @@ class MeanImputer(AbstractImputer):
         # SimpleImputer reduces the number of features without giving messages. The issue is fixed in
         # scikit-learn==1.2.0 by an argument "keep_empty_features"; however, autogluon==0.6.1 requires
         # scikit-learn<1.2.0.
-        data.loc[:, impute_features] = imputer.fit_transform(
-            data.loc[:, impute_features]
-        ).astype(np.float32)
+        res = imputer.fit_transform(data.loc[:, impute_features]).astype(np.float32)
+        if type(res) == pd.DataFrame:
+            res = res.values
+        data.loc[:, impute_features] = res
 
         self.transformer = imputer
         self.record_features = cp(trainer.feature_names)
@@ -78,10 +95,21 @@ class MeanImputer(AbstractImputer):
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         trainer.feature_names = cp(self.record_features)
         data = input_data.copy()
-        data.loc[:, self.record_imputed_features] = self.transformer.transform(
+        res = self.transformer.transform(
             data.loc[:, self.record_imputed_features]
         ).astype(np.float32)
+        if type(res) == pd.DataFrame:
+            res = res.values
+        data.loc[:, self.record_imputed_features] = res
         return data
+
+    def _new_imputer(self):
+        raise NotImplementedError
+
+
+class MeanImputer(AbstractSklearnImputer):
+    def __init__(self):
+        super(MeanImputer, self).__init__()
 
     def _new_imputer(self):
         from sklearn.impute import SimpleImputer
@@ -89,7 +117,7 @@ class MeanImputer(AbstractImputer):
         return SimpleImputer(strategy="mean")
 
 
-class MedianImputer(MeanImputer):
+class MedianImputer(AbstractSklearnImputer):
     def __init__(self):
         super(MedianImputer, self).__init__()
 
@@ -99,7 +127,7 @@ class MedianImputer(MeanImputer):
         return SimpleImputer(strategy="median")
 
 
-class ModeImputer(MeanImputer):
+class ModeImputer(AbstractSklearnImputer):
     def __init__(self):
         super(ModeImputer, self).__init__()
 
@@ -107,22 +135,6 @@ class ModeImputer(MeanImputer):
         from sklearn.impute import SimpleImputer
 
         return SimpleImputer(strategy="most_frequent")
-
-
-class NaNImputer(AbstractImputer):
-    def __init__(self):
-        super(NaNImputer, self).__init__()
-
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
-        self.record_features = cp(trainer.feature_names)
-        impute_features = self._get_impute_features(trainer.feature_names, data)
-        return data.dropna(axis=0, subset=impute_features)
-
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
-        return data.dropna(axis=0, subset=self.record_imputed_features)
 
 
 imputer_mapping = {}
