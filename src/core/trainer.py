@@ -276,12 +276,33 @@ class Trainer:
     ):
         self.feature_names = feature_names
         self.label_name = label_name
+        self.imputed_mask = pd.DataFrame(
+            columns=self.feature_names,
+            data=np.isnan(self.df[self.feature_names].values).astype(int),
+            index=np.arange(len(self.df)),
+        )
         self.df = self.dataimputer.fit_transform(df, trainer=self)
         (
             self.df,
             self.feature_names,
         ) = self.derive_stacked(self.df)
         # There may exist nan in stacked features.
+        self.derived_stacked_features = np.setdiff1d(
+            self.feature_names, self.imputed_mask.columns
+        )
+        self.imputed_mask = pd.concat(
+            [
+                self.imputed_mask,
+                pd.DataFrame(
+                    columns=self.derived_stacked_features,
+                    data=np.isnan(self.df[self.derived_stacked_features].values).astype(
+                        int
+                    ),
+                    index=np.arange(len(self.df)),
+                ),
+            ],
+            axis=1,
+        )
         self.df = (
             self.dataimputer.fit_transform(self.df, trainer=self)
             .copy()
@@ -291,6 +312,12 @@ class Trainer:
         self._data_process(
             warm_start=warm_start,
             verbose=verbose,
+        )
+
+        self.imputed_mask = (
+            self.imputed_mask.loc[self.retained_indices, self.feature_names]
+            .copy()
+            .reset_index(drop=True)
         )
 
         def update_indices(indices):
