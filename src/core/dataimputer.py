@@ -41,9 +41,9 @@ class NaNImputer(AbstractImputer):
         return data.dropna(axis=0, subset=self.record_imputed_features)
 
 
-class MiceImputer(AbstractImputer):
+class MiceLightgbmImputer(AbstractImputer):
     def __init__(self):
-        super(MiceImputer, self).__init__()
+        super(MiceLightgbmImputer, self).__init__()
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         data = input_data.copy()
@@ -105,6 +105,41 @@ class AbstractSklearnImputer(AbstractImputer):
 
     def _new_imputer(self):
         raise NotImplementedError
+
+
+class MiceImputer(AbstractSklearnImputer):
+    def __init__(self):
+        super(MiceImputer, self).__init__()
+
+    def _new_imputer(self):
+        from sklearn.experimental import enable_iterative_imputer
+        from sklearn.impute import IterativeImputer
+
+        return IterativeImputer(
+            random_state=0,
+            max_iter=1000,
+            tol=1e-3,
+            sample_posterior=False,
+        )
+
+
+class MissForestImputer(AbstractSklearnImputer):
+    def __init__(self):
+        super(MissForestImputer, self).__init__()
+
+    def _new_imputer(self):
+        from sklearn.ensemble import RandomForestRegressor
+        from sklearn.experimental import enable_iterative_imputer
+        from sklearn.impute import IterativeImputer
+
+        estimator_rf = RandomForestRegressor(
+            n_estimators=1,
+            max_depth=3,
+            random_state=0,
+            bootstrap=True,
+            n_jobs=-1,
+        )
+        return IterativeImputer(estimator=estimator_rf, random_state=0, max_iter=10)
 
 
 class GainImputer(AbstractSklearnImputer):
