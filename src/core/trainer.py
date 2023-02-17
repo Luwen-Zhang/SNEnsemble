@@ -782,11 +782,7 @@ class Trainer:
 
             plt.close()
 
-    def plot_feature_importance(self, modelbase, fig_size=(7, 4)):
-        """
-        Calculate and plot permutation feature importance.
-        :return: None
-        """
+    def cal_feature_importance(self, modelbase):
         from src.core.model import TorchModel
 
         if not issubclass(type(modelbase), TorchModel):
@@ -812,6 +808,14 @@ class Trainer:
             .cpu()
             .numpy()[0]
         )
+        return attr
+
+    def plot_feature_importance(self, modelbase, fig_size=(7, 4)):
+        """
+        Calculate and plot permutation feature importance.
+        :return: None
+        """
+        attr = self.cal_feature_importance(modelbase)
 
         clr = sns.color_palette("deep")
 
