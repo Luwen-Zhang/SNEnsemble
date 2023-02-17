@@ -107,6 +107,16 @@ class AbstractSklearnImputer(AbstractImputer):
         raise NotImplementedError
 
 
+class GainImputer(AbstractSklearnImputer):
+    def __init__(self):
+        super(GainImputer, self).__init__()
+
+    def _new_imputer(self):
+        from src.utils.imputers.gain import GainImputation
+
+        return GainImputation()
+
+
 class MeanImputer(AbstractSklearnImputer):
     def __init__(self):
         super(MeanImputer, self).__init__()
