@@ -77,18 +77,7 @@ class AbstractModel:
         if derived_data is None:
             df, _, derived_data = self.trainer.derive(df)
 
-        additional_data = []
-        absent_keys = []
-        for key in self.trainer.derived_data.keys():
-            if key not in derived_data.keys():
-                absent_keys.append(key)
-            else:
-                additional_data.append(derived_data[key])
-        if len(absent_keys) > 0:
-            raise Exception(
-                f"Additional feature {absent_keys} not in the input derived_data."
-            )
-        return self._predict(df, model_name, additional_data, **kwargs)
+        return self._predict(df, model_name, derived_data, **kwargs)
 
     def _predict_all(self, verbose=True, test_data_only=False):
         self._check_train_status()
@@ -132,7 +121,7 @@ class AbstractModel:
         enable_tqdm()
         return predictions
 
-    def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
+    def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
         raise NotImplementedError
 
     def _train(self, dump_trainer=True, verbose=True, warm_start=False, **kwargs):
@@ -220,7 +209,7 @@ class AutoGluon(AbstractModel):
         if dump_trainer:
             save_trainer(self.trainer)
 
-    def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
+    def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
         return self.model.predict(
             df[self.trainer.feature_names], model=model_name, **kwargs
         )
@@ -429,7 +418,7 @@ class WideDeep(AbstractModel):
         if dump_trainer:
             save_trainer(self.trainer)
 
-    def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
+    def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
         X_df = self.tab_preprocessor.transform(df)
         return self.model[model_name].predict(X_tab=X_df)
 
@@ -777,7 +766,7 @@ class WideDeep(AbstractModel):
 #             save_trainer(self.trainer)
 #         print("\n-------------Pytorch-tabular End-------------\n")
 #
-#     def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
+#     def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
 #         model = self.model[model_name]
 #         target = model.config.target[0]
 #         return np.array(model.predict(df)[f"{target}_prediction"])
@@ -968,9 +957,7 @@ class TabNet(AbstractModel):
         if dump_trainer:
             save_trainer(self.trainer)
 
-    def _predict(
-        self, df: pd.DataFrame, model_name=None, additional_data=None, **kwargs
-    ):
+    def _predict(self, df: pd.DataFrame, model_name=None, derived_data=None, **kwargs):
         # Basic components in _predict():
         # Return a ndarray with shape (len(df), 1) of predictions by the model_name.
         return self.model.predict(
@@ -1084,7 +1071,7 @@ class TorchModel(AbstractModel):
         return predictions
 
     def _predict(
-        self, input_df: pd.DataFrame, model_name, additional_data: list = None, **kwargs
+        self, input_df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
     ):
         df = self.trainer.dataimputer.transform(input_df.copy(), self.trainer)
         df = self.trainer._data_transform(df)
@@ -1094,7 +1081,7 @@ class TorchModel(AbstractModel):
         ).to(self.trainer.device)
         D = [
             torch.tensor(value, dtype=torch.float32).to(self.trainer.device)
-            for value in additional_data
+            for value in derived_data.values()
         ]
         y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(
             self.trainer.device
@@ -1501,9 +1488,9 @@ class ModelAssembly(AbstractModel):
             submodel.train(*args, **kwargs)
         print(f"\n-------------{self.program} End-------------\n")
 
-    def _predict(self, df: pd.DataFrame, model_name, additional_data=None, **kwargs):
+    def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
         return self.models[self._get_model_idx(model_name)].predict(
-            df=df, model_name=model_name, additional_data=additional_data, **kwargs
+            df=df, model_name=model_name, derived_data=derived_data, **kwargs
         )
 
     def _predict_all(self, **kwargs):
