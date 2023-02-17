@@ -1,3 +1,4 @@
+import sklearn.exceptions
 from src.core.trainer import Trainer
 import pandas as pd
 from copy import deepcopy as cp
@@ -112,9 +113,14 @@ class MiceImputer(AbstractSklearnImputer):
         super(MiceImputer, self).__init__()
 
     def _new_imputer(self):
+        # https://github.com/vanderschaarlab/hyperimpute/blob/main/src/hyperimpute/plugins/imputers/plugin_sklearn_ice.py
         from sklearn.experimental import enable_iterative_imputer
         from sklearn.impute import IterativeImputer
+        import warnings
 
+        warnings.simplefilter(
+            action="ignore", category=sklearn.exceptions.ConvergenceWarning
+        )
         return IterativeImputer(
             random_state=0,
             max_iter=1000,
@@ -131,7 +137,11 @@ class MissForestImputer(AbstractSklearnImputer):
         from sklearn.ensemble import RandomForestRegressor
         from sklearn.experimental import enable_iterative_imputer
         from sklearn.impute import IterativeImputer
+        import warnings
 
+        warnings.simplefilter(
+            action="ignore", category=sklearn.exceptions.ConvergenceWarning
+        )
         estimator_rf = RandomForestRegressor(
             n_estimators=1,
             max_depth=3,
