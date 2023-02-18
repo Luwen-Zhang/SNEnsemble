@@ -10,9 +10,20 @@ class AbstractProcessor:
         self.record_features = None
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        raise NotImplementedError
+        data = input_data.copy()
+        res = self._fit_transform(data, trainer, **kwargs)
+        self.record_features = cp(trainer.feature_names)
+        return res
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        trainer.feature_names = cp(self.record_features)
+        data = input_data.copy()
+        return self._transform(data, trainer, **kwargs)
+
+    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+        raise NotImplementedError
+
+    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         raise NotImplementedError
 
 
@@ -20,8 +31,7 @@ class LackDataMaterialRemover(AbstractProcessor):
     def __init__(self):
         super(LackDataMaterialRemover, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
+    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         m_codes = data.loc[:, "Material_Code"].copy()
         m_cnts_index = list(m_codes.value_counts(ascending=False).index)
         self.lack_data_mat = m_cnts_index[len(m_cnts_index) // 10 * 8 :]
@@ -29,12 +39,9 @@ class LackDataMaterialRemover(AbstractProcessor):
             m_codes = data.loc[:, "Material_Code"].copy()
             where_material = m_codes.index[np.where(m_codes == m_code)[0]]
             data = data.drop(where_material)
-        self.record_features = cp(trainer.feature_names)
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
+    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         for m_code in self.lack_data_mat:
             m_codes = data.loc[:, "Material_Code"].copy()
             where_material = m_codes.index[np.where(m_codes == m_code)[0]]
@@ -46,24 +53,20 @@ class MaterialSelector(AbstractProcessor):
     def __init__(self):
         super(MaterialSelector, self).__init__()
 
-    def fit_transform(
-        self, input_data: pd.DataFrame, trainer: Trainer, m_code=None, **kwargs
+    def _fit_transform(
+        self, data: pd.DataFrame, trainer: Trainer, m_code=None, **kwargs
     ):
         if m_code is None:
             raise Exception('MaterialSelector requires the argument "m_code".')
-        data = input_data.copy()
         m_codes = trainer.df.loc[np.array(data.index), "Material_Code"].copy()
         if m_code not in list(m_codes):
             raise Exception(f"m_code {m_code} not available.")
         where_material = m_codes.index[np.where(m_codes == m_code)[0]]
         data = data.loc[where_material, :]
-        self.record_features = cp(trainer.feature_names)
         self.m_code = m_code
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
+    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         m_codes = data.loc[:, "Material_Code"].copy()
         if self.m_code not in list(m_codes):
             raise Exception(f"m_code {self.m_code} not available.")
@@ -76,9 +79,9 @@ class FeatureValueSelector(AbstractProcessor):
     def __init__(self):
         super(FeatureValueSelector, self).__init__()
 
-    def fit_transform(
+    def _fit_transform(
         self,
-        input_data: pd.DataFrame,
+        data: pd.DataFrame,
         trainer: Trainer,
         feature=None,
         value=None,
@@ -88,20 +91,16 @@ class FeatureValueSelector(AbstractProcessor):
             raise Exception(
                 'FeatureValueSelector requires arguments "feature" and "value".'
             )
-        data = input_data.copy()
         if value not in list(data[feature]):
             raise Exception(
                 f"Value {value} not available for feature {feature}. Select from {data[feature].unique()}"
             )
         where_value = data.index[np.where(data[feature] == value)[0]]
         data = data.loc[where_value, :]
-        self.record_features = cp(trainer.feature_names)
         self.feature, self.value = feature, value
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
+    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         if self.value not in list(data[self.feature]):
             raise Exception(
                 f"Value {self.value} not available for feature {self.feature}. Select from {data[self.feature].unique()}"
@@ -115,9 +114,8 @@ class IQRRemover(AbstractProcessor):
     def __init__(self):
         super(IQRRemover, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        print(f"Removing outliers by IQR. Original size: {len(input_data)}, ", end="")
-        data = input_data.copy()
+    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+        print(f"Removing outliers by IQR. Original size: {len(data)}, ", end="")
         for feature in list(trainer.args["feature_names_type"].keys()):
             if pd.isna(data[feature]).all():
                 raise Exception(f"All values of {feature} are NaN.")
@@ -136,21 +134,18 @@ class IQRRemover(AbstractProcessor):
             data = data.drop(upper)
             data = data.drop(lower)
         print(f"Final size: {len(data)}.")
-        self.record_features = cp(trainer.feature_names)
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        return input_data.copy()
+    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+        return data
 
 
 class StdRemover(AbstractProcessor):
     def __init__(self):
         super(StdRemover, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        print(f"Removing outliers by std. Original size: {len(input_data)}, ", end="")
-        data = input_data.copy()
+    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+        print(f"Removing outliers by std. Original size: {len(data)}, ", end="")
         for feature in list(trainer.args["feature_names_type"].keys()):
             if pd.isna(data[feature]).all():
                 raise Exception(f"All values of {feature} are NaN.")
@@ -164,20 +159,17 @@ class StdRemover(AbstractProcessor):
             data = data.drop(upper)
             data = data.drop(lower)
         print(f"Final size: {len(data)}.")
-        self.record_features = cp(trainer.feature_names)
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        return input_data.copy()
+    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+        return data
 
 
 class AbstractFeatureSelector(AbstractProcessor):
     def __init__(self):
         super(AbstractFeatureSelector, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
+    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         retain_features = list(self._get_feature_names_out(data, trainer))
         removed_features = list(np.setdiff1d(trainer.feature_names, retain_features))
         if len(removed_features) > 0:
@@ -185,12 +177,10 @@ class AbstractFeatureSelector(AbstractProcessor):
             print(
                 f"{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features retained: {retain_features}."
             )
-        self.record_features = cp(trainer.feature_names)
         return data[retain_features + trainer.label_name]
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        return input_data.copy()
+    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+        return data
 
     def _get_feature_names_out(self, input_data, trainer):
         raise NotImplementedError
@@ -293,28 +283,25 @@ class UnscaledDataRecorder(AbstractTransformer):
     def __init__(self):
         super(UnscaledDataRecorder, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
+    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+        feature_data, label_data = trainer._divide_from_tabular_dataset(data)
 
         trainer.unscaled_feature_data = feature_data
         trainer.unscaled_label_data = label_data
-        self.record_features = cp(trainer.feature_names)
-        return input_data.copy()
+        return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
+    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+        feature_data, label_data = trainer._divide_from_tabular_dataset(data)
         trainer.unscaled_feature_data = feature_data
         trainer.unscaled_label_data = label_data
-        return input_data.copy()
+        return data
 
 
 class StandardScaler(AbstractTransformer):
     def __init__(self):
         super(StandardScaler, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
+    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         from sklearn.preprocessing import StandardScaler as ss
 
         scaler = ss()
@@ -326,12 +313,9 @@ class StandardScaler(AbstractTransformer):
         ).astype(np.float32)
 
         self.transformer = scaler
-        self.record_features = cp(trainer.feature_names)
         return data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
+    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         data.loc[:, trainer.feature_names] = self.transformer.transform(
             data.loc[:, trainer.feature_names]
         ).astype(np.float32)
