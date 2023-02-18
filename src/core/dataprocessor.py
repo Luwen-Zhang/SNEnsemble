@@ -172,20 +172,14 @@ class StdRemover(AbstractProcessor):
         return input_data.copy()
 
 
-class SingleValueFeatureRemover(AbstractProcessor):
+class AbstractFeatureSelector(AbstractProcessor):
     def __init__(self):
-        super(SingleValueFeatureRemover, self).__init__()
+        super(AbstractFeatureSelector, self).__init__()
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         data = input_data.copy()
-        retain_features = []
-        removed_features = []
-        for feature in trainer.feature_names:
-            if len(np.unique(data[feature])) == 1:
-                removed_features.append(feature)
-            else:
-                retain_features.append(feature)
-
+        retain_features = list(self._get_feature_names_out(data, trainer))
+        removed_features = list(np.setdiff1d(trainer.feature_names, retain_features))
         if len(removed_features) > 0:
             trainer.feature_names = retain_features
             print(
@@ -198,37 +192,81 @@ class SingleValueFeatureRemover(AbstractProcessor):
         trainer.feature_names = cp(self.record_features)
         return input_data.copy()
 
+    def _get_feature_names_out(self, input_data, trainer):
+        raise NotImplementedError
 
-class NaNFeatureRemover(AbstractProcessor):
+
+class SingleValueFeatureRemover(AbstractFeatureSelector):
+    def __init__(self):
+        super(SingleValueFeatureRemover, self).__init__()
+
+    def _get_feature_names_out(self, data, trainer):
+        retain_features = []
+        for feature in trainer.feature_names:
+            if len(np.unique(data[feature])) != 1:
+                retain_features.append(feature)
+        return retain_features
+
+
+class NaNFeatureRemover(AbstractFeatureSelector):
     def __init__(self):
         super(NaNFeatureRemover, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
+    def _get_feature_names_out(self, data, trainer):
         retain_features = []
-        removed_features = []
         all_missing_idx = np.where(
             np.isnan(data[trainer.feature_names].values).all(axis=0)
         )[0]
         for idx, feature in enumerate(trainer.feature_names):
-            if idx in all_missing_idx:
-                removed_features.append(feature)
-            else:
+            if idx not in all_missing_idx:
                 retain_features.append(feature)
-
-        if len(removed_features) > 0:
-            trainer.feature_names = retain_features
-            print(
-                f"{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features retained: {retain_features}."
-            )
-        self.record_features = cp(trainer.feature_names)
-        return data[retain_features + trainer.label_name]
-
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        return input_data.copy()
+        return retain_features
 
 
+class RFEFeatureSelector(AbstractFeatureSelector):
+    def __init__(self):
+        super(RFEFeatureSelector, self).__init__()
+
+    def _get_feature_names_out(self, data, trainer):
+        from sklearn.feature_selection import RFECV
+        from sklearn.model_selection import KFold
+        from sklearn.ensemble import RandomForestRegressor
+
+        min_features_to_select = 1  # Minimum number of features to consider
+        rf = RandomForestRegressor(n_estimators=100, n_jobs=-1, random_state=0)
+        cv = KFold(5)
+
+        rfecv = RFECV(
+            estimator=rf,
+            step=1,
+            cv=cv,
+            scoring="neg_root_mean_squared_error",
+            min_features_to_select=min_features_to_select,
+            n_jobs=-1,
+            verbose=0,
+        )
+        rfecv.fit(
+            data[trainer.feature_names],
+            data[trainer.label_name].values.flatten(),
+        )
+        retain_features = list(rfecv.get_feature_names_out())
+        return retain_features
+
+
+class VarianceFeatureSelector(AbstractFeatureSelector):
+    def __init__(self):
+        super(VarianceFeatureSelector, self).__init__()
+
+    def _get_feature_names_out(self, data, trainer):
+        from sklearn.feature_selection import VarianceThreshold
+
+        sel = VarianceThreshold(threshold=(0.8 * (1 - 0.8)))
+        sel.fit(
+            data[trainer.feature_names],
+            data[trainer.label_name].values.flatten(),
+        )
+        retain_features = list(sel.get_feature_names_out())
+        return retain_features
 
 
 class AbstractTransformer(AbstractProcessor):
