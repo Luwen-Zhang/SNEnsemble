@@ -424,31 +424,51 @@ class Trainer:
         warm_start=False,
         verbose=True,
     ):
-        self.feature_data = self.df[self.feature_names]
-        self.label_data = self.df[self.label_name]
-        self.unscaled_feature_data = cp(self.feature_data)
-        self.unscaled_label_data = cp(self.label_data)
-        _, feature_names, label_name = self._get_tabular_dataset()
+        self.unscaled_feature_data = pd.DataFrame()
+        self.unscaled_label_data = pd.DataFrame()
         self.df.reset_index(drop=True, inplace=True)
+        self.scaled_df = self.df.copy()
         original_length = len(self.df)
 
-        if verbose:
-            data = self._data_preprocess(self.df, warm_start=warm_start)
-        else:
-            with HiddenPrints():
-                data = self._data_preprocess(self.df, warm_start=warm_start)
+        with HiddenPrints(disable_std=not verbose):
+            training_data = self._data_preprocess(
+                self.df.loc[list(self.train_indices) + list(self.val_indices), :],
+                warm_start=warm_start,
+            )
+            unscaled_training_data = pd.concat(
+                [self.unscaled_feature_data, self.unscaled_label_data], axis=1
+            )
+            testing_data = self._data_preprocess(
+                self.df.loc[self.test_indices, :], warm_start=True
+            )
+            unscaled_testing_data = pd.concat(
+                [self.unscaled_feature_data, self.unscaled_label_data], axis=1
+            )
 
-        # Reset indices
-        self.retained_indices = np.array(data.index)
+        self.retained_indices = np.unique(
+            np.sort(np.array(list(training_data.index) + list(testing_data.index)))
+        )
         self.dropped_indices = np.setdiff1d(
             np.arange(original_length), self.retained_indices
         )
-        self.df = pd.DataFrame(self.df.loc[self.retained_indices, :]).reset_index(
-            drop=True
-        )
+
+        def process_df(df, training, testing):
+            df.loc[training.index, training.columns] = training.values
+            df.loc[testing.index, testing.columns] = testing.values
+            df = pd.DataFrame(df.loc[self.retained_indices, :]).reset_index(drop=True)
+            return df
+
+        self.df = process_df(self.df, unscaled_training_data, unscaled_testing_data)
+        self.scaled_df = process_df(self.scaled_df, training_data, testing_data)
 
         # feature_data and label_data does not contain derived data.
-        self.feature_data, self.label_data = self._divide_from_tabular_dataset(data)
+        (
+            self.unscaled_feature_data,
+            self.unscaled_label_data,
+        ) = self._divide_from_tabular_dataset(self.df)
+        self.feature_data, self.label_data = self._divide_from_tabular_dataset(
+            self.scaled_df
+        )
 
     def _data_preprocess(self, input_data: pd.DataFrame, warm_start=False):
         data = input_data.copy()
@@ -582,8 +602,8 @@ class Trainer:
         return mode, cnt_mode, mode_percent
 
     def _divide_from_tabular_dataset(self, data: pd.DataFrame):
-        feature_data = data[self.feature_names].reset_index(drop=True)
-        label_data = data[self.label_name].reset_index(drop=True)
+        feature_data = data[self.feature_names]
+        label_data = data[self.label_name]
 
         return feature_data, label_data
 
