@@ -276,6 +276,9 @@ class Trainer:
     ):
         self.feature_names = feature_names
         self.label_name = label_name
+        self.df = df.copy()
+        if np.isnan(df[self.label_name].values).any():
+            raise Exception("Label missing in the input dataframe.")
         self.imputed_mask = pd.DataFrame(
             columns=self.feature_names,
             data=np.isnan(self.df[self.feature_names].values).astype(int),
