@@ -279,12 +279,38 @@ class Trainer:
         self.df = df.copy()
         if np.isnan(df[self.label_name].values).any():
             raise Exception("Label missing in the input dataframe.")
+
+        if all_training:
+            self.train_indices = self.test_indices = self.val_indices = np.arange(
+                len(self.df)
+            )
+        elif train_indices is None or val_indices is None or test_indices is None:
+            (
+                self.train_indices,
+                self.val_indices,
+                self.test_indices,
+            ) = self.datasplitter.split(self.df, feature_names, label_name)
+        else:
+            self.train_indices = train_indices
+            self.test_indices = val_indices
+            self.val_indices = test_indices
+
         self.imputed_mask = pd.DataFrame(
             columns=self.feature_names,
             data=np.isnan(self.df[self.feature_names].values).astype(int),
             index=np.arange(len(self.df)),
         )
-        self.df = self.dataimputer.fit_transform(df, trainer=self)
+
+        def make_imputation():
+            train_val_indices = list(self.train_indices) + list(self.val_indices)
+            self.df.loc[train_val_indices, :] = self.dataimputer.fit_transform(
+                self.df.loc[train_val_indices, :], trainer=self
+            )
+            self.df.loc[self.test_indices, :] = self.dataimputer.transform(
+                self.df.loc[self.test_indices, :], trainer=self
+            )
+
+        make_imputation()
         (
             self.df,
             self.feature_names,
@@ -306,11 +332,7 @@ class Trainer:
             ],
             axis=1,
         )
-        self.df = (
-            self.dataimputer.fit_transform(self.df, trainer=self)
-            .copy()
-            .dropna(axis=0, subset=self.label_name)
-        )
+        make_imputation()
 
         self._data_process(
             warm_start=warm_start,
@@ -332,20 +354,9 @@ class Trainer:
                 ]
             )
 
-        if all_training:
-            self.train_indices = self.test_indices = self.val_indices = np.arange(
-                len(self.df)
-            )
-        elif train_indices is None or val_indices is None or test_indices is None:
-            (
-                self.train_indices,
-                self.val_indices,
-                self.test_indices,
-            ) = self.datasplitter.split(self.df, feature_names, label_name)
-        else:
-            self.train_indices = update_indices(train_indices)
-            self.test_indices = update_indices(test_indices)
-            self.val_indices = update_indices(val_indices)
+        self.train_indices = update_indices(self.train_indices)
+        self.test_indices = update_indices(self.test_indices)
+        self.val_indices = update_indices(self.val_indices)
 
         if (
             len(self.train_indices) == 0
@@ -354,7 +365,7 @@ class Trainer:
         ):
             raise Exception(
                 "No sufficient data after preprocessing. This is caused by arguments train/val/test_"
-                "indices or warm_start of set_data(). Set warm_start to True might help."
+                "indices or warm_start of set_data()."
             )
 
         self.derived_data = (
