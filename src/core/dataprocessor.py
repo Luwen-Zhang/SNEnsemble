@@ -170,7 +170,7 @@ class AbstractFeatureSelector(AbstractProcessor):
         super(AbstractFeatureSelector, self).__init__()
 
     def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        retain_features = list(self._get_feature_names_out(data, trainer))
+        retain_features = list(self._get_feature_names_out(data, trainer, **kwargs))
         removed_features = list(np.setdiff1d(trainer.feature_names, retain_features))
         if len(removed_features) > 0:
             trainer.feature_names = retain_features
@@ -182,7 +182,7 @@ class AbstractFeatureSelector(AbstractProcessor):
     def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         return data
 
-    def _get_feature_names_out(self, input_data, trainer):
+    def _get_feature_names_out(self, input_data, trainer, **kwargs):
         raise NotImplementedError
 
 
@@ -190,7 +190,7 @@ class SingleValueFeatureRemover(AbstractFeatureSelector):
     def __init__(self):
         super(SingleValueFeatureRemover, self).__init__()
 
-    def _get_feature_names_out(self, data, trainer):
+    def _get_feature_names_out(self, data, trainer, **kwargs):
         retain_features = []
         for feature in trainer.feature_names:
             if len(np.unique(data[feature])) != 1:
@@ -202,7 +202,7 @@ class NaNFeatureRemover(AbstractFeatureSelector):
     def __init__(self):
         super(NaNFeatureRemover, self).__init__()
 
-    def _get_feature_names_out(self, data, trainer):
+    def _get_feature_names_out(self, data, trainer, **kwargs):
         retain_features = []
         all_missing_idx = np.where(
             np.isnan(data[trainer.feature_names].values).all(axis=0)
@@ -217,23 +217,25 @@ class RFEFeatureSelector(AbstractFeatureSelector):
     def __init__(self):
         super(RFEFeatureSelector, self).__init__()
 
-    def _get_feature_names_out(self, data, trainer):
+    def _get_feature_names_out(
+        self, data, trainer, n_estimators=100, step=1, verbose=0, **kwargs
+    ):
         from sklearn.feature_selection import RFECV
         from sklearn.model_selection import KFold
         from sklearn.ensemble import RandomForestRegressor
 
         min_features_to_select = 1  # Minimum number of features to consider
-        rf = RandomForestRegressor(n_estimators=100, n_jobs=-1, random_state=0)
+        rf = RandomForestRegressor(n_estimators=n_estimators, n_jobs=-1, random_state=0)
         cv = KFold(5)
 
         rfecv = RFECV(
             estimator=rf,
-            step=1,
+            step=step,
             cv=cv,
             scoring="neg_root_mean_squared_error",
             min_features_to_select=min_features_to_select,
             n_jobs=-1,
-            verbose=0,
+            verbose=verbose,
         )
         rfecv.fit(
             data[trainer.feature_names],
@@ -247,10 +249,10 @@ class VarianceFeatureSelector(AbstractFeatureSelector):
     def __init__(self):
         super(VarianceFeatureSelector, self).__init__()
 
-    def _get_feature_names_out(self, data, trainer):
+    def _get_feature_names_out(self, data, trainer, thres=0.8, **kwargs):
         from sklearn.feature_selection import VarianceThreshold
 
-        sel = VarianceThreshold(threshold=(0.8 * (1 - 0.8)))
+        sel = VarianceThreshold(threshold=(thres * (1 - thres)))
         sel.fit(
             data[trainer.feature_names],
             data[trainer.label_name].values.flatten(),
