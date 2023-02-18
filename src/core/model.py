@@ -92,7 +92,8 @@ class AbstractModel:
                 raise Exception(
                     f"Additional feature {absent_keys} not in the input derived_data."
                 )
-
+        df = self.trainer.dataimputer.transform(df.copy(), self.trainer)
+        df = self.trainer.data_transform(df)
         return self._predict(df, model_name, derived_data, **kwargs)
 
     def _predict_all(self, verbose=True, test_data_only=False):
@@ -1089,22 +1090,20 @@ class TorchModel(AbstractModel):
     def _predict(
         self, input_df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
     ):
-        df = self.trainer.dataimputer.transform(input_df.copy(), self.trainer)
-        df = self.trainer._data_transform(df)
         X = torch.tensor(
-            df[self.trainer.feature_names].values.astype(np.float32),
+            input_df[self.trainer.feature_names].values.astype(np.float32),
             dtype=torch.float32,
         ).to(self.trainer.device)
         D = [
             torch.tensor(value, dtype=torch.float32).to(self.trainer.device)
             for value in derived_data.values()
         ]
-        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(
+        y = torch.tensor(np.zeros((len(input_df), 1)), dtype=torch.float32).to(
             self.trainer.device
         )
 
         loader = Data.DataLoader(
-            Data.TensorDataset(X, *D, y), batch_size=len(df), shuffle=False
+            Data.TensorDataset(X, *D, y), batch_size=len(input_df), shuffle=False
         )
 
         pred, _, _ = self._test_step(self.model, loader, self.trainer.loss_fn)

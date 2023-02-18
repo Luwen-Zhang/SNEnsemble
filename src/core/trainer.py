@@ -438,9 +438,7 @@ class Trainer:
             unscaled_training_data = pd.concat(
                 [self.unscaled_feature_data, self.unscaled_label_data], axis=1
             )
-            testing_data = self._data_preprocess(
-                self.df.loc[self.test_indices, :], warm_start=True
-            )
+            testing_data = self.data_transform(self.df.loc[self.test_indices, :])
             unscaled_testing_data = pd.concat(
                 [self.unscaled_feature_data, self.unscaled_label_data], axis=1
             )
@@ -480,15 +478,8 @@ class Trainer:
         data = data[self.feature_names + self.label_name]
         return data
 
-    def _data_transform(self, input_data: pd.DataFrame):
-        data = input_data.copy()
-        from src.core.dataprocessor import AbstractTransformer
-
-        for processor, kwargs in self.dataprocessors:
-            if issubclass(type(processor), AbstractTransformer):
-                data = processor.transform(data, self, **kwargs)
-        data = data[self.feature_names + self.label_name]
-        return data
+    def data_transform(self, input_data: pd.DataFrame):
+        return self._data_preprocess(input_data.copy(), warm_start=True)
 
     def _update_dataset_auto(self):
         X = torch.tensor(
