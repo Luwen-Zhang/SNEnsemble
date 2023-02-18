@@ -108,7 +108,7 @@ class config(BaseConfig):
                 #     {"feature": "Data source", "value": "SNL/MSU/DOE"},
                 # ),
                 ("NaNFeatureRemover", {}),
-                ("SingleValueFeatureRemover", {}),
+                ("VarianceFeatureSelector", {"thres": 1}),
                 ("UnscaledDataRecorder", {}),
                 ("StandardScaler", {}),
             ],

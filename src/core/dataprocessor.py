@@ -186,18 +186,6 @@ class AbstractFeatureSelector(AbstractProcessor):
         raise NotImplementedError
 
 
-class SingleValueFeatureRemover(AbstractFeatureSelector):
-    def __init__(self):
-        super(SingleValueFeatureRemover, self).__init__()
-
-    def _get_feature_names_out(self, data, trainer, **kwargs):
-        retain_features = []
-        for feature in trainer.feature_names:
-            if len(np.unique(data[feature])) != 1:
-                retain_features.append(feature)
-        return retain_features
-
-
 class NaNFeatureRemover(AbstractFeatureSelector):
     def __init__(self):
         super(NaNFeatureRemover, self).__init__()
