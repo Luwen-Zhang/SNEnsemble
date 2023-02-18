@@ -229,24 +229,6 @@ class NaNFeatureRemover(AbstractProcessor):
         return input_data.copy()
 
 
-class UnscaledDataRecorder(AbstractProcessor):
-    def __init__(self):
-        super(UnscaledDataRecorder, self).__init__()
-
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
-
-        trainer.unscaled_feature_data = feature_data
-        trainer.unscaled_label_data = label_data
-        self.record_features = cp(trainer.feature_names)
-        return input_data.copy()
-
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
-        trainer.unscaled_feature_data = feature_data
-        trainer.unscaled_label_data = label_data
-        return input_data.copy()
 
 
 class AbstractTransformer(AbstractProcessor):
@@ -267,6 +249,26 @@ class AbstractTransformer(AbstractProcessor):
             )
         )
         return trans_res[0, self.record_features.index(feature_name)]
+
+
+class UnscaledDataRecorder(AbstractTransformer):
+    def __init__(self):
+        super(UnscaledDataRecorder, self).__init__()
+
+    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
+
+        trainer.unscaled_feature_data = feature_data
+        trainer.unscaled_label_data = label_data
+        self.record_features = cp(trainer.feature_names)
+        return input_data.copy()
+
+    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        trainer.feature_names = cp(self.record_features)
+        feature_data, label_data = trainer._divide_from_tabular_dataset(input_data)
+        trainer.unscaled_feature_data = feature_data
+        trainer.unscaled_label_data = label_data
+        return input_data.copy()
 
 
 class StandardScaler(AbstractTransformer):
