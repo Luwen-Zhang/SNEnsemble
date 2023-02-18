@@ -5,7 +5,9 @@ import numpy as np
 
 
 class RecursiveFeatureElimination:
-    def __init__(self, trainer: Trainer, model_name: str, metric: str = "RMSE"):
+    def __init__(
+        self, trainer: Trainer, model_name: str, metric: str = "Validation RMSE"
+    ):
         self.trainer = cp(trainer)
         self.model = self.trainer.get_modelbase(program=model_name)
         self.metric = metric
@@ -31,7 +33,7 @@ class RecursiveFeatureElimination:
                 label_name=self.trainer.label_name,
             )
             leaderboard = self.trainer.get_leaderboard(
-                test_data_only=True,
+                test_data_only=False,
                 cross_validation=cross_validation,
                 verbose=False,
             )
