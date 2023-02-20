@@ -331,7 +331,7 @@ class Trainer:
                 ),
             ],
             axis=1,
-        )
+        )[self.feature_names]
         make_imputation()
 
         self._data_process(
@@ -1001,7 +1001,26 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_corr(self, fontsize=10, cmap="bwr"):
+    def cal_corr(self, imputed=False, features_only=False):
+        subset = (
+            self.feature_names
+            if features_only
+            else self.feature_names + self.label_name
+        )
+        if not imputed:
+            not_imputed_df = self.get_not_imputed_df()
+            return not_imputed_df[subset].corr()
+        else:
+            return self.df[subset].corr()
+
+    def get_not_imputed_df(self):
+        tmp_df = self.df.copy().loc[:, self.feature_names]
+        tmp_df.values[np.where(self.imputed_mask[self.feature_names].values)] = np.nan
+        not_imputed_df = self.df.copy()
+        not_imputed_df.loc[:, self.feature_names] = tmp_df
+        return not_imputed_df
+
+    def plot_corr(self, fontsize=10, cmap="bwr", imputed=False):
         """
         Plot Pearson correlation among features and the target.
         :return: None
@@ -1011,8 +1030,7 @@ class Trainer:
         fig = plt.figure(figsize=(10, 10))
         ax = plt.subplot(111)
         plt.box(on=True)
-        df_all = pd.concat([self.feature_data, self.label_data], axis=1)
-        corr = df_all.corr().values
+        corr = self.cal_corr(imputed=imputed).values
         im = ax.imshow(corr, cmap=cmap)
         ax.set_xticks(np.arange(len(feature_names)))
         ax.set_yticks(np.arange(len(feature_names)))
@@ -1054,12 +1072,14 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_feature_box(self):
+    def plot_feature_box(self, imputed=False):
         # sns.reset_defaults()
         plt.figure(figsize=(6, 6))
         ax = plt.subplot(111)
         bp = sns.boxplot(
-            data=self.feature_data,
+            data=self.feature_data
+            if imputed
+            else self.get_not_imputed_df()[self.feature_names],
             orient="h",
             linewidth=1,
             fliersize=4,
