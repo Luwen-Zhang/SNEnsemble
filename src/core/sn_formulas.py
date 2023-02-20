@@ -15,7 +15,6 @@ class AbstractSN(nn.Module):
         self.derived_feature_names = list(self.trainer.derived_data.keys())
         self.feature_mapping = {}
         self.tabular_feature_indices = {}
-        self.derived_feature_indices = {}
         self.to(trainer.device)
         self.material_features = np.array(
             list(self.trainer.args["feature_names_type"].keys())
@@ -81,17 +80,14 @@ class AbstractSN(nn.Module):
                 )
             elif var in self.derived_feature_names:
                 self.feature_mapping[var] = 1
-                self.derived_feature_indices[var] = self.derived_feature_names.index(
-                    var
-                )
 
-    def _get_var_slices(self, x, additional_tensors):
+    def _get_var_slices(self, x, derived_tensors):
         var_slices = []
         for var in self.sn_vars:
             if self.feature_mapping[var] == 0:
                 var_slices.append(x[:, self.tabular_feature_indices[var]].view(-1, 1))
             else:
-                var_slices.append(additional_tensors[self.derived_feature_indices[var]])
+                var_slices.append(derived_tensors[var])
         return var_slices
 
     @staticmethod
@@ -101,7 +97,7 @@ class AbstractSN(nn.Module):
     def _register_variable(self):
         raise NotImplementedError
 
-    def forward(self, x, additional_tensors):
+    def forward(self, x, derived_tensors):
         raise NotImplementedError
 
     def get_tex(self):
@@ -120,8 +116,8 @@ class linlogSN(AbstractSN):
         self.a = cp(self.template_sequential)
         self.b = cp(self.template_sequential)
 
-    def forward(self, x, additional_tensors):
-        var_slices = self._get_var_slices(x, additional_tensors)
+    def forward(self, x, derived_tensors):
+        var_slices = self._get_var_slices(x, derived_tensors)
         mat = x[:, self.stress_unrelated_features_idx]
         a, b = -torch.abs(self.a(mat)), torch.abs(self.b(mat))
         return a * var_slices[0] + b
@@ -139,8 +135,8 @@ class loglogSN(linlogSN):
         super(loglogSN, self).__init__(trainer)
         self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
 
-    def forward(self, x, additional_tensors):
-        var_slices = self._get_var_slices(x, additional_tensors)
+    def forward(self, x, derived_tensors):
+        var_slices = self._get_var_slices(x, derived_tensors)
         s = var_slices[0] - self.s_zero_slip
         mat = x[:, self.stress_unrelated_features_idx]
         a, b = -torch.abs(self.a(mat)), torch.abs(self.b(mat))
@@ -170,8 +166,8 @@ class TrivialSN(linlogSN):
     def get_tex(self):
         raise NotImplementedError
 
-    def forward(self, x, additional_tensors):
-        var_slices = self._get_var_slices(x, additional_tensors)
+    def forward(self, x, derived_tensors):
+        var_slices = self._get_var_slices(x, derived_tensors)
         s = torch.abs(var_slices[0] - self.s_zero_slip)
 
         if self.training:
@@ -212,8 +208,8 @@ class SigmoidSN(linlogSN):
     def get_tex(self):
         raise NotImplementedError
 
-    def forward(self, x, additional_tensors):
-        var_slices = self._get_var_slices(x, additional_tensors)
+    def forward(self, x, derived_tensors):
+        var_slices = self._get_var_slices(x, derived_tensors)
         s = torch.abs(var_slices[0] - self.s_zero_slip)
 
         if self.training:
@@ -242,8 +238,8 @@ class KohoutSN(linlogSN):
     def get_tex(self):
         raise NotImplementedError
 
-    def forward(self, x, additional_tensors):
-        var_slices = self._get_var_slices(x, additional_tensors)
+    def forward(self, x, derived_tensors):
+        var_slices = self._get_var_slices(x, derived_tensors)
         s = torch.abs(var_slices[0] - self.s_zero_slip) + 1
         mat = x[:, self.stress_unrelated_features_idx]
         a, b, B = (

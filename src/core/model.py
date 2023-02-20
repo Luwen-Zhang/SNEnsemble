@@ -1180,12 +1180,7 @@ class TorchModel(AbstractModel):
             yhat = tensors[-1]
             data = tensors[0]
             additional_tensors = tensors[1 : len(tensors) - 1]
-            derived_tensors = {}
-            for tensor, name in zip(
-                additional_tensors, self.trainer.derived_data.keys()
-            ):
-                derived_tensors[name] = tensor
-            y = model(data, derived_tensors)
+            y = model(*([data] + additional_tensors))
             loss = loss_fn(yhat, y)
             loss.backward()
             optimizer.step()
@@ -1205,12 +1200,7 @@ class TorchModel(AbstractModel):
                 yhat = tensors[-1]
                 data = tensors[0]
                 additional_tensors = tensors[1 : len(tensors) - 1]
-                derived_tensors = {}
-                for tensor, name in zip(
-                    additional_tensors, self.trainer.derived_data.keys()
-                ):
-                    derived_tensors[name] = tensor
-                y = model(data, derived_tensors)
+                y = model(*([data] + additional_tensors))
                 loss = loss_fn(yhat, y)
                 avg_loss += loss.item() * len(y)
                 pred += list(y.cpu().detach().numpy())
@@ -1298,6 +1288,7 @@ class ThisWork(TorchModel):
             len(self.trainer.label_name),
             self.trainer.layers,
             activated_sn=self.activated_sn,
+            trainer=self.trainer,
         ).to(self.trainer.device)
 
     def _get_model_names(self):
@@ -1332,6 +1323,7 @@ class ThisWorkRidge(ThisWork):
             len(self.trainer.label_name),
             self.trainer.layers,
             activated_sn=self.activated_sn,
+            trainer=self.trainer,
         ).to(self.trainer.device)
 
     def _train_step(self, model, train_loader, optimizer, loss_fn):
@@ -1342,12 +1334,7 @@ class ThisWorkRidge(ThisWork):
             yhat = tensors[-1]
             data = tensors[0]
             additional_tensors = tensors[1 : len(tensors) - 1]
-            derived_tensors = {}
-            for tensor, name in zip(
-                additional_tensors, self.trainer.derived_data.keys()
-            ):
-                derived_tensors[name] = tensor
-            y = model(data, derived_tensors)
+            y = model(*([data] + additional_tensors))
             self.ridge(model, yhat)
             loss = loss_fn(yhat, y)
             loss.backward()
@@ -1465,6 +1452,7 @@ class MLP(TorchModel):
             len(self.trainer.feature_names),
             len(self.trainer.label_name),
             self.trainer.layers if self.layers is None else self.layers,
+            trainer=self.trainer,
         ).to(self.trainer.device)
 
     def _get_model_names(self):

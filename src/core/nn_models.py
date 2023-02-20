@@ -7,24 +7,41 @@ def init_weights(m):
         torch.nn.init.kaiming_normal_(m.weight)
 
 
-class NN(nn.Module):
-    def __init__(self, n_inputs, n_outputs, layers):
-        super(NN, self).__init__()
+class AbstractNN(nn.Module):
+    def __init__(self, trainer):
+        super(AbstractNN, self).__init__()
+        self.derived_feature_names = list(trainer.derived_data.keys())
+
+    def forward(self, *tensors):
+        x = tensors[0]
+        additional_tensors = tensors[1:]
+        derived_tensors = {}
+        for tensor, name in zip(additional_tensors, self.derived_feature_names):
+            derived_tensors[name] = tensor
+        return self._forward(x, derived_tensors)
+
+    def _forward(self, x, derived_tensors):
+        raise NotImplementedError
+
+
+class NN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, trainer):
+        super(NN, self).__init__(trainer)
         num_inputs = n_inputs
         num_outputs = n_outputs
 
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
 
-    def forward(self, x, additional_tensors):
+    def _forward(self, x, derived_tensors):
         x = self.net(x)
         output = x
 
         return output
 
 
-class ThisWorkNN(nn.Module):
-    def __init__(self, n_inputs, n_outputs, layers, activated_sn):
-        super(ThisWorkNN, self).__init__()
+class ThisWorkNN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, activated_sn, trainer):
+        super(ThisWorkNN, self).__init__(trainer)
         num_inputs = n_inputs
         num_outputs = n_outputs
 
@@ -40,9 +57,9 @@ class ThisWorkNN(nn.Module):
             nn.ReLU,
         )
 
-    def forward(self, x, additional_tensors):
+    def _forward(self, x, derived_tensors):
         preds = torch.concat(
-            [sn(x, additional_tensors) for sn in self.activated_sn],
+            [sn(x, derived_tensors) for sn in self.activated_sn],
             dim=1,
         )
 
@@ -60,9 +77,9 @@ class ThisWorkNN(nn.Module):
         return output
 
 
-class ThisWorkRidgeNN(nn.Module):
-    def __init__(self, n_inputs, n_outputs, layers, activated_sn):
-        super(ThisWorkRidgeNN, self).__init__()
+class ThisWorkRidgeNN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, activated_sn, trainer):
+        super(ThisWorkRidgeNN, self).__init__(trainer)
         num_inputs = n_inputs
         num_outputs = n_outputs
 
@@ -76,9 +93,9 @@ class ThisWorkRidgeNN(nn.Module):
         )
         self.preds = None
 
-    def forward(self, x, additional_tensors):
+    def _forward(self, x, derived_tensors):
         preds = torch.concat(
-            [sn(x, additional_tensors) for sn in self.activated_sn],
+            [sn(x, derived_tensors) for sn in self.activated_sn],
             dim=1,
         )
         self.preds = preds
