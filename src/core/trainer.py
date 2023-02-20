@@ -808,40 +808,69 @@ class Trainer:
 
             plt.close()
 
-    def cal_feature_importance(self, modelbase):
+    def cal_feature_importance(self, modelbase, method="permutation"):
         from src.core.model import TorchModel
 
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
 
-        def forward_func(data):
-            ground_truth = self.label_data.loc[self.test_indices, :].values.flatten()
-            # Maybe D should be re-derived?
-            D = self._get_additional_tensors_slice(self.test_dataset.indices)
-            y = self.tensors[-1][self.test_dataset.indices, :]
-            loader = Data.DataLoader(
-                Data.TensorDataset(data, *D, y), batch_size=len(y), shuffle=False
-            )
-            prediction, _, _ = modelbase._test_step(
-                modelbase.model, loader, self.loss_fn
-            )
-            loss = float(self._metric_sklearn(ground_truth, prediction, self.loss))
-            return loss
+        if method == "permutation":
 
-        feature_perm = FeaturePermutation(forward_func)
-        attr = (
-            feature_perm.attribute(self.tensors[0][self.test_dataset.indices, :])
-            .cpu()
-            .numpy()[0]
-        )
+            def forward_func(data):
+                ground_truth = self.label_data.loc[
+                    self.test_indices, :
+                ].values.flatten()
+                # Maybe D should be re-derived?
+                D = self._get_additional_tensors_slice(self.test_indices)
+                y = self.tensors[-1][self.test_indices, :]
+                loader = Data.DataLoader(
+                    Data.TensorDataset(data, *D, y), batch_size=len(y), shuffle=False
+                )
+                prediction, _, _ = modelbase._test_step(
+                    modelbase.model, loader, self.loss_fn
+                )
+                loss = float(self._metric_sklearn(ground_truth, prediction, self.loss))
+                return loss
+
+            feature_perm = FeaturePermutation(forward_func)
+            attr = (
+                feature_perm.attribute(self.tensors[0][self.test_indices, :])
+                .cpu()
+                .numpy()[0]
+            )
+        elif method == "shap":
+            shap_values, data = self.cal_shap(modelbase=modelbase, explainer="deep")
+            attr = np.mean(np.abs(shap_values[0]), axis=0)
+        else:
+            raise NotImplementedError
         return attr
 
-    def plot_feature_importance(self, modelbase, fig_size=(7, 4)):
+    def cal_shap(self, modelbase, explainer="deep"):
+        from src.core.model import TorchModel
+        import shap
+
+        if not issubclass(type(modelbase), TorchModel):
+            raise Exception("A TorchModel should be passed.")
+
+        bk_indices = np.random.choice(self.train_indices, size=100, replace=False)
+        X_train_bk = self._get_first_tensor_slice(bk_indices)
+        D_train_bk = self._get_additional_tensors_slice(bk_indices)
+        background_data = [X_train_bk, *D_train_bk]
+
+        X_test = self._get_first_tensor_slice(self.test_indices)
+        D_test = self._get_additional_tensors_slice(self.test_indices)
+        test_data = [X_test, *D_test]
+        explainer = shap.DeepExplainer(modelbase.model, background_data)
+
+        shap_values = explainer.shap_values(test_data)
+        return shap_values, test_data
+
+    def plot_feature_importance(self, modelbase, fig_size=(7, 4), method="permutation"):
         """
         Calculate and plot permutation feature importance.
         :return: None
         """
-        attr = self.cal_feature_importance(modelbase)
+        attr = self.cal_feature_importance(modelbase, method=method)
 
         clr = sns.color_palette("deep")
 
@@ -1707,6 +1736,9 @@ class Trainer:
             if tensor is not None:
                 res.append(tensor[indices, :])
         return tuple(res)
+
+    def _get_first_tensor_slice(self, indices):
+        return self.tensors[0][indices, :]
 
 
 def save_trainer(trainer, path=None, verbose=True):
