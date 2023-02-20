@@ -249,6 +249,88 @@ class VarianceFeatureSelector(AbstractFeatureSelector):
         return retain_features
 
 
+class CorrFeatureSelector(AbstractFeatureSelector):
+    def __init__(self):
+        super(CorrFeatureSelector, self).__init__()
+
+    def _get_feature_names_out(
+        self, data, trainer, thres=0.8, n_estimators=100, **kwargs
+    ):
+        abs_corr = trainer.cal_corr(imputed=False, features_only=True).abs()
+        where_corr = np.where(abs_corr > thres)
+        where_corr = [[trainer.feature_names[x] for x in y] for y in where_corr]
+        corr_chain = {}
+
+        def add_edge(x, y):
+            if x not in corr_chain.keys():
+                corr_chain[x] = [y]
+            elif y not in corr_chain[x]:
+                corr_chain[x].append(y)
+
+        for x, y in zip(*where_corr):
+            if x != y:
+                add_edge(x, y)
+                add_edge(y, x)
+        corr_feature = list(corr_chain.keys())
+        for x in np.setdiff1d(trainer.feature_names, corr_feature):
+            corr_chain[x] = []
+
+        def dfs(visited, graph, node, ls):
+            if node not in visited:
+                ls.append(node)
+                visited.add(node)
+                for neighbour in graph[node]:
+                    ls = dfs(visited, graph, neighbour, ls)
+            return ls
+
+        corr_sets = []
+        for x in corr_feature[::-1]:
+            if len(corr_sets) != 0:
+                for sets in corr_sets:
+                    if x in sets:
+                        break
+                else:
+                    corr_sets.append(dfs(set(), corr_chain, x, []))
+            else:
+                corr_sets.append(dfs(set(), corr_chain, x, []))
+
+        corr_sets = [[x for x in y] for y in corr_sets]
+
+        from sklearn.ensemble import RandomForestRegressor
+
+        rf = RandomForestRegressor(n_estimators=n_estimators, n_jobs=-1, random_state=0)
+        rf.fit(
+            data[trainer.feature_names],
+            data[trainer.label_name].values.flatten(),
+        )
+        import shap
+
+        explainer = shap.Explainer(rf)
+        shap_values = explainer(
+            data.loc[
+                np.random.choice(
+                    np.array(data.index), size=min([100, len(data)]), replace=False
+                ),
+                trainer.feature_names,
+            ]
+        )
+        from src.utils.utils import pretty
+
+        retain_features = list(np.setdiff1d(trainer.feature_names, corr_feature))
+        attr = np.mean(np.abs(shap_values.values), axis=0)
+        print("Correlated features (Ranked by SHAP):")
+        for corr_set in corr_sets:
+            set_shap = [attr[trainer.feature_names.index(x)] for x in corr_set]
+            max_shap_feature = corr_set[set_shap.index(np.max(set_shap))]
+            retain_features += [max_shap_feature]
+            order = np.array(set_shap).argsort()
+            corr_set_dict = {}
+            for idx in order[::-1]:
+                corr_set_dict[corr_set[idx]] = set_shap[idx]
+            print(pretty(corr_set_dict))
+        return retain_features
+
+
 class AbstractTransformer(AbstractProcessor):
     def __init__(self):
         super(AbstractTransformer, self).__init__()
