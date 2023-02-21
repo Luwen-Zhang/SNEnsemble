@@ -93,7 +93,6 @@ class AbstractModel:
                     f"Additional feature {absent_keys} not in the input derived_data."
                 )
         df = self.trainer.dataimputer.transform(df.copy(), self.trainer)
-        df = self.trainer.data_transform(df)
         return self._predict(df, model_name, derived_data, **kwargs)
 
     def _predict_all(self, verbose=True, test_data_only=False):
@@ -1090,6 +1089,7 @@ class TorchModel(AbstractModel):
     def _predict(
         self, input_df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
     ):
+        df = self.trainer.data_transform(input_df)
         X = torch.tensor(
             input_df[self.trainer.feature_names].values.astype(np.float32),
             dtype=torch.float32,
