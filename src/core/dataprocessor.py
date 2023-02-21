@@ -380,9 +380,6 @@ class StandardScaler(AbstractTransformer):
         from sklearn.preprocessing import StandardScaler as ss
 
         scaler = ss()
-        # Indeed, scalers should fit on training dataset and transform the whole dataset. But due to the incorporation
-        # of complex data processing pipline, we just fit and transform on the whole dataset. We do the same thing in
-        # data-imputers.
         data.loc[:, trainer.feature_names] = scaler.fit_transform(
             data.loc[:, trainer.feature_names]
         ).astype(np.float32)
