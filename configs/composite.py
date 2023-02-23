@@ -99,7 +99,6 @@ class config(BaseConfig):
                 # ),
             ],
             "data_processors": [
-                # ("IQRRemover", {}),
                 # ("MaterialSelector", {"m_code": "MD-DD5P-UP2[0/±45/0]S"}),
                 # ("LackDataMaterialRemover", {}),
                 # ("FeatureValueSelector", {"feature": "R-value", "value": 0.1}),
@@ -109,6 +108,8 @@ class config(BaseConfig):
                 # ),
                 ("NaNFeatureRemover", {}),
                 ("VarianceFeatureSelector", {"thres": 1}),
+                # ("CorrFeatureSelector", {"n_estimators": 100}),
+                # ("RFEFeatureSelector", {"n_estimators": 100}),
                 ("UnscaledDataRecorder", {}),
                 ("StandardScaler", {}),
             ],
