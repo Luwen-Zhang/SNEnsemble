@@ -32,10 +32,21 @@ class NN(AbstractNN):
         num_outputs = n_outputs
 
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
+        self.nets = [
+            get_sequential(layers, dims[-1], 1, nn.ReLU)
+            for dims in self.derived_feature_dims
+        ]
+        self.weight = get_sequential([32], len(self.nets) + 1, num_outputs, nn.ReLU)
 
     def _forward(self, x, derived_tensors):
-        x = self.net(x)
-        output = x
+        if len(derived_tensors) > 0:
+            x = [self.net(x)] + [
+                net(y) for net, y in zip(self.nets, derived_tensors.values())
+            ]
+            x = torch.concat(x, dim=1)
+            output = self.weight(x)
+        else:
+            output = self.net(x)
 
         return output
 
