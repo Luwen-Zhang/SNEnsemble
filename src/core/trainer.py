@@ -251,13 +251,13 @@ class Trainer:
         cont_feature_names = [
             x
             for x in self.args["feature_names_type"].keys()
-            if x not in self.args["categorical_feature_names"]
+            if x not in self.args["categorical_feature_names_type"].keys()
         ]
         cat_feature_names = [
             str(x)
             for x in np.intersect1d(
                 list(self.args["feature_names_type"].keys()),
-                self.args["categorical_feature_names"],
+                list(self.args["categorical_feature_names_type"].keys()),
             )
         ]
         label_name = self.args["label_name"]

@@ -47,7 +47,7 @@ class BaseConfig:
             ],
             "data_derivers": [],
             "feature_names_type": {},
-            "categorical_feature_names_type": ["Data source", "Resin Type", "Sequence"],
+            "categorical_feature_names_type": {"Data source": 1},
             "feature_types": ["Fatigue loading", "Material", "Derived"],
             "label_name": ["Cycles to Failure"],
         }
