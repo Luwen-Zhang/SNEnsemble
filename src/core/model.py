@@ -21,7 +21,8 @@ class AbstractModel:
     def fit(
         self,
         df,
-        feature_names: list,
+        cont_feature_names: list,
+        cat_feature_names: list,
         label_name: list,
         derived_data: dict = None,
         verbose=True,
@@ -30,7 +31,8 @@ class AbstractModel:
     ):
         self.trainer.set_data(
             df,
-            feature_names=feature_names,
+            cont_feature_names=cont_feature_names,
+            cat_feature_names=cat_feature_names,
             label_name=label_name,
             derived_data=derived_data,
             warm_start=warm_start if self._trained else False,
@@ -71,7 +73,7 @@ class AbstractModel:
         absent_features = [
             x
             for x in np.setdiff1d(
-                self.trainer.feature_names, self.trainer.derived_stacked_features
+                self.trainer.all_feature_names, self.trainer.derived_stacked_features
             )
             if x not in df.columns
         ]
@@ -100,10 +102,15 @@ class AbstractModel:
         self._check_train_status()
 
         model_names = self._get_model_names()
-        tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
-        train_data = tabular_dataset.loc[self.trainer.train_dataset.indices, :].copy()
-        val_data = tabular_dataset.loc[self.trainer.val_dataset.indices, :].copy()
-        test_data = tabular_dataset.loc[self.trainer.test_dataset.indices, :].copy()
+        (
+            tabular_dataset,
+            cont_feature_names,
+            cat_feature_names,
+            label_name,
+        ) = self.trainer.get_tabular_dataset()
+        train_data = tabular_dataset.loc[self.trainer.train_indices, :].copy()
+        val_data = tabular_dataset.loc[self.trainer.val_indices, :].copy()
+        test_data = tabular_dataset.loc[self.trainer.test_indices, :].copy()
 
         predictions = {}
         disable_tqdm()
@@ -202,14 +209,19 @@ class AutoGluon(AbstractModel):
         from autogluon.tabular import TabularPredictor
         from autogluon.features import AutoMLPipelineFeatureGenerator
 
-        tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
+        (
+            tabular_dataset,
+            cont_feature_names,
+            cat_feature_names,
+            label_name,
+        ) = self.trainer.get_tabular_dataset()
         predictor = TabularPredictor(
             label=label_name[0], path=self.root, problem_type="regression"
         )
         with HiddenPrints(disable_logging=True if not verbose else False):
             predictor.fit(
-                tabular_dataset.loc[self.trainer.train_dataset.indices, :],
-                tuning_data=tabular_dataset.loc[self.trainer.val_dataset.indices, :],
+                tabular_dataset.loc[self.trainer.train_indices, :],
+                tuning_data=tabular_dataset.loc[self.trainer.val_indices, :],
                 presets="best_quality"
                 if not debug_mode
                 else "medium_quality_faster_train",
@@ -223,7 +235,7 @@ class AutoGluon(AbstractModel):
                 ),
             )
         self.leaderboard = predictor.leaderboard(
-            tabular_dataset.loc[self.trainer.test_dataset.indices, :], silent=True
+            tabular_dataset.loc[self.trainer.test_indices, :], silent=True
         )
         self.leaderboard.to_csv(self.root + "leaderboard.csv")
         self.model = predictor
@@ -234,7 +246,7 @@ class AutoGluon(AbstractModel):
 
     def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
         return self.model.predict(
-            df[self.trainer.feature_names], model=model_name, **kwargs
+            df[self.trainer.all_feature_names], model=model_name, **kwargs
         )
 
     def _get_model_names(self):
@@ -284,8 +296,13 @@ class WideDeep(AbstractModel):
         )
         from typing import Optional, Dict
 
-        tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
-        tab_preprocessor = TabPreprocessor(continuous_cols=feature_names)
+        (
+            tabular_dataset,
+            cont_feature_names,
+            cat_feature_names,
+            label_name,
+        ) = self.trainer.get_tabular_dataset()
+        tab_preprocessor = TabPreprocessor(continuous_cols=cont_feature_names)
         X_tab_train = tab_preprocessor.fit_transform(
             tabular_dataset.loc[self.trainer.train_indices, :]
         )
@@ -298,7 +315,7 @@ class WideDeep(AbstractModel):
 
         args = dict(
             column_idx=tab_preprocessor.column_idx,
-            continuous_cols=feature_names,
+            continuous_cols=cont_feature_names,
         )
         tab_models = {
             "TabMlp": TabMlp(**args),
@@ -502,10 +519,10 @@ class WideDeep(AbstractModel):
 #         )
 #         from pytorch_tabular.config import DataConfig, OptimizerConfig, TrainerConfig
 #
-#         tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
+#         tabular_dataset, cont_feature_names, label_name = self.trainer.get_tabular_dataset()
 #
 #         data_config = DataConfig(
-#             target=label_name, continuous_cols=feature_names, num_workers=8
+#             target=label_name, continuous_cols=cont_feature_names, num_workers=8
 #         )
 #
 #         trainer_config = TrainerConfig(
@@ -719,10 +736,10 @@ class WideDeep(AbstractModel):
 #                     try:
 #                         tabular_model.fit(
 #                             train=tabular_dataset.loc[
-#                                 self.trainer.train_dataset.indices, :
+#                                 self.trainer.train_indices, :
 #                             ],
 #                             validation=tabular_dataset.loc[
-#                                 self.trainer.val_dataset.indices, :
+#                                 self.trainer.val_indices, :
 #                             ],
 #                             loss=self.trainer.loss_fn,
 #                         )
@@ -730,7 +747,7 @@ class WideDeep(AbstractModel):
 #                         exceptions.append(e)
 #                         return 1e3
 #                     res = tabular_model.evaluate(
-#                         tabular_dataset.loc[self.trainer.val_dataset.indices, :]
+#                         tabular_dataset.loc[self.trainer.val_indices, :]
 #                     )[0]["test_mean_squared_error"]
 #                 if verbose:
 #                     print(res)
@@ -765,14 +782,14 @@ class WideDeep(AbstractModel):
 #                 tabular_model.config["progress_bar_refresh_rate"] = 0
 #
 #                 tabular_model.fit(
-#                     train=tabular_dataset.loc[self.trainer.train_dataset.indices, :],
-#                     validation=tabular_dataset.loc[self.trainer.val_dataset.indices, :],
+#                     train=tabular_dataset.loc[self.trainer.train_indices, :],
+#                     validation=tabular_dataset.loc[self.trainer.val_indices, :],
 #                     loss=self.trainer.loss_fn,
 #                 )
 #                 metrics["model"].append(tabular_model.config._model_name)
 #                 metrics["mse"].append(
 #                     tabular_model.evaluate(
-#                         tabular_dataset.loc[self.trainer.test_dataset.indices, :]
+#                         tabular_dataset.loc[self.trainer.test_indices, :]
 #                     )[0]["test_mean_squared_error"]
 #                 )
 #                 models[tabular_model.config._model_name] = tabular_model
@@ -828,12 +845,17 @@ class TabNet(AbstractModel):
     ):
         # Basic components in _train():
         # 1. Prepare training, validation, and testing dataset.
-        train_indices = self.trainer.train_dataset.indices
-        val_indices = self.trainer.val_dataset.indices
-        test_indices = self.trainer.test_dataset.indices
+        train_indices = self.trainer.train_indices
+        val_indices = self.trainer.val_indices
+        test_indices = self.trainer.test_indices
 
-        tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
-        feature_data = tabular_dataset[feature_names].copy()
+        (
+            tabular_dataset,
+            cont_feature_names,
+            cat_feature_names,
+            label_name,
+        ) = self.trainer.get_tabular_dataset()
+        feature_data = tabular_dataset[cont_feature_names].copy()
         label_data = tabular_dataset[label_name].copy()
 
         train_x = feature_data.values[np.array(train_indices), :].astype(np.float32)
@@ -988,7 +1010,7 @@ class TabNet(AbstractModel):
         # Basic components in _predict():
         # Return a ndarray with shape (len(df), 1) of predictions by the model_name.
         return self.model.predict(
-            df[self.trainer.feature_names].values.astype(np.float32)
+            df[self.trainer.cont_feature_names].values.astype(np.float32)
         ).reshape(-1, 1)
 
     def _get_model_names(self):
@@ -1102,19 +1124,19 @@ class TorchModel(AbstractModel):
     ):
         df = self.trainer.data_transform(input_df)
         X = torch.tensor(
-            input_df[self.trainer.feature_names].values.astype(np.float32),
+            df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
         ).to(self.trainer.device)
         D = [
             torch.tensor(value, dtype=torch.float32).to(self.trainer.device)
             for value in derived_data.values()
         ]
-        y = torch.tensor(np.zeros((len(input_df), 1)), dtype=torch.float32).to(
+        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(
             self.trainer.device
         )
 
         loader = Data.DataLoader(
-            Data.TensorDataset(X, *D, y), batch_size=len(input_df), shuffle=False
+            Data.TensorDataset(X, *D, y), batch_size=len(df), shuffle=False
         )
 
         pred, _, _ = self._test_step(self.model, loader, self.trainer.loss_fn)
@@ -1295,7 +1317,7 @@ class ThisWork(TorchModel):
             )
         set_torch_random(0)
         return ThisWorkNN(
-            len(self.trainer.feature_names),
+            len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
             self.trainer.layers,
             activated_sn=self.activated_sn,
@@ -1330,7 +1352,7 @@ class ThisWorkRidge(ThisWork):
             )
         set_torch_random(0)
         return ThisWorkRidgeNN(
-            len(self.trainer.feature_names),
+            len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
             self.trainer.layers,
             activated_sn=self.activated_sn,
@@ -1409,7 +1431,8 @@ class ThisWorkPretrain(ThisWork):
             )
             self.trainer.set_data(
                 selected_df,
-                feature_names=self.trainer.feature_names,
+                cont_feature_names=self.trainer.cont_feature_names,
+                cat_feature_names=self.trainer.cat_feature_names,
                 label_name=self.trainer.label_name,
                 warm_start=True,
                 verbose=verbose,
@@ -1427,7 +1450,8 @@ class ThisWorkPretrain(ThisWork):
             print("Finetunning...")
         self.trainer.set_data(
             original_df,
-            feature_names=self.trainer.feature_names,
+            cont_feature_names=self.trainer.cont_feature_names,
+            cat_feature_names=self.trainer.cat_feature_names,
             label_name=self.trainer.label_name,
             warm_start=True,
             verbose=verbose,
@@ -1460,7 +1484,7 @@ class MLP(TorchModel):
     def _new_model(self):
         set_torch_random(0)
         return NN(
-            len(self.trainer.feature_names),
+            len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
             self.trainer.layers if self.layers is None else self.layers,
             trainer=self.trainer,

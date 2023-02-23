@@ -11,7 +11,7 @@ class AbstractSN(nn.Module):
         super(AbstractSN, self).__init__()
         self.sn_vars = self._get_sn_vars()
         self.trainer = trainer
-        self.tabular_feature_names = self.trainer.feature_names
+        self.tabular_feature_names = self.trainer.cont_feature_names
         self.derived_feature_names = list(self.trainer.derived_data.keys())
         self.feature_mapping = {}
         self.tabular_feature_indices = {}
@@ -53,7 +53,7 @@ class AbstractSN(nn.Module):
     def test_sn_vars(cls, trainer):
         for var in cls._get_sn_vars():
             if (
-                not var in trainer.feature_names
+                not var in trainer.cont_feature_names
                 and not var in trainer.derived_data.keys()
             ):
                 return False
@@ -67,7 +67,7 @@ class AbstractSN(nn.Module):
     def _check_sn_vars(self):
         if not self.test_sn_vars(self.trainer):
             raise Exception(
-                f"Required columns of {self.__class__.__name__} do not exist in Trainer.feature_names, but "
+                f"Required columns of {self.__class__.__name__} do not exist in Trainer.cont_feature_names, but "
                 f"it is included in selected SN models. Do not force adding any SN model."
             )
 

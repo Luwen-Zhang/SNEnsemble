@@ -8,19 +8,39 @@ import sys, inspect
 
 class AbstractImputer:
     def __init__(self):
-        self.record_features = None
+        self.record_cont_features = None
         self.record_imputed_features = None
 
     def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        raise NotImplementedError
+        data = input_data.copy()
+        self.record_cont_features = cp(trainer.cont_feature_names)
+        self.record_cat_features = cp(trainer.cat_feature_names)
+        data.loc[:, self.record_cat_features] = data[self.record_cat_features].fillna(
+            "Unknown"
+        )
+        return self._fit_transform(data, trainer, **kwargs)
 
     def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        data = input_data.copy()
+        trainer.cont_feature_names = cp(self.record_cont_features)
+        trainer.cat_feature_names = cp(self.record_cat_features)
+        data.loc[:, self.record_cat_features] = data[self.record_cat_features].fillna(
+            "Unknown"
+        )
+        return self._transform(data, trainer, **kwargs)
+
+    def _fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         raise NotImplementedError
 
-    def _get_impute_features(self, feature_names, data):
-        all_missing_idx = np.where(np.isnan(data[feature_names].values).all(axis=0))[0]
+    def _transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        raise NotImplementedError
+
+    def _get_impute_features(self, cont_feature_names, data):
+        all_missing_idx = np.where(
+            np.isnan(data[cont_feature_names].values).all(axis=0)
+        )[0]
         impute_features = [
-            x for idx, x in enumerate(feature_names) if idx not in all_missing_idx
+            x for idx, x in enumerate(cont_feature_names) if idx not in all_missing_idx
         ]
         self.record_imputed_features = impute_features
         return impute_features
@@ -30,79 +50,79 @@ class NaNImputer(AbstractImputer):
     def __init__(self):
         super(NaNImputer, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
-        self.record_features = cp(trainer.feature_names)
-        impute_features = self._get_impute_features(trainer.feature_names, data)
-        return data.dropna(axis=0, subset=impute_features)
+    def _fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        impute_features = self._get_impute_features(
+            trainer.cont_feature_names, input_data
+        )
+        return input_data.dropna(axis=0, subset=impute_features)
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
-        return data.dropna(axis=0, subset=self.record_imputed_features)
+    def _transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        return input_data.dropna(axis=0, subset=self.record_imputed_features)
 
 
 class MiceLightgbmImputer(AbstractImputer):
     def __init__(self):
         super(MiceLightgbmImputer, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
+    def _fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         import miceforest as mf
 
-        impute_features = self._get_impute_features(trainer.feature_names, data)
-        imputer = mf.ImputationKernel(data.loc[:, impute_features], random_state=0)
+        impute_features = self._get_impute_features(
+            trainer.cont_feature_names, input_data
+        )
+        imputer = mf.ImputationKernel(
+            input_data.loc[:, impute_features], random_state=0
+        )
         imputer.mice(iterations=2, n_estimators=1)
-        data.loc[:, impute_features] = imputer.complete_data().values.astype(np.float32)
+        input_data.loc[:, impute_features] = imputer.complete_data().values.astype(
+            np.float32
+        )
         imputer.compile_candidate_preds()
         self.transformer = imputer
-        self.record_features = cp(trainer.feature_names)
-        return data
+        return input_data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
-        data.loc[:, self.record_imputed_features] = (
+    def _transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        input_data.loc[:, self.record_imputed_features] = (
             self.transformer.impute_new_data(
-                new_data=data.loc[:, self.record_imputed_features]
+                new_data=input_data.loc[:, self.record_imputed_features]
             )
             .complete_data()
             .values.astype(np.float32)
         )
-        return data
+        return input_data
 
 
 class AbstractSklearnImputer(AbstractImputer):
     def __init__(self):
         super(AbstractSklearnImputer, self).__init__()
 
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
-        impute_features = self._get_impute_features(trainer.feature_names, data)
+    def _fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+        impute_features = self._get_impute_features(
+            trainer.cont_feature_names, input_data
+        )
         imputer = self._new_imputer()
         # https://github.com/scikit-learn/scikit-learn/issues/16426
         # SimpleImputer reduces the number of features without giving messages. The issue is fixed in
         # scikit-learn==1.2.0 by an argument "keep_empty_features"; however, autogluon==0.6.1 requires
         # scikit-learn<1.2.0.
-        res = imputer.fit_transform(data.loc[:, impute_features]).astype(np.float32)
+        res = imputer.fit_transform(input_data.loc[:, impute_features]).astype(
+            np.float32
+        )
         if type(res) == pd.DataFrame:
             res = res.values
-        data.loc[:, impute_features] = res
+        input_data.loc[:, impute_features] = res
 
         self.transformer = imputer
-        self.record_features = cp(trainer.feature_names)
-        return data
+        return input_data
 
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.feature_names = cp(self.record_features)
-        data = input_data.copy()
+    def _transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
         res = self.transformer.transform(
-            data.loc[:, self.record_imputed_features]
+            input_data.loc[:, self.record_imputed_features]
         ).astype(np.float32)
         if type(res) == pd.DataFrame:
             res = res.values
-        data.loc[:, self.record_imputed_features] = res
-        return data
+        input_data.loc[:, self.record_imputed_features] = res
+        return input_data
 
     def _new_imputer(self):
         raise NotImplementedError

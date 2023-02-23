@@ -111,7 +111,7 @@ def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
 
 
 def plot_pdp(
-    feature_names,
+    cont_feature_names,
     x_values_list,
     mean_pdp_list,
     ci_left_list,
@@ -122,22 +122,22 @@ def plot_pdp(
     upper_lim=7,
 ):
     max_col = 4
-    if len(feature_names) > max_col:
+    if len(cont_feature_names) > max_col:
         width = max_col
-        if len(feature_names) % max_col == 0:
-            height = len(feature_names) // max_col
+        if len(cont_feature_names) % max_col == 0:
+            height = len(cont_feature_names) // max_col
         else:
-            height = len(feature_names) // max_col + 1
+            height = len(cont_feature_names) // max_col + 1
         figsize = (14, 3 * height)
     else:
-        figsize = (3 * len(feature_names), 2.5)
-        width = len(feature_names)
+        figsize = (3 * len(cont_feature_names), 2.5)
+        width = len(cont_feature_names)
         height = 1
     # print(figsize, width, height)
 
     fig = plt.figure(figsize=figsize)
 
-    for idx, focus_feature in enumerate(feature_names):
+    for idx, focus_feature in enumerate(cont_feature_names):
         ax = plt.subplot(height, width, idx + 1)
         # ax.plot(x_values_list[idx], mean_pdp_list[idx], color = clr_map[focus_feature], linewidth = 0.5)
         ax.plot(
@@ -207,18 +207,18 @@ def plot_pdp(
 
 
 def plot_partial_err(feature_data, truth, pred, thres=0.8):
-    feature_names = list(feature_data.columns)
+    cont_feature_names = list(feature_data.columns)
     max_col = 4
-    if len(feature_names) > max_col:
+    if len(cont_feature_names) > max_col:
         width = max_col
-        if len(feature_names) % max_col == 0:
-            height = len(feature_names) // max_col
+        if len(cont_feature_names) % max_col == 0:
+            height = len(cont_feature_names) // max_col
         else:
-            height = len(feature_names) // max_col + 1
+            height = len(cont_feature_names) // max_col + 1
         figsize = (14, 3 * height)
     else:
-        figsize = (3 * len(feature_names), 2.5)
-        width = len(feature_names)
+        figsize = (3 * len(cont_feature_names), 2.5)
+        width = len(cont_feature_names)
         height = 1
     # print(figsize, width, height)
 
@@ -229,7 +229,7 @@ def plot_partial_err(feature_data, truth, pred, thres=0.8):
     high_err = err[np.where(err > thres)[0]]
     low_err_data = feature_data.loc[np.where(err <= thres)[0], :]
     low_err = err[np.where(err <= thres)[0]]
-    for idx, focus_feature in enumerate(feature_names):
+    for idx, focus_feature in enumerate(cont_feature_names):
         ax = plt.subplot(height, width, idx + 1)
         # ax.plot(x_values_list[idx], mean_pdp_list[idx], color = clr_map[focus_feature], linewidth = 0.5)
         ax.scatter(

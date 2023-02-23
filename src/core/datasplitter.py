@@ -11,14 +11,14 @@ class AbstractSplitter:
             else np.array(train_val_test)
         )
 
-    def split(self, df, feature_names, label_name):
+    def split(self, df, cont_feature_names, cat_feature_names, label_name):
         train_indices, val_indices, test_indices = self._split(
-            df, feature_names, label_name
+            df, cont_feature_names, cat_feature_names, label_name
         )
         self._check_split(train_indices, val_indices, test_indices)
         return train_indices, val_indices, test_indices
 
-    def _split(self, df, feature_names, label_name):
+    def _split(self, df, cont_feature_names, cat_feature_names, label_name):
         raise NotImplementedError
 
     def _check_split(self, train_indices, val_indices, test_indices):
@@ -58,7 +58,7 @@ class RandomSplitter(AbstractSplitter):
     def __int__(self, train_val_test=None):
         super(RandomSplitter, self).__init__(train_val_test)
 
-    def _split(self, df, feature_names, label_name):
+    def _split(self, df, cont_feature_names, cat_feature_names, label_name):
         length = len(df)
         train_indices, test_indices = train_test_split(
             np.arange(length), test_size=self.train_val_test[2], shuffle=True
@@ -76,7 +76,7 @@ class MaterialSplitter(AbstractSplitter):
     def __int__(self, train_val_test=None):
         super(MaterialSplitter, self).__init__(train_val_test)
 
-    def _split(self, df, feature_names, label_name):
+    def _split(self, df, cont_feature_names, cat_feature_names, label_name):
         self._check_exist(df, "Material_Code", "Material_Code")
         mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
         mat_lay_set = list(sorted(set(mat_lay)))
@@ -108,7 +108,7 @@ class MaterialCycleSplitter(AbstractSplitter):
     def __int__(self, train_val_test=None):
         super(MaterialCycleSplitter, self).__init__(train_val_test)
 
-    def _split(self, df, feature_names, label_name):
+    def _split(self, df, cont_feature_names, cat_feature_names, label_name):
         self._check_exist(df, "Material_Code", "Material_Code")
         mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
         mat_lay_set = list(sorted(set(mat_lay)))
@@ -154,7 +154,7 @@ class CycleSplitter(AbstractSplitter):
     def __int__(self, train_val_test=None):
         super(CycleSplitter, self).__init__(train_val_test)
 
-    def _split(self, df, feature_names, label_name):
+    def _split(self, df, cont_feature_names, cat_feature_names, label_name):
         cycle = df[label_name].values.flatten()
 
         train_indices = np.where(

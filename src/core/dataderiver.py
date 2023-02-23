@@ -238,7 +238,8 @@ class DriveCoeffDeriver(AbstractDeriver):
         mlp_trainer.set_data_splitter(name="RandomSplitter")
         mlp_trainer.set_data(
             trainer.df,
-            feature_names=trainer.feature_names,
+            cont_feature_names=trainer.cont_feature_names,
+            cat_feature_names=trainer.cat_feature_names,
             label_name=trainer.label_name,
             verbose=False,
             warm_start=True
@@ -275,12 +276,12 @@ class DriveCoeffDeriver(AbstractDeriver):
 
         interpolator = {}
         plt.figure(figsize=(10, 10))
-        cmap = plt.cm.get_cmap("hsv", len(trainer.feature_names))
+        cmap = plt.cm.get_cmap("hsv", len(trainer.cont_feature_names))
         marker = itertools.cycle(("^", "<", ">", "+", "o", "*", "s"))
         ax = plt.subplot(111)
 
         for i, (x_value, mean_pdp, feature_name) in enumerate(
-            zip(x_values_list, mean_pdp_list, trainer.feature_names)
+            zip(x_values_list, mean_pdp_list, trainer.cont_feature_names)
         ):
             # print(
             #     f"{feature_name}, diff_y:{mean_pdp[-1] - mean_pdp[1]:.5f}, diff_x:{x_value[-1] - x_value[0]}"

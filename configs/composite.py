@@ -106,6 +106,7 @@ class config(BaseConfig):
                 #     "FeatureValueSelector",
                 #     {"feature": "Data source", "value": "SNL/MSU/DOE"},
                 # ),
+                ("CategoricalOrdinalEncoder", {}),
                 ("NaNFeatureRemover", {}),
                 ("VarianceFeatureSelector", {"thres": 1}),
                 # ("CorrFeatureSelector", {"n_estimators": 100}),
@@ -113,7 +114,7 @@ class config(BaseConfig):
                 ("UnscaledDataRecorder", {}),
                 ("StandardScaler", {}),
             ],
-            "feature_types": ["Fatigue loading", "Material", "Derived"],
+            "feature_types": ["Fatigue loading", "Material", "Categorical", "Derived"],
             "label_name": ["log(Cycles to Failure)"],
         }
         if do_super:

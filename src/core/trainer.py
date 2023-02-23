@@ -248,10 +248,21 @@ class Trainer:
             self.df = pd.read_csv(data_path)
         self.data_path = data_path
 
-        feature_names = list(self.args["feature_names_type"].keys())
+        cont_feature_names = [
+            x
+            for x in self.args["feature_names_type"].keys()
+            if x not in self.args["categorical_feature_names_type"].keys()
+        ]
+        cat_feature_names = [
+            str(x)
+            for x in np.intersect1d(
+                list(self.args["feature_names_type"].keys()),
+                list(self.args["categorical_feature_names_type"].keys()),
+            )
+        ]
         label_name = self.args["label_name"]
 
-        self.set_data(self.df, feature_names, label_name)
+        self.set_data(self.df, cont_feature_names, cat_feature_names, label_name)
         print(
             "Dataset size:",
             len(self.train_dataset),
@@ -261,10 +272,15 @@ class Trainer:
 
         self.save_data()
 
+    @property
+    def all_feature_names(self):
+        return self.cont_feature_names + self.cat_feature_names
+
     def set_data(
         self,
         df,
-        feature_names,
+        cont_feature_names,
+        cat_feature_names,
         label_name,
         derived_data=None,
         warm_start=False,
@@ -274,7 +290,11 @@ class Trainer:
         val_indices=None,
         test_indices=None,
     ):
-        self.feature_names = feature_names
+        self.cont_feature_names = cont_feature_names
+        self.cat_feature_names = cat_feature_names
+        self.cat_feature_mapping = {}
+        for feature in self.cat_feature_mapping:
+            self.cat_feature_mapping[feature] = []
         self.label_name = label_name
         self.df = df.copy()
         if np.isnan(df[self.label_name].values).any():
@@ -289,15 +309,22 @@ class Trainer:
                 self.train_indices,
                 self.val_indices,
                 self.test_indices,
-            ) = self.datasplitter.split(self.df, feature_names, label_name)
+            ) = self.datasplitter.split(
+                self.df, cont_feature_names, cat_feature_names, label_name
+            )
         else:
             self.train_indices = train_indices
             self.test_indices = val_indices
             self.val_indices = test_indices
 
-        self.imputed_mask = pd.DataFrame(
-            columns=self.feature_names,
-            data=np.isnan(self.df[self.feature_names].values).astype(int),
+        self.cont_imputed_mask = pd.DataFrame(
+            columns=self.cont_feature_names,
+            data=np.isnan(self.unscaled_feature_data.values).astype(int),
+            index=np.arange(len(self.df)),
+        )
+        self.cat_imputed_mask = pd.DataFrame(
+            columns=self.cat_feature_names,
+            data=pd.isna(self.df[self.cat_feature_names]).values.astype(int),
             index=np.arange(len(self.df)),
         )
 
@@ -313,15 +340,15 @@ class Trainer:
         make_imputation()
         (
             self.df,
-            self.feature_names,
+            self.cont_feature_names,
         ) = self.derive_stacked(self.df)
         # There may exist nan in stacked features.
         self.derived_stacked_features = np.setdiff1d(
-            self.feature_names, self.imputed_mask.columns
+            self.cont_feature_names, self.cont_imputed_mask.columns
         )
-        self.imputed_mask = pd.concat(
+        self.cont_imputed_mask = pd.concat(
             [
-                self.imputed_mask,
+                self.cont_imputed_mask,
                 pd.DataFrame(
                     columns=self.derived_stacked_features,
                     data=np.isnan(self.df[self.derived_stacked_features].values).astype(
@@ -331,7 +358,7 @@ class Trainer:
                 ),
             ],
             axis=1,
-        )[self.feature_names]
+        )[self.cont_feature_names]
         make_imputation()
 
         self._data_process(
@@ -339,8 +366,13 @@ class Trainer:
             verbose=verbose,
         )
 
-        self.imputed_mask = (
-            self.imputed_mask.loc[self.retained_indices, self.feature_names]
+        self.cont_imputed_mask = (
+            self.cont_imputed_mask.loc[self.retained_indices, self.cont_feature_names]
+            .copy()
+            .reset_index(drop=True)
+        )
+        self.cat_imputed_mask = (
+            self.cat_imputed_mask.loc[self.retained_indices, self.cat_feature_names]
             .copy()
             .reset_index(drop=True)
         )
@@ -378,37 +410,55 @@ class Trainer:
             else None
         )
 
+    def categories_inverse_transform(self, X: pd.DataFrame):
+        from src.core.dataprocessor import CategoricalOrdinalEncoder
+
+        for processor, _ in self.dataprocessors:
+            if type(processor) == CategoricalOrdinalEncoder:
+                encoder = processor.transformer
+                cat_features = processor.record_cat_features
+                if len(cat_features) == 0:
+                    return X.copy()
+                break
+        else:
+            return X.copy()
+        X_copy = X.copy()
+        X_copy.loc[:, cat_features] = encoder.inverse_transform(X[cat_features].copy())
+        return X_copy
+
     def save_data(self, path: str = None):
         if path is None:
             path = self.project_root
 
-        self.df.to_csv(os.path.join(path, "data.csv"), encoding="utf-8", index=False)
-        tabular_data, _, _ = self._get_tabular_dataset()
-        tabular_data.to_csv(
+        self.categories_inverse_transform(self.df).to_csv(
+            os.path.join(path, "data.csv"), encoding="utf-8", index=False
+        )
+        tabular_data, _, _, _ = self.get_tabular_dataset()
+        self.categories_inverse_transform(tabular_data).to_csv(
             os.path.join(path, "tabular_data.csv"), encoding="utf-8", index=False
         )
 
         print(f"Data saved to {path} (data.csv and tabular_data.csv).")
 
     def derive(self, df):
-        df_tmp, feature_names = self.derive_stacked(df)
+        df_tmp, cont_feature_names = self.derive_stacked(df)
         derived_data = self.derive_unstacked(df_tmp)
 
-        return (df_tmp, feature_names, derived_data)
+        return (df_tmp, cont_feature_names, derived_data)
 
     def derive_stacked(self, df):
         df_tmp = df.copy()
-        feature_names = cp(self.feature_names)
+        cont_feature_names = cp(self.cont_feature_names)
         for deriver, kwargs in self.dataderivers:
             kwargs = deriver.make_defaults(**kwargs)
             if kwargs["stacked"]:
                 value, name, col_names = deriver.derive(df_tmp, trainer=self, **kwargs)
                 if not kwargs["intermediate"]:
                     for col_name in col_names:
-                        if col_name not in feature_names:
-                            feature_names.append(col_name)
+                        if col_name not in cont_feature_names:
+                            cont_feature_names.append(col_name)
                 df_tmp[col_names] = value
-        return df_tmp, feature_names
+        return df_tmp, cont_feature_names
 
     def derive_unstacked(self, df):
         derived_data = {}
@@ -417,6 +467,8 @@ class Trainer:
             if not kwargs["stacked"]:
                 value, name, _ = deriver.derive(df, trainer=self, **kwargs)
                 derived_data[name] = value
+        if len(self.cat_feature_names) > 0:
+            derived_data["categorical"] = df[self.cat_feature_names].values
         return derived_data
 
     def _data_process(
@@ -424,8 +476,9 @@ class Trainer:
         warm_start=False,
         verbose=True,
     ):
-        self.unscaled_feature_data = pd.DataFrame()
-        self.unscaled_label_data = pd.DataFrame()
+        self._unscaled_feature_data = pd.DataFrame()
+        self._unscaled_label_data = pd.DataFrame()
+        self._categorical_data = pd.DataFrame()
         self.df.reset_index(drop=True, inplace=True)
         self.scaled_df = self.df.copy()
         original_length = len(self.df)
@@ -436,11 +489,21 @@ class Trainer:
                 warm_start=warm_start,
             )
             unscaled_training_data = pd.concat(
-                [self.unscaled_feature_data, self.unscaled_label_data], axis=1
+                [
+                    self._unscaled_feature_data,
+                    self._categorical_data,
+                    self._unscaled_label_data,
+                ],
+                axis=1,
             )
             testing_data = self.data_transform(self.df.loc[self.test_indices, :])
             unscaled_testing_data = pd.concat(
-                [self.unscaled_feature_data, self.unscaled_label_data], axis=1
+                [
+                    self._unscaled_feature_data,
+                    self._categorical_data,
+                    self._unscaled_label_data,
+                ],
+                axis=1,
             )
 
         self.retained_indices = np.unique(
@@ -454,19 +517,33 @@ class Trainer:
             df.loc[training.index, training.columns] = training.values
             df.loc[testing.index, testing.columns] = testing.values
             df = pd.DataFrame(df.loc[self.retained_indices, :]).reset_index(drop=True)
+            df.loc[:, self.cat_feature_names] = df.loc[
+                :, self.cat_feature_names
+            ].astype(np.int16)
             return df
 
         self.df = process_df(self.df, unscaled_training_data, unscaled_testing_data)
         self.scaled_df = process_df(self.scaled_df, training_data, testing_data)
 
-        # feature_data and label_data does not contain derived data.
-        (
-            self.unscaled_feature_data,
-            self.unscaled_label_data,
-        ) = self._divide_from_tabular_dataset(self.df)
-        self.feature_data, self.label_data = self._divide_from_tabular_dataset(
-            self.scaled_df
-        )
+    @property
+    def unscaled_feature_data(self):
+        return self.df[self.cont_feature_names].copy()
+
+    @property
+    def unscaled_label_data(self):
+        return self.df[self.label_name].copy()
+
+    @property
+    def categorical_data(self):
+        return self.df[self.cat_feature_names].copy()
+
+    @property
+    def feature_data(self):
+        return self.scaled_df[self.cont_feature_names].copy()
+
+    @property
+    def label_data(self):
+        return self.scaled_df[self.label_name].copy()
 
     def _data_preprocess(self, input_data: pd.DataFrame, warm_start=False):
         data = input_data.copy()
@@ -475,7 +552,7 @@ class Trainer:
                 data = processor.transform(data, self, **kwargs)
             else:
                 data = processor.fit_transform(data, self, **kwargs)
-        data = data[self.feature_names + self.label_name]
+        data = data[self.all_feature_names + self.label_name]
         return data
 
     def data_transform(self, input_data: pd.DataFrame):
@@ -509,9 +586,9 @@ class Trainer:
     def get_zero_slip(self, feature_name):
         if not hasattr(self, "dataprocessors"):
             raise Exception(f"Run load_config first.")
-        elif len(self.dataprocessors) == 0 and feature_name in self.feature_names:
+        elif len(self.dataprocessors) == 0 and feature_name in self.cont_feature_names:
             return 0
-        if feature_name not in self.dataprocessors[-1][0].record_features:
+        if feature_name not in self.dataprocessors[-1][0].record_cont_features:
             raise Exception(f"Feature {feature_name} not available.")
 
         x = 0
@@ -521,7 +598,7 @@ class Trainer:
         return x
 
     def describe(self, transformed=False, save=True):
-        tabular = self._get_tabular_dataset(transformed=transformed)[0]
+        tabular = self.get_tabular_dataset(transformed=transformed)[0]
         desc = tabular.describe()
 
         skew = tabular.skew()
@@ -592,26 +669,30 @@ class Trainer:
         )
         return mode, cnt_mode, mode_percent
 
-    def _divide_from_tabular_dataset(self, data: pd.DataFrame):
-        feature_data = data[self.feature_names]
+    def divide_from_tabular_dataset(self, data: pd.DataFrame):
+        feature_data = data[self.cont_feature_names]
+        categorical_data = data[self.cat_feature_names]
         label_data = data[self.label_name]
 
-        return feature_data, label_data
+        return feature_data, categorical_data, label_data
 
-    def _get_tabular_dataset(
+    def get_tabular_dataset(
         self, transformed=False
-    ) -> Tuple[pd.DataFrame, list, list]:
+    ) -> Tuple[pd.DataFrame, list, list, list]:
         if transformed:
             feature_data = self.feature_data
         else:
             feature_data = self.unscaled_feature_data
 
-        feature_names = cp(self.feature_names)
+        cont_feature_names = cp(self.cont_feature_names)
+        cat_feature_names = cp(self.cat_feature_names)
         label_name = cp(self.label_name)
 
-        tabular_dataset = pd.concat([feature_data, self.label_data], axis=1)
+        tabular_dataset = pd.concat(
+            [feature_data, self.categorical_data, self.label_data], axis=1
+        )
 
-        return tabular_dataset, feature_names, label_name
+        return tabular_dataset, cont_feature_names, cat_feature_names, label_name
 
     def cross_validation(
         self, programs, n_random, verbose, test_data_only, type="random"
@@ -879,7 +960,7 @@ class Trainer:
             clr[self.args["feature_names_type"][x]]
             if x in self.args["feature_names_type"].keys()
             else clr[len(self.args["feature_types"]) - 1]
-            for x in self.feature_names
+            for x in self.cont_feature_names
         ]
 
         clr_map = dict()
@@ -890,7 +971,7 @@ class Trainer:
         ax = plt.subplot(111)
         plot_importance(
             ax,
-            self.feature_names,
+            self.cont_feature_names,
             attr,
             pal=pal,
             clr_map=clr_map,
@@ -963,7 +1044,7 @@ class Trainer:
         )
 
         fig = plot_pdp(
-            self.feature_names,
+            self.cont_feature_names,
             x_values_list,
             mean_pdp_list,
             ci_left_list,
@@ -986,7 +1067,7 @@ class Trainer:
         ci_right_list = []
 
         for feature_idx, feature_name in enumerate(
-            self.feature_names if feature_subset is None else feature_subset
+            self.cont_feature_names if feature_subset is None else feature_subset
         ):
             if kwargs["verbose"]:
                 print("Calculate PDP: ", feature_name)
@@ -1017,9 +1098,9 @@ class Trainer:
             df=self.df.loc[self.test_indices], model_name=model_name
         ).flatten()
         plot_partial_err(
-            self.feature_data.loc[np.array(self.test_dataset.indices), :].reset_index(
-                drop=True
-            ),
+            self.feature_data.loc[
+                np.array(self.test_indices), self.cont_feature_names
+            ].reset_index(drop=True),
             ground_truth,
             prediction,
             thres=thres,
@@ -1032,9 +1113,9 @@ class Trainer:
 
     def cal_corr(self, imputed=False, features_only=False):
         subset = (
-            self.feature_names
+            self.cont_feature_names
             if features_only
-            else self.feature_names + self.label_name
+            else self.cont_feature_names + self.label_name
         )
         if not imputed:
             not_imputed_df = self.get_not_imputed_df()
@@ -1043,10 +1124,20 @@ class Trainer:
             return self.df[subset].corr()
 
     def get_not_imputed_df(self):
-        tmp_df = self.df.copy().loc[:, self.feature_names]
-        tmp_df.values[np.where(self.imputed_mask[self.feature_names].values)] = np.nan
+        tmp_cont_df = self.df.copy().loc[:, self.cont_feature_names]
+        if np.sum(np.abs(self.cont_imputed_mask.values)) != 0:
+            tmp_cont_df.values[
+                np.where(self.cont_imputed_mask[self.cont_feature_names].values)
+            ] = np.nan
+        tmp_cat_df = self.df.copy().loc[:, self.cat_feature_names]
+        if np.sum(np.abs(self.cat_imputed_mask.values)) != 0:
+            tmp_cat_df.values[
+                np.where(self.cat_imputed_mask[self.cat_feature_names].values)
+            ] = np.nan
         not_imputed_df = self.df.copy()
-        not_imputed_df.loc[:, self.feature_names] = tmp_df
+        not_imputed_df.loc[:, self.all_feature_names] = pd.concat(
+            [tmp_cont_df, tmp_cat_df, self.df[self.label_name]], axis=1
+        )
         return not_imputed_df
 
     def plot_corr(self, fontsize=10, cmap="bwr", imputed=False):
@@ -1054,26 +1145,26 @@ class Trainer:
         Plot Pearson correlation among features and the target.
         :return: None
         """
-        feature_names = self.feature_names + self.label_name
+        cont_feature_names = self.cont_feature_names + self.label_name
         # sns.reset_defaults()
         fig = plt.figure(figsize=(10, 10))
         ax = plt.subplot(111)
         plt.box(on=True)
         corr = self.cal_corr(imputed=imputed).values
         im = ax.imshow(corr, cmap=cmap)
-        ax.set_xticks(np.arange(len(feature_names)))
-        ax.set_yticks(np.arange(len(feature_names)))
+        ax.set_xticks(np.arange(len(cont_feature_names)))
+        ax.set_yticks(np.arange(len(cont_feature_names)))
 
-        ax.set_xticklabels(feature_names, fontsize=fontsize)
-        ax.set_yticklabels(feature_names, fontsize=fontsize)
+        ax.set_xticklabels(cont_feature_names, fontsize=fontsize)
+        ax.set_yticklabels(cont_feature_names, fontsize=fontsize)
 
         plt.setp(ax.get_xticklabels(), rotation=90, ha="right", rotation_mode="anchor")
 
         norm_corr = corr - (np.max(corr) + np.min(corr)) / 2
         norm_corr /= np.max(norm_corr)
 
-        for i in range(len(feature_names)):
-            for j in range(len(feature_names)):
+        for i in range(len(cont_feature_names)):
+            for j in range(len(cont_feature_names)):
                 text = ax.text(
                     j,
                     i,
@@ -1108,7 +1199,7 @@ class Trainer:
         bp = sns.boxplot(
             data=self.feature_data
             if imputed
-            else self.get_not_imputed_df()[self.feature_names],
+            else self.get_not_imputed_df()[self.cont_feature_names],
             orient="h",
             linewidth=1,
             fliersize=4,
@@ -1230,7 +1321,7 @@ class Trainer:
 
         # If other parameters are not consistent, raise Warning.
         stress_unrelated_cols = [
-            name for name in self.feature_names if "Stress" not in name
+            name for name in self.cont_feature_names if "Stress" not in name
         ]
         other_params = self.df.loc[
             np.concatenate(
@@ -1603,8 +1694,9 @@ class Trainer:
             if refit:
                 bootstrap_model.fit(
                     df_bootstrap,
-                    self.dataprocessors[0][0].record_features,
-                    self.label_name,
+                    cont_feature_names=self.dataprocessors[0][0].record_cont_features,
+                    cat_feature_names=self.dataprocessors[0][0].record_cat_features,
+                    label_name=self.label_name,
                     verbose=False,
                     warm_start=True,
                 )
