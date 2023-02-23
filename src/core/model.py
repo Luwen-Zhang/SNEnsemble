@@ -207,7 +207,11 @@ class AutoGluon(AbstractModel):
 
         warnings.simplefilter(action="ignore", category=UserWarning)
         from autogluon.tabular import TabularPredictor
-        from autogluon.features import AutoMLPipelineFeatureGenerator
+        from autogluon.features.generators import PipelineFeatureGenerator
+        from autogluon.features.generators.category import CategoryFeatureGenerator
+        from autogluon.features.generators.identity import IdentityFeatureGenerator
+        from autogluon.common.features.feature_metadata import FeatureMetadata
+        from autogluon.common.features.types import R_INT, R_FLOAT
 
         (
             tabular_dataset,
@@ -215,8 +219,27 @@ class AutoGluon(AbstractModel):
             cat_feature_names,
             label_name,
         ) = self.trainer.get_tabular_dataset()
+        tabular_dataset = self.trainer.categories_inverse_transform(tabular_dataset)
         predictor = TabularPredictor(
             label=label_name[0], path=self.root, problem_type="regression"
+        )
+        feature_metadata = {}
+        for feature in cont_feature_names:
+            feature_metadata[feature] = "float"
+        for feature in cat_feature_names:
+            feature_metadata[feature] = "object"
+        feature_generator = PipelineFeatureGenerator(
+            generators=[
+                [
+                    IdentityFeatureGenerator(
+                        infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT]),
+                        feature_metadata_in=FeatureMetadata(feature_metadata),
+                    ),
+                    CategoryFeatureGenerator(
+                        feature_metadata_in=FeatureMetadata(feature_metadata)
+                    ),
+                ]
+            ]
         )
         with HiddenPrints(disable_logging=True if not verbose else False):
             predictor.fit(
@@ -230,9 +253,7 @@ class AutoGluon(AbstractModel):
                 else None,
                 use_bag_holdout=True,
                 verbosity=0 if not verbose else 2,
-                feature_generator=AutoMLPipelineFeatureGenerator(
-                    enable_categorical_features=False
-                ),
+                feature_generator=feature_generator,
             )
         self.leaderboard = predictor.leaderboard(
             tabular_dataset.loc[self.trainer.test_indices, :], silent=True
@@ -302,7 +323,10 @@ class WideDeep(AbstractModel):
             cat_feature_names,
             label_name,
         ) = self.trainer.get_tabular_dataset()
-        tab_preprocessor = TabPreprocessor(continuous_cols=cont_feature_names)
+        tab_preprocessor = TabPreprocessor(
+            continuous_cols=cont_feature_names,
+            cat_embed_cols=cat_feature_names if len(cat_feature_names) != 0 else None,
+        )
         X_tab_train = tab_preprocessor.fit_transform(
             tabular_dataset.loc[self.trainer.train_indices, :]
         )
@@ -316,11 +340,16 @@ class WideDeep(AbstractModel):
         args = dict(
             column_idx=tab_preprocessor.column_idx,
             continuous_cols=cont_feature_names,
+            cat_embed_input=tab_preprocessor.cat_embed_input
+            if len(cat_feature_names) != 0
+            else None,
         )
         tab_models = {
             "TabMlp": TabMlp(**args),
             "TabResnet": TabResnet(**args),
-            "TabTransformer": TabTransformer(embed_continuous=True, **args),
+            "TabTransformer": TabTransformer(
+                embed_continuous=True if len(cat_feature_names) == 0 else False, **args
+            ),
             "TabNet": TabNet(**args),
             "SAINT": SAINT(**args),
             "ContextAttentionMLP": ContextAttentionMLP(**args),

@@ -15,6 +15,7 @@ class config(BaseConfig):
         cfg = {
             "database": "composite_database_02162023",
             "feature_names_type": {
+                "Data source": 2,
                 "Fibre Volume Fraction": 1,
                 "Fibre Weight Fraction": 1,
                 "Percentage of Fibre in 0-deg Direction": 1,
