@@ -512,6 +512,10 @@ class WideDeep(AbstractModel):
         ]
 
 
+class _WideDeepCallback:
+    pass
+
+
 # class PytorchTabular(AbstractModel):
 #     def __init__(self, trainer=None):
 #         super(PytorchTabular, self).__init__(trainer)
