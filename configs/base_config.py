@@ -11,7 +11,7 @@ class BaseConfig:
             "bayes_opt": False,
             "bayes_epoch": 3,
             "patience": 50,
-            "epoch": 200,
+            "epoch": 500,
             "lr": 0.003,
             "weight_decay": 0.002,
             "batch_size": 1024,
