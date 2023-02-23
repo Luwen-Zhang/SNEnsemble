@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch.optim
 
 from .trainer import *
@@ -199,9 +200,12 @@ class AutoGluon(AbstractModel):
 
         warnings.simplefilter(action="ignore", category=UserWarning)
         from autogluon.tabular import TabularPredictor
+        from autogluon.features import AutoMLPipelineFeatureGenerator
 
         tabular_dataset, feature_names, label_name = self.trainer._get_tabular_dataset()
-        predictor = TabularPredictor(label=label_name[0], path=self.root)
+        predictor = TabularPredictor(
+            label=label_name[0], path=self.root, problem_type="regression"
+        )
         with HiddenPrints(disable_logging=True if not verbose else False):
             predictor.fit(
                 tabular_dataset.loc[self.trainer.train_dataset.indices, :],
@@ -214,6 +218,9 @@ class AutoGluon(AbstractModel):
                 else None,
                 use_bag_holdout=True,
                 verbosity=0 if not verbose else 2,
+                feature_generator=AutoMLPipelineFeatureGenerator(
+                    enable_categorical_features=False
+                ),
             )
         self.leaderboard = predictor.leaderboard(
             tabular_dataset.loc[self.trainer.test_dataset.indices, :], silent=True
@@ -435,7 +442,11 @@ class WideDeep(AbstractModel):
             save_trainer(self.trainer)
 
     def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
+        # SettingWithCopyWarning in TabPreprocessor.transform
+        # i.e. df_cont[self.standardize_cols] = self.scaler.transform(df_std.values)
+        pd.set_option("mode.chained_assignment", "warn")
         X_df = self.tab_preprocessor.transform(df)
+        pd.set_option("mode.chained_assignment", "raise")
         return self.model[model_name].predict(X_tab=X_df)
 
     def _get_model_names(self):
