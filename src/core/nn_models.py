@@ -11,6 +11,7 @@ class AbstractNN(nn.Module):
     def __init__(self, trainer):
         super(AbstractNN, self).__init__()
         self.derived_feature_names = list(trainer.derived_data.keys())
+        self.derived_feature_dims = trainer.get_derived_data_sizes()
 
     def forward(self, *tensors):
         x = tensors[0]

@@ -646,7 +646,7 @@ class Trainer:
         for modelbase in modelbases_to_train:
             modelbase.train(verbose=verbose, debug_mode=debug_mode)
 
-    def _get_derived_data_sizes(self):
+    def get_derived_data_sizes(self):
         return [x.shape for x in self.derived_data.values()]
 
     @staticmethod
@@ -988,7 +988,7 @@ class Trainer:
             for x in self.cont_feature_names
         ]
 
-        dims = self._get_derived_data_sizes()
+        dims = self.get_derived_data_sizes()
         derived_names = []
         for key_idx, key in enumerate(self.derived_data.keys()):
             derived_names += (
