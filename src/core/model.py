@@ -96,7 +96,9 @@ class AbstractModel:
                     f"Additional feature {absent_keys} not in the input derived_data."
                 )
         df = self.trainer.dataimputer.transform(df.copy(), self.trainer)
-        return self._predict(df, model_name, derived_data, **kwargs)
+        return self._predict(
+            df, model_name, self.trainer.sort_derived_data(derived_data), **kwargs
+        )
 
     def _predict_all(self, verbose=True, test_data_only=False):
         self._check_train_status()

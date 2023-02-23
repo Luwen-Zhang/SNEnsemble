@@ -401,7 +401,9 @@ class Trainer:
             )
 
         self.derived_data = (
-            self.derive_unstacked(self.df) if derived_data is None else derived_data
+            self.derive_unstacked(self.df)
+            if derived_data is None
+            else self.sort_derived_data(derived_data)
         )
         self._update_dataset_auto()
         self._material_code = (
@@ -409,6 +411,15 @@ class Trainer:
             if "Material_Code" in self.df.columns
             else None
         )
+
+    def sort_derived_data(self, derived_data):
+        if derived_data is None:
+            return None
+        else:
+            tmp_derived_data = {}
+            for key in self.derived_data.keys():
+                tmp_derived_data[key] = derived_data[key]
+            return tmp_derived_data
 
     def categories_inverse_transform(self, X: pd.DataFrame):
         from src.core.dataprocessor import CategoricalOrdinalEncoder
@@ -1668,6 +1679,7 @@ class Trainer:
         # Values. No. RWP 21-12. 2021.
         from src.core.model import TorchModel
 
+        derived_data = self.sort_derived_data(derived_data)
         if not issubclass(type(model), TorchModel):
             raise Exception(f"Model {type(model)} is not a TorchModel.")
         x_value = np.linspace(
