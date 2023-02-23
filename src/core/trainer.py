@@ -908,15 +908,15 @@ class Trainer:
 
         if method == "permutation":
 
-            def forward_func(data):
+            def forward_func(X, *D):
                 ground_truth = self.label_data.loc[
                     self.test_indices, :
                 ].values.flatten()
-                # Maybe D should be re-derived?
-                D = self._get_additional_tensors_slice(self.test_indices)
                 y = self.tensors[-1][self.test_indices, :]
                 loader = Data.DataLoader(
-                    Data.TensorDataset(data, *D, y), batch_size=len(y), shuffle=False
+                    Data.TensorDataset(X, *D, y),
+                    batch_size=len(y),
+                    shuffle=False,
                 )
                 prediction, _, _ = modelbase._test_step(
                     modelbase.model, loader, self.loss_fn
@@ -925,14 +925,28 @@ class Trainer:
                 return loss
 
             feature_perm = FeaturePermutation(forward_func)
-            attr = (
-                feature_perm.attribute(self.tensors[0][self.test_indices, :])
-                .cpu()
-                .numpy()[0]
-            )
+            attr = [
+                x.cpu().numpy().flatten()
+                for x in feature_perm.attribute(
+                    tuple(
+                        [
+                            self._get_first_tensor_slice(self.test_indices),
+                            *self._get_additional_tensors_slice(self.test_indices),
+                        ]
+                    )
+                )
+            ]
+            attr = np.append(attr[0], attr[1:])
         elif method == "shap":
             shap_values, data = self.cal_shap(modelbase=modelbase, explainer="deep")
-            attr = np.mean(np.abs(shap_values[0]), axis=0)
+            attr = (
+                np.append(
+                    np.mean(np.abs(shap_values[0]), axis=0),
+                    [np.mean(np.abs(x), axis=0) for x in shap_values[1:]],
+                )
+                if len(shap_values) > 1
+                else np.mean(np.abs(shap_values[0]), axis=0)
+            )
         else:
             raise NotImplementedError
         return attr
@@ -970,9 +984,29 @@ class Trainer:
         pal = [
             clr[self.args["feature_names_type"][x]]
             if x in self.args["feature_names_type"].keys()
-            else clr[len(self.args["feature_types"]) - 1]
+            else clr[self.args["feature_types"].index("Derived")]
             for x in self.cont_feature_names
         ]
+
+        dims = self._get_derived_data_sizes()
+        derived_names = []
+        for key_idx, key in enumerate(self.derived_data.keys()):
+            derived_names += (
+                [
+                    f"{key} (dim {i})" if dims[key_idx][-1] > 1 else key
+                    for i in range(dims[key_idx][-1])
+                ]
+                if key != "categorical"
+                else self.cat_feature_names
+            )
+            if key == "categorical":
+                pal += [clr[self.args["feature_types"].index("Categorical")]] * dims[
+                    key_idx
+                ][-1]
+            else:
+                pal += [clr[self.args["feature_types"].index("Derived")]] * dims[
+                    key_idx
+                ][-1]
 
         clr_map = dict()
         for idx, feature_type in enumerate(self.args["feature_types"]):
@@ -982,7 +1016,7 @@ class Trainer:
         ax = plt.subplot(111)
         plot_importance(
             ax,
-            self.cont_feature_names,
+            self.cont_feature_names + derived_names,
             attr,
             pal=pal,
             clr_map=clr_map,
@@ -990,6 +1024,12 @@ class Trainer:
             edgecolor="k",
             orient="h",
         )
+        if method == "permutation":
+            ax.set_xlabel("Permutation feature importance")
+        elif method == "shap":
+            ax.set_xlabel("SHAP feature importance")
+        else:
+            ax.set_xlabel("Feature importance")
         plt.tight_layout()
 
         boxes = []
