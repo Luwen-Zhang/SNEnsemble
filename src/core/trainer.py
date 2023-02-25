@@ -1884,6 +1884,50 @@ class Trainer:
     def _get_first_tensor_slice(self, indices):
         return self.tensors[0][indices, :]
 
+    def get_base_predictor(
+        self,
+        categorical=True,
+        **kwargs,
+    ):
+        from sklearn.impute import SimpleImputer
+        from sklearn.compose import ColumnTransformer
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import OneHotEncoder
+        from sklearn.ensemble import RandomForestRegressor
+
+        rf = RandomForestRegressor(**kwargs)
+
+        if len(self.cat_feature_names) > 0 and categorical:
+            categorical_encoder = OneHotEncoder()
+            numerical_pipe = SimpleImputer(strategy="mean")
+            preprocessing = ColumnTransformer(
+                [
+                    (
+                        "cat",
+                        categorical_encoder,
+                        lambda x: [y for y in self.cat_feature_names if y in x.columns],
+                    ),
+                    (
+                        "num",
+                        numerical_pipe,
+                        lambda x: [
+                            y for y in self.cont_feature_names if y in x.columns
+                        ],
+                    ),
+                ],
+                verbose_feature_names_out=False,
+            )
+
+            pip = Pipeline(
+                [
+                    ("preprocess", preprocessing),
+                    ("classifier", rf),
+                ]
+            )
+            return pip
+        else:
+            return rf
+
 
 def save_trainer(trainer, path=None, verbose=True):
     import pickle

@@ -111,7 +111,10 @@ class config(BaseConfig):
                 ("NaNFeatureRemover", {}),
                 ("VarianceFeatureSelector", {"thres": 1}),
                 # ("CorrFeatureSelector", {"n_estimators": 100}),
-                # ("RFEFeatureSelector", {"n_estimators": 100}),
+                # (
+                #     "RFEFeatureSelector",
+                #     {"n_estimators": 100, "method": "auto", "verbose": True},
+                # ),
                 ("UnscaledDataRecorder", {}),
                 ("StandardScaler", {}),
             ],

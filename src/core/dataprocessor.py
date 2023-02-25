@@ -220,24 +220,51 @@ class RFEFeatureSelector(AbstractFeatureSelector):
         super(RFEFeatureSelector, self).__init__()
 
     def _get_feature_names_out(
-        self, data, trainer, n_estimators=100, step=1, verbose=0, **kwargs
+        self,
+        data,
+        trainer,
+        n_estimators=100,
+        step=1,
+        verbose=0,
+        min_features_to_select=1,
+        method="auto",
+        **kwargs,
     ):
-        from sklearn.feature_selection import RFECV
+        from src.utils.processors.rfecv import ExtendRFECV
         from sklearn.model_selection import KFold
-        from sklearn.ensemble import RandomForestRegressor
+        import shap
 
-        min_features_to_select = 1  # Minimum number of features to consider
-        rf = RandomForestRegressor(n_estimators=n_estimators, n_jobs=-1, random_state=0)
         cv = KFold(5)
 
-        rfecv = RFECV(
-            estimator=rf,
+        def importance_getter(estimator, data):
+            np.random.seed(0)
+            selected_data = data.loc[
+                np.random.choice(
+                    np.arange(data.shape[0]),
+                    size=min(100, data.shape[0]),
+                    replace=False,
+                ),
+                :,
+            ]
+            return np.mean(
+                np.abs(shap.Explainer(estimator)(selected_data).values),
+                axis=0,
+            )
+
+        rfecv = ExtendRFECV(
+            estimator=trainer.get_base_predictor(
+                categorical=False,
+                n_estimators=100,
+                n_jobs=-1,
+                random_state=0,
+            ),
             step=step,
             cv=cv,
             scoring="neg_root_mean_squared_error",
             min_features_to_select=min_features_to_select,
             n_jobs=-1,
             verbose=verbose,
+            importance_getter=importance_getter if method == "shap" else method,
         )
         rfecv.fit(
             data[trainer.all_feature_names],
@@ -310,9 +337,9 @@ class CorrFeatureSelector(AbstractFeatureSelector):
 
         corr_sets = [[x for x in y] for y in corr_sets]
 
-        from sklearn.ensemble import RandomForestRegressor
-
-        rf = RandomForestRegressor(n_estimators=n_estimators, n_jobs=-1, random_state=0)
+        rf = trainer.get_base_predictor(
+            categorical=False, n_estimators=n_estimators, n_jobs=-1, random_state=0
+        )
         rf.fit(
             data[trainer.all_feature_names],
             data[trainer.label_name].values.flatten(),
