@@ -949,7 +949,19 @@ class Trainer:
             )
         else:
             raise NotImplementedError
-        return attr
+
+        dims = self.get_derived_data_sizes()
+        importance_names = self.cont_feature_names
+        for key_idx, key in enumerate(self.derived_data.keys()):
+            importance_names += (
+                [
+                    f"{key} (dim {i})" if dims[key_idx][-1] > 1 else key
+                    for i in range(dims[key_idx][-1])
+                ]
+                if key != "categorical"
+                else self.cat_feature_names
+            )
+        return attr, importance_names
 
     def cal_shap(self, modelbase, explainer="deep"):
         from src.core.model import TorchModel
@@ -976,7 +988,7 @@ class Trainer:
         Calculate and plot permutation feature importance.
         :return: None
         """
-        attr = self.cal_feature_importance(modelbase, method=method)
+        attr, names = self.cal_feature_importance(modelbase, method=method)
 
         clr = sns.color_palette("deep")
 
@@ -989,16 +1001,7 @@ class Trainer:
         ]
 
         dims = self.get_derived_data_sizes()
-        derived_names = []
         for key_idx, key in enumerate(self.derived_data.keys()):
-            derived_names += (
-                [
-                    f"{key} (dim {i})" if dims[key_idx][-1] > 1 else key
-                    for i in range(dims[key_idx][-1])
-                ]
-                if key != "categorical"
-                else self.cat_feature_names
-            )
             if key == "categorical":
                 pal += [clr[self.args["feature_types"].index("Categorical")]] * dims[
                     key_idx
@@ -1016,7 +1019,7 @@ class Trainer:
         ax = plt.subplot(111)
         plot_importance(
             ax,
-            self.cont_feature_names + derived_names,
+            names,
             attr,
             pal=pal,
             clr_map=clr_map,
