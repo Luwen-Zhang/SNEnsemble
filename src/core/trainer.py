@@ -1343,6 +1343,105 @@ class Trainer:
         code_df = self.get_material_code(unique=False, partition=partition)
         return code_df.index[np.where(code_df["Material_Code"] == m_code)[0]]
 
+    def plot_data_split(self, bins=30, percentile="all"):
+        from matplotlib.gridspec import GridSpec
+
+        train_m_code = list(
+            self.get_material_code(unique=True, partition="train")["Material_Code"]
+        )
+        val_m_code = list(
+            self.get_material_code(unique=True, partition="val")["Material_Code"]
+        )
+        test_m_code = list(
+            self.get_material_code(unique=True, partition="test")["Material_Code"]
+        )
+        all_m_code = list(self.get_material_code(unique=True)["Material_Code"])
+        no_train_m_code = np.setdiff1d(all_m_code, train_m_code)
+        val_only_m_code = np.setdiff1d(no_train_m_code, test_m_code)
+        rest_m_code = np.setdiff1d(no_train_m_code, val_only_m_code)
+
+        all_m_code = train_m_code + list(val_only_m_code) + list(rest_m_code)
+
+        all_cycle = self.df[self.label_name].values.flatten()
+        length = len(all_m_code)
+        train_heat = np.zeros((length, bins))
+        val_heat = np.zeros((length, bins))
+        test_heat = np.zeros((length, bins))
+        np.seterr(invalid="ignore")
+        for idx, material in enumerate(all_m_code):
+            cycle = all_cycle[
+                self._select_by_material_code(m_code=material, partition="all")
+            ]
+            if percentile == "all":
+                hist_range = (np.min(all_cycle), np.max(all_cycle))
+            else:
+                hist_range = (np.min(cycle), np.max(cycle))
+            all_hist = np.histogram(cycle, bins=bins, range=hist_range)[0]
+
+            def get_heat(partition):
+                cycles = all_cycle[
+                    self._select_by_material_code(m_code=material, partition=partition)
+                ]
+                return np.histogram(cycles, range=hist_range, bins=bins)[0] / all_hist
+
+            train_heat[idx, :] = get_heat(partition="train")
+            val_heat[idx, :] = get_heat(partition="val")
+            test_heat[idx, :] = get_heat(partition="test")
+
+        train_heat[np.isnan(train_heat)] = 0
+        val_heat[np.isnan(val_heat)] = 0
+        test_heat[np.isnan(test_heat)] = 0
+        fig = plt.figure(figsize=(8, 2.5))
+        gs = GridSpec(100, 100, figure=fig)
+
+        def plot_im(heat, name, pos, hide_y_ticks=False):
+            ax = fig.add_subplot(pos)
+            im = ax.imshow(heat, aspect=bins / length, cmap="Oranges")
+            if hide_y_ticks:
+                ax.set_yticks([])
+            ax.set_title(name)
+            ax.set_xlim([-0.5, bins - 0.5])
+            ax.set_xticks([0 - 0.5, (bins - 1) / 2, bins - 0.5])
+            if percentile == "all":
+                ax.set_xticklabels(
+                    [
+                        f"{x:.1f}"
+                        for x in [hist_range[0], np.mean(hist_range), hist_range[1]]
+                    ]
+                )
+            else:
+                ax.set_xticklabels([0, 50, 100])
+            return im
+
+        plot_im(train_heat, "Training set", gs[:, 0:30], hide_y_ticks=False)
+        plot_im(val_heat, "Validation set", gs[:, 33:63], hide_y_ticks=True)
+        im = plot_im(test_heat, "Testing set", gs[:, 66:96], hide_y_ticks=True)
+        # plt.colorbar(mappable=im)
+        cax = fig.add_subplot(gs[50:98, 98:])
+        cbar = plt.colorbar(cax=cax, mappable=im)
+        cax.set_ylabel("Density")
+
+        ax = fig.add_subplot(111, frameon=False)
+        plt.tick_params(
+            labelcolor="none",
+            which="both",
+            top=False,
+            bottom=False,
+            left=False,
+            right=False,
+        )
+        if percentile == "all":
+            ax.set_xlabel(self.label_name[0])
+        else:
+            ax.set_xlabel(f"Percentile of {self.label_name[0]} for each material")
+        ax.set_ylabel(f"ID of Material")
+        plt.savefig(
+            self.project_root
+            + f"{self.datasplitter.__class__.__name__}_{percentile}.pdf",
+            bbox_inches="tight",
+        )
+        plt.close()
+
     def plot_multiple_S_N(self, m_codes, hide_plt_show=True, **kwargs):
         for m_code in m_codes:
             print(m_code)
