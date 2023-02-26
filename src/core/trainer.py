@@ -314,8 +314,8 @@ class Trainer:
             )
         else:
             self.train_indices = train_indices
-            self.test_indices = val_indices
-            self.val_indices = test_indices
+            self.val_indices = val_indices
+            self.test_indices = test_indices
 
         self.cont_imputed_mask = pd.DataFrame(
             columns=self.cont_feature_names,
