@@ -936,7 +936,7 @@ class Trainer:
                     )
                 )
             ]
-            attr = np.append(attr[0], attr[1:])
+            attr = np.abs(np.append(attr[0], attr[1:]))
         elif method == "shap":
             shap_values, data = self.cal_shap(modelbase=modelbase, explainer="deep")
             attr = (
