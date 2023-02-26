@@ -248,18 +248,12 @@ class Trainer:
             self.df = pd.read_csv(data_path)
         self.data_path = data_path
 
-        cont_feature_names = [
-            x
-            for x in self.args["feature_names_type"].keys()
-            if x not in self.args["categorical_feature_names"]
-        ]
-        cat_feature_names = [
-            str(x)
-            for x in np.intersect1d(
-                list(self.args["feature_names_type"].keys()),
-                self.args["categorical_feature_names"],
-            )
-        ]
+        cont_feature_names = self.extract_cont_feature_names(
+            self.args["feature_names_type"].keys()
+        )
+        cat_feature_names = self.extract_cat_feature_names(
+            self.args["feature_names_type"].keys()
+        )
         label_name = self.args["label_name"]
 
         self.set_data(self.df, cont_feature_names, cat_feature_names, label_name)
@@ -410,6 +404,36 @@ class Trainer:
             pd.DataFrame(self.df["Material_Code"])
             if "Material_Code" in self.df.columns
             else None
+        )
+
+    def extract_cont_feature_names(self, all_feature_names):
+        return [
+            x
+            for x in all_feature_names
+            if x not in self.args["categorical_feature_names"]
+        ]
+
+    def extract_cat_feature_names(self, all_feature_names):
+        return [
+            str(x)
+            for x in np.intersect1d(
+                list(all_feature_names),
+                self.args["categorical_feature_names"],
+            )
+        ]
+
+    def set_feature_names(self, all_feature_names):
+        cont_feature_names = self.extract_cont_feature_names(all_feature_names)
+        cat_feature_names = self.extract_cat_feature_names(all_feature_names)
+        self.set_data(
+            self.df,
+            cont_feature_names,
+            cat_feature_names,
+            self.label_name,
+            verbose=False,
+            train_indices=self.train_indices,
+            val_indices=self.val_indices,
+            test_indices=self.test_indices,
         )
 
     def sort_derived_data(self, derived_data):
