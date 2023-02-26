@@ -462,9 +462,21 @@ class CategoricalOrdinalEncoder(AbstractTransformer):
         return data
 
     def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data.loc[:, trainer.cat_feature_names] = self.transformer.transform(
-            data.loc[:, trainer.cat_feature_names]
-        ).astype(int)
+        try:
+            data.loc[:, trainer.cat_feature_names] = self.transformer.transform(
+                data.loc[:, trainer.cat_feature_names]
+            ).astype(int)
+        except:
+            try:
+                # Categorical features are already transformed.
+                self.transformer.inverse_transform(
+                    data.loc[:, trainer.cat_feature_names]
+                )
+                return data
+            except:
+                raise Exception(
+                    f"Categorical features are not compatible with the fitted OrdinalEncoder."
+                )
         return data
 
 
