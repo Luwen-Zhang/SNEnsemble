@@ -1341,8 +1341,6 @@ class Trainer:
 
     def _select_by_material_code(self, m_code: str, partition="all"):
         code_df = self.get_material_code(unique=False, partition=partition)
-        if m_code not in code_df["Material_Code"].values:
-            raise Exception(f"Material code {m_code} not available.")
         return code_df.index[np.where(code_df["Material_Code"] == m_code)[0]]
 
     def plot_multiple_S_N(self, m_codes, hide_plt_show=True, **kwargs):
@@ -1382,7 +1380,11 @@ class Trainer:
         m_train_indices = self._select_by_material_code(m_code, partition="train")
         m_test_indices = self._select_by_material_code(m_code, partition="test")
         m_val_indices = self._select_by_material_code(m_code, partition="val")
-        original_train_indices = cp(m_train_indices)
+        original_indices = self._select_by_material_code(m_code, partition="all")
+
+        if len(original_indices) == 0:
+            raise Exception(f"Material_Code {m_code} not available.")
+
         sgn = 1 if load_dir == "tension" else -1
         m_train_indices = m_train_indices[
             (self.df.loc[m_train_indices, s_col] * sgn > 0)
@@ -1422,17 +1424,18 @@ class Trainer:
             else:
                 warnings.warn(message, UserWarning)
 
-        # If no training points available, raise an exception.
-        if len(m_train_indices) == 0:
-            unique_r = np.unique(self.df.loc[original_train_indices, r_col])
+        # If no training or validation points available, raise an exception.
+        if (
+            len(m_train_indices) == 0
+            and len(m_val_indices) == 0
+            and len(m_test_indices) == 0
+        ):
+            unique_r = np.unique(self.df.loc[original_indices, r_col])
             available_r = []
             for r in unique_r:
                 if (
-                    (self.df.loc[original_train_indices, s_col] * sgn > 0)
-                    & (
-                        (self.df.loc[original_train_indices, r_col] - r).__abs__()
-                        < 1e-3
-                    )
+                    (self.df.loc[original_indices, s_col] * sgn > 0)
+                    & ((self.df.loc[original_indices, r_col] - r).__abs__() < 1e-3)
                 ).any():
                     available_r.append(r)
             raise Exception(
@@ -1463,12 +1466,15 @@ class Trainer:
 
         # Get bootstrap predictions and confidence intervals from program-model_name
         model = self.get_modelbase(program=program)
+        chosen_indices = (
+            m_train_indices
+            if len(m_train_indices) != 0
+            else np.append(m_val_indices, m_test_indices)
+        )
         x_value, mean_pred, ci_left, ci_right = self._bootstrap(
             model=model,
-            df=self.df.loc[m_train_indices, :],
-            derived_data=self.get_derived_data_slice(
-                self.derived_data, m_train_indices
-            ),
+            df=self.df.loc[chosen_indices, :],
+            derived_data=self.get_derived_data_slice(self.derived_data, chosen_indices),
             focus_feature=s_col,
             n_bootstrap=n_bootstrap,
             grid_size=grid_size,
@@ -1478,7 +1484,7 @@ class Trainer:
             average=False,
             verbose=verbose,
             model_name=model_name,
-            refit=refit,
+            refit=refit if len(m_train_indices) != 0 else False,
         )
 
         # Defining a series of utilities.
@@ -1592,30 +1598,35 @@ class Trainer:
         scatter_plot_func(n_test, s_test, clr[2], "Testing")
 
         # Plot predictions and intervals.
-        # if not (np.isnan(ci_left).any() or np.isnan(ci_right).any()):
-        #     interval_plot_func(
-        #         mean_pred, ci_left, ci_right, clr[1], f"Bootstrap CI {CI*100:.1f}\%"
-        #     )
-        # else:
-        #     ax.plot(mean_pred, x_value, color=clr[1], zorder=10)
+        if len(m_train_indices) != 0:
+            _, ci_left, ci_right, psn_pred = get_interval_psn(
+                s_train.values,
+                n_train.values,
+                x_value,
+                n_pred_vals=mean_pred,
+            )
 
-        _, ci_left, ci_right, psn_pred = get_interval_psn(
-            s_train.values,
-            n_train.values,
-            x_value,
-            n_pred_vals=mean_pred,
-        )
-
-        interval_plot_func(mean_pred, ci_left, ci_right, clr[1], f"{model_name} CI")
-        psn_plot_func(psn_pred, color=clr[1], name=f"{model_name} 5\% PoF")
+            interval_plot_func(mean_pred, ci_left, ci_right, clr[1], f"{model_name} CI")
+            psn_plot_func(psn_pred, color=clr[1], name=f"{model_name} 5\% PoF")
+        else:
+            if not (np.isnan(ci_left).any() or np.isnan(ci_right).any()):
+                interval_plot_func(
+                    mean_pred,
+                    ci_left,
+                    ci_right,
+                    clr[1],
+                    f"Bootstrap {model_name} CI {CI*100:.1f}\%",
+                )
+            else:
+                ax.plot(mean_pred, x_value, color=clr[1], zorder=10)
 
         # Get predictions, intervals and psn for lin-log and log-log SN.
-        lin_pred, lin_ci_left, lin_ci_right, lin_psn_pred = get_interval_psn(
-            s_train.values, n_train.values, x_value
-        )
-        log_pred, log_ci_left, log_ci_right, log_psn_pred = get_interval_psn(
-            np.log10(s_train.values), n_train.values, np.log10(x_value)
-        )
+        # lin_pred, lin_ci_left, lin_ci_right, lin_psn_pred = get_interval_psn(
+        #     s_train.values, n_train.values, x_value
+        # )
+        # log_pred, log_ci_left, log_ci_right, log_psn_pred = get_interval_psn(
+        #     np.log10(s_train.values), n_train.values, np.log10(x_value)
+        # )
 
         # Plot predictions, intervals and psn.
         # interval_plot_func(lin_pred, lin_ci_left, lin_ci_right, clr[0], f"Lin-log CI")
@@ -1787,7 +1798,9 @@ class Trainer:
                     bootstrap_model.predict(
                         df_perm,
                         model_name=model_name,
-                        derived_data=tmp_derived_data,  # To avoid rederiving stacked data
+                        derived_data=tmp_derived_data
+                        if focus_feature in self.derived_stacked_features
+                        else None,  # To avoid rederiving stacked data
                     )
                 )
             if average:
