@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import torch.optim
-
+from typing import Type
 from .trainer import *
 import skopt
 from skopt import gp_minimize
@@ -1527,6 +1527,102 @@ class MLP(TorchModel):
 
     def _get_model_names(self):
         return ["MLP"]
+
+
+class RFE(TorchModel):
+    def __init__(
+        self,
+        trainer: Trainer,
+        torch_model: Type[TorchModel],
+        program=None,
+        metric: str = "Validation RMSE",
+        impor_method: str = "shap",
+        cross_validation=5,
+        min_features=1,
+    ):
+        self.metric = metric
+        self.impor_method = impor_method
+        self.cross_validation = cross_validation
+        self.min_features = min_features
+
+        self.trainer = cp(trainer)
+        self.torch_model = torch_model
+        self.modelbase = self.torch_model(self.trainer)
+        self.trainer.modelbases = []
+        self.trainer.modelbases_names = []
+        self.trainer.add_modelbases([self.modelbase])
+        self.metrics = []
+        self.features_eliminated = []
+        self.selected_features = []
+        self.impor_dicts = []
+        super(RFE, self).__init__(trainer=self.trainer, program=program)
+
+    def _get_program_name(self):
+        return "RFE-" + self.modelbase._get_program_name()
+
+    def _get_model_names(self):
+        return self.modelbase._get_model_names()
+
+    def _new_model(self):
+        return self.modelbase._new_model()
+
+    def _train(
+        self,
+        verbose: bool = True,
+        warm_start=False,
+        **kwargs,
+    ):
+        if warm_start:
+            self.modelbase._train(warm_start=warm_start, verbose=verbose, **kwargs)
+        else:
+            self.run(verbose=verbose)
+            self.modelbase._train(warm_start=warm_start, verbose=verbose, **kwargs)
+
+    def run(self, verbose=True):
+        rest_features = list(
+            np.setdiff1d(
+                self.trainer.all_feature_names, self.trainer.derived_stacked_features
+            )
+        )
+        while len(rest_features) > self.min_features:
+            if verbose:
+                print(f"Using features: {rest_features}")
+            self.trainer.set_data_derivers(config=[])
+            self.trainer.set_feature_names(rest_features)
+            if self.cross_validation == 0:
+                self.modelbase._train(verbose=False, dump_trainer=False)
+            leaderboard = self.trainer.get_leaderboard(
+                test_data_only=False,
+                cross_validation=self.cross_validation,
+                verbose=False,
+                dump_trainer=False,
+            )
+            self.metrics.append(leaderboard.loc[0, self.metric])
+            importance, names = self.trainer.cal_feature_importance(
+                modelbase=self.modelbase, method=self.impor_method
+            )
+            impor_dict = {"feature": [], "attr": []}
+            for imp, name in zip(importance, names):
+                if name in rest_features:
+                    impor_dict["feature"].append(name)
+                    impor_dict["attr"].append(imp)
+            df = pd.DataFrame(impor_dict)
+            df.sort_values(by="attr", inplace=True, ascending=False)
+            df.reset_index(drop=True, inplace=True)
+            rest_features = list(df["feature"])
+            print(rest_features)
+            self.features_eliminated.append(rest_features.pop(-1))
+            self.impor_dicts.append(df)
+            if verbose:
+                print(f"Eliminated feature: {self.features_eliminated[-1]}")
+                # print(f"Permutation importance:\n{df}")
+
+        select_idx = self.metrics.index(np.min(self.metrics))
+        self.selected_features = self.features_eliminated[select_idx:]
+        self.trainer.set_data_derivers(config=self.trainer.args["data_derivers"])
+        self.trainer.set_feature_names(self.selected_features)
+        if verbose:
+            print(f"Selected features: {self.selected_features}")
 
 
 class ModelAssembly(AbstractModel):
