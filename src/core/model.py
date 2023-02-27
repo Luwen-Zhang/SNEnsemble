@@ -1545,14 +1545,14 @@ class RFE(TorchModel):
         self.cross_validation = cross_validation
         self.min_features = min_features
 
-        self.trainer = cp(trainer)
+        self.internal_trainer = cp(trainer)
         self.torch_model = torch_model
-        super(RFE, self).__init__(trainer=self.trainer, program=program)
-        self.trainer.project_root = self.root
-        self.modelbase = self.torch_model(self.trainer)
-        self.trainer.modelbases = []
-        self.trainer.modelbases_names = []
-        self.trainer.add_modelbases([self.modelbase])
+        super(RFE, self).__init__(trainer=trainer, program=program)
+        self.internal_trainer.project_root = self.root
+        self.modelbase = self.torch_model(self.internal_trainer)
+        self.internal_trainer.modelbases = []
+        self.internal_trainer.modelbases_names = []
+        self.internal_trainer.add_modelbases([self.modelbase])
         self.metrics = []
         self.features_eliminated = []
         self.selected_features = []
@@ -1590,17 +1590,17 @@ class RFE(TorchModel):
         while len(rest_features) > self.min_features:
             if verbose:
                 print(f"Using features: {rest_features}")
-            self.trainer.set_feature_names(rest_features)
+            self.internal_trainer.set_feature_names(rest_features)
             if self.cross_validation == 0:
                 self.modelbase._train(verbose=False, dump_trainer=False)
-            leaderboard = self.trainer.get_leaderboard(
+            leaderboard = self.internal_trainer.get_leaderboard(
                 test_data_only=False,
                 cross_validation=self.cross_validation,
                 verbose=False,
                 dump_trainer=False,
             )
             self.metrics.append(leaderboard.loc[0, self.metric])
-            importance, names = self.trainer.cal_feature_importance(
+            importance, names = self.internal_trainer.cal_feature_importance(
                 modelbase=self.modelbase, method=self.impor_method
             )
             impor_dict = {"feature": [], "attr": []}
@@ -1621,7 +1621,7 @@ class RFE(TorchModel):
 
         select_idx = self.metrics.index(np.min(self.metrics))
         self.selected_features = self.features_eliminated[select_idx:]
-        self.trainer.set_feature_names(self.selected_features)
+        self.internal_trainer.set_feature_names(self.selected_features)
         if verbose:
             print(f"Selected features: {self.selected_features}")
             print(f"Eliminated features: {self.features_eliminated[:select_idx]}")
