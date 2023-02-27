@@ -1586,15 +1586,10 @@ class RFE(TorchModel):
             self.modelbase._train(warm_start=warm_start, verbose=verbose, **kwargs)
 
     def run(self, verbose=True):
-        rest_features = list(
-            np.setdiff1d(
-                self.trainer.all_feature_names, self.trainer.derived_stacked_features
-            )
-        )
+        rest_features = cp(self.trainer.all_feature_names)
         while len(rest_features) > self.min_features:
             if verbose:
                 print(f"Using features: {rest_features}")
-            self.trainer.set_data_derivers(config=[])
             self.trainer.set_feature_names(rest_features)
             if self.cross_validation == 0:
                 self.modelbase._train(verbose=False, dump_trainer=False)
@@ -1626,10 +1621,10 @@ class RFE(TorchModel):
 
         select_idx = self.metrics.index(np.min(self.metrics))
         self.selected_features = self.features_eliminated[select_idx:]
-        self.trainer.set_data_derivers(config=self.trainer.args["data_derivers"])
         self.trainer.set_feature_names(self.selected_features)
         if verbose:
             print(f"Selected features: {self.selected_features}")
+            print(f"Eliminated features: {self.features_eliminated[:select_idx]}")
 
 
 class ModelAssembly(AbstractModel):

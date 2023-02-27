@@ -447,6 +447,9 @@ class Trainer:
     def set_feature_names(self, all_feature_names):
         cont_feature_names = self.extract_cont_feature_names(all_feature_names)
         cat_feature_names = self.extract_cat_feature_names(all_feature_names)
+        derived_stacked_features = self.extract_derived_stacked_feature_names(
+            all_feature_names
+        )
         self.set_data(
             self.df,
             cont_feature_names,
@@ -457,6 +460,14 @@ class Trainer:
             val_indices=self.val_indices,
             test_indices=self.test_indices,
         )
+        self.cont_feature_names = [
+            x
+            for x in self.cont_feature_names
+            if not (
+                x in self.derived_stacked_features and x not in derived_stacked_features
+            )
+        ]
+        self._update_dataset_auto()
 
     def sort_derived_data(self, derived_data):
         if derived_data is None:
