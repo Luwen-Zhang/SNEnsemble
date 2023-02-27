@@ -419,7 +419,8 @@ class Trainer:
         return [
             x
             for x in all_feature_names
-            if x not in self.args["categorical_feature_names"]
+            if x in self.args["feature_names_type"].keys()
+            and x not in self.args["categorical_feature_names"]
         ]
 
     def extract_cat_feature_names(self, all_feature_names):
