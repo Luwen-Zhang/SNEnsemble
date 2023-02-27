@@ -270,6 +270,10 @@ class Trainer:
     def all_feature_names(self):
         return self.cont_feature_names + self.cat_feature_names
 
+    @property
+    def derived_stacked_features(self):
+        return self.extract_derived_stacked_feature_names(self.all_feature_names)
+
     def set_data(
         self,
         df,
@@ -311,12 +315,12 @@ class Trainer:
             self.val_indices = val_indices
             self.test_indices = test_indices
 
-        self.cont_imputed_mask = pd.DataFrame(
+        self._cont_imputed_mask = pd.DataFrame(
             columns=self.cont_feature_names,
             data=np.isnan(self.unscaled_feature_data.values).astype(int),
             index=np.arange(len(self.df)),
         )
-        self.cat_imputed_mask = pd.DataFrame(
+        self._cat_imputed_mask = pd.DataFrame(
             columns=self.cat_feature_names,
             data=pd.isna(self.df[self.cat_feature_names]).values.astype(int),
             index=np.arange(len(self.df)),
@@ -337,12 +341,9 @@ class Trainer:
             self.cont_feature_names,
         ) = self.derive_stacked(self.df)
         # There may exist nan in stacked features.
-        self.derived_stacked_features = np.setdiff1d(
-            self.cont_feature_names, self.cont_imputed_mask.columns
-        )
-        self.cont_imputed_mask = pd.concat(
+        self._cont_imputed_mask = pd.concat(
             [
-                self.cont_imputed_mask,
+                self._cont_imputed_mask,
                 pd.DataFrame(
                     columns=self.derived_stacked_features,
                     data=np.isnan(self.df[self.derived_stacked_features].values).astype(
@@ -360,13 +361,13 @@ class Trainer:
             verbose=verbose,
         )
 
-        self.cont_imputed_mask = (
-            self.cont_imputed_mask.loc[self.retained_indices, self.cont_feature_names]
+        self._cont_imputed_mask = (
+            self._cont_imputed_mask.loc[self.retained_indices, self.cont_feature_names]
             .copy()
             .reset_index(drop=True)
         )
-        self.cat_imputed_mask = (
-            self.cat_imputed_mask.loc[self.retained_indices, self.cat_feature_names]
+        self._cat_imputed_mask = (
+            self._cat_imputed_mask.loc[self.retained_indices, self.cat_feature_names]
             .copy()
             .reset_index(drop=True)
         )
@@ -406,6 +407,14 @@ class Trainer:
             else None
         )
 
+    @property
+    def cont_imputed_mask(self):
+        return self._cont_imputed_mask[self.cont_feature_names]
+
+    @property
+    def cat_imputed_mask(self):
+        return self._cat_imputed_mask[self.cat_feature_names]
+
     def extract_cont_feature_names(self, all_feature_names):
         return [
             x
@@ -419,6 +428,18 @@ class Trainer:
             for x in np.intersect1d(
                 list(all_feature_names),
                 self.args["categorical_feature_names"],
+            )
+        ]
+
+    def extract_derived_stacked_feature_names(self, all_feature_names):
+        return [
+            str(x)
+            for x in np.setdiff1d(
+                all_feature_names,
+                np.append(
+                    self.extract_cont_feature_names(all_feature_names),
+                    self.extract_cat_feature_names(all_feature_names),
+                ),
             )
         ]
 
