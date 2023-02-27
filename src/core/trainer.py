@@ -458,7 +458,18 @@ class Trainer:
         else:
             return X.copy()
         X_copy = X.copy()
-        X_copy.loc[:, cat_features] = encoder.inverse_transform(X[cat_features].copy())
+        try:
+            X_copy.loc[:, cat_features] = encoder.inverse_transform(
+                X[cat_features].copy()
+            )
+        except:
+            try:
+                encoder.transform(X[cat_features].copy())
+                return X_copy
+            except:
+                raise Exception(
+                    f"Categorical features are not compatible with the fitted OrdinalEncoder."
+                )
         return X_copy
 
     def save_data(self, path: str = None):
@@ -1207,14 +1218,16 @@ class Trainer:
             tmp_cont_df.values[
                 np.where(self.cont_imputed_mask[self.cont_feature_names].values)
             ] = np.nan
-        tmp_cat_df = self.df.copy().loc[:, self.cat_feature_names]
+        tmp_cat_df = self.categories_inverse_transform(self.df).loc[
+            :, self.cat_feature_names
+        ]
         if np.sum(np.abs(self.cat_imputed_mask.values)) != 0:
             tmp_cat_df.values[
                 np.where(self.cat_imputed_mask[self.cat_feature_names].values)
             ] = np.nan
         not_imputed_df = self.df.copy()
         not_imputed_df.loc[:, self.all_feature_names] = pd.concat(
-            [tmp_cont_df, tmp_cat_df, self.df[self.label_name]], axis=1
+            [tmp_cont_df, tmp_cat_df], axis=1
         )
         return not_imputed_df
 
