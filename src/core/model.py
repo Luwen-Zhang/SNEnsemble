@@ -1547,6 +1547,8 @@ class RFE(TorchModel):
 
         self.trainer = cp(trainer)
         self.torch_model = torch_model
+        super(RFE, self).__init__(trainer=self.trainer, program=program)
+        self.trainer.project_root = self.root
         self.modelbase = self.torch_model(self.trainer)
         self.trainer.modelbases = []
         self.trainer.modelbases_names = []
@@ -1555,16 +1557,21 @@ class RFE(TorchModel):
         self.features_eliminated = []
         self.selected_features = []
         self.impor_dicts = []
-        super(RFE, self).__init__(trainer=self.trainer, program=program)
 
     def _get_program_name(self):
-        return "RFE-" + self.modelbase._get_program_name()
+        return "RFE-" + self.torch_model.__name__
 
     def _get_model_names(self):
         return self.modelbase._get_model_names()
 
     def _new_model(self):
         return self.modelbase._new_model()
+
+    def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
+        return self.modelbase._predict(df, model_name, derived_data, **kwargs)
+
+    def _predict_all(self, **kwargs):
+        return self.modelbase._predict_all(**kwargs)
 
     def _train(
         self,
