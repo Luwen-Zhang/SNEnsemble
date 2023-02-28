@@ -2,7 +2,10 @@ import numpy as np
 import pandas as pd
 import torch.optim
 from typing import Type
-from .trainer import *
+from src.trainer.trainer import Trainer, save_trainer
+from skopt.space import Real, Integer, Categorical
+import torch.utils.data as Data
+from src.utils.utils import *
 import skopt
 from skopt import gp_minimize
 
@@ -1327,7 +1330,7 @@ class ThisWork(TorchModel):
         super(ThisWork, self).__init__(trainer, program=program)
         self.activated_sn = None
         self.manual_activate = manual_activate
-        from src.core.sn_formulas import sn_mapping
+        from src.model.sn_formulas import sn_mapping
 
         if self.manual_activate is not None:
             for sn in self.manual_activate:
@@ -1338,7 +1341,7 @@ class ThisWork(TorchModel):
         return "ThisWork"
 
     def _new_model(self):
-        from src.core.sn_formulas import sn_mapping
+        from src.model.sn_formulas import sn_mapping
 
         if self.activated_sn is None:
             self.activated_sn = []
@@ -1373,7 +1376,7 @@ class ThisWorkRidge(ThisWork):
         return "ThisWorkRidge"
 
     def _new_model(self):
-        from src.core.sn_formulas import sn_mapping
+        from src.model.sn_formulas import sn_mapping
 
         if self.activated_sn is None:
             self.activated_sn = []

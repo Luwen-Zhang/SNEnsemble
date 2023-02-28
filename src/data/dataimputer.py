@@ -1,5 +1,5 @@
 import sklearn.exceptions
-from src.core.trainer import Trainer
+from src.trainer.trainer import Trainer
 import pandas as pd
 from copy import deepcopy as cp
 import numpy as np

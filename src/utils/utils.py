@@ -14,9 +14,10 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker
 import seaborn as sns
 import matplotlib
-from src.core.nn_models import *
+from src.model.nn_models import *
 import logging
 import random
+from copy import deepcopy as cp
 
 clr = sns.color_palette("deep")
 

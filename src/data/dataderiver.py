@@ -1,6 +1,6 @@
 import numpy as np
 import sys, inspect
-from ..utils.utils import *
+from src.utils.utils import *
 from copy import deepcopy as cp
 
 
@@ -248,7 +248,7 @@ class DriveCoeffDeriver(AbstractDeriver):
             all_training=True,
         )
 
-        from src.core.model import MLP
+        from src.model.model import MLP
 
         mlp = MLP(mlp_trainer)
         mlp_trainer.modelbases = []

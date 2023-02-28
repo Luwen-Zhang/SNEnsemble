@@ -1,5 +1,4 @@
 .idea/
-src/data/
 src/logs/
 venv/
 pyvenv.cfg

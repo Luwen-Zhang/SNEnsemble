@@ -1,5 +1,5 @@
 import sys, inspect
-from src.core.trainer import Trainer
+from src.trainer.trainer import Trainer
 import torch.nn as nn
 import torch
 import numpy as np
@@ -36,7 +36,7 @@ class AbstractSN(nn.Module):
                 if "Stress" not in name
             ]
         )
-        from src.core.nn_models import get_sequential
+        from src.model.nn_models import get_sequential
 
         self.template_sequential = get_sequential(
             n_inputs=len(self.stress_unrelated_features_idx),

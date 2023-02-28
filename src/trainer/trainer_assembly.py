@@ -1,5 +1,6 @@
-from src.core.trainer import *
-from ..utils.utils import *
+from src.trainer.trainer import Trainer, load_trainer
+from src.utils.utils import *
+import time
 import os
 
 

@@ -4,7 +4,7 @@ and comparing baseline models.
 """
 from typing import *
 import os.path
-from ..utils.utils import *
+from src.utils.utils import *
 import torch
 from torch import nn
 from torch.utils.data import Subset
@@ -204,17 +204,17 @@ class Trainer:
             print(f"Project will be saved to {self.project_root}")
 
     def set_data_splitter(self, name, verbose=True):
-        from src.core.datasplitter import get_data_splitter
+        from src.data.datasplitter import get_data_splitter
 
         self.datasplitter = get_data_splitter(name)()
 
     def set_data_imputer(self, name, verbose=True):
-        from src.core.dataimputer import get_data_imputer
+        from src.data.dataimputer import get_data_imputer
 
         self.dataimputer = get_data_imputer(name)()
 
     def set_data_processors(self, config: List[Tuple], verbose=True):
-        from src.core.dataprocessor import get_data_processor
+        from src.data.dataprocessor import get_data_processor
 
         if "UnscaledDataRecorder" not in [name for name, _ in config]:
             if verbose:
@@ -227,7 +227,7 @@ class Trainer:
         ]
 
     def set_data_derivers(self, config: List[Tuple], verbose=True):
-        from src.core.dataderiver import get_data_deriver
+        from src.data.dataderiver import get_data_deriver
 
         self.dataderivers = [
             (get_data_deriver(name)(), kwargs) for name, kwargs in config
@@ -479,7 +479,7 @@ class Trainer:
             return tmp_derived_data
 
     def categories_inverse_transform(self, X: pd.DataFrame):
-        from src.core.dataprocessor import CategoricalOrdinalEncoder
+        from src.data.dataprocessor import CategoricalOrdinalEncoder
 
         for processor, _ in self.dataprocessors:
             if type(processor) == CategoricalOrdinalEncoder:
@@ -969,7 +969,7 @@ class Trainer:
             plt.close()
 
     def cal_feature_importance(self, modelbase, method="permutation"):
-        from src.core.model import TorchModel
+        from src.model.model import TorchModel
 
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
@@ -1032,7 +1032,7 @@ class Trainer:
         return attr, importance_names
 
     def cal_shap(self, modelbase, explainer="deep"):
-        from src.core.model import TorchModel
+        from src.model.model import TorchModel
         import shap
 
         if not issubclass(type(modelbase), TorchModel):
@@ -1138,7 +1138,7 @@ class Trainer:
         :param upper_lim: Upper limit of y-axis when plotting.
         :return: None
         """
-        from src.core.model import TorchModel
+        from src.model.model import TorchModel
 
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
@@ -1211,7 +1211,7 @@ class Trainer:
         :param thres: Points with loss higher than thres will be marked.
         :return: None
         """
-        from src.core.model import TorchModel
+        from src.model.model import TorchModel
 
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
@@ -1900,7 +1900,7 @@ class Trainer:
     ):
         # Cook, Thomas R., et al. Explaining Machine Learning by Bootstrapping Partial Dependence Functions and Shapley
         # Values. No. RWP 21-12. 2021.
-        from src.core.model import TorchModel
+        from src.model.model import TorchModel
 
         derived_data = self.sort_derived_data(derived_data)
         if not issubclass(type(model), TorchModel):
