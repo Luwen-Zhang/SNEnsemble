@@ -112,7 +112,9 @@ def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
 
 
 def plot_pdp(
-    cont_feature_names,
+    feature_names,
+    cat_feature_names,
+    cat_feature_mapping,
     x_values_list,
     mean_pdp_list,
     ci_left_list,
@@ -123,39 +125,65 @@ def plot_pdp(
     upper_lim=7,
 ):
     max_col = 4
-    if len(cont_feature_names) > max_col:
+    if len(feature_names) > max_col:
         width = max_col
-        if len(cont_feature_names) % max_col == 0:
-            height = len(cont_feature_names) // max_col
+        if len(feature_names) % max_col == 0:
+            height = len(feature_names) // max_col
         else:
-            height = len(cont_feature_names) // max_col + 1
+            height = len(feature_names) // max_col + 1
         figsize = (14, 3 * height)
     else:
-        figsize = (3 * len(cont_feature_names), 2.5)
-        width = len(cont_feature_names)
+        figsize = (3 * len(feature_names), 2.5)
+        width = len(feature_names)
         height = 1
     # print(figsize, width, height)
 
     fig = plt.figure(figsize=figsize)
 
-    for idx, focus_feature in enumerate(cont_feature_names):
+    def transform(value):
+        if log_trans:
+            return 10**value
+        else:
+            return value
+
+    for idx, focus_feature in enumerate(feature_names):
         ax = plt.subplot(height, width, idx + 1)
         # ax.plot(x_values_list[idx], mean_pdp_list[idx], color = clr_map[focus_feature], linewidth = 0.5)
-        ax.plot(
-            x_values_list[idx],
-            10 ** mean_pdp_list[idx] if log_trans else mean_pdp_list[idx],
-            color="k",
-            linewidth=0.7,
-        )
+        if focus_feature not in cat_feature_names:
+            ax.plot(
+                x_values_list[idx],
+                transform(mean_pdp_list[idx]),
+                color="k",
+                linewidth=0.7,
+            )
 
-        ax.fill_between(
-            x_values_list[idx],
-            10 ** ci_left_list[idx] if log_trans else ci_left_list,
-            10 ** ci_right_list[idx] if log_trans else ci_right_list,
-            alpha=0.4,
-            color="k",
-            edgecolor=None,
-        )
+            ax.fill_between(
+                x_values_list[idx],
+                transform(ci_left_list[idx]),
+                transform(ci_right_list[idx]),
+                alpha=0.4,
+                color="k",
+                edgecolor=None,
+            )
+        else:
+            yerr = (
+                np.vstack([transform(ci_left_list[idx]), transform(ci_right_list[idx])])
+                - transform(mean_pdp_list[idx])
+                if not np.isnan(ci_left_list[idx]).any()
+                else None
+            )
+            ax.bar(
+                x_values_list[idx],
+                transform(mean_pdp_list[idx]),
+                yerr=yerr,
+                capsize=5,
+                color=[0.5, 0.5, 0.5],
+                edgecolor=None,
+                error_kw={"elinewidth": 0.2, "capthick": 0.2},
+                tick_label=[
+                    cat_feature_mapping[focus_feature][x] for x in x_values_list[idx]
+                ],
+            )
 
         ax.set_title(focus_feature, {"fontsize": 12})
         # ax.set_xlim([0, 1])
@@ -171,20 +199,21 @@ def plot_pdp(
             ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
 
         if np.min(x_values_list[idx]) < np.max(x_values_list[idx]):
-            ax2 = ax.twinx()
+            if focus_feature not in cat_feature_names:
+                ax2 = ax.twinx()
 
-            ax2.hist(
-                hist_data[focus_feature],
-                bins=x_values_list[idx],
-                density=True,
-                color="k",
-                alpha=0.2,
-                rwidth=0.8,
-            )
-            # sns.rugplot(data=chosen_data, height=0.05, ax=ax2, color='k')
-            # ax2.set_ylim([0,1])
-            ax2.set_xlim([np.min(x_values_list[idx]), np.max(x_values_list[idx])])
-            ax2.set_yticks([])
+                ax2.hist(
+                    hist_data[focus_feature],
+                    bins=x_values_list[idx],
+                    density=True,
+                    color="k",
+                    alpha=0.2,
+                    rwidth=0.8,
+                )
+                # sns.rugplot(data=chosen_data, height=0.05, ax=ax2, color='k')
+                # ax2.set_ylim([0,1])
+                ax2.set_xlim([np.min(x_values_list[idx]), np.max(x_values_list[idx])])
+                ax2.set_yticks([])
         else:
             ax2 = ax.twinx()
             ax2.text(0.5, 0.5, "Invalid interval", ha="center", va="center")
@@ -208,18 +237,18 @@ def plot_pdp(
 
 
 def plot_partial_err(feature_data, truth, pred, thres=0.8):
-    cont_feature_names = list(feature_data.columns)
+    feature_names = list(feature_data.columns)
     max_col = 4
-    if len(cont_feature_names) > max_col:
+    if len(feature_names) > max_col:
         width = max_col
-        if len(cont_feature_names) % max_col == 0:
-            height = len(cont_feature_names) // max_col
+        if len(feature_names) % max_col == 0:
+            height = len(feature_names) // max_col
         else:
-            height = len(cont_feature_names) // max_col + 1
+            height = len(feature_names) // max_col + 1
         figsize = (14, 3 * height)
     else:
-        figsize = (3 * len(cont_feature_names), 2.5)
-        width = len(cont_feature_names)
+        figsize = (3 * len(feature_names), 2.5)
+        width = len(feature_names)
         height = 1
     # print(figsize, width, height)
 
@@ -230,7 +259,7 @@ def plot_partial_err(feature_data, truth, pred, thres=0.8):
     high_err = err[np.where(err > thres)[0]]
     low_err_data = feature_data.loc[np.where(err <= thres)[0], :]
     low_err = err[np.where(err <= thres)[0]]
-    for idx, focus_feature in enumerate(cont_feature_names):
+    for idx, focus_feature in enumerate(feature_names):
         ax = plt.subplot(height, width, idx + 1)
         # ax.plot(x_values_list[idx], mean_pdp_list[idx], color = clr_map[focus_feature], linewidth = 0.5)
         ax.scatter(

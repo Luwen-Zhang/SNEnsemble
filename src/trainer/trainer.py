@@ -1149,6 +1149,7 @@ class Trainer:
             ci_left_list,
             ci_right_list,
         ) = self.cal_partial_dependence(
+            feature_subset=self.all_feature_names,
             model=modelbase,
             model_name=model_name,
             df=self.df.loc[self.train_indices, :],
@@ -1166,7 +1167,9 @@ class Trainer:
         )
 
         fig = plot_pdp(
-            self.cont_feature_names,
+            self.all_feature_names,
+            self.cat_feature_names,
+            self.cat_feature_mapping,
             x_values_list,
             mean_pdp_list,
             ci_left_list,
@@ -1905,15 +1908,18 @@ class Trainer:
         derived_data = self.sort_derived_data(derived_data)
         if not issubclass(type(model), TorchModel):
             raise Exception(f"Model {type(model)} is not a TorchModel.")
-        x_value = np.linspace(
-            np.nanpercentile(df[focus_feature].values, (100 - percentile) / 2)
-            if x_min is None
-            else x_min,
-            np.nanpercentile(df[focus_feature].values, 100 - (100 - percentile) / 2)
-            if x_max is None
-            else x_max,
-            grid_size,
-        )
+        if focus_feature in self.cont_feature_names:
+            x_value = np.linspace(
+                np.nanpercentile(df[focus_feature].values, (100 - percentile) / 2)
+                if x_min is None
+                else x_min,
+                np.nanpercentile(df[focus_feature].values, 100 - (100 - percentile) / 2)
+                if x_max is None
+                else x_max,
+                grid_size,
+            )
+        elif focus_feature in self.cat_feature_names:
+            x_value = np.unique(df[focus_feature].values)
         df = df.reset_index(drop=True)
         expected_value_bootstrap_replications = []
         for i_bootstrap in range(n_bootstrap):
