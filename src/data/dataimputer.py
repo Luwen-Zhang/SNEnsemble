@@ -16,7 +16,7 @@ class AbstractImputer:
         self.record_cont_features = cp(trainer.cont_feature_names)
         self.record_cat_features = cp(trainer.cat_feature_names)
         data.loc[:, self.record_cat_features] = data[self.record_cat_features].fillna(
-            "Unknown"
+            "UNK"
         )
         return self._fit_transform(data, trainer, **kwargs)
 
@@ -25,7 +25,7 @@ class AbstractImputer:
         trainer.cont_feature_names = cp(self.record_cont_features)
         trainer.cat_feature_names = cp(self.record_cat_features)
         data.loc[:, self.record_cat_features] = data[self.record_cat_features].fillna(
-            "Unknown"
+            "UNK"
         )
         return self._transform(data, trainer, **kwargs)
 

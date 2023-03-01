@@ -13,7 +13,7 @@ class config(BaseConfig):
         if do_super:
             super(config, self).__init__()
         cfg = {
-            "database": "composite_database_02232023",
+            "database": "composite_database_03012023",
             "feature_names_type": {
                 "Resin Type": 2,
                 "Fibre Volume Fraction": 1,
