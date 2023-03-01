@@ -10,6 +10,9 @@ warnings.simplefilter(action="ignore", category=DeprecationWarning)
 
 import numpy as np
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import seaborn as sns
