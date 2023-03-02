@@ -18,7 +18,7 @@ class AbstractModel:
         self.model = None
         self.leaderboard = None
         self.program = self._get_program_name() if program is None else program
-        self.params = None
+        self.model_params = {}
         self._mkdir()
 
     def fit(
@@ -103,19 +103,44 @@ class AbstractModel:
             df, model_name, self.trainer.sort_derived_data(derived_data), **kwargs
         )
 
+    def _base_train_data_preprocess(self):
+        label_name = self.trainer.label_name
+        df = self.trainer.df
+        train_indices = self.trainer.train_indices
+        val_indices = self.trainer.val_indices
+        test_indices = self.trainer.test_indices
+        X_train = df.loc[train_indices, :].copy()
+        X_val = df.loc[val_indices, :].copy()
+        X_test = df.loc[test_indices, :].copy()
+        y_train = df.loc[train_indices, label_name].values
+        y_val = df.loc[val_indices, label_name].values
+        y_test = df.loc[test_indices, label_name].values
+        D_train = self.trainer.get_derived_data_slice(
+            derived_data=self.trainer.derived_data, indices=self.trainer.train_indices
+        )
+        D_val = self.trainer.get_derived_data_slice(
+            derived_data=self.trainer.derived_data, indices=self.trainer.val_indices
+        )
+        D_test = self.trainer.get_derived_data_slice(
+            derived_data=self.trainer.derived_data, indices=self.trainer.test_indices
+        )
+        return X_train, D_train, y_train, X_val, D_val, y_val, X_test, D_test, y_test
+
     def _predict_all(self, verbose=True, test_data_only=False):
         self._check_train_status()
 
         model_names = self._get_model_names()
         (
-            tabular_dataset,
-            cont_feature_names,
-            cat_feature_names,
-            label_name,
-        ) = self.trainer.get_tabular_dataset()
-        train_data = tabular_dataset.loc[self.trainer.train_indices, :].copy()
-        val_data = tabular_dataset.loc[self.trainer.val_indices, :].copy()
-        test_data = tabular_dataset.loc[self.trainer.test_indices, :].copy()
+            X_train,
+            D_train,
+            y_train,
+            X_val,
+            D_val,
+            y_val,
+            X_test,
+            D_test,
+            y_test,
+        ) = self._base_train_data_preprocess()
 
         predictions = {}
         disable_tqdm()
@@ -124,22 +149,20 @@ class AbstractModel:
                 print(model_name, f"{idx + 1}/{len(model_names)}")
             if not test_data_only:
                 y_train_pred = self._predict(
-                    train_data, model_name=model_name, as_pandas=False
+                    X_train,
+                    derived_data=D_train,
+                    model_name=model_name,
                 )
-                y_train = train_data[self.trainer.label_name[0]].values
-
                 y_val_pred = self._predict(
-                    val_data, model_name=model_name, as_pandas=False
+                    X_val, derived_data=D_val, model_name=model_name
                 )
-                y_val = val_data[self.trainer.label_name[0]].values
             else:
                 y_train_pred = y_train = None
                 y_val_pred = y_val = None
 
             y_test_pred = self._predict(
-                test_data, model_name=model_name, as_pandas=False
+                X_test, derived_data=D_test, model_name=model_name
             )
-            y_test = test_data[self.trainer.label_name[0]].values
 
             predictions[model_name] = {
                 "Training": (y_train_pred, y_train),
@@ -151,16 +174,113 @@ class AbstractModel:
         return predictions
 
     def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
-        raise NotImplementedError
+        X_df, derived_data = self._data_preprocess(
+            df, derived_data, model_name=model_name
+        )
+        return self._pred_single_model(
+            self.model[model_name],
+            X_test=X_df,
+            D_test=derived_data,
+            derived_data=derived_data,
+            verbose=False,
+        )
 
     def _train(self, dump_trainer=True, verbose=True, warm_start=False, **kwargs):
-        raise NotImplementedError
+        # disable_tqdm()
+        data = self._base_train_data_preprocess()
+        (
+            X_train,
+            D_train,
+            y_train,
+            X_val,
+            D_val,
+            y_val,
+            X_test,
+            D_test,
+            y_test,
+        ) = self._train_data_preprocess(*data)
+        self.total_epoch = self.trainer.args["epoch"]
+        self.model = {}
 
-    def _get_model_names(self):
-        raise NotImplementedError
+        for model_name in self._get_model_names():
+            if verbose:
+                print(f"Training {model_name}")
+            tmp_params = self._get_params(model_name, verbose=verbose)
 
-    def _get_program_name(self):
-        raise NotImplementedError
+            if self.trainer.bayes_opt and not warm_start:
+                callback = BayesCallback(
+                    tqdm(total=self.trainer.n_calls, disable=not verbose)
+                )
+                global _bayes_objective
+
+                @skopt.utils.use_named_args(self._space(model_name=model_name))
+                def _bayes_objective(**params):
+                    with HiddenPrints(disable_logging=True):
+                        model = self._new_model(
+                            model_name=model_name, verbose=False, **params
+                        )
+
+                        self._train_single_model(
+                            model,
+                            epoch=self.trainer.args["bayes_epoch"],
+                            X_train=X_train,
+                            D_train=D_train,
+                            y_train=y_train,
+                            X_val=X_val,
+                            D_val=D_val,
+                            y_val=y_val,
+                            verbose=False,
+                            warm_start=False,
+                            **params,
+                        )
+
+                    pred = self._pred_single_model(model, X_val, D_val, verbose=False)
+                    res = Trainer._metric_sklearn(pred, y_val, self.trainer.loss)
+                    return res
+
+                with warnings.catch_warnings():
+                    # To obtain clean progress bar.
+                    warnings.simplefilter("ignore")
+                    result = gp_minimize(
+                        _bayes_objective,
+                        self._space(model_name=model_name),
+                        n_calls=self.trainer.n_calls,
+                        callback=callback.call,
+                        random_state=0,
+                        x0=list(tmp_params.values()),
+                    )
+                params = {}
+                for key, value in zip(tmp_params.keys(), result.x):
+                    params[key] = value
+                self.model_params[model_name] = cp(params)
+                callback.close()
+                skopt.dump(result, self.trainer.project_root + "skopt.pt")
+                tmp_params = self._get_params(
+                    model_name=model_name, verbose=verbose
+                )  # to announce the optimized params.
+
+            if not warm_start or (warm_start and not self._trained):
+                self.model[model_name] = self._new_model(
+                    model_name=model_name, verbose=verbose, **tmp_params
+                )
+
+            self._train_single_model(
+                self.model[model_name],
+                epoch=self.total_epoch,
+                X_train=X_train,
+                D_train=D_train,
+                y_train=y_train,
+                X_val=X_val,
+                D_val=D_val,
+                y_val=y_val,
+                verbose=verbose,
+                warm_start=warm_start,
+                **tmp_params,
+            )
+
+        # enable_tqdm()
+        if dump_trainer:
+            save_trainer(self.trainer)
 
     def _check_train_status(self):
         if not self._trained:
@@ -168,16 +288,13 @@ class AbstractModel:
                 f"{self.program} not trained, run {self.__class__.__name__}.train() first."
             )
 
-    def _get_params(self, verbose=True):
-        if self.params is None:
-            return self._get_initial_params()
+    def _get_params(self, model_name, verbose=True):
+        if model_name not in self.model_params.keys():
+            return self._initial_values(model_name=model_name)
         else:
             if verbose:
-                print(f"Previous params loaded: {self.params}")
-            return self.params
-
-    def _get_initial_params(self):
-        return cp(self.trainer.chosen_params)
+                print(f"Previous params loaded: {self.model_params[model_name]}")
+            return self.model_params[model_name]
 
     @property
     def _trained(self):
@@ -190,6 +307,59 @@ class AbstractModel:
         self.root = self.trainer.project_root + self.program + "/"
         if not os.path.exists(self.root):
             os.mkdir(self.root)
+
+    def _get_model_names(self):
+        raise NotImplementedError
+
+    def _get_program_name(self):
+        raise NotImplementedError
+
+    # Following methods are for the default _train and _predict methods. If users directly overload _train and _predict,
+    # following methods are not required to be implemented.
+    def _new_model(self, model_name, verbose, **kwargs):
+        raise NotImplementedError
+
+    def _train_data_preprocess(
+        self,
+        X_train,
+        D_train,
+        y_train,
+        X_val,
+        D_val,
+        y_val,
+        X_test,
+        D_test,
+        y_test,
+    ):
+        raise NotImplementedError
+
+    def _data_preprocess(self, df, derived_data, model_name):
+        raise NotImplementedError
+
+    def _train_single_model(
+        self,
+        model,
+        epoch,
+        X_train,
+        D_train,
+        y_train,
+        X_val,
+        D_val,
+        y_val,
+        verbose,
+        warm_start,
+        **kwargs,
+    ):
+        raise NotImplementedError
+
+    def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+        raise NotImplementedError
+
+    def _space(self, model_name):
+        raise NotImplementedError
+
+    def _initial_values(self, model_name):
+        raise NotImplementedError
 
 
 class AutoGluon(AbstractModel):
@@ -282,31 +452,17 @@ class AutoGluon(AbstractModel):
 class WideDeep(AbstractModel):
     def __init__(self, trainer=None, program=None):
         super(WideDeep, self).__init__(trainer, program=program)
-        self.model_params = {}
 
     def _get_program_name(self):
         return "WideDeep"
 
-    def _get_model_params(self, model_name, verbose=True):
-        if model_name not in self.model_params.keys():
-            return self._get_initial_params()
-        else:
-            if verbose:
-                print(f"Previous params loaded: {self.model_params[model_name]}.")
-            return self.model_params[model_name]
+    def _space(self, model_name):
+        return self.trainer.SPACE
 
-    def _train(
-        self,
-        verbose: bool = False,
-        debug_mode: bool = False,
-        dump_trainer=True,
-        warm_start=False,
-        **kwargs,
-    ):
-        # disable_tqdm()
-        from pytorch_widedeep import Trainer as wd_Trainer
-        from pytorch_widedeep.preprocessing import TabPreprocessor
-        from pytorch_widedeep.callbacks import Callback, EarlyStopping
+    def _initial_values(self, model_name):
+        return self.trainer.chosen_params
+
+    def _new_model(self, model_name, verbose, **kwargs):
         from pytorch_widedeep.models import (
             WideDeep,
             TabMlp,
@@ -320,51 +476,45 @@ class WideDeep(AbstractModel):
             TabPerceiver,
             TabFastFormer,
         )
+        from pytorch_widedeep import Trainer as wd_Trainer
+        from pytorch_widedeep.callbacks import Callback, EarlyStopping
         from typing import Optional, Dict
 
-        (
-            tabular_dataset,
-            cont_feature_names,
-            cat_feature_names,
-            label_name,
-        ) = self.trainer.get_tabular_dataset()
-        tab_preprocessor = TabPreprocessor(
-            continuous_cols=cont_feature_names,
-            cat_embed_cols=cat_feature_names if len(cat_feature_names) != 0 else None,
-        )
-        X_tab_train = tab_preprocessor.fit_transform(
-            tabular_dataset.loc[self.trainer.train_indices, :]
-        )
-        y_train = tabular_dataset.loc[self.trainer.train_indices, label_name].values
-        X_tab_val = tab_preprocessor.transform(
-            tabular_dataset.loc[self.trainer.val_indices, :]
-        )
-        y_val = tabular_dataset.loc[self.trainer.val_indices, label_name].values
-        self.tab_preprocessor = tab_preprocessor
+        cont_feature_names = self.trainer.cont_feature_names
+        cat_feature_names = self.trainer.cat_feature_names
 
         args = dict(
-            column_idx=tab_preprocessor.column_idx,
+            column_idx=self.tab_preprocessor.column_idx,
             continuous_cols=cont_feature_names,
-            cat_embed_input=tab_preprocessor.cat_embed_input
+            cat_embed_input=self.tab_preprocessor.cat_embed_input
             if len(cat_feature_names) != 0
             else None,
         )
-        tab_models = {
-            "TabMlp": TabMlp(**args),
-            "TabResnet": TabResnet(**args),
-            "TabTransformer": TabTransformer(
-                embed_continuous=True if len(cat_feature_names) == 0 else False, **args
-            ),
-            "TabNet": TabNet(**args),
-            "SAINT": SAINT(**args),
-            "ContextAttentionMLP": ContextAttentionMLP(**args),
-            "SelfAttentionMLP": SelfAttentionMLP(**args),
-            "FTTransformer": FTTransformer(**args),
-            "TabPerceiver": TabPerceiver(**args),
-            "TabFastFormer": TabFastFormer(**args),
+
+        if model_name == "TabTransformer":
+            args["embed_continuous"] = True if len(cat_feature_names) == 0 else False
+
+        mapping = {
+            "TabMlp": TabMlp,
+            "TabResnet": TabResnet,
+            "TabTransformer": TabTransformer,
+            "TabNet": TabNet,
+            "SAINT": SAINT,
+            "ContextAttentionMLP": ContextAttentionMLP,
+            "SelfAttentionMLP": SelfAttentionMLP,
+            "FTTransformer": FTTransformer,
+            "TabPerceiver": TabPerceiver,
+            "TabFastFormer": TabFastFormer,
         }
 
-        total_epoch = self.trainer.static_params["epoch"]
+        tab_model = mapping[model_name](**args)
+        model = WideDeep(deeptabular=tab_model)
+
+        optimizer = torch.optim.Adam(
+            model.deeptabular.parameters(),
+            lr=kwargs["lr"],
+            weight_decay=kwargs["weight_decay"],
+        )
 
         global _WideDeepCallback
 
@@ -374,131 +524,105 @@ class WideDeep(AbstractModel):
                 self.val_ls = []
 
             def on_epoch_end(
-                self,
+                callback_self,
                 epoch: int,
                 logs: Optional[Dict] = None,
                 metric: Optional[float] = None,
             ):
                 train_loss = logs["train_loss"]
                 val_loss = logs["val_loss"]
-                self.val_ls.append(val_loss)
+                callback_self.val_ls.append(val_loss)
                 if epoch % 20 == 0 and verbose:
                     print(
-                        f"Epoch: {epoch + 1}/{total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
-                        f"Min val loss: {np.min(self.val_ls):.4f}"
+                        f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
+                        f"Min val loss: {np.min(callback_self.val_ls):.4f}"
                     )
 
-        self.model = {}
-        for name, tab_model in tab_models.items():
-            if verbose:
-                print(f"Training {name}")
-            self.params = self._get_model_params(name, verbose=verbose)
-            model = WideDeep(deeptabular=tab_model)
+        wd_trainer = wd_Trainer(
+            model,
+            objective="regression",
+            verbose=0,
+            callbacks=[
+                EarlyStopping(
+                    patience=self.trainer.static_params["patience"],
+                    verbose=1 if verbose else 0,
+                    restore_best_weights=True,
+                ),
+                _WideDeepCallback(),
+            ],
+            optimizers={"deeptabular": optimizer} if self.trainer.bayes_opt else None,
+            num_workers=16,
+            device=self.trainer.device,
+        )
+        return wd_trainer
 
-            optimizer = torch.optim.Adam(
-                model.deeptabular.parameters(),
-                lr=self.params["lr"],
-                weight_decay=self.params["weight_decay"],
-            )
+    def _train_data_preprocess(
+        self,
+        X_train,
+        D_train,
+        y_train,
+        X_val,
+        D_val,
+        y_val,
+        X_test,
+        D_test,
+        y_test,
+    ):
+        from pytorch_widedeep.preprocessing import TabPreprocessor
 
-            wd_trainer = wd_Trainer(
-                model,
-                objective="regression",
-                verbose=0,
-                callbacks=[
-                    EarlyStopping(
-                        patience=self.trainer.static_params["patience"],
-                        verbose=1 if verbose else 0,
-                        restore_best_weights=True,
-                    ),
-                    _WideDeepCallback(),
-                ],
-                optimizers={"deeptabular": optimizer}
-                if self.trainer.bayes_opt
-                else None,
-                num_workers=16,
-                device=self.trainer.device,
-            )
+        cont_feature_names = self.trainer.cont_feature_names
+        cat_feature_names = self.trainer.cat_feature_names
+        tab_preprocessor = TabPreprocessor(
+            continuous_cols=cont_feature_names,
+            cat_embed_cols=cat_feature_names if len(cat_feature_names) != 0 else None,
+        )
+        X_tab_train = tab_preprocessor.fit_transform(X_train)
+        X_tab_val = tab_preprocessor.transform(X_val)
+        X_tab_test = tab_preprocessor.transform(X_test)
+        self.tab_preprocessor = tab_preprocessor
+        return (
+            X_tab_train,
+            D_train,
+            y_train,
+            X_tab_val,
+            D_val,
+            y_val,
+            X_tab_test,
+            D_test,
+            y_test,
+        )
 
-            if self.trainer.bayes_opt:
-                callback = BayesCallback(
-                    tqdm(total=self.trainer.n_calls, disable=not verbose)
-                )
-                global _widedeep_bayes_objective
+    def _train_single_model(
+        self,
+        model,
+        epoch,
+        X_train,
+        D_train,
+        y_train,
+        X_val,
+        D_val,
+        y_val,
+        verbose,
+        warm_start,
+        **kwargs,
+    ):
+        model.fit(
+            X_train={"X_tab": X_train, "target": y_train},
+            X_val={"X_tab": X_val, "target": y_val},
+            n_epochs=epoch,
+            batch_size=int(kwargs["batch_size"]),
+        )
 
-                @skopt.utils.use_named_args(self.trainer.SPACE)
-                def _widedeep_bayes_objective(**params):
-                    with HiddenPrints(disable_logging=True):
-                        tmp_model = cp(model)
-                        tmp_wd_trainer = wd_Trainer(
-                            tmp_model,
-                            objective="regression",
-                            verbose=0,
-                            optimizers={
-                                "deeptabular": torch.optim.Adam(
-                                    tmp_model.deeptabular.parameters(),
-                                    lr=params["lr"],
-                                    weight_decay=params["weight_decay"],
-                                )
-                            },
-                            num_workers=16,
-                            device=self.trainer.device,
-                        )
+    def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+        return model.predict(X_tab=X_test)
 
-                    tmp_wd_trainer.fit(
-                        X_train={"X_tab": X_tab_train, "target": y_train},
-                        X_val={"X_tab": X_tab_val, "target": y_val},
-                        n_epochs=self.trainer.bayes_epoch,
-                        batch_size=int(params["batch_size"]),
-                    )
-
-                    pred = tmp_wd_trainer.predict(X_tab=X_tab_val)
-                    res = Trainer._metric_sklearn(pred, y_val, self.trainer.loss)
-                    return res
-
-                with warnings.catch_warnings():
-                    # To obtain clean progress bar.
-                    warnings.simplefilter("ignore")
-                    result = gp_minimize(
-                        _widedeep_bayes_objective,
-                        self.trainer.SPACE,
-                        n_calls=self.trainer.n_calls,
-                        callback=callback.call,
-                        random_state=0,
-                        x0=list(self.params.values()),
-                    )
-                params = {}
-                for key, value in zip(self.params.keys(), result.x):
-                    params[key] = value
-                    if key in optimizer.defaults.keys():
-                        optimizer.defaults[key] = value
-                self.params = params
-                self.model_params[name] = cp(params)
-                callback.close()
-                skopt.dump(result, self.trainer.project_root + "skopt.pt")
-                self.params = self._get_model_params(
-                    model_name=name, verbose=verbose
-                )  # to announce the optimized params.
-
-            wd_trainer.fit(
-                X_train={"X_tab": X_tab_train, "target": y_train},
-                X_val={"X_tab": X_tab_val, "target": y_val},
-                n_epochs=total_epoch,
-                batch_size=int(self.params["batch_size"]),
-            )
-            self.model[name] = wd_trainer
-
-        # enable_tqdm()
-        if dump_trainer:
-            save_trainer(self.trainer)
-
-    def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
+    def _data_preprocess(self, df, derived_data, model_name):
         # SettingWithCopyWarning in TabPreprocessor.transform
         # i.e. df_cont[self.standardize_cols] = self.scaler.transform(df_std.values)
         pd.set_option("mode.chained_assignment", "warn")
         X_df = self.tab_preprocessor.transform(df)
         pd.set_option("mode.chained_assignment", "raise")
-        return self.model[model_name].predict(X_tab=X_df)
+        return X_df, derived_data
 
     def _get_model_names(self):
         return [
@@ -873,54 +997,104 @@ class TabNet(AbstractModel):
                 print(f"Previous additional params loaded: {self.additional_params}.")
             return list(self.additional_params.values())
 
-    def _train(
-        self,
-        verbose: bool = False,
-        debug_mode: bool = False,
-        dump_trainer=True,
-        warm_start=False,
-        **kwargs,
-    ):
-        # Basic components in _train():
-        # 1. Prepare training, validation, and testing dataset.
-        train_indices = self.trainer.train_indices
-        val_indices = self.trainer.val_indices
-        test_indices = self.trainer.test_indices
+    def _get_model_names(self):
+        return ["TabNet"]
 
-        (
-            tabular_dataset,
-            cont_feature_names,
-            cat_feature_names,
-            label_name,
-        ) = self.trainer.get_tabular_dataset()
-        feature_data = tabular_dataset[cont_feature_names].copy()
-        label_data = tabular_dataset[label_name].copy()
-
-        train_x = feature_data.values[np.array(train_indices), :].astype(np.float32)
-        test_x = feature_data.values[np.array(test_indices), :].astype(np.float32)
-        val_x = feature_data.values[np.array(val_indices), :].astype(np.float32)
-        train_y = (
-            label_data.values[np.array(train_indices), :]
-            .reshape(-1, 1)
-            .astype(np.float32)
-        )
-        test_y = (
-            label_data.values[np.array(test_indices), :]
-            .reshape(-1, 1)
-            .astype(np.float32)
-        )
-        val_y = (
-            label_data.values[np.array(val_indices), :]
-            .reshape(-1, 1)
-            .astype(np.float32)
-        )
-
-        eval_set = [(val_x, val_y)]
-
+    def _new_model(self, model_name, verbose, **kwargs):
         from pytorch_tabnet.tab_model import TabNetRegressor
 
-        # 2. Setup a scikit-optimize search space and its initial values.
-        SPACE = [
+        def extract_params(keys, values):
+            params = {}
+            optim_params = {}
+            batch_size = 32
+            for key, value in zip(keys, values):
+                if key in [
+                    "n_d",
+                    "n_a",
+                    "n_steps",
+                    "gamma",
+                    "n_independent",
+                    "n_shared",
+                ]:
+                    params[key] = value
+                elif key == "batch_size":
+                    batch_size = int(value)
+                else:
+                    optim_params[key] = value
+            return params, optim_params, batch_size
+
+        params, optim_params, batch_size = extract_params(
+            kwargs.keys(), kwargs.values()
+        )
+
+        model = TabNetRegressor(
+            verbose=20 if verbose else 0, optimizer_params=optim_params
+        )
+
+        model.set_params(**params)
+        return model
+
+    def _train_data_preprocess(
+        self,
+        X_train,
+        D_train,
+        y_train,
+        X_val,
+        D_val,
+        y_val,
+        X_test,
+        D_test,
+        y_test,
+    ):
+        cont_feature_names = self.trainer.cont_feature_names
+
+        X_train = X_train[cont_feature_names].astype(np.float32)
+        X_val = X_val[cont_feature_names].astype(np.float32)
+        X_test = X_test[cont_feature_names].astype(np.float32)
+        y_train = y_train.astype(np.float32)
+        y_val = y_val.astype(np.float32)
+        y_test = y_test.astype(np.float32)
+
+        return X_train, D_train, y_train, X_val, D_val, y_val, X_test, D_test, y_test
+
+    def _data_preprocess(self, df, derived_data, model_name):
+        return (
+            df[self.trainer.cont_feature_names].values.astype(np.float32),
+            derived_data,
+        )
+
+    def _train_single_model(
+        self,
+        model,
+        epoch,
+        X_train,
+        D_train,
+        y_train,
+        X_val,
+        D_val,
+        y_val,
+        verbose,
+        warm_start,
+        **kwargs,
+    ):
+        eval_set = [(X_val, y_val)]
+
+        model.fit(
+            X_train,
+            y_train,
+            eval_set=eval_set,
+            max_epochs=epoch,
+            patience=self.trainer.bayes_epoch,
+            loss_fn=self.trainer.loss_fn,
+            eval_metric=[self.trainer.loss],
+            batch_size=int(kwargs["batch_size"]),
+        )
+
+    def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+        return model.predict(X_test).reshape(-1, 1)
+
+    def _space(self, model_name):
+        return [
             Integer(low=4, high=64, prior="uniform", name="n_d", dtype=int),  # 8
             Integer(low=4, high=64, prior="uniform", name="n_a", dtype=int),  # 8
             Integer(low=3, high=10, prior="uniform", name="n_steps", dtype=int),  # 3
@@ -930,318 +1104,24 @@ class TabNet(AbstractModel):
             ),  # 2
             Integer(low=1, high=5, prior="uniform", name="n_shared", dtype=int),  # 2
         ] + self.trainer.SPACE
-        param_names = [x.name for x in SPACE]
 
-        def extract_params(keys, values):
-            params = {}
-            optim_params = {}
-            batch_size = 32
-            for key, value in zip(keys, values):
-                if key in self.params.keys():
-                    if key != "batch_size":
-                        optim_params[key] = value
-                else:
-                    params[key] = value
-                if key == "batch_size":
-                    batch_size = int(value)
-            return params, optim_params, batch_size
-
-        # 3. Define a objective function that receives parameters, generates a new model, sets parameters, fits the
-        # model, predicts on validation dataset, and returns a scalar metric.
-        global _tabnet_bayes_objective
-
-        @skopt.utils.use_named_args(SPACE)
-        def _tabnet_bayes_objective(**params):
-            # 3.1 Receive parameters to be set.
-            params, optim_params, batch_size = extract_params(
-                params.keys(), params.values()
-            )
-
-            with HiddenPrints(disable_logging=True):
-                # 3.2 Generate a new model
-                model = TabNetRegressor(verbose=0, optimizer_params=optim_params)
-                # 3.3 Set parameters
-                model.set_params(**params)
-                # 3.4 Fits the model
-                model.fit(
-                    train_x,
-                    train_y,
-                    eval_set=eval_set,
-                    max_epochs=self.trainer.bayes_epoch,
-                    patience=self.trainer.bayes_epoch,
-                    loss_fn=self.trainer.loss_fn,
-                    eval_metric=[self.trainer.loss],
-                    batch_size=batch_size,
-                )
-                # 3.5 Predicts on the validation dataset.
-                res = self.trainer._metric_sklearn(
-                    model.predict(val_x).reshape(-1, 1), val_y, self.trainer.loss
-                )
-            # 3.6 Returns a scalar metric.
-            return res
-
-        # 4. If trainer.bayes_opt is True, run bayesian hyperparameter searching.
-        if not debugger_is_active() and self.trainer.bayes_opt:
-            # debugger_is_active() otherwise: AssertionError: can only test a child process
-            self.params = self._get_params(verbose=verbose)
-            defaults = self._get_additional_params(verbose=verbose) + list(
-                self.params.values()
-            )
-            callback = BayesCallback(
-                tqdm(total=self.trainer.n_calls, disable=not verbose)
-            )
-            result = gp_minimize(
-                _tabnet_bayes_objective,
-                SPACE,
-                x0=defaults,
-                n_calls=self.trainer.n_calls if not debug_mode else 11,
-                random_state=0,
-                callback=callback.call,
-            )
-            params, optim_params, batch_size = extract_params(param_names, result.x)
-            callback.close()
-            skopt.dump(result, self.trainer.project_root + "skopt.pt")
-
-            # Note: Set params for later usage, i.e. self._get_params().
-            for name, value in zip(param_names, result.x):
-                if name in self.params.keys():
-                    self.params[name] = value
-            self.additional_params = params
-        # Note: Set initial chosen_params if bayes has not been run, otherwise optimized params are loaded.
-        self.params = self._get_params(verbose=verbose)
-        defaults = self._get_additional_params(verbose=verbose) + list(
-            self.params.values()
-        )
-        params, optim_params, batch_size = extract_params(param_names, defaults)
-
-        # 5. Generate a new model, set parameters based on chosen_params or results from bayesopt, and train the model.
-        model = TabNetRegressor(
-            verbose=20 if verbose else 0, optimizer_params=optim_params
-        )
-        model.set_params(**params)
-        model.fit(
-            train_x,
-            train_y,
-            eval_set=eval_set,
-            max_epochs=self.trainer.static_params["epoch"],
-            patience=self.trainer.static_params["patience"],
-            loss_fn=self.trainer.loss_fn,
-            eval_metric=[self.trainer.loss],
-            batch_size=batch_size,
-        )
-
-        # Optional: Get some instant results.
-        y_test_pred = model.predict(test_x).reshape(-1, 1)
-        print(
-            "MSE Loss:",
-            self.trainer._metric_sklearn(y_test_pred, test_y, "mse"),
-            "RMSE Loss:",
-            self.trainer._metric_sklearn(y_test_pred, test_y, "rmse"),
-        )
-        # 6. Record the model
-        self.model = model
-        # Optional: Dump the trainer.
-        if dump_trainer:
-            save_trainer(self.trainer)
-
-    def _predict(self, df: pd.DataFrame, model_name=None, derived_data=None, **kwargs):
-        # Basic components in _predict():
-        # Return a ndarray with shape (len(df), 1) of predictions by the model_name.
-        return self.model.predict(
-            df[self.trainer.cont_feature_names].values.astype(np.float32)
-        ).reshape(-1, 1)
-
-    def _get_model_names(self):
-        return ["TabNet"]
+    def _initial_values(self, model_name):
+        return {
+            "n_d": 8,
+            "n_a": 8,
+            "n_steps": 3,
+            "gamma": 1.3,
+            "n_independent": 2,
+            "n_shared": 2,
+            "lr": self.trainer.chosen_params["lr"],
+            "weight_decay": self.trainer.chosen_params["weight_decay"],
+            "batch_size": self.trainer.chosen_params["batch_size"],
+        }
 
 
 class TorchModel(AbstractModel):
     def __init__(self, trainer=None, program=None):
         super(TorchModel, self).__init__(trainer, program=program)
-
-    def _new_model(self):
-        raise NotImplementedError
-
-    def _bayes(self, verbose=True):
-        """
-        Running Gaussian process bayesian optimization on hyperparameters. Configurations are given in the configfile.
-        chosen_params will be optimized.
-        """
-        if not self.trainer.bayes_opt:
-            return None
-
-        self.params = self._get_params(verbose=verbose)
-
-        # If def is not global, pickle will raise 'Can't get local attribute ...'
-        # IT IS NOT SAFE, BUT I DID NOT FIND A BETTER SOLUTION
-        global _trainer_bayes_objective, _trainerBayesCallback
-
-        callback = BayesCallback(tqdm(total=self.trainer.n_calls, disable=not verbose))
-
-        from copy import deepcopy as cp
-
-        tmp_static_params = cp(self.trainer.static_params)
-        # https://forums.fast.ai/t/hyperparameter-tuning-and-number-of-epochs/54935/2
-        tmp_static_params["epoch"] = self.trainer.bayes_epoch
-        tmp_static_params["patience"] = self.trainer.bayes_epoch
-
-        @skopt.utils.use_named_args(self.trainer.SPACE)
-        def _trainer_bayes_objective(**params):
-            res, _, _ = self._model_train(
-                model=self._new_model(),
-                verbose=False,
-                **{**params, **tmp_static_params},
-            )
-
-            return res
-
-        with warnings.catch_warnings():
-            # To obtain clean progress bar.
-            warnings.simplefilter("ignore")
-            result = gp_minimize(
-                _trainer_bayes_objective,
-                self.trainer.SPACE,
-                n_calls=self.trainer.n_calls,
-                random_state=0,
-                x0=list(self.params.values()),
-                callback=callback.call,
-            )
-        callback.close()
-        skopt.dump(result, self.trainer.project_root + "skopt.pt")
-
-        params = {}
-        for key, value in zip(self.params.keys(), result.x):
-            params[key] = value
-
-        self.params = params
-
-    def _predict_all(self, verbose=True, test_data_only=False):
-        self._check_train_status()
-
-        train_loader = Data.DataLoader(
-            self.trainer.train_dataset,
-            batch_size=len(self.trainer.train_dataset),
-            generator=torch.Generator().manual_seed(0),
-        )
-        val_loader = Data.DataLoader(
-            self.trainer.val_dataset,
-            batch_size=len(self.trainer.val_dataset),
-            generator=torch.Generator().manual_seed(0),
-        )
-        test_loader = Data.DataLoader(
-            self.trainer.test_dataset,
-            batch_size=len(self.trainer.test_dataset),
-            generator=torch.Generator().manual_seed(0),
-        )
-
-        if not test_data_only:
-            y_train_pred, y_train, _ = self._test_step(
-                self.model, train_loader, self.trainer.loss_fn
-            )
-            y_val_pred, y_val, _ = self._test_step(
-                self.model, val_loader, self.trainer.loss_fn
-            )
-        else:
-            y_train_pred = y_train = None
-            y_val_pred = y_val = None
-        y_test_pred, y_test, _ = self._test_step(
-            self.model, test_loader, self.trainer.loss_fn
-        )
-
-        predictions = {}
-        predictions[self._get_model_names()[0]] = {
-            "Training": (y_train_pred, y_train),
-            "Validation": (y_val_pred, y_val),
-            "Testing": (y_test_pred, y_test),
-        }
-
-        return predictions
-
-    def _predict(
-        self, input_df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
-    ):
-        df = self.trainer.data_transform(input_df)
-        X = torch.tensor(
-            df[self.trainer.cont_feature_names].values.astype(np.float32),
-            dtype=torch.float32,
-        ).to(self.trainer.device)
-        D = [
-            torch.tensor(value, dtype=torch.float32).to(self.trainer.device)
-            for value in derived_data.values()
-        ]
-        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(
-            self.trainer.device
-        )
-
-        loader = Data.DataLoader(
-            Data.TensorDataset(X, *D, y), batch_size=len(df), shuffle=False
-        )
-
-        pred, _, _ = self._test_step(self.model, loader, self.trainer.loss_fn)
-        return pred
-
-    def _model_train(
-        self,
-        model,
-        verbose=True,
-        verbose_per_epoch=20,
-        warm_start=False,
-        **params,
-    ):
-        train_loader = Data.DataLoader(
-            self.trainer.train_dataset,
-            batch_size=int(params["batch_size"]),
-            generator=torch.Generator().manual_seed(0),
-        )
-        val_loader = Data.DataLoader(
-            self.trainer.val_dataset,
-            batch_size=len(self.trainer.val_dataset),
-            generator=torch.Generator().manual_seed(0),
-        )
-
-        optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=params["lr"] / 10 if warm_start else params["lr"],
-            weight_decay=params["weight_decay"],
-        )
-
-        train_ls = []
-        val_ls = []
-        stop_epoch = params["epoch"]
-
-        early_stopping = EarlyStopping(
-            patience=params["patience"],
-            verbose=False,
-            path=self.trainer.project_root + "fatigue.pt",
-        )
-
-        for epoch in range(params["epoch"]):
-            train_loss = self._train_step(
-                model, train_loader, optimizer, self.trainer.loss_fn
-            )
-            train_ls.append(train_loss)
-            _, _, val_loss = self._test_step(model, val_loader, self.trainer.loss_fn)
-            val_ls.append(val_loss)
-
-            if verbose and ((epoch + 1) % verbose_per_epoch == 0 or epoch == 0):
-                print(
-                    f"Epoch: {epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min val loss: {np.min(val_ls):.4f}"
-                )
-
-            early_stopping(val_loss, model)
-
-            if early_stopping.early_stop:
-                if verbose:
-                    idx = val_ls.index(min(val_ls))
-                    print(
-                        f"Early stopping at epoch {epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}, Val loss: {val_ls[idx]:.4f}"
-                    )
-                break
-
-        idx = val_ls.index(min(val_ls))
-        min_loss = val_ls[idx]
-
-        return min_loss, train_ls, val_ls
 
     def _train_step(self, model, train_loader, optimizer, loss_fn):
         model.train()
@@ -1279,50 +1159,141 @@ class TorchModel(AbstractModel):
             avg_loss /= len(test_loader.dataset)
         return np.array(pred), np.array(truth), avg_loss
 
-    def _train(
+    def _train_data_preprocess(
         self,
-        verbose_per_epoch=20,
-        verbose: bool = True,
-        debug_mode: bool = False,
-        dump_trainer=True,
-        warm_start=False,
-        **kwargs,
+        X_train,
+        D_train,
+        y_train,
+        X_val,
+        D_val,
+        y_val,
+        X_test,
+        D_test,
+        y_test,
     ):
-        if not warm_start or (warm_start and not self._trained):
-            self.model = self._new_model()
-
-        self._bayes(verbose=verbose)
-
-        self.params = self._get_params(verbose=verbose)
-
-        min_loss, self.train_ls, self.val_ls = self._model_train(
-            model=self.model,
-            verbose=verbose,
-            verbose_per_epoch=verbose_per_epoch,
-            warm_start=warm_start,
-            **{**self.params, **self.trainer.static_params},
+        train_loader = Data.DataLoader(
+            self.trainer.train_dataset,
+            batch_size=len(self.trainer.train_dataset),
+            generator=torch.Generator().manual_seed(0),
         )
-
-        self.model.load_state_dict(torch.load(self.trainer.project_root + "fatigue.pt"))
-
-        if verbose:
-            print(f"Minimum loss: {min_loss:.5f}")
-
+        val_loader = Data.DataLoader(
+            self.trainer.val_dataset,
+            batch_size=len(self.trainer.val_dataset),
+            generator=torch.Generator().manual_seed(0),
+        )
         test_loader = Data.DataLoader(
             self.trainer.test_dataset,
             batch_size=len(self.trainer.test_dataset),
             generator=torch.Generator().manual_seed(0),
         )
+        return (
+            train_loader,
+            None,
+            y_train,
+            val_loader,
+            None,
+            y_val,
+            test_loader,
+            None,
+            y_test,
+        )
 
-        _, _, mse = self._test_step(self.model, test_loader, torch.nn.MSELoss())
-        rmse = np.sqrt(mse)
-        self.metrics = {"mse": mse, "rmse": rmse}
+    def _data_preprocess(self, df, derived_data, model_name):
+        df = self.trainer.data_transform(df)
+        X = torch.tensor(
+            df[self.trainer.cont_feature_names].values.astype(np.float32),
+            dtype=torch.float32,
+        ).to(self.trainer.device)
+        D = [
+            torch.tensor(value, dtype=torch.float32).to(self.trainer.device)
+            for value in derived_data.values()
+        ]
+        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(
+            self.trainer.device
+        )
+
+        loader = Data.DataLoader(
+            Data.TensorDataset(X, *D, y), batch_size=len(df), shuffle=False
+        )
+        return loader, derived_data
+
+    def _train_single_model(
+        self,
+        model,
+        epoch,
+        X_train,
+        D_train,
+        y_train,
+        X_val,
+        D_val,
+        y_val,
+        verbose,
+        warm_start,
+        **kwargs,
+    ):
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
+            weight_decay=kwargs["weight_decay"],
+        )
+
+        train_loader = Data.DataLoader(
+            X_train.dataset,
+            batch_size=int(kwargs["batch_size"]),
+            generator=torch.Generator().manual_seed(0),
+        )
+        val_loader = X_val
+
+        train_ls = []
+        val_ls = []
+        stop_epoch = self.trainer.args["epoch"]
+
+        early_stopping = EarlyStopping(
+            patience=self.trainer.static_params["patience"],
+            verbose=False,
+            path=self.trainer.project_root + "fatigue.pt",
+        )
+
+        for i_epoch in range(epoch):
+            train_loss = self._train_step(
+                model, train_loader, optimizer, self.trainer.loss_fn
+            )
+            train_ls.append(train_loss)
+            _, _, val_loss = self._test_step(model, val_loader, self.trainer.loss_fn)
+            val_ls.append(val_loss)
+
+            if verbose and ((i_epoch + 1) % 20 == 0 or i_epoch == 0):
+                print(
+                    f"Epoch: {i_epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min val loss: {np.min(val_ls):.4f}"
+                )
+
+            early_stopping(val_loss, model)
+
+            if early_stopping.early_stop:
+                if verbose:
+                    idx = val_ls.index(min(val_ls))
+                    print(
+                        f"Early stopping at epoch {i_epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}, Val loss: {val_ls[idx]:.4f}"
+                    )
+                break
+
+        idx = val_ls.index(min(val_ls))
+        min_loss = val_ls[idx]
+
+        model.load_state_dict(torch.load(self.trainer.project_root + "fatigue.pt"))
 
         if verbose:
-            print(f"Test MSE loss: {mse:.5f}, RMSE loss: {rmse:.5f}")
+            print(f"Minimum loss: {min_loss:.5f}")
 
-        if dump_trainer:
-            save_trainer(self.trainer, verbose=verbose)
+    def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+        y_test_pred, _, _ = self._test_step(model, X_test, self.trainer.loss_fn)
+        return y_test_pred
+
+    def _space(self, model_name):
+        return self.trainer.SPACE
+
+    def _initial_values(self, model_name):
+        return self.trainer.chosen_params
 
 
 class ThisWork(TorchModel):
@@ -1340,7 +1311,7 @@ class ThisWork(TorchModel):
     def _get_program_name(self):
         return "ThisWork"
 
-    def _new_model(self):
+    def _new_model(self, model_name, verbose, **kwargs):
         from src.model.sn_formulas import sn_mapping
 
         if self.activated_sn is None:
@@ -1375,7 +1346,7 @@ class ThisWorkRidge(ThisWork):
     def _get_program_name(self):
         return "ThisWorkRidge"
 
-    def _new_model(self):
+    def _new_model(self, model_name, verbose, **kwargs):
         from src.model.sn_formulas import sn_mapping
 
         if self.activated_sn is None:
@@ -1519,7 +1490,7 @@ class MLP(TorchModel):
     def _get_program_name(self):
         return "MLP"
 
-    def _new_model(self):
+    def _new_model(self, model_name, verbose, **kwargs):
         set_torch_random(0)
         return NN(
             len(self.trainer.cont_feature_names),
@@ -1567,8 +1538,8 @@ class RFE(TorchModel):
     def _get_model_names(self):
         return self.modelbase._get_model_names()
 
-    def _new_model(self):
-        return self.modelbase._new_model()
+    def _new_model(self, model_name, verbose, **kwargs):
+        return self.modelbase._new_model(model_name, verbose, **kwargs)
 
     def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
         return self.modelbase._predict(df, model_name, derived_data, **kwargs)
@@ -1604,7 +1575,9 @@ class RFE(TorchModel):
             )
             self.metrics.append(leaderboard.loc[0, self.metric])
             importance, names = self.internal_trainer.cal_feature_importance(
-                modelbase=self.modelbase, method=self.impor_method
+                modelbase=self.modelbase,
+                model_name=self.modelbase._get_model_names()[0],
+                method=self.impor_method,
             )
             impor_dict = {"feature": [], "attr": []}
             for imp, name in zip(importance, names):

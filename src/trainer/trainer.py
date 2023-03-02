@@ -975,7 +975,7 @@ class Trainer:
 
             plt.close()
 
-    def cal_feature_importance(self, modelbase, method="permutation"):
+    def cal_feature_importance(self, modelbase, model_name, method="permutation"):
         from src.model.model import TorchModel
 
         if not issubclass(type(modelbase), TorchModel):
@@ -994,7 +994,7 @@ class Trainer:
                     shuffle=False,
                 )
                 prediction, _, _ = modelbase._test_step(
-                    modelbase.model, loader, self.loss_fn
+                    modelbase.model[model_name], loader, self.loss_fn
                 )
                 loss = float(self._metric_sklearn(ground_truth, prediction, self.loss))
                 return loss
@@ -1013,7 +1013,9 @@ class Trainer:
             ]
             attr = np.abs(np.append(attr[0], attr[1:]))
         elif method == "shap":
-            shap_values, data = self.cal_shap(modelbase=modelbase, explainer="deep")
+            shap_values, data = self.cal_shap(
+                modelbase=modelbase, model_name=model_name, explainer="deep"
+            )
             attr = (
                 np.append(
                     np.mean(np.abs(shap_values[0]), axis=0),
@@ -1038,7 +1040,7 @@ class Trainer:
             )
         return attr, importance_names
 
-    def cal_shap(self, modelbase, explainer="deep"):
+    def cal_shap(self, modelbase, model_name, explainer="deep"):
         from src.model.model import TorchModel
         import shap
 
@@ -1053,7 +1055,7 @@ class Trainer:
         X_test = self._get_first_tensor_slice(self.test_indices)
         D_test = self._get_additional_tensors_slice(self.test_indices)
         test_data = [X_test, *D_test]
-        explainer = shap.DeepExplainer(modelbase.model, background_data)
+        explainer = shap.DeepExplainer(modelbase.model[model_name], background_data)
 
         shap_values = explainer.shap_values(test_data)
         return shap_values, test_data
