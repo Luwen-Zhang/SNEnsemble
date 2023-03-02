@@ -278,6 +278,19 @@ class AbstractModel:
                 **tmp_params,
             )
 
+            test_pred = self._pred_single_model(
+                self.model[model_name], X_test, D_test, verbose=False
+            )
+            test_res = Trainer._metric_sklearn(test_pred, y_test, self.trainer.loss)
+
+            if verbose:
+                if self.trainer.loss == "mse":
+                    print(
+                        f"Test MSE loss: {test_res:.5f}, RMSE loss: {np.sqrt(test_res):.5f}"
+                    )
+                else:
+                    print(f"Test {self.trainer.loss} loss: {test_res:.5f}.")
+
         # enable_tqdm()
         if dump_trainer:
             save_trainer(self.trainer)
