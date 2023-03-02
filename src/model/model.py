@@ -11,12 +11,13 @@ from skopt import gp_minimize
 
 
 class AbstractModel:
-    def __init__(self, trainer: Trainer = None, program=None):
+    def __init__(self, trainer: Trainer = None, program=None, subset=None):
         self.trainer = trainer
         if not hasattr(trainer, "database"):
             trainer.load_config(default_configfile="base_config")
         self.model = None
         self.leaderboard = None
+        self.subset = subset
         self.program = self._get_program_name() if program is None else program
         self.model_params = {}
         self._mkdir()
@@ -69,9 +70,9 @@ class AbstractModel:
     ):
         if self.model is None:
             raise Exception("Run fit() before predict().")
-        if model_name not in self._get_model_names():
+        if model_name not in self.get_model_names():
             raise Exception(
-                f"Model {model_name} is not available. Select among {self._get_model_names()}"
+                f"Model {model_name} is not available. Select among {self.get_model_names()}"
             )
         absent_features = [
             x
@@ -129,7 +130,7 @@ class AbstractModel:
     def _predict_all(self, verbose=True, test_data_only=False):
         self._check_train_status()
 
-        model_names = self._get_model_names()
+        model_names = self.get_model_names()
         (
             X_train,
             D_train,
@@ -202,7 +203,7 @@ class AbstractModel:
         self.total_epoch = self.trainer.args["epoch"]
         self.model = {}
 
-        for model_name in self._get_model_names():
+        for model_name in self.get_model_names():
             if verbose:
                 print(f"Training {model_name}")
             tmp_params = self._get_params(model_name, verbose=verbose)
@@ -320,6 +321,15 @@ class AbstractModel:
         self.root = self.trainer.project_root + self.program + "/"
         if not os.path.exists(self.root):
             os.mkdir(self.root)
+
+    def get_model_names(self):
+        if self.subset is not None:
+            for model in self.subset:
+                if model not in self._get_model_names():
+                    raise Exception(f"Model {model} not available for {self.program}.")
+            return self.subset
+        else:
+            return self._get_model_names()
 
     def _get_model_names(self):
         raise NotImplementedError
@@ -1547,7 +1557,7 @@ class RFE(TorchModel):
         return "RFE-" + self.torch_model.__name__
 
     def _get_model_names(self):
-        return self.modelbase._get_model_names()
+        return self.modelbase.get_model_names()
 
     def _new_model(self, model_name, verbose, **kwargs):
         return self.modelbase._new_model(model_name, verbose, **kwargs)
@@ -1587,7 +1597,7 @@ class RFE(TorchModel):
             self.metrics.append(leaderboard.loc[0, self.metric])
             importance, names = self.internal_trainer.cal_feature_importance(
                 modelbase=self.modelbase,
-                model_name=self.modelbase._get_model_names()[0],
+                model_name=self.modelbase.get_model_names()[0],
                 method=self.impor_method,
             )
             impor_dict = {"feature": [], "attr": []}
@@ -1663,7 +1673,7 @@ class ModelAssembly(AbstractModel):
     def _get_model_names(self):
         model_names = []
         for submodel in self.models:
-            model_names += submodel._get_model_names()
+            model_names += submodel.get_model_names()
         return model_names
 
     def _check_train_status(self):
@@ -1679,7 +1689,7 @@ class ModelAssembly(AbstractModel):
         available_idx = []
         available_program = []
         for idx, submodel in enumerate(self.models):
-            if model_name in submodel._get_model_names():
+            if model_name in submodel.get_model_names():
                 available_idx.append(idx)
                 available_program.append(submodel.program)
         if len(available_idx) == 1:

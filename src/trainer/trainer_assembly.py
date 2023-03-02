@@ -140,7 +140,7 @@ class TrainerAssembly:
             for project in selected_projects:
                 trainer = self.trainers[self.projects.index(project)]
                 modelbase = trainer.get_modelbase(program)
-                model_names = modelbase._get_model_names()
+                model_names = modelbase.get_model_names()
                 predictions = projects_program_predictions[project][program]
                 unique_model_names += model_names
                 all_model_names.append(model_names)
@@ -282,7 +282,7 @@ class TrainerAssembly:
             trainer = self.trainers[self.projects.index(project)]
             for program in programs:
                 modelbase = trainer.get_modelbase(program)
-                model_names = modelbase._get_model_names()
+                model_names = modelbase.get_model_names()
                 all_exist_model_names += [program + name for name in model_names]
 
             unique_exist_model_names = list(set(all_exist_model_names))

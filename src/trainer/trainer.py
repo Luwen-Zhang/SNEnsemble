@@ -936,7 +936,7 @@ class Trainer:
         :return: None
         """
         modelbase = self.get_modelbase(program)
-        model_names = modelbase._get_model_names()
+        model_names = modelbase.get_model_names()
         predictions = modelbase._predict_all()
 
         for idx, model_name in enumerate(model_names):
