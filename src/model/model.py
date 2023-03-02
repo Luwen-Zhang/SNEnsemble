@@ -1685,24 +1685,39 @@ class RFE(TorchModel):
 
 
 class ModelAssembly(AbstractModel):
-    def __init__(self, trainer=None, models=None, program=None):
+    def __init__(self, trainer, models=None, program=None, model_subset=None):
         self.program = "ModelAssembly" if program is None else program
-        super(ModelAssembly, self).__init__(trainer, program=self.program)
-        self.models = (
-            [TabNet(self.trainer), MLP(self.trainer)] if models is None else models
+        super(ModelAssembly, self).__init__(
+            trainer, program=self.program, model_subset=model_subset
         )
+        self.models = {}
+        if models is None:
+            if model_subset is None:
+                raise Exception(f"One of models and model_subset should be specified.")
+            else:
+                for model_name in model_subset:
+                    self.models[model_name] = getattr(
+                        sys.modules[__name__], model_name
+                    )(trainer, model_subset=[model_name])
+        else:
+            for model in models:
+                if len(model.get_model_names()) > 1:
+                    raise Exception(
+                        f"ModelAssembly is designed for modelbases with a single model."
+                    )
+                self.models[model.get_model_names()[0]] = model
 
     def _get_program_name(self):
         return self.program
 
-    def fit(self, **kwargs):
-        for submodel in self.models:
-            submodel.fit(**kwargs)
+    def fit(self, model_subset=None, **kwargs):
+        for model_name in self.models.keys() if model_subset is None else model_subset:
+            self.models[model_name].fit(**kwargs)
 
     def predict(
         self, df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
     ):
-        return self.models[self._get_model_idx(model_name)].predict(
+        return self.models[model_name].predict(
             df=df, model_name=model_name, derived_data=derived_data, **kwargs
         )
 
@@ -1712,54 +1727,38 @@ class ModelAssembly(AbstractModel):
         **kwargs,
     ):
         print(f"\n-------------Run {self.program}-------------\n")
-        for submodel in self.models:
-            submodel.train(*args, **kwargs)
+        self._train(*args, **kwargs)
         print(f"\n-------------{self.program} End-------------\n")
 
+    def _train(self, model_subset=None, *args, **kwargs):
+        for model_name in self.models.keys() if model_subset is None else model_subset:
+            self.models[model_name]._train(*args, **kwargs)
+
     def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
-        return self.models[self._get_model_idx(model_name)].predict(
+        return self.models[model_name].predict(
             df=df, model_name=model_name, derived_data=derived_data, **kwargs
         )
 
     def _predict_all(self, **kwargs):
         self._check_train_status()
         predictions = {}
-        for submodel in self.models:
+        for submodel in self.models.values():
             sub_predictions = submodel._predict_all(**kwargs)
             for key, value in sub_predictions.items():
                 predictions[key] = value
         return predictions
 
     def _get_model_names(self):
-        model_names = []
-        for submodel in self.models:
-            model_names += submodel.get_model_names()
-        return model_names
+        return list(self.models.keys())
 
     def _check_train_status(self):
-        for submodel in self.models:
+        for submodel in self.models.values():
             try:
                 submodel._check_train_status()
             except:
                 raise Exception(
                     f"{self.program} not trained, run {self.__class__.__name__}.train() first."
                 )
-
-    def _get_model_idx(self, model_name):
-        available_idx = []
-        available_program = []
-        for idx, submodel in enumerate(self.models):
-            if model_name in submodel.get_model_names():
-                available_idx.append(idx)
-                available_program.append(submodel.program)
-        if len(available_idx) == 1:
-            return available_idx[0]
-        elif len(available_idx) == 0:
-            raise Exception(f"{model_name} not in the ModelAssembly.")
-        else:
-            raise Exception(
-                f"Multiple {model_name} in the ModelAssembly (in {available_program})."
-            )
 
 
 class BayesCallback:
