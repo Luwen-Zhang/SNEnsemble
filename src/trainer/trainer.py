@@ -975,8 +975,10 @@ class Trainer:
 
             plt.close()
 
-    def cal_feature_importance(self, modelbase, model_name, method="permutation"):
+    def cal_feature_importance(self, program, model_name, method="permutation"):
         from src.model.model import TorchModel
+
+        modelbase = self.get_modelbase(program)
 
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
@@ -1013,9 +1015,7 @@ class Trainer:
             ]
             attr = np.abs(np.append(attr[0], attr[1:]))
         elif method == "shap":
-            shap_values, data = self.cal_shap(
-                modelbase=modelbase, model_name=model_name, explainer="deep"
-            )
+            shap_values, data = self.cal_shap(program=program, model_name=model_name)
             attr = (
                 np.append(
                     np.mean(np.abs(shap_values[0]), axis=0),
@@ -1040,9 +1040,11 @@ class Trainer:
             )
         return attr, importance_names
 
-    def cal_shap(self, modelbase, model_name, explainer="deep"):
+    def cal_shap(self, program, model_name):
         from src.model.model import TorchModel
         import shap
+
+        modelbase = self.get_modelbase(program)
 
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
@@ -1060,12 +1062,16 @@ class Trainer:
         shap_values = explainer.shap_values(test_data)
         return shap_values, test_data
 
-    def plot_feature_importance(self, modelbase, fig_size=(7, 4), method="permutation"):
+    def plot_feature_importance(
+        self, program, model_name, fig_size=(7, 4), method="permutation"
+    ):
         """
         Calculate and plot permutation feature importance.
         :return: None
         """
-        attr, names = self.cal_feature_importance(modelbase, method=method)
+        attr, names = self.cal_feature_importance(
+            program=program, model_name=model_name, method=method
+        )
 
         clr = sns.color_palette("deep")
 
@@ -1129,7 +1135,7 @@ class Trainer:
 
     def plot_partial_dependence(
         self,
-        modelbase,
+        program,
         model_name,
         refit=True,
         log_trans: bool = True,
@@ -1149,6 +1155,8 @@ class Trainer:
         """
         from src.model.model import TorchModel
 
+        modelbase = self.get_modelbase(program)
+
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
 
@@ -1159,7 +1167,7 @@ class Trainer:
             ci_right_list,
         ) = self.cal_partial_dependence(
             feature_subset=self.all_feature_names,
-            model=modelbase,
+            program=program,
             model_name=model_name,
             df=self.df.loc[self.train_indices, :],
             derived_data=self.get_derived_data_slice(
@@ -1217,7 +1225,7 @@ class Trainer:
 
         return x_values_list, mean_pdp_list, ci_left_list, ci_right_list
 
-    def plot_partial_err(self, modelbase, model_name, thres=0.8):
+    def plot_partial_err(self, program, model_name, thres=0.8):
         """
         Calculate and plot partial error dependency for each feature.
         :param thres: Points with loss higher than thres will be marked.
@@ -1225,6 +1233,7 @@ class Trainer:
         """
         from src.model.model import TorchModel
 
+        modelbase = self.get_modelbase(program)
         if not issubclass(type(modelbase), TorchModel):
             raise Exception("A TorchModel should be passed.")
         ground_truth = self.label_data.loc[self.test_indices, :].values.flatten()
@@ -1622,14 +1631,13 @@ class Trainer:
         s_max = s_max if sgn > 0 else np.min([s_max, -1e-5])
 
         # Get bootstrap predictions and confidence intervals from program-model_name
-        model = self.get_modelbase(program=program)
         chosen_indices = (
             m_train_indices
             if len(m_train_indices) != 0
             else np.append(m_val_indices, m_test_indices)
         )
         x_value, mean_pred, ci_left, ci_right = self._bootstrap(
-            model=model,
+            program=program,
             df=self.df.loc[chosen_indices, :],
             derived_data=self.get_derived_data_slice(self.derived_data, chosen_indices),
             focus_feature=s_col,
@@ -1893,7 +1901,7 @@ class Trainer:
 
     def _bootstrap(
         self,
-        model,
+        program,
         df,
         derived_data,
         focus_feature,
@@ -1914,9 +1922,10 @@ class Trainer:
         # Values. No. RWP 21-12. 2021.
         from src.model.model import TorchModel
 
+        modelbase = self.get_modelbase(program)
         derived_data = self.sort_derived_data(derived_data)
-        if not issubclass(type(model), TorchModel):
-            raise Exception(f"Model {type(model)} is not a TorchModel.")
+        if not issubclass(type(modelbase), TorchModel):
+            raise Exception(f"Model {type(modelbase)} is not a TorchModel.")
         if focus_feature in self.cont_feature_names:
             x_value = np.linspace(
                 np.nanpercentile(df[focus_feature].values, (100 - percentile) / 2)
@@ -1929,6 +1938,8 @@ class Trainer:
             )
         elif focus_feature in self.cat_feature_names:
             x_value = np.unique(df[focus_feature].values)
+        else:
+            raise Exception(f"{focus_feature} not available.")
         df = df.reset_index(drop=True)
         expected_value_bootstrap_replications = []
         for i_bootstrap in range(n_bootstrap):
@@ -1940,7 +1951,7 @@ class Trainer:
                 derived_data, list(df_bootstrap.index)
             )
             df_bootstrap = df_bootstrap.reset_index(drop=True)
-            bootstrap_model = cp(model)
+            bootstrap_model = cp(modelbase)
             if refit:
                 bootstrap_model.fit(
                     df_bootstrap,
