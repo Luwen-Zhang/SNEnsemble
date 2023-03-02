@@ -1955,6 +1955,7 @@ class Trainer:
             if refit:
                 bootstrap_model.fit(
                     df_bootstrap,
+                    model_subset=[model_name],
                     cont_feature_names=self.dataprocessors[0][0].record_cont_features,
                     cat_feature_names=self.dataprocessors[0][0].record_cat_features,
                     label_name=self.label_name,

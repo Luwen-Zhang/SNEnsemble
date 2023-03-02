@@ -11,13 +11,13 @@ from skopt import gp_minimize
 
 
 class AbstractModel:
-    def __init__(self, trainer: Trainer = None, program=None, subset=None):
+    def __init__(self, trainer: Trainer = None, program=None, model_subset=None):
         self.trainer = trainer
         if not hasattr(trainer, "database"):
             trainer.load_config(default_configfile="base_config")
         self.model = None
         self.leaderboard = None
-        self.subset = subset
+        self.model_subset = model_subset
         self.program = self._get_program_name() if program is None else program
         self.model_params = {}
         self._mkdir()
@@ -28,6 +28,7 @@ class AbstractModel:
         cont_feature_names: list,
         cat_feature_names: list,
         label_name: list,
+        model_subset: list = None,
         derived_data: dict = None,
         verbose=True,
         warm_start=False,
@@ -52,6 +53,7 @@ class AbstractModel:
         self.train(
             dump_trainer=False,
             verbose=verbose,
+            model_subset=model_subset,
             warm_start=warm_start if self._trained else False,
         )
 
@@ -186,7 +188,14 @@ class AbstractModel:
             verbose=False,
         )
 
-    def _train(self, dump_trainer=True, verbose=True, warm_start=False, **kwargs):
+    def _train(
+        self,
+        model_subset=None,
+        dump_trainer=True,
+        verbose=True,
+        warm_start=False,
+        **kwargs,
+    ):
         # disable_tqdm()
         data = self._base_train_data_preprocess()
         (
@@ -203,7 +212,9 @@ class AbstractModel:
         self.total_epoch = self.trainer.args["epoch"]
         self.model = {}
 
-        for model_name in self.get_model_names():
+        for model_name in (
+            self.get_model_names() if model_subset is None else model_subset
+        ):
             if verbose:
                 print(f"Training {model_name}")
             tmp_params = self._get_params(model_name, verbose=verbose)
@@ -323,11 +334,11 @@ class AbstractModel:
             os.mkdir(self.root)
 
     def get_model_names(self):
-        if self.subset is not None:
-            for model in self.subset:
+        if self.model_subset is not None:
+            for model in self.model_subset:
                 if model not in self._get_model_names():
                     raise Exception(f"Model {model} not available for {self.program}.")
-            return self.subset
+            return self.model_subset
         else:
             return self._get_model_names()
 
@@ -386,8 +397,10 @@ class AbstractModel:
 
 
 class AutoGluon(AbstractModel):
-    def __init__(self, trainer=None, program=None):
-        super(AutoGluon, self).__init__(trainer, program=program)
+    def __init__(self, trainer=None, program=None, model_subset=None):
+        super(AutoGluon, self).__init__(
+            trainer, program=program, model_subset=model_subset
+        )
 
     def _get_program_name(self):
         return "AutoGluon"
@@ -395,6 +408,7 @@ class AutoGluon(AbstractModel):
     def _train(
         self,
         verbose: bool = False,
+        model_subset: list = None,
         debug_mode: bool = False,
         dump_trainer=True,
         warm_start=False,
@@ -403,6 +417,11 @@ class AutoGluon(AbstractModel):
         disable_tqdm()
         import warnings
 
+        if model_subset is not None:
+            warnings.warn(
+                f"AutoGluon does not support training models separately, but a model_subset is passed to AutoGluon.",
+                category=UserWarning,
+            )
         warnings.simplefilter(action="ignore", category=UserWarning)
         from autogluon.tabular import TabularPredictor
         from autogluon.features.generators import PipelineFeatureGenerator
@@ -473,8 +492,10 @@ class AutoGluon(AbstractModel):
 
 
 class WideDeep(AbstractModel):
-    def __init__(self, trainer=None, program=None):
-        super(WideDeep, self).__init__(trainer, program=program)
+    def __init__(self, trainer=None, program=None, model_subset=None):
+        super(WideDeep, self).__init__(
+            trainer, program=program, model_subset=model_subset
+        )
 
     def _get_program_name(self):
         return "WideDeep"
@@ -1005,8 +1026,10 @@ class _WideDeepCallback:
 
 
 class TabNet(AbstractModel):
-    def __init__(self, trainer=None, program=None):
-        super(TabNet, self).__init__(trainer, program=program)
+    def __init__(self, trainer=None, program=None, model_subset=None):
+        super(TabNet, self).__init__(
+            trainer, program=program, model_subset=model_subset
+        )
         self.additional_params = None
 
     def _get_program_name(self):
@@ -1141,8 +1164,10 @@ class TabNet(AbstractModel):
 
 
 class TorchModel(AbstractModel):
-    def __init__(self, trainer=None, program=None):
-        super(TorchModel, self).__init__(trainer, program=program)
+    def __init__(self, trainer=None, program=None, model_subset=None):
+        super(TorchModel, self).__init__(
+            trainer, program=program, model_subset=model_subset
+        )
 
     def _train_step(self, model, train_loader, optimizer, loss_fn):
         model.train()
@@ -1318,8 +1343,12 @@ class TorchModel(AbstractModel):
 
 
 class ThisWork(TorchModel):
-    def __init__(self, trainer=None, manual_activate=None, program=None):
-        super(ThisWork, self).__init__(trainer, program=program)
+    def __init__(
+        self, trainer=None, manual_activate=None, program=None, model_subset=None
+    ):
+        super(ThisWork, self).__init__(
+            trainer, program=program, model_subset=model_subset
+        )
         self.activated_sn = None
         self.manual_activate = manual_activate
         from src.model.sn_formulas import sn_mapping
@@ -1359,11 +1388,6 @@ class ThisWork(TorchModel):
 
 
 class ThisWorkRidge(ThisWork):
-    def __init__(self, trainer=None, manual_activate=None, program=None):
-        super(ThisWorkRidge, self).__init__(
-            trainer=trainer, manual_activate=manual_activate, program=program
-        )
-
     def _get_program_name(self):
         return "ThisWorkRidge"
 
@@ -1425,11 +1449,6 @@ class ThisWorkRidge(ThisWork):
 
 
 class ThisWorkPretrain(ThisWork):
-    def __init__(self, trainer=None, manual_activate=None, program=None):
-        super(ThisWorkPretrain, self).__init__(
-            trainer=trainer, manual_activate=manual_activate, program=program
-        )
-
     def train(self, *args, **kwargs):
         tmp_kwargs = cp(kwargs)
         verbose = "verbose" not in kwargs.keys() or kwargs["verbose"]
@@ -1504,8 +1523,8 @@ class ThisWorkPretrain(ThisWork):
 
 
 class MLP(TorchModel):
-    def __init__(self, trainer=None, program=None, layers=None):
-        super(MLP, self).__init__(trainer, program=program)
+    def __init__(self, trainer=None, program=None, layers=None, model_subset=None):
+        super(MLP, self).__init__(trainer, program=program, model_subset=model_subset)
         self.layers = layers
 
     def _get_program_name(self):
@@ -1529,6 +1548,7 @@ class RFE(TorchModel):
         self,
         trainer: Trainer,
         torch_model: Type[TorchModel],
+        model_subset=None,
         program=None,
         metric: str = "Validation RMSE",
         impor_method: str = "shap",
@@ -1542,7 +1562,9 @@ class RFE(TorchModel):
 
         self.internal_trainer = cp(trainer)
         self.torch_model = torch_model
-        super(RFE, self).__init__(trainer=trainer, program=program)
+        super(RFE, self).__init__(
+            trainer=trainer, program=program, model_subset=model_subset
+        )
         self.internal_trainer.project_root = self.root
         self.modelbase = self.torch_model(self.internal_trainer)
         self.internal_trainer.modelbases = []
@@ -1571,23 +1593,36 @@ class RFE(TorchModel):
     def _train(
         self,
         verbose: bool = True,
+        model_subset: list = None,
         warm_start=False,
         **kwargs,
     ):
         if warm_start:
-            self.modelbase._train(warm_start=warm_start, verbose=verbose, **kwargs)
+            self.modelbase._train(
+                warm_start=warm_start,
+                model_subset=model_subset,
+                verbose=verbose,
+                **kwargs,
+            )
         else:
-            self.run(verbose=verbose)
-            self.modelbase._train(warm_start=warm_start, verbose=verbose, **kwargs)
+            self.run(verbose=verbose, model_subset=model_subset)
+            self.modelbase._train(
+                warm_start=warm_start,
+                model_subset=model_subset,
+                verbose=verbose,
+                **kwargs,
+            )
 
-    def run(self, verbose=True):
+    def run(self, verbose=True, model_subset=None):
         rest_features = cp(self.trainer.all_feature_names)
         while len(rest_features) > self.min_features:
             if verbose:
                 print(f"Using features: {rest_features}")
             self.internal_trainer.set_feature_names(rest_features)
             if self.cross_validation == 0:
-                self.modelbase._train(verbose=False, dump_trainer=False)
+                self.modelbase._train(
+                    verbose=False, model_subset=model_subset, dump_trainer=False
+                )
             leaderboard = self.internal_trainer.get_leaderboard(
                 test_data_only=False,
                 cross_validation=self.cross_validation,
@@ -1596,7 +1631,7 @@ class RFE(TorchModel):
             )
             self.metrics.append(leaderboard.loc[0, self.metric])
             importance, names = self.internal_trainer.cal_feature_importance(
-                modelbase=self.modelbase,
+                program=self.modelbase.program,
                 model_name=self.modelbase.get_model_names()[0],
                 method=self.impor_method,
             )
