@@ -184,7 +184,6 @@ class AbstractModel:
             self.model[model_name],
             X_test=X_df,
             D_test=derived_data,
-            derived_data=derived_data,
             verbose=False,
         )
 
