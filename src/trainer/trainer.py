@@ -626,12 +626,19 @@ class Trainer:
 
     def _data_preprocess(self, input_data: pd.DataFrame, warm_start=False):
         data = input_data.copy()
+        cont_feature_names = cp(self.cont_feature_names)
+        cat_feature_names = cp(self.cat_feature_names)
         for processor, kwargs in self.dataprocessors:
             if warm_start:
                 data = processor.transform(data, self, **kwargs)
             else:
                 data = processor.fit_transform(data, self, **kwargs)
         data = data[self.all_feature_names + self.label_name]
+        if warm_start:
+            # If set_feature is called, and if some derived features are removed, recorded features in processors will
+            # be restored when predicting new data.
+            self.cont_feature_names = cont_feature_names
+            self.cat_feature_names = cat_feature_names
         return data
 
     def data_transform(self, input_data: pd.DataFrame):
