@@ -1294,25 +1294,26 @@ class Trainer:
         :param thres: Points with loss higher than thres will be marked.
         :return: None
         """
-        from src.model.model import TorchModel
-
         modelbase = self.get_modelbase(program)
-        if not issubclass(type(modelbase), TorchModel):
-            raise Exception("A TorchModel should be passed.")
+
         ground_truth = self.label_data.loc[self.test_indices, :].values.flatten()
         prediction = modelbase.predict(
-            df=self.df.loc[self.test_indices], model_name=model_name
+            df=self.df.loc[self.test_indices, :],
+            derived_data=self.derive_unstacked(self.df.loc[self.test_indices, :]),
+            model_name=model_name,
         ).flatten()
         plot_partial_err(
-            self.feature_data.loc[
-                np.array(self.test_indices), self.cont_feature_names
+            self.df.loc[
+                np.array(self.test_indices), self.all_feature_names
             ].reset_index(drop=True),
-            ground_truth,
-            prediction,
+            cat_feature_names=self.cat_feature_names,
+            cat_feature_mapping=self.cat_feature_mapping,
+            truth=ground_truth,
+            pred=prediction,
             thres=thres,
         )
 
-        plt.savefig(self.project_root + "partial_err.pdf")
+        plt.savefig(self.project_root + f"partial_err_{program}_{model_name}.pdf")
         if is_notebook():
             plt.show()
         plt.close()

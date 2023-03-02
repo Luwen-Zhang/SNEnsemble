@@ -239,7 +239,9 @@ def plot_pdp(
     return fig
 
 
-def plot_partial_err(feature_data, truth, pred, thres=0.8):
+def plot_partial_err(
+    feature_data, cat_feature_names, cat_feature_mapping, truth, pred, thres=0.8
+):
     feature_names = list(feature_data.columns)
     max_col = 4
     if len(feature_names) > max_col:
@@ -289,6 +291,14 @@ def plot_partial_err(feature_data, truth, pred, thres=0.8):
             alpha=0.2,
             rwidth=0.8,
         )
+        if focus_feature in cat_feature_names:
+            ticks = np.sort(np.unique(feature_data[focus_feature].values)).astype(int)
+            tick_label = [cat_feature_mapping[focus_feature][x] for x in ticks]
+            ax.set_xticks(ticks)
+            ax.set_xlabel(tick_label)
+            ax.set_xlim([-0.5, len(ticks) - 0.5])
+            ax2.set_xlim([-0.5, len(ticks) - 0.5])
+
         # sns.rugplot(data=chosen_data, height=0.05, ax=ax2, color='k')
         # ax2.set_ylim([0,1])
         # ax2.set_xlim([np.min(x_values_list[idx]), np.max(x_values_list[idx])])
