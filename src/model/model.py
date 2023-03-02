@@ -1003,11 +1003,11 @@ class TabNet(AbstractModel):
     def _new_model(self, model_name, verbose, **kwargs):
         from pytorch_tabnet.tab_model import TabNetRegressor
 
-        def extract_params(keys, values):
+        def extract_params(**kwargs):
             params = {}
             optim_params = {}
             batch_size = 32
-            for key, value in zip(keys, values):
+            for key, value in kwargs.items():
                 if key in [
                     "n_d",
                     "n_a",
@@ -1023,9 +1023,7 @@ class TabNet(AbstractModel):
                     optim_params[key] = value
             return params, optim_params, batch_size
 
-        params, optim_params, batch_size = extract_params(
-            kwargs.keys(), kwargs.values()
-        )
+        params, optim_params, batch_size = extract_params(**kwargs)
 
         model = TabNetRegressor(
             verbose=20 if verbose else 0, optimizer_params=optim_params
@@ -1048,9 +1046,9 @@ class TabNet(AbstractModel):
     ):
         cont_feature_names = self.trainer.cont_feature_names
 
-        X_train = X_train[cont_feature_names].astype(np.float32)
-        X_val = X_val[cont_feature_names].astype(np.float32)
-        X_test = X_test[cont_feature_names].astype(np.float32)
+        X_train = X_train[cont_feature_names].values.astype(np.float32)
+        X_val = X_val[cont_feature_names].values.astype(np.float32)
+        X_test = X_test[cont_feature_names].values.astype(np.float32)
         y_train = y_train.astype(np.float32)
         y_val = y_val.astype(np.float32)
         y_test = y_test.astype(np.float32)
