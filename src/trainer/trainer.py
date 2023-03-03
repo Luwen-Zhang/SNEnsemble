@@ -1216,12 +1216,7 @@ class Trainer:
         :param upper_lim: Upper limit of y-axis when plotting.
         :return: None
         """
-        from src.model.model import TorchModel
-
         modelbase = self.get_modelbase(program)
-
-        if not issubclass(type(modelbase), TorchModel):
-            raise Exception("A TorchModel should be passed.")
 
         (
             x_values_list,
@@ -1260,7 +1255,9 @@ class Trainer:
             upper_lim=upper_lim,
         )
 
-        plt.savefig(self.project_root + "partial_dependence.pdf")
+        plt.savefig(
+            self.project_root + f"partial_dependence_{program}_{model_name}.pdf"
+        )
         if is_notebook():
             plt.show()
         plt.close()
@@ -1984,12 +1981,8 @@ class Trainer:
     ):
         # Cook, Thomas R., et al. Explaining Machine Learning by Bootstrapping Partial Dependence Functions and Shapley
         # Values. No. RWP 21-12. 2021.
-        from src.model.model import TorchModel
-
         modelbase = self.get_modelbase(program)
         derived_data = self.sort_derived_data(derived_data)
-        if not issubclass(type(modelbase), TorchModel):
-            raise Exception(f"Model {type(modelbase)} is not a TorchModel.")
         if focus_feature in self.cont_feature_names:
             x_value = np.linspace(
                 np.nanpercentile(df[focus_feature].values, (100 - percentile) / 2)
