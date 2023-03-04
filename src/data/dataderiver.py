@@ -1,89 +1,9 @@
-import numpy as np
-import sys, inspect
-from src.utils.utils import *
+from src.utils import *
+from src.data import AbstractDeriver
 from copy import deepcopy as cp
-
-
-class AbstractDeriver:
-    def __init__(self):
-        pass
-
-    def derive(
-        self,
-        df,
-        trainer,
-        derived_name,
-        **kwargs,
-    ):
-        kwargs = self.make_defaults(**kwargs)
-        for arg_name in self._required_cols(**kwargs):
-            self._check_arg(arg_name, **kwargs)
-            self._check_exist(df, arg_name, **kwargs)
-        for arg_name in self._required_params(**kwargs) + ["stacked", "intermediate"]:
-            self._check_arg(arg_name, **kwargs)
-        values = self._derive(df, trainer, **kwargs)
-        self._check_values(values)
-        names = (
-            self._generate_col_names(derived_name, values.shape[-1], **kwargs)
-            if "col_names" not in kwargs
-            else kwargs["col_names"]
-        )
-        return values, derived_name, names
-
-    def make_defaults(self, **kwargs):
-        for key, value in self._defaults().items():
-            if key not in kwargs.keys():
-                kwargs[key] = value
-        return kwargs
-
-    def _derive(
-        self,
-        df,
-        trainer,
-        **kwargs,
-    ):
-        raise NotImplementedError
-
-    def _defaults(self):
-        return {}
-
-    def _derived_names(self, **kwargs):
-        raise NotImplementedError
-
-    def _generate_col_names(self, derived_name, length, **kwargs):
-        try:
-            names = self._derived_names(**kwargs)
-        except:
-            names = (
-                [f"{derived_name}-{idx}" for idx in range(length)]
-                if length > 1
-                else [derived_name]
-            )
-        return names
-
-    def _required_cols(self, **kwargs):
-        raise NotImplementedError
-
-    def _required_params(self, **kwargs):
-        raise NotImplementedError
-
-    def _check_arg(self, name, **kwargs):
-        if name not in kwargs.keys():
-            raise Exception(
-                f"Derivation: {name} should be specified for deriver {self.__class__.__name__}"
-            )
-
-    def _check_exist(self, df, name, **kwargs):
-        if kwargs[name] not in df.columns:
-            raise Exception(
-                f"Derivation: {name} is not a valid column in df for deriver {self.__class__.__name__}."
-            )
-
-    def _check_values(self, values):
-        if len(values.shape) == 1:
-            raise Exception(
-                f"Derivation: {name} returns a one dimensional numpy.ndarray. Use reshape(-1, 1) to transform into 2D."
-            )
+import itertools
+import inspect
+from scipy.interpolate import CubicSpline
 
 
 class DegLayerDeriver(AbstractDeriver):
@@ -248,7 +168,7 @@ class DriveCoeffDeriver(AbstractDeriver):
             all_training=True,
         )
 
-        from src.model.model import MLP
+        from src.model import MLP
 
         mlp = MLP(mlp_trainer)
         mlp_trainer.modelbases = []
@@ -270,9 +190,6 @@ class DriveCoeffDeriver(AbstractDeriver):
                 percentile=80,
             )
         self.avg_pred = mlp_trainer.label_data.values.mean()
-
-        from scipy.interpolate import CubicSpline
-        import itertools
 
         interpolator = {}
         plt.figure(figsize=(10, 10))

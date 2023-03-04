@@ -24,7 +24,6 @@
 # SOFTWARE.
 
 from typing import Any, List, Tuple, Union
-
 import numpy as np
 from sklearn.base import TransformerMixin
 import torch

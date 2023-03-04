@@ -1,33 +1,16 @@
-from src.trainer.trainer import Trainer
-import pandas as pd
-from copy import deepcopy as cp
-import numpy as np
-import sys, inspect
-
-
-class AbstractProcessor:
-    def __init__(self):
-        self.record_cont_features = None
-        self.record_cat_features = None
-
-    def fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data = input_data.copy()
-        res = self._fit_transform(data, trainer, **kwargs)
-        self.record_cont_features = cp(trainer.cont_feature_names)
-        self.record_cat_features = cp(trainer.cat_feature_names)
-        return res
-
-    def transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.cont_feature_names = cp(self.record_cont_features)
-        trainer.cat_feature_names = cp(self.record_cat_features)
-        data = input_data.copy()
-        return self._transform(data, trainer, **kwargs)
-
-    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        raise NotImplementedError
-
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        raise NotImplementedError
+from src.utils import *
+from src.trainer import Trainer
+from src.data import (
+    AbstractProcessor,
+    AbstractFeatureSelector,
+    AbstractTransformer,
+)
+import shap
+import inspect
+from sklearn.model_selection import KFold
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.preprocessing import StandardScaler as skStandardScaler
+from sklearn.preprocessing import OrdinalEncoder
 
 
 class LackDataMaterialRemover(AbstractProcessor):
@@ -168,38 +151,6 @@ class StdRemover(AbstractProcessor):
         return data
 
 
-class AbstractFeatureSelector(AbstractProcessor):
-    def __init__(self):
-        super(AbstractFeatureSelector, self).__init__()
-
-    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        retain_features = list(self._get_feature_names_out(data, trainer, **kwargs))
-        removed_features = list(
-            np.setdiff1d(trainer.all_feature_names, retain_features)
-        )
-        if len(removed_features) > 0:
-            trainer.cont_feature_names = [
-                x for x in trainer.cont_feature_names if x in retain_features
-            ]
-            trainer.cat_feature_names = [
-                x for x in trainer.cat_feature_names if x in retain_features
-            ]
-            print(
-                f"{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features retained: {retain_features}."
-            )
-        return data[
-            trainer.cont_feature_names + trainer.cat_feature_names + trainer.label_name
-        ]
-
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        return data[
-            trainer.cont_feature_names + trainer.cat_feature_names + trainer.label_name
-        ]
-
-    def _get_feature_names_out(self, input_data, trainer, **kwargs):
-        raise NotImplementedError
-
-
 class NaNFeatureRemover(AbstractFeatureSelector):
     def __init__(self):
         super(NaNFeatureRemover, self).__init__()
@@ -231,8 +182,6 @@ class RFEFeatureSelector(AbstractFeatureSelector):
         **kwargs,
     ):
         from src.utils.processors.rfecv import ExtendRFECV
-        from sklearn.model_selection import KFold
-        import shap
 
         cv = KFold(5)
 
@@ -279,8 +228,6 @@ class VarianceFeatureSelector(AbstractFeatureSelector):
         super(VarianceFeatureSelector, self).__init__()
 
     def _get_feature_names_out(self, data, trainer, thres=0.8, **kwargs):
-        from sklearn.feature_selection import VarianceThreshold
-
         sel = VarianceThreshold(threshold=(thres * (1 - thres)))
         sel.fit(
             data[trainer.all_feature_names],
@@ -344,7 +291,6 @@ class CorrFeatureSelector(AbstractFeatureSelector):
             data[trainer.all_feature_names],
             data[trainer.label_name].values.flatten(),
         )
-        import shap
 
         explainer = shap.Explainer(rf)
         shap_values = explainer(
@@ -355,7 +301,6 @@ class CorrFeatureSelector(AbstractFeatureSelector):
                 trainer.all_feature_names,
             ]
         )
-        from src.utils.utils import pretty
 
         retain_features = list(np.setdiff1d(trainer.cont_feature_names, corr_feature))
         attr = np.mean(np.abs(shap_values.values), axis=0)
@@ -371,28 +316,6 @@ class CorrFeatureSelector(AbstractFeatureSelector):
             print(pretty(corr_set_dict))
         retain_features += trainer.cat_feature_names
         return retain_features
-
-
-class AbstractTransformer(AbstractProcessor):
-    def __init__(self):
-        super(AbstractTransformer, self).__init__()
-        self.transformer = None
-
-    def zero_slip(self, feature_name, x):
-        zero_data = pd.DataFrame(
-            data=np.array(
-                [
-                    0 if feature_name != record_feature else x
-                    for record_feature in self.record_cont_features
-                ]
-            ).reshape(1, -1),
-            columns=self.record_cont_features,
-        )
-        try:
-            trans_res = self.transformer.transform(zero_data)
-        except:
-            trans_res = zero_data.values
-        return trans_res[0, self.record_cont_features.index(feature_name)]
 
 
 class UnscaledDataRecorder(AbstractTransformer):
@@ -428,9 +351,7 @@ class StandardScaler(AbstractTransformer):
         super(StandardScaler, self).__init__()
 
     def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        from sklearn.preprocessing import StandardScaler as ss
-
-        scaler = ss()
+        scaler = skStandardScaler()
         data.loc[:, trainer.cont_feature_names] = scaler.fit_transform(
             data.loc[:, trainer.cont_feature_names]
         ).astype(np.float32)
@@ -450,8 +371,6 @@ class CategoricalOrdinalEncoder(AbstractTransformer):
         super(CategoricalOrdinalEncoder, self).__init__()
 
     def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        from sklearn.preprocessing import OrdinalEncoder
-
         oe = OrdinalEncoder()
         data.loc[:, trainer.cat_feature_names] = oe.fit_transform(
             data.loc[:, trainer.cat_feature_names]

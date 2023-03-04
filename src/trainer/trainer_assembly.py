@@ -1,7 +1,7 @@
-from src.trainer.trainer import Trainer, load_trainer
-from src.utils.utils import *
+from src.trainer import Trainer, load_trainer
+from src.utils import *
 import time
-import os
+from copy import deepcopy as cp
 
 
 class TrainerAssembly:

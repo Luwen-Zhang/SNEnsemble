@@ -1,9 +1,8 @@
-import sys, inspect
-from src.trainer.trainer import Trainer
+from src.utils import *
+from src.trainer import Trainer
 import torch.nn as nn
-import torch
-import numpy as np
 from copy import deepcopy as cp
+import inspect
 
 
 class AbstractSN(nn.Module):

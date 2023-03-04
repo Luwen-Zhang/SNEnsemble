@@ -1,28 +1,11 @@
-import torch
-from torch import nn
+from src.utils import *
+from src.model import AbstractNN
+import torch.nn as nn
 
 
 def init_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.kaiming_normal_(m.weight)
-
-
-class AbstractNN(nn.Module):
-    def __init__(self, trainer):
-        super(AbstractNN, self).__init__()
-        self.derived_feature_names = list(trainer.derived_data.keys())
-        self.derived_feature_dims = trainer.get_derived_data_sizes()
-
-    def forward(self, *tensors):
-        x = tensors[0]
-        additional_tensors = tensors[1:]
-        derived_tensors = {}
-        for tensor, name in zip(additional_tensors, self.derived_feature_names):
-            derived_tensors[name] = tensor
-        return self._forward(x, derived_tensors)
-
-    def _forward(self, x, derived_tensors):
-        raise NotImplementedError
 
 
 class NN(AbstractNN):

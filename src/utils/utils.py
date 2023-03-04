@@ -1,28 +1,35 @@
 """
 All utilities used in the project.
 """
+
 import os
+import os.path
 import sys
 import warnings
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
-warnings.simplefilter(action="ignore", category=DeprecationWarning)
-
+import logging
+import random
 import numpy as np
 import pandas as pd
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker
+import matplotlib.patches
+from matplotlib.patches import Rectangle
 import seaborn as sns
-import matplotlib
-from src.model.nn_models import *
-import logging
-import random
-from copy import deepcopy as cp
+import torch
+import torch.optim
+from distutils.spawn import find_executable
 
+warnings.simplefilter(action="ignore", category=FutureWarning)
+warnings.simplefilter(action="ignore", category=DeprecationWarning)
 clr = sns.color_palette("deep")
+sns.reset_defaults()
+matplotlib.use("Agg")
+if find_executable("latex"):
+    matplotlib.rc("text", usetex=True)
+plt.rcParams["font.family"] = "serif"
+plt.rcParams["font.serif"] = "Times New Roman"
+plt.rcParams["figure.autolayout"] = True
 
 
 def is_notebook() -> bool:
@@ -44,16 +51,6 @@ if is_notebook():
     from tqdm.notebook import tqdm
 else:
     from tqdm import tqdm
-
-sns.reset_defaults()
-
-from distutils.spawn import find_executable
-
-if find_executable("latex"):
-    matplotlib.rc("text", usetex=True)
-plt.rcParams["font.family"] = "serif"
-plt.rcParams["font.serif"] = "Times New Roman"
-plt.rcParams["figure.autolayout"] = True
 
 
 # https://stackoverflow.com/questions/65840698/how-to-make-r2-score-in-nn-lstm-pytorch
@@ -96,8 +93,6 @@ def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
     sns.barplot(y, x, palette=palette, **kwargs)
     # ax.set_xlim([0, 1])
     ax.set_xlabel("Permutation feature importance")
-
-    from matplotlib.patches import Rectangle
 
     legend = ax.legend(
         handles=[
