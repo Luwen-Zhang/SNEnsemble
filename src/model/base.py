@@ -1,3 +1,7 @@
+import numpy as np
+import pandas as pd
+import torch.optim.optimizer
+
 from src.utils import *
 from src.trainer import Trainer, save_trainer
 import skopt
@@ -5,10 +9,29 @@ from skopt import gp_minimize
 import torch.utils.data as Data
 import torch.nn as nn
 from copy import deepcopy as cp
+from typing import *
+from skopt.space import Real, Integer, Categorical
 
 
 class AbstractModel:
-    def __init__(self, trainer: Trainer = None, program=None, model_subset=None):
+    def __init__(
+        self,
+        trainer: Trainer = None,
+        program: str = None,
+        model_subset: List[str] = None,
+    ):
+        """
+        The base class for all model-bases.
+
+        Parameters
+        ----------
+        trainer:
+            A trainer instance that contains all information and datasets. The trainer has loaded configs and data.
+        program:
+            The name of the modelbase. If None, the name from :func:`_get_program_name` is used.
+        model_subset:
+            The names of specific models selected in the modelbase. Only these models will be trained.
+        """
         self.trainer = trainer
         if not hasattr(trainer, "database"):
             trainer.load_config(default_configfile="base_config")
@@ -21,16 +44,41 @@ class AbstractModel:
 
     def fit(
         self,
-        df,
-        cont_feature_names: list,
-        cat_feature_names: list,
-        label_name: list,
-        model_subset: list = None,
-        derived_data: dict = None,
-        verbose=True,
-        warm_start=False,
-        bayes_opt=False,
+        df: pd.DataFrame,
+        cont_feature_names: List[str],
+        cat_feature_names: List[str],
+        label_name: List[str],
+        model_subset: List[str] = None,
+        derived_data: Dict[str, np.ndarray] = None,
+        verbose: bool = True,
+        warm_start: bool = False,
+        bayes_opt: bool = False,
     ):
+        """
+        Fit models using a tabular dataset. Data of the trainer will be changed.
+
+        Parameters
+        ----------
+        df:
+            A tabular dataset.
+        cont_feature_names:
+            The names of continuous features.
+        cat_feature_names:
+            The names of categorical features.
+        label_name:
+            The name of the target.
+        model_subset:
+            The names of a subset of all available models (in :func:`get_model_names`). Only these models will be
+            trained.
+        derived_data:
+            Data derived from :func:`Trainer.derive_unstacked`. If not None, unstacked data will be re-derived.
+        verbose:
+            Verbosity.
+        warm_start:
+            Whether to train models based on previous trained models.
+        bayes_opt:
+            Whether to perform Gaussian-process-based Bayesian Hyperparameter Optimization for each model.
+        """
         self.trainer.set_data(
             df,
             cont_feature_names=cont_feature_names,
@@ -55,8 +103,18 @@ class AbstractModel:
         )
 
     def train(self, *args, **kwargs):
-        # Training the model using data in the trainer directly.
-        # The method can be rewritten to implement other training strategies.
+        """
+        Training the model using data in the trainer directly.
+        The method can be rewritten to implement other training strategies.
+
+        Parameters
+        ----------
+        *args:
+            Arguments of :func:`_train` for models.
+        **kwargs:
+            Arguments of :func:`_train` for models.
+        """
+
         verbose = "verbose" not in kwargs.keys() or kwargs["verbose"]
         if verbose:
             print(f"\n-------------Run {self.program}-------------\n")
@@ -65,8 +123,27 @@ class AbstractModel:
             print(f"\n-------------{self.program} End-------------\n")
 
     def predict(
-        self, df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
-    ):
+        self, df: pd.DataFrame, model_name: str, derived_data: dict = None, **kwargs
+    ) -> np.ndarray:
+        """
+        Predict a new dataset using the selected model.
+
+        Parameters
+        ----------
+        df:
+            A new tabular dataset.
+        model_name:
+            A selected name of a model, which is already trained.
+        derived_data:
+            Data derived from :func:`Trainer.derive_unstacked`. If not None, unstacked data will be re-derived.
+        **kwargs:
+            Arguments of :func:`_predict` for models.
+
+        Returns
+        -------
+        prediction:
+            Predicted target.
+        """
         if self.model is None:
             raise Exception("Run fit() before predict().")
         if model_name not in self.get_model_names():
@@ -103,7 +180,29 @@ class AbstractModel:
             df, model_name, self.trainer.sort_derived_data(derived_data), **kwargs
         )
 
-    def _base_train_data_preprocess(self):
+    def _base_train_data_preprocess(
+        self,
+    ) -> Tuple[
+        pd.DataFrame,
+        Dict[str, np.ndarray],
+        np.ndarray,
+        pd.DataFrame,
+        Dict[str, np.ndarray],
+        np.ndarray,
+        pd.DataFrame,
+        Dict[str, np.ndarray],
+        np.ndarray,
+    ]:
+        """
+        Load tabular training/validation/testing datasets from the trainer.
+
+        Returns
+        -------
+        datasets:
+            The training datasets: X_train, D_train, y_train;
+            The validation datasets: X_val, D_val, y_val;
+            The testing datasets: X_test, D_test, y_test
+        """
         label_name = self.trainer.label_name
         df = self.trainer.df
         train_indices = self.trainer.train_indices
@@ -126,7 +225,25 @@ class AbstractModel:
         )
         return X_train, D_train, y_train, X_val, D_val, y_val, X_test, D_test, y_test
 
-    def _predict_all(self, verbose=True, test_data_only=False):
+    def _predict_all(
+        self, verbose: bool = True, test_data_only: bool = False
+    ) -> Dict[str, Dict]:
+        """
+        Predict training/validation/testing datasets to evaluate the performance of all models.
+
+        Parameters
+        ----------
+        verbose:
+            Verbosity.
+        test_data_only:
+            Whether to predict only testing datasets. If True, the whole dataset will be evaluated.
+
+        Returns
+        -------
+        predictions:
+            A dict of results. Its keys are "Training", "Testing", and "Validation". Its values are tuples containing
+            predicted values and ground truth values
+        """
         self._check_train_status()
 
         model_names = self.get_model_names()
@@ -173,7 +290,28 @@ class AbstractModel:
         enable_tqdm()
         return predictions
 
-    def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
+    def _predict(
+        self, df: pd.DataFrame, model_name: str, derived_data: Dict = None, **kwargs
+    ) -> np.ndarray:
+        """
+        Make prediction based on a tabular dataset using the selected model.
+
+        Parameters
+        ----------
+        df:
+            A new tabular dataset.
+        model_name:
+            A name of a selected model, which is already trained.
+        derived_data:
+            Data derived from :func:`Trainer.derive_unstacked`. If not None, unstacked data will be re-derived.
+        **kwargs:
+            Ignored.
+
+        Returns
+        -------
+        pred:
+            Prediction of the target.
+        """
         X_df, derived_data = self._data_preprocess(
             df, derived_data, model_name=model_name
         )
@@ -186,12 +324,30 @@ class AbstractModel:
 
     def _train(
         self,
-        model_subset=None,
-        dump_trainer=True,
-        verbose=True,
-        warm_start=False,
+        model_subset: List[str] = None,
+        dump_trainer: bool = True,
+        verbose: bool = True,
+        warm_start: bool = False,
         **kwargs,
     ):
+        """
+        The basic framework of training models, including processing the dataset, training each model (with/without
+        bayesian hyperparameter optimization), and make simple predictions.
+
+        Parameters
+        ----------
+        model_subset:
+            The names of a subset of all available models (in :func:`get_model_names`). Only these models will be
+            trained.
+        dump_trainer:
+            Whether to save the trainer after models are trained.
+        verbose:
+            Verbosity.
+        warm_start:
+            Whether to train models based on previous trained models.
+        **kwargs:
+            Ignored.
+        """
         # disable_tqdm()
         data = self._base_train_data_preprocess()
         (
@@ -304,12 +460,30 @@ class AbstractModel:
             save_trainer(self.trainer)
 
     def _check_train_status(self):
+        """
+        Raise exception if _predict is called and the modelbase is not trained.
+        """
         if not self._trained:
             raise Exception(
                 f"{self.program} not trained, run {self.__class__.__name__}.train() first."
             )
 
-    def _get_params(self, model_name, verbose=True):
+    def _get_params(self, model_name: str, verbose=True) -> Dict[str, Any]:
+        """
+        Load default parameters or optimized parameters of the selected model.
+
+        Parameters
+        ----------
+        model_name:
+            The name of a selected model.
+        verbose:
+            Verbosity
+
+        Returns
+        -------
+        params:
+            A dict of parameters
+        """
         if model_name not in self.model_params.keys():
             return self._initial_values(model_name=model_name)
         else:
@@ -318,18 +492,29 @@ class AbstractModel:
             return self.model_params[model_name]
 
     @property
-    def _trained(self):
+    def _trained(self) -> bool:
         if self.model is None:
             return False
         else:
             return True
 
     def _mkdir(self):
+        """
+        Create a directory for the modelbase under the root of the trainer.
+        """
         self.root = self.trainer.project_root + self.program + "/"
         if not os.path.exists(self.root):
             os.mkdir(self.root)
 
-    def get_model_names(self):
+    def get_model_names(self) -> List[str]:
+        """
+        Get names of available models. It can be selected when initializing the modelbase.
+
+        Returns
+        -------
+        names:
+            Names of available models.
+        """
         if self.model_subset is not None:
             for model in self.model_subset:
                 if model not in self._get_model_names():
@@ -338,61 +523,212 @@ class AbstractModel:
         else:
             return self._get_model_names()
 
-    def _get_model_names(self):
+    def _get_model_names(self) -> List[str]:
+        """
+        Get all available models implemented in the modelbase.
+
+        Returns
+        -------
+        names:
+            Names of available models.
+        """
         raise NotImplementedError
 
-    def _get_program_name(self):
+    def _get_program_name(self) -> str:
+        """
+        Get the default name of the modelbase.
+
+        Returns
+        -------
+        name:
+            The default name of the modelbase.
+        """
         raise NotImplementedError
 
     # Following methods are for the default _train and _predict methods. If users directly overload _train and _predict,
     # following methods are not required to be implemented.
-    def _new_model(self, model_name, verbose, **kwargs):
+    def _new_model(self, model_name: str, verbose: bool, **kwargs):
+        """
+        Generate a new selected model based on kwargs.
+
+        Parameters
+        ----------
+        model_name:
+            The name of a selected model.
+        verbose:
+            Verbosity.
+        **kwargs:
+            Parameters to generate the model. It contains all arguments in :func:`_initial_values`.
+
+        Returns
+        -------
+        model:
+            A new model (without any restriction). It will be passed to :func:`_train_single_model` and
+            :func:`_pred_single_model`.
+        """
         raise NotImplementedError
 
     def _train_data_preprocess(
         self,
-        X_train,
-        D_train,
-        y_train,
-        X_val,
-        D_val,
-        y_val,
-        X_test,
-        D_test,
-        y_test,
+        X_train: pd.DataFrame,
+        D_train: Dict[str, np.ndarray],
+        y_train: np.ndarray,
+        X_val: pd.DataFrame,
+        D_val: Dict[str, np.ndarray],
+        y_val: np.ndarray,
+        X_test: pd.DataFrame,
+        D_test: Dict[str, np.ndarray],
+        y_test: np.ndarray,
     ):
+        """
+        Processing the dataset returned by :func:`_base_train_data_preprocess`. Returned values will be passed to
+        :func:`_train_single_model` and :func:`_pred_single_model`. This function can be used to train e.g. imputers
+        and scalers.
+
+        Parameters
+        ----------
+        The training datasets: X_train, D_train, y_train;
+        The validation datasets: X_val, D_val, y_val;
+        The testing datasets: X_test, D_test, y_test
+
+        Returns
+        -------
+        The training datasets: X_train, D_train, y_train;
+        The validation datasets: X_val, D_val, y_val;
+        The testing datasets: X_test, D_test, y_test
+        """
         raise NotImplementedError
 
-    def _data_preprocess(self, df, derived_data, model_name):
+    def _data_preprocess(
+        self, df: pd.DataFrame, derived_data: Dict[str, np.ndarray], model_name: str
+    ) -> Tuple[pd.DataFrame, Dict[str, np.ndarray]]:
+        """
+        Perform the same preprocessing as :func:`_train_data_preprocess` on a new dataset.
+
+        Parameters
+        ----------
+        df:
+            The new tabular dataset.
+        derived_data:
+            Data derived from :func:`Trainer.derive_unstacked`.
+        model_name:
+            The name of a selected model.
+
+        Returns
+        -------
+        data:
+            The processed tabular dataset and derived data.
+        """
         raise NotImplementedError
 
     def _train_single_model(
         self,
-        model,
-        epoch,
-        X_train,
-        D_train,
-        y_train,
-        X_val,
-        D_val,
-        y_val,
-        verbose,
-        warm_start,
+        model: Any,
+        epoch: Optional[int],
+        X_train: Any,
+        D_train: Any,
+        y_train: np.ndarray,
+        X_val: Any,
+        D_val: Any,
+        y_val: Any,
+        verbose: bool,
+        warm_start: bool,
         **kwargs,
     ):
+        """
+        Training the model (initialized in :func:`_new_model`).
+
+        Parameters
+        ----------
+        model:
+            The model initialized in :func:`_new_model`.
+        epoch:
+            Total epochs to train the model.
+        X_train:
+            The training data from :func:`_train_data_preprocess`.
+        D_train:
+            The training derived data from :func:`_train_data_preprocess`.
+        y_train:
+            The training target from :func:`_train_data_preprocess`.
+        X_val:
+            The validation data from :func:`_train_data_preprocess`.
+        D_val:
+            The validation derived data from :func:`_train_data_preprocess`.
+        y_val:
+            The validation target from :func:`_train_data_preprocess`.
+        verbose:
+            Verbosity.
+        warm_start:
+            Whether to train models based on previous trained models.
+        **kwargs:
+            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
+        """
         raise NotImplementedError
 
-    def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+    def _pred_single_model(
+        self, model: Any, X_test: Any, D_test: Any, verbose: bool, **kwargs
+    ) -> np.ndarray:
+        """
+        Predict with the model trained in :func:`_train_single_model`.
+
+        Parameters
+        ----------
+        model:
+            The model trained in :func:`_train_single_model`.
+        X_test:
+            The testing data from :func:`_train_data_preprocess`.
+        D_test:
+            The testing derived data from :func:`_train_data_preprocess`.
+        verbose:
+            Verbosity.
+        **kwargs:
+            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
+
+        Returns
+        -------
+        pred:
+            Prediction of the target.
+        """
         raise NotImplementedError
 
-    def _space(self, model_name):
+    def _space(self, model_name: str) -> List[Union[Integer, Real, Categorical]]:
+        """
+        A list of scikit-optimize search space for the selected model.
+
+        Parameters
+        ----------
+        model_name:
+            The name of a selected model that is currently going through bayes optimization.
+
+        Returns
+        -------
+        space:
+            A list of skopt.space.
+        """
         raise NotImplementedError
 
-    def _initial_values(self, model_name):
+    def _initial_values(self, model_name: str) -> Dict[str, Union[int, float]]:
+        """
+        Initial values of hyperparameters to be optimized. The order should be the same as those in :func:`_space`.
+
+        Parameters
+        ----------
+        model_name:
+            The name of a selected model.
+
+        Returns
+        -------
+        params:
+            A dict of initial hyperparameters.
+        """
         raise NotImplementedError
 
 
 class BayesCallback:
+    """
+    Show a tqdm progress bar when performing bayes optimization.
+    """
+
     def __init__(self, bar):
         self.bar = bar
         self.postfix = {
@@ -420,12 +756,41 @@ class BayesCallback:
 
 
 class TorchModel(AbstractModel):
+    """
+    The specific class for PyTorch-like models. Some abstract methods in AbstractModel are implemented.
+    """
+
     def __init__(self, trainer=None, program=None, model_subset=None):
         super(TorchModel, self).__init__(
             trainer, program=program, model_subset=model_subset
         )
 
-    def _train_step(self, model, train_loader, optimizer, loss_fn):
+    def _train_step(
+        self,
+        model: nn.Module,
+        train_loader: Data.DataLoader,
+        optimizer: torch.optim.Optimizer,
+        loss_fn: nn.Module,
+    ) -> float:
+        """
+        Train a torch.nn.Module model in a single epoch.
+
+        Parameters
+        ----------
+        model:
+            The torch model initialized in :func:`_new_model`.
+        train_loader:
+            The DataLoader of the training dataset.
+        optimizer:
+            A torch optimizer.
+        loss_fn:
+            A torch loss function.
+
+        Returns
+        -------
+        loss:
+            The loss of the model on the training dataset.
+        """
         model.train()
         avg_loss = 0
         for idx, tensors in enumerate(train_loader):
@@ -442,7 +807,26 @@ class TorchModel(AbstractModel):
         avg_loss /= len(train_loader.dataset)
         return avg_loss
 
-    def _test_step(self, model, test_loader, loss_fn):
+    def _test_step(
+        self, model: nn.Module, test_loader: Data.DataLoader, loss_fn: nn.Module
+    ) -> Tuple[np.ndarray, np.ndarray, float]:
+        """
+        Evaluate a torch.nn.Module model in a single epoch.
+
+        Parameters
+        ----------
+        model:
+            The torch model initialized in :func:`_new_model`.
+        test_loader:
+            The DataLoader of the testing dataset.
+        loss_fn:
+            A torch loss function.
+
+        Returns
+        -------
+        results:
+            The prediction, ground truth, and loss of the model on the testing dataset.
+        """
         model.eval()
         pred = []
         truth = []
@@ -599,12 +983,35 @@ class TorchModel(AbstractModel):
 
 
 class AbstractNN(nn.Module):
-    def __init__(self, trainer):
+    def __init__(self, trainer: Trainer):
+        """
+        PyTorch model that contains derived data names and dimensions from the trainer.
+
+        Parameters
+        ----------
+        trainer:
+            A Trainer instance.
+        """
         super(AbstractNN, self).__init__()
         self.derived_feature_names = list(trainer.derived_data.keys())
         self.derived_feature_dims = trainer.get_derived_data_sizes()
 
-    def forward(self, *tensors):
+    def forward(self, *tensors: torch.Tensor) -> torch.Tensor:
+        """
+        A wrapper of the original forward of nn.Module. Input data are tensors with no names, but their names are
+        obtained during initialization, so that a dict of derived data with names is generated and passed to
+        :func:`_forward`.
+
+        Parameters
+        ----------
+        tensors:
+            Input tensors to the torch model.
+
+        Returns
+        -------
+        result:
+            The obtained tensor.
+        """
         x = tensors[0]
         additional_tensors = tensors[1:]
         derived_tensors = {}
@@ -612,5 +1019,7 @@ class AbstractNN(nn.Module):
             derived_tensors[name] = tensor
         return self._forward(x, derived_tensors)
 
-    def _forward(self, x, derived_tensors):
+    def _forward(
+        self, x: torch.Tensor, derived_tensors: Dict[str, torch.Tensor]
+    ) -> torch.Tensor:
         raise NotImplementedError

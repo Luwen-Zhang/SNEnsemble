@@ -427,7 +427,7 @@ class AbstractSklearnImputer(AbstractImputer):
         input_data.loc[:, self.record_imputed_features] = res
         return input_data
 
-    def _new_imputer(self) -> Optional[sklearn.impute._base._BaseImputer, Any]:
+    def _new_imputer(self):
         """
         Get a sklearn-style imputer.
 
@@ -617,7 +617,7 @@ class AbstractSplitter:
     The base class for data-splitters that split the dataset and return training, validation and testing indices.
     """
 
-    def __init__(self, train_val_test: Optional[List, np.ndarray] = None):
+    def __init__(self, train_val_test: Optional[Union[List, np.ndarray]] = None):
         self.train_val_test = (
             np.array([0.6, 0.2, 0.2])
             if train_val_test is None
