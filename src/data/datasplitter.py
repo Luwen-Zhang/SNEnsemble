@@ -2,9 +2,14 @@ from src.utils import *
 from src.data import AbstractSplitter
 import inspect
 from sklearn.model_selection import train_test_split
+from typing import Type
 
 
 class RandomSplitter(AbstractSplitter):
+    """
+    Randomly split the dataset.
+    """
+
     def __int__(self, train_val_test=None):
         super(RandomSplitter, self).__init__(train_val_test)
 
@@ -31,7 +36,12 @@ def mat_lay_index(chosen_mat_lay, mat_lay):
 
 
 class MaterialSplitter(AbstractSplitter):
-    def __int__(self, train_val_test=None):
+    """
+    Split the dataset by the material code to simulate the scenario of designing new materials.
+    Training/validation/testing datasets will contain entirely different materials.
+    """
+
+    def __init__(self, train_val_test=None):
         super(MaterialSplitter, self).__init__(train_val_test)
 
     def _split(self, df, cont_feature_names, cat_feature_names, label_name):
@@ -63,7 +73,14 @@ class MaterialSplitter(AbstractSplitter):
 
 
 class MaterialCycleSplitter(AbstractSplitter):
-    def __int__(self, train_val_test=None):
+    """
+    Split the dataset by the material code and the number of cycles to simulate the scenario of designing new materials
+    using limited data from accelerated fatigue tests. Training/validation/testing datasets will contain entirely
+    different materials, and validation/testing sets contain data that have larger number of cycles than the training
+    set (even much larger in the testing set).
+    """
+
+    def __init__(self, train_val_test=None):
         super(MaterialCycleSplitter, self).__init__(train_val_test)
 
     def _split(self, df, cont_feature_names, cat_feature_names, label_name):
@@ -108,7 +125,13 @@ class MaterialCycleSplitter(AbstractSplitter):
 
 
 class CycleSplitter(AbstractSplitter):
-    def __int__(self, train_val_test=None):
+    """
+    Split the dataset by the material code and the number of cycles to simulate the scenario of prediction using
+    limited data from accelerated fatigue tests. Validation/testing sets contain data that have larger number of cycles
+    than the training set (even much larger in the testing set).
+    """
+
+    def __init__(self, train_val_test=None):
         super(CycleSplitter, self).__init__(train_val_test)
 
     def _split(self, df, cont_feature_names, cat_feature_names, label_name):
@@ -161,7 +184,7 @@ for name, cls in clsmembers:
         splitter_mapping[name] = cls
 
 
-def get_data_splitter(name: str):
+def get_data_splitter(name: str) -> Type[AbstractSplitter]:
     if name not in splitter_mapping.keys():
         raise Exception(f"Data splitter {name} not implemented.")
     elif not issubclass(splitter_mapping[name], AbstractSplitter):

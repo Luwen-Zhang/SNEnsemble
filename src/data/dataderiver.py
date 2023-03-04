@@ -4,9 +4,17 @@ from copy import deepcopy as cp
 import itertools
 import inspect
 from scipy.interpolate import CubicSpline
+from typing import Type
 
 
 class DegLayerDeriver(AbstractDeriver):
+    """
+    Derive the number of layers in 0/45/90/other degree according to the laminate sequence code. Required arguments are:
+
+    sequence_column: str
+        The column of laminate sequence codes (for instance, "0/45/90/45/0").
+    """
+
     def __init__(self):
         super(DegLayerDeriver, self).__init__()
 
@@ -48,6 +56,15 @@ class DegLayerDeriver(AbstractDeriver):
 
 
 class RelativeDeriver(AbstractDeriver):
+    """
+    Dividing a feature by another to derive a new feature. Required arguments are:
+
+    absolute_col: str
+        The feature that needs to be divided.
+    relative2_col: str
+        The feature that acts as the denominator.
+    """
+
     def __init__(self):
         super(RelativeDeriver, self).__init__()
 
@@ -76,6 +93,15 @@ class RelativeDeriver(AbstractDeriver):
 
 
 class MinStressDeriver(AbstractDeriver):
+    """
+    Calculate minimum stress using maximum stress and R-value. Required arguments are:
+
+    max_stress_col: str
+        The name of maximum stress
+    r_value_col: str
+        The name of R-value
+    """
+
     def __init__(self):
         super(MinStressDeriver, self).__init__()
 
@@ -102,6 +128,17 @@ class MinStressDeriver(AbstractDeriver):
 
 
 class WalkerStressDeriver(AbstractDeriver):
+    """
+    Calculate Walker equivalent stress. Required arguments are:
+
+    max_stress_col: str
+        The name of maximum stress
+    r_value_col: str
+        The name of R-value
+    power_index: float
+        The power index of the walker equivalent stress. If is 0.5, it coincides with SWT equivalent stress.
+    """
+
     def __init__(self):
         super(WalkerStressDeriver, self).__init__()
 
@@ -249,6 +286,23 @@ class DriveCoeffDeriver(AbstractDeriver):
 
 
 class SuppStressDeriver(AbstractDeriver):
+    """
+    Calculate absolute values of maximum stress, stress amplitude (Peak-to-peak) and mean stress. Their corresponding
+    relative stresses (relative to static modulus) are also calculated. For the maximum stress, the larger one of
+    tensile and compressive stresses is selected. Required arguments are:
+
+    max_stress_col: str
+        The name of maximum stress
+    min_stress_col: str
+        The name of minimum stress
+    ucs_col: str
+        The name of ultimate compressive stress
+    uts_col: str
+        The name of ultimate tensile stress
+    relative: bool
+        Whether to calculate relative stresses.
+    """
+
     def __init__(self):
         super(SuppStressDeriver, self).__init__()
 
@@ -346,7 +400,7 @@ for name, cls in clsmembers:
         deriver_mapping[name] = cls
 
 
-def get_data_deriver(name: str):
+def get_data_deriver(name: str) -> Type[AbstractDeriver]:
     if name not in deriver_mapping.keys():
         raise Exception(f"Data deriver {name} not implemented.")
     elif not issubclass(deriver_mapping[name], AbstractDeriver):

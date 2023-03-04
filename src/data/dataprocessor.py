@@ -11,9 +11,14 @@ from sklearn.model_selection import KFold
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import StandardScaler as skStandardScaler
 from sklearn.preprocessing import OrdinalEncoder
+from typing import Type
 
 
 class LackDataMaterialRemover(AbstractProcessor):
+    """
+    Remove materials with fewer data (last 80%).
+    """
+
     def __init__(self):
         super(LackDataMaterialRemover, self).__init__()
 
@@ -36,6 +41,13 @@ class LackDataMaterialRemover(AbstractProcessor):
 
 
 class MaterialSelector(AbstractProcessor):
+    """
+    Select data with the specified material code. Required arguments:
+
+    m_code: str
+        The selected material code.
+    """
+
     def __init__(self):
         super(MaterialSelector, self).__init__()
 
@@ -62,6 +74,15 @@ class MaterialSelector(AbstractProcessor):
 
 
 class FeatureValueSelector(AbstractProcessor):
+    """
+    Select data with the specified feature value. Required arguments:
+
+    feature: str
+        The feature that will be filtered.
+    value: float
+        The specified feature value.
+    """
+
     def __init__(self):
         super(FeatureValueSelector, self).__init__()
 
@@ -97,6 +118,11 @@ class FeatureValueSelector(AbstractProcessor):
 
 
 class IQRRemover(AbstractProcessor):
+    """
+    Remove outliers using IQR strategy. Outliers are those
+    out of the range [25-percentile - 1.5 * IQR, 75-percentile + 1.5 * IQR], where IQR = 75-percentile - 25-percentile.
+    """
+
     def __init__(self):
         super(IQRRemover, self).__init__()
 
@@ -127,6 +153,10 @@ class IQRRemover(AbstractProcessor):
 
 
 class StdRemover(AbstractProcessor):
+    """
+    Remove outliers using standard error strategy. Outliers are those out of the range of 3sigma.
+    """
+
     def __init__(self):
         super(StdRemover, self).__init__()
 
@@ -152,6 +182,10 @@ class StdRemover(AbstractProcessor):
 
 
 class NaNFeatureRemover(AbstractFeatureSelector):
+    """
+    Remove features that contain no valid value.
+    """
+
     def __init__(self):
         super(NaNFeatureRemover, self).__init__()
 
@@ -167,6 +201,21 @@ class NaNFeatureRemover(AbstractFeatureSelector):
 
 
 class RFEFeatureSelector(AbstractFeatureSelector):
+    """
+    Select features using recursive feature elimination, adapted from the implementation of RFECV in sklearn.
+    Available arguments:
+
+    n_estimators: int
+        The number of trees used in random forests.
+    step: int
+        The number of eliminated features at each step.
+    min_features_to_select: int
+        The minimum number of features.
+    method: str
+        The method of calculating importance. "auto" for default impurity-based method implemented in
+        RandomForestRegressor, and "shap" for SHAP value (which may slow down the program but is more accurate).
+    """
+
     def __init__(self):
         super(RFEFeatureSelector, self).__init__()
 
@@ -224,6 +273,13 @@ class RFEFeatureSelector(AbstractFeatureSelector):
 
 
 class VarianceFeatureSelector(AbstractFeatureSelector):
+    """
+    Remove features that almost (by a certain fraction) contain an identical value. Required arguments:
+
+    thres: float
+        If more than thres * 100 percent of values are the same, the feature is removed.
+    """
+
     def __init__(self):
         super(VarianceFeatureSelector, self).__init__()
 
@@ -238,6 +294,17 @@ class VarianceFeatureSelector(AbstractFeatureSelector):
 
 
 class CorrFeatureSelector(AbstractFeatureSelector):
+    """
+    Select features that are not correlated (in the sense of Pearson correlation). Correlated features will be ranked
+    by SHAP using RandomForestRegressor, and the feature with the highest importance will be selected.
+    Required arguments:
+
+    thres:
+        The threshold of pearson correlation.
+    n_estimators:
+        The number of trees used in random forests.
+    """
+
     def __init__(self):
         super(CorrFeatureSelector, self).__init__()
 
@@ -319,6 +386,11 @@ class CorrFeatureSelector(AbstractFeatureSelector):
 
 
 class UnscaledDataRecorder(AbstractTransformer):
+    """
+    Record unscaled data in the trainer. This processor MUST be inserted before ANY AbstractTransformer (like a
+    StandardScaler). The recorded data will be used to generate Trainer.df.
+    """
+
     def __init__(self):
         super(UnscaledDataRecorder, self).__init__()
 
@@ -347,6 +419,10 @@ class UnscaledDataRecorder(AbstractTransformer):
 
 
 class StandardScaler(AbstractTransformer):
+    """
+    The standard scaler implemented using StandardScaler from sklearn.
+    """
+
     def __init__(self):
         super(StandardScaler, self).__init__()
 
@@ -367,6 +443,11 @@ class StandardScaler(AbstractTransformer):
 
 
 class CategoricalOrdinalEncoder(AbstractTransformer):
+    """
+    The categorical feature encoder that transform string values to unique integer values, implemented using
+    OrdinalEncoder from sklearn.
+    """
+
     def __init__(self):
         super(CategoricalOrdinalEncoder, self).__init__()
 
@@ -406,7 +487,7 @@ for name, cls in clsmembers:
         processor_mapping[name] = cls
 
 
-def get_data_processor(name: str):
+def get_data_processor(name: str) -> Type[AbstractProcessor]:
     if name not in processor_mapping.keys():
         raise Exception(f"Data processor {name} not implemented.")
     elif not issubclass(processor_mapping[name], AbstractProcessor):

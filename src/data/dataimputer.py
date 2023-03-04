@@ -7,9 +7,14 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
+from typing import Type
 
 
 class NaNImputer(AbstractImputer):
+    """
+    Remove all data with NaN.
+    """
+
     def __init__(self):
         super(NaNImputer, self).__init__()
 
@@ -24,6 +29,10 @@ class NaNImputer(AbstractImputer):
 
 
 class MiceLightgbmImputer(AbstractImputer):
+    """
+    An implementation of MICE with lightgbm.
+    """
+
     def __init__(self):
         super(MiceLightgbmImputer, self).__init__()
 
@@ -56,6 +65,10 @@ class MiceLightgbmImputer(AbstractImputer):
 
 
 class MiceImputer(AbstractSklearnImputer):
+    """
+    An implementation of MICE by sklearn.
+    """
+
     def __init__(self):
         super(MiceImputer, self).__init__()
 
@@ -73,6 +86,10 @@ class MiceImputer(AbstractSklearnImputer):
 
 
 class MissForestImputer(AbstractSklearnImputer):
+    """
+    MICE-Random forest implemented using sklearn.
+    """
+
     def __init__(self):
         super(MissForestImputer, self).__init__()
 
@@ -91,6 +108,10 @@ class MissForestImputer(AbstractSklearnImputer):
 
 
 class GainImputer(AbstractSklearnImputer):
+    """
+    Imputation using GAIN.
+    """
+
     def __init__(self):
         super(GainImputer, self).__init__()
 
@@ -101,6 +122,10 @@ class GainImputer(AbstractSklearnImputer):
 
 
 class MeanImputer(AbstractSklearnImputer):
+    """
+    Imputation with average values implemented using sklearn's SimpleImputer.
+    """
+
     def __init__(self):
         super(MeanImputer, self).__init__()
 
@@ -109,6 +134,10 @@ class MeanImputer(AbstractSklearnImputer):
 
 
 class MedianImputer(AbstractSklearnImputer):
+    """
+    Imputation with median values implemented using sklearn's SimpleImputer.
+    """
+
     def __init__(self):
         super(MedianImputer, self).__init__()
 
@@ -117,6 +146,10 @@ class MedianImputer(AbstractSklearnImputer):
 
 
 class ModeImputer(AbstractSklearnImputer):
+    """
+    Imputation with mode values implemented using sklearn's SimpleImputer.
+    """
+
     def __init__(self):
         super(ModeImputer, self).__init__()
 
@@ -131,7 +164,7 @@ for name, cls in clsmembers:
         imputer_mapping[name] = cls
 
 
-def get_data_imputer(name: str):
+def get_data_imputer(name: str) -> Type[AbstractImputer]:
     if name not in imputer_mapping.keys():
         raise Exception(f"Data imputer {name} not implemented.")
     elif not issubclass(imputer_mapping[name], AbstractImputer):
