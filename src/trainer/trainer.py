@@ -2083,28 +2083,7 @@ class Trainer:
 
     @staticmethod
     def _metric_sklearn(y_true, y_pred, metric):
-        if metric == "mse":
-            from sklearn.metrics import mean_squared_error
-
-            return mean_squared_error(y_true, y_pred)
-        elif metric == "rmse":
-            from sklearn.metrics import mean_squared_error
-
-            return np.sqrt(mean_squared_error(y_true, y_pred))
-        elif metric == "mae":
-            from sklearn.metrics import mean_absolute_error
-
-            return mean_absolute_error(y_true, y_pred)
-        elif metric == "mape":
-            from sklearn.metrics import mean_absolute_percentage_error
-
-            return mean_absolute_percentage_error(y_true, y_pred)
-        elif metric == "r2":
-            from sklearn.metrics import r2_score
-
-            return r2_score(y_true, y_pred)
-        else:
-            raise Exception(f"Metric {metric} not implemented.")
+        return metric_sklearn(y_true, y_pred, metric)
 
     def _plot_truth_pred(
         self,
