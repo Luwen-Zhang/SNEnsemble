@@ -399,7 +399,7 @@ class AbstractModel:
                         )
 
                     pred = self._pred_single_model(model, X_val, D_val, verbose=False)
-                    res = Trainer._metric_sklearn(pred, y_val, self.trainer.loss)
+                    res = metric_sklearn(pred, y_val, self.trainer.loss)
                     return res
 
                 with warnings.catch_warnings():
@@ -445,7 +445,7 @@ class AbstractModel:
             test_pred = self._pred_single_model(
                 self.model[model_name], X_test, D_test, verbose=False
             )
-            test_res = Trainer._metric_sklearn(test_pred, y_test, self.trainer.loss)
+            test_res = metric_sklearn(test_pred, y_test, self.trainer.loss)
 
             if verbose:
                 if self.trainer.loss == "mse":
