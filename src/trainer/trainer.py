@@ -22,13 +22,33 @@ sys.path.append("configs/")
 
 
 class Trainer:
-    def __init__(self, device="cpu", project=None):
+    def __init__(self, device: str = "cpu", project: str = None):
+        """
+        The bridge of all modules. It contains all configurations and data. It can analyze the dataset (correlation,
+        description, etc.), train model-bases, and evaluate results (including feature importance, partial dependency,
+        etc.).
+
+        Parameters
+        ----------
+        device:
+            Device on which models are trained. Choose from "cuda" and "cpu".
+        project:
+            The name of the trainer.
+        """
         self.device = device
         self.project = project
         self.modelbases = []
         self.modelbases_names = []
 
     def add_modelbases(self, models: list):
+        """
+        Add a list of model-bases and check whether their names conflict.
+
+        Parameters
+        ----------
+        models:
+            A list of AbstractModels.
+        """
         self.modelbases += models
         self.modelbases_names = [x.program for x in self.modelbases]
         if len(self.modelbases_names) != len(list(set(self.modelbases_names))):
@@ -646,8 +666,7 @@ class Trainer:
         ).to(self.device)
 
         D = [
-            torch.tensor(value, dtype=torch.float32).to(self.device)
-            for value in self.derived_data.values()
+            torch.tensor(value).to(self.device) for value in self.derived_data.values()
         ]
         dataset = Data.TensorDataset(X, *D, y)
 

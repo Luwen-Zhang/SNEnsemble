@@ -9,28 +9,84 @@ def init_weights(m):
 
 
 class NN(AbstractNN):
-    def __init__(self, n_inputs, n_outputs, layers, trainer):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        embedding_dim=10,
+        n_hidden=3,
+        lstm_layers=1,
+    ):
         super(NN, self).__init__(trainer)
         num_inputs = n_inputs
         num_outputs = n_outputs
-
+        self.run_any = False
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
-        self.nets = [
-            get_sequential(layers, dims[-1], 1, nn.ReLU)
-            for dims in self.derived_feature_dims
-        ]
-        self.weight = get_sequential([32], len(self.nets) + 1, num_outputs, nn.ReLU)
+        if "categorical" in self.derived_feature_names:
+            self.cat_net = get_sequential(
+                layers, self.derived_feature_names_dims["categorical"][-1], 1, nn.ReLU
+            )
+            self.run_cat = True
+            self.run_any = True
+        else:
+            self.run_cat = False
+
+        self.n_hidden = n_hidden
+        self.embedding_dim = embedding_dim
+        self.lstm_layers = lstm_layers
+        if "Number of Layers" in self.derived_feature_names:
+            self.seq_lstm = nn.LSTM(
+                input_size=embedding_dim,
+                hidden_size=n_hidden,
+                num_layers=lstm_layers,
+                batch_first=True,
+            )
+            # The input degree would be in range [-90, 100] (where 100 is the padding value). It will be transformed to
+            # [0, 190] by adding 100, so the number of categories (vocab) will be 191
+            self.embedding = nn.Embedding(
+                num_embeddings=191, embedding_dim=embedding_dim
+            )
+            self.run_lstm = True
+            self.run_any = True
+        else:
+            self.run_lstm = False
+
+        if self.run_any:
+            self.w = get_sequential(
+                [32],
+                self.net.output.out_features + int(self.run_cat) + int(self.run_lstm),
+                num_outputs,
+                nn.ReLU,
+            )
 
     def _forward(self, x, derived_tensors):
-        if len(derived_tensors) > 0:
-            x = [self.net(x)] + [
-                net(y) for net, y in zip(self.nets, derived_tensors.values())
-            ]
-            x = torch.concat(x, dim=1)
-            output = self.weight(x)
-        else:
-            output = self.net(x)
+        all_res = [self.net(x)]
 
+        if self.run_cat:
+            all_res += [self.cat_net(derived_tensors["categorical"].to(torch.float32))]
+        if self.run_lstm:
+            seq = derived_tensors["Lay-up Sequence"]
+            lens = derived_tensors["Number of Layers"]
+            h_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden)
+            c_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden)
+
+            seq_embed = self.embedding(seq + 90)
+            seq_packed = nn.utils.rnn.pack_padded_sequence(
+                seq_embed,
+                torch.flatten(lens),
+                batch_first=True,
+                enforce_sorted=False,
+            )
+            # We don't need all hidden states for all hidden LSTM cell (which is the first returned value), but only
+            # the last hidden state.
+            _, (h_t, _) = self.seq_lstm(seq_packed, (h_0, c_0))
+            all_res += [torch.mean(h_t, dim=[0, 2]).view(-1, 1)]
+
+        output = torch.concat(all_res, dim=1)
+        if self.run_any:
+            output = self.w(output)
         return output
 
 
