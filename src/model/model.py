@@ -624,7 +624,7 @@ class MLP(TorchModel):
 
     def _new_model(self, model_name, verbose, **kwargs):
         set_torch_random(0)
-        return NN(
+        return MLPNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
             self.trainer.layers if self.layers is None else self.layers,
@@ -633,6 +633,66 @@ class MLP(TorchModel):
 
     def _get_model_names(self):
         return ["MLP"]
+
+
+class CatEmbedLSTM(TorchModel):
+    def __init__(self, trainer=None, program=None, layers=None, model_subset=None):
+        super(CatEmbedLSTM, self).__init__(
+            trainer, program=program, model_subset=model_subset
+        )
+        self.layers = layers
+
+    def _get_program_name(self):
+        return "CatEmbedLSTM"
+
+    def _new_model(self, model_name, verbose, **kwargs):
+        set_torch_random(0)
+        return CatEmbedLSTMNN(
+            len(self.trainer.cont_feature_names),
+            len(self.trainer.label_name),
+            self.trainer.layers if self.layers is None else self.layers,
+            trainer=self.trainer,
+            cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
+            lstm_embedding_dim=kwargs["lstm_embedding_dim"],
+            cat_embedding_dim=kwargs["cat_embedding_dim"],
+            n_hidden=kwargs["n_hidden"],
+        ).to(self.trainer.device)
+
+    def _get_optimizer(self, model, warm_start, **kwargs):
+        # return torch.optim.Adam(
+        #     model.parameters(),
+        #     lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
+        #     weight_decay=kwargs["weight_decay"],
+        # )
+        return torch.optim.SGD(
+            model.parameters(),
+            lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
+            weight_decay=kwargs["weight_decay"],
+        )
+
+    def _get_model_names(self):
+        return ["CatEmbedLSTM"]
+
+    def _space(self, model_name):
+        return [
+            Integer(
+                low=3, high=100, prior="uniform", name="lstm_embedding_dim", dtype=int
+            ),
+            Integer(
+                low=3, high=100, prior="uniform", name="cat_embedding_dim", dtype=int
+            ),
+            Integer(low=3, high=10, prior="uniform", name="n_hidden", dtype=int),
+        ] + self.trainer.SPACE
+
+    def _initial_values(self, model_name):
+        return {
+            "lstm_embedding_dim": 10,
+            "cat_embedding_dim": 10,
+            "n_hidden": 3,
+            "lr": self.trainer.chosen_params["lr"],
+            "weight_decay": self.trainer.chosen_params["weight_decay"],
+            "batch_size": self.trainer.chosen_params["batch_size"],
+        }
 
 
 class RFE(TorchModel):

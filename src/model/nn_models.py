@@ -1,6 +1,7 @@
 from src.utils import *
 from src.model import AbstractNN
 import torch.nn as nn
+from typing import *
 
 
 def init_weights(m):
@@ -8,25 +9,66 @@ def init_weights(m):
         torch.nn.init.kaiming_normal_(m.weight)
 
 
-class NN(AbstractNN):
+class MLPNN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, trainer):
+        super(MLPNN, self).__init__(trainer)
+        num_inputs = n_inputs
+        num_outputs = n_outputs
+        self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
+        self.nets = [
+            get_sequential(layers, dims[-1], 1, nn.ReLU)
+            for dims in self.derived_feature_dims
+        ]
+        self.weight = get_sequential([32], len(self.nets) + 1, num_outputs, nn.ReLU)
+
+    def _forward(self, x, derived_tensors):
+        if len(derived_tensors) > 0:
+            x = [self.net(x)] + [
+                net(y.to(torch.float32))
+                for net, y in zip(self.nets, derived_tensors.values())
+            ]
+            x = torch.concat(x, dim=1)
+            output = self.weight(x)
+        else:
+            output = self.net(x)
+
+        return output
+
+
+class CatEmbedLSTMNN(AbstractNN):
     def __init__(
         self,
         n_inputs,
         n_outputs,
         layers,
         trainer,
-        embedding_dim=10,
+        cat_num_unique: List[int] = None,
+        cat_embedding_dim=10,
+        lstm_embedding_dim=10,
         n_hidden=3,
         lstm_layers=1,
     ):
-        super(NN, self).__init__(trainer)
+        super(CatEmbedLSTMNN, self).__init__(trainer)
         num_inputs = n_inputs
         num_outputs = n_outputs
         self.run_any = False
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
+        self.cont_norm = nn.LayerNorm(num_inputs)
+
+        self.cat_embedding_dim = cat_embedding_dim
         if "categorical" in self.derived_feature_names:
-            self.cat_net = get_sequential(
-                layers, self.derived_feature_names_dims["categorical"][-1], 1, nn.ReLU
+            # See pytorch_widedeep.models.tabular.embeddings_layers.SameSizeCatEmbeddings
+            self.cat_embeds = [
+                nn.Embedding(
+                    num_embeddings=num_unique + 1,
+                    embedding_dim=cat_embedding_dim,
+                    padding_idx=0,
+                )
+                for num_unique in cat_num_unique
+            ]
+            self.cat_dropout = nn.Dropout(0.1)
+            self.cat_encoder = get_sequential(
+                [32], cat_embedding_dim, len(cat_num_unique), nn.ReLU
             )
             self.run_cat = True
             self.run_any = True
@@ -34,11 +76,11 @@ class NN(AbstractNN):
             self.run_cat = False
 
         self.n_hidden = n_hidden
-        self.embedding_dim = embedding_dim
+        self.lstm_embedding_dim = lstm_embedding_dim
         self.lstm_layers = lstm_layers
         if "Number of Layers" in self.derived_feature_names:
             self.seq_lstm = nn.LSTM(
-                input_size=embedding_dim,
+                input_size=lstm_embedding_dim,
                 hidden_size=n_hidden,
                 num_layers=lstm_layers,
                 batch_first=True,
@@ -46,7 +88,7 @@ class NN(AbstractNN):
             # The input degree would be in range [-90, 100] (where 100 is the padding value). It will be transformed to
             # [0, 190] by adding 100, so the number of categories (vocab) will be 191
             self.embedding = nn.Embedding(
-                num_embeddings=191, embedding_dim=embedding_dim
+                num_embeddings=191, embedding_dim=lstm_embedding_dim
             )
             self.run_lstm = True
             self.run_any = True
@@ -56,16 +98,25 @@ class NN(AbstractNN):
         if self.run_any:
             self.w = get_sequential(
                 [32],
-                self.net.output.out_features + int(self.run_cat) + int(self.run_lstm),
+                self.net.output.out_features
+                + int(self.run_cat) * len(cat_num_unique)
+                + int(self.run_lstm),
                 num_outputs,
                 nn.ReLU,
             )
 
     def _forward(self, x, derived_tensors):
-        all_res = [self.net(x)]
+        all_res = [self.net(self.cont_norm(x))]
 
         if self.run_cat:
-            all_res += [self.cat_net(derived_tensors["categorical"].to(torch.float32))]
+            cat = derived_tensors["categorical"].long()
+            x_cat_embeds = [
+                self.cat_embeds[i](cat[:, i]).unsqueeze(1) for i in range(cat.size(1))
+            ]
+            x_cat = torch.cat(x_cat_embeds, 1)
+            x_cat = self.cat_dropout(x_cat)
+            x_cat = self.cat_encoder(x_cat).squeeze(-1)
+            all_res += [x_cat]
         if self.run_lstm:
             seq = derived_tensors["Lay-up Sequence"]
             lens = derived_tensors["Number of Layers"]
@@ -157,12 +208,16 @@ class ThisWorkRidgeNN(AbstractNN):
 
 def get_sequential(layers, n_inputs, n_outputs, act_func):
     net = nn.Sequential()
-    net.add_module("input", nn.Linear(n_inputs, layers[0]))
-    net.add_module("activate", act_func())
-    for idx in range(len(layers) - 1):
-        net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
-        net.add_module("activate" + str(idx), act_func())
-    net.add_module("output", nn.Linear(layers[-1], n_outputs))
+    if len(layers) > 0:
+        net.add_module("input", nn.Linear(n_inputs, layers[0]))
+        net.add_module("activate", act_func())
+        for idx in range(len(layers) - 1):
+            net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
+            net.add_module("activate" + str(idx), act_func())
+        net.add_module("output", nn.Linear(layers[-1], n_outputs))
+    else:
+        net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
+        net.add_module("activate", act_func())
 
     net.apply(init_weights)
     return net
