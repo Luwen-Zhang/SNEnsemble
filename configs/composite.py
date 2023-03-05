@@ -91,22 +91,22 @@ class config(BaseConfig):
                         "stacked": True,
                     },
                 ),
-                # (
-                #     "LayUpSequenceDeriver",
-                #     {
-                #         "sequence_column": "Sequence",
-                #         "derived_name": "Lay-up Sequence",
-                #         "stacked": False,
-                #     },
-                # ),
-                # (
-                #     "NumLayersDeriver",
-                #     {
-                #         "sequence_column": "Sequence",
-                #         "derived_name": "Number of Layers",
-                #         "stacked": False,
-                #     },
-                # )
+                (
+                    "LayUpSequenceDeriver",
+                    {
+                        "sequence_column": "Sequence",
+                        "derived_name": "Lay-up Sequence",
+                        "stacked": False,
+                    },
+                ),
+                (
+                    "NumLayersDeriver",
+                    {
+                        "sequence_column": "Sequence",
+                        "derived_name": "Number of Layers",
+                        "stacked": False,
+                    },
+                )
                 # (
                 #     "DriveCoeffDeriver",
                 #     {
