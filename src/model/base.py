@@ -917,11 +917,7 @@ class TorchModel(AbstractModel):
         warm_start,
         **kwargs,
     ):
-        optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
-            weight_decay=kwargs["weight_decay"],
-        )
+        optimizer = self._get_optimizer(model, warm_start, **kwargs)
 
         train_loader = Data.DataLoader(
             X_train.dataset,
@@ -980,6 +976,13 @@ class TorchModel(AbstractModel):
 
     def _initial_values(self, model_name):
         return self.trainer.chosen_params
+
+    def _get_optimizer(self, model, warm_start, **kwargs):
+        return torch.optim.Adam(
+            model.parameters(),
+            lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
+            weight_decay=kwargs["weight_decay"],
+        )
 
 
 class AbstractNN(nn.Module):
