@@ -995,6 +995,11 @@ class AbstractNN(nn.Module):
         super(AbstractNN, self).__init__()
         self.derived_feature_names = list(trainer.derived_data.keys())
         self.derived_feature_dims = trainer.get_derived_data_sizes()
+        self.derived_feature_names_dims = {}
+        for name, dim in zip(
+            trainer.derived_data.keys(), trainer.get_derived_data_sizes()
+        ):
+            self.derived_feature_names_dims[name] = dim
 
     def forward(self, *tensors: torch.Tensor) -> torch.Tensor:
         """
