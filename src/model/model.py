@@ -654,16 +654,16 @@ class CatEmbedLSTM(TorchModel):
         ).to(self.trainer.device)
 
     def _get_optimizer(self, model, warm_start, **kwargs):
-        # return torch.optim.Adam(
-        #     model.parameters(),
-        #     lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
-        #     weight_decay=kwargs["weight_decay"],
-        # )
-        return torch.optim.SGD(
+        return torch.optim.Adam(
             model.parameters(),
             lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
             weight_decay=kwargs["weight_decay"],
         )
+        # return torch.optim.SGD(
+        #     model.parameters(),
+        #     lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
+        #     weight_decay=kwargs["weight_decay"],
+        # )
 
     def _get_model_names(self):
         return ["CatEmbedLSTM"]
@@ -690,13 +690,13 @@ class CatEmbedLSTM(TorchModel):
 
     def _initial_values(self, model_name):
         return {
-            "lstm_embedding_dim": 10,
-            "cat_embedding_dim": 10,
-            "n_hidden": 10,
-            "lstm_layers": 1,
-            "lr": self.trainer.chosen_params["lr"],
-            "weight_decay": self.trainer.chosen_params["weight_decay"],
-            "batch_size": self.trainer.chosen_params["batch_size"],
+            "lstm_embedding_dim": 10,  # bayes-opt: 1000
+            "cat_embedding_dim": 10,  # bayes-opt: 1
+            "n_hidden": 10,  # bayes-opt: 1
+            "lstm_layers": 1,  # bayes-opt: 1
+            "lr": 0.003,  # bayes-opt: 0.0218894
+            "weight_decay": 0.002,  # bayes-opt: 0.05
+            "batch_size": 1024,  # bayes-opt: 32
         }
 
 
