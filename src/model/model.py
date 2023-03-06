@@ -130,8 +130,8 @@ class WideDeep(AbstractModel):
             TabFastFormer,
         )
         from pytorch_widedeep import Trainer as wd_Trainer
-        from pytorch_widedeep.callbacks import Callback, EarlyStopping
-        from typing import Optional, Dict
+        from pytorch_widedeep.callbacks import EarlyStopping
+        from src.utils.delay.widedeep_callback import WideDeepCallback
 
         cont_feature_names = self.trainer.cont_feature_names
         cat_feature_names = self.trainer.cat_feature_names
@@ -169,28 +169,6 @@ class WideDeep(AbstractModel):
             weight_decay=kwargs["weight_decay"],
         )
 
-        global _WideDeepCallback
-
-        class _WideDeepCallback(Callback):
-            def __init__(self):
-                super(_WideDeepCallback, self).__init__()
-                self.val_ls = []
-
-            def on_epoch_end(
-                callback_self,
-                epoch: int,
-                logs: Optional[Dict] = None,
-                metric: Optional[float] = None,
-            ):
-                train_loss = logs["train_loss"]
-                val_loss = logs["val_loss"]
-                callback_self.val_ls.append(val_loss)
-                if epoch % 20 == 0 and verbose:
-                    print(
-                        f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
-                        f"Min val loss: {np.min(callback_self.val_ls):.4f}"
-                    )
-
         wd_trainer = wd_Trainer(
             model,
             objective="regression",
@@ -201,7 +179,7 @@ class WideDeep(AbstractModel):
                     verbose=1 if verbose else 0,
                     restore_best_weights=True,
                 ),
-                _WideDeepCallback(),
+                WideDeepCallback(total_epoch=self.total_epoch, verbose=verbose),
             ],
             optimizers={"deeptabular": optimizer} if self.trainer.bayes_opt else None,
             num_workers=16,
@@ -290,10 +268,6 @@ class WideDeep(AbstractModel):
             "TabPerceiver",
             "TabFastFormer",
         ]
-
-
-class _WideDeepCallback:
-    pass
 
 
 class TabNet(AbstractModel):
