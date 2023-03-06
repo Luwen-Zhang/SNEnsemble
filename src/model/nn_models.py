@@ -42,6 +42,8 @@ class CatEmbedLSTMNN(AbstractNN):
         n_outputs,
         layers,
         trainer,
+        manual_activate_sn=None,
+        sn_coeff_vars_idx=None,
         cat_num_unique: List[int] = None,
         cat_embedding_dim=10,
         lstm_embedding_dim=10,
@@ -51,9 +53,36 @@ class CatEmbedLSTMNN(AbstractNN):
         super(CatEmbedLSTMNN, self).__init__(trainer)
         num_inputs = n_inputs
         num_outputs = n_outputs
-        self.run_any = False
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
         self.cont_norm = nn.LayerNorm(num_inputs)
+        from src.model.sn_formulas import sn_mapping
+
+        activated_sn = []
+        for key, sn in sn_mapping.items():
+            if sn.test_sn_vars(
+                trainer.cont_feature_names, list(trainer.derived_data.keys())
+            ) and (manual_activate_sn is None or key in manual_activate_sn):
+                activated_sn.append(
+                    sn(
+                        cont_feature_names=trainer.cont_feature_names,
+                        derived_feature_names=list(trainer.derived_data.keys()),
+                        s_zero_slip=trainer.get_zero_slip(sn.get_sn_vars()[0]),
+                        sn_coeff_vars_idx=sn_coeff_vars_idx,
+                    )
+                )
+        print(f"Activated SN models: {[sn.__class__.__name__ for sn in activated_sn]}")
+        if len(activated_sn) > 0:
+            self.sn_coeff_vars_idx = sn_coeff_vars_idx
+            self.activated_sn = nn.ModuleList(activated_sn)
+            self.sn_component_weights = get_sequential(
+                [16, 64, 128, 64, 16],
+                len(sn_coeff_vars_idx),
+                len(self.activated_sn),
+                nn.ReLU,
+            )
+            self.run_sn = True
+        else:
+            self.run_sn = False
 
         self.cat_embedding_dim = cat_embedding_dim
         if "categorical" in self.derived_feature_names:
@@ -71,7 +100,6 @@ class CatEmbedLSTMNN(AbstractNN):
                 [32], cat_embedding_dim, len(cat_num_unique), nn.ReLU
             )
             self.run_cat = True
-            self.run_any = True
         else:
             self.run_cat = False
 
@@ -91,14 +119,15 @@ class CatEmbedLSTMNN(AbstractNN):
                 num_embeddings=191, embedding_dim=lstm_embedding_dim
             )
             self.run_lstm = True
-            self.run_any = True
         else:
             self.run_lstm = False
 
+        self.run_any = self.run_sn or self.run_lstm or self.run_cat
         if self.run_any:
             self.w = get_sequential(
                 [32],
                 self.net.output.out_features
+                + int(self.run_sn)
                 + int(self.run_cat) * len(cat_num_unique)
                 + int(self.run_lstm),
                 num_outputs,
@@ -108,6 +137,21 @@ class CatEmbedLSTMNN(AbstractNN):
     def _forward(self, x, derived_tensors):
         all_res = [self.net(self.cont_norm(x))]
 
+        if self.run_sn:
+            x_sn = torch.concat(
+                [sn(x, derived_tensors) for sn in self.activated_sn],
+                dim=1,
+            )
+            x_sn = torch.mul(
+                x_sn,
+                nn.functional.normalize(
+                    torch.abs(self.sn_component_weights(x[:, self.sn_coeff_vars_idx])),
+                    p=1,
+                    dim=1,
+                ),
+            )
+            x_sn = torch.sum(x_sn, dim=1).view(-1, 1)
+            all_res += [x_sn]
         if self.run_cat:
             cat = derived_tensors["categorical"].long()
             x_cat_embeds = [

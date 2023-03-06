@@ -641,10 +641,18 @@ class MLP(TorchModel):
 
 
 class CatEmbedLSTM(TorchModel):
-    def __init__(self, trainer=None, program=None, layers=None, model_subset=None):
+    def __init__(
+        self,
+        trainer=None,
+        manual_activate_sn=None,
+        program=None,
+        layers=None,
+        model_subset=None,
+    ):
         super(CatEmbedLSTM, self).__init__(
             trainer, program=program, model_subset=model_subset
         )
+        self.manual_activate_sn = manual_activate_sn
         self.layers = layers
 
     def _get_program_name(self):
@@ -652,11 +660,18 @@ class CatEmbedLSTM(TorchModel):
 
     def _new_model(self, model_name, verbose, **kwargs):
         set_torch_random(0)
+        sn_coeff_vars_idx = [
+            self.trainer.cont_feature_names.index(name)
+            for name, type in self.trainer.args["feature_names_type"].items()
+            if self.trainer.args["feature_types"][type] == "Material"
+        ]
         return CatEmbedLSTMNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
             self.trainer.layers if self.layers is None else self.layers,
             trainer=self.trainer,
+            manual_activate_sn=self.manual_activate_sn,
+            sn_coeff_vars_idx=sn_coeff_vars_idx,
             cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
             lstm_embedding_dim=kwargs["lstm_embedding_dim"],
             cat_embedding_dim=kwargs["cat_embedding_dim"],
