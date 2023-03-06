@@ -171,7 +171,7 @@ class CatEmbedLSTMNN(AbstractNN):
             h_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden)
             c_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden)
 
-            seq_embed = self.embedding(seq + 90)
+            seq_embed = self.embedding(seq.long() + 90)
             seq_packed = nn.utils.rnn.pack_padded_sequence(
                 seq_embed,
                 torch.flatten(lens),
