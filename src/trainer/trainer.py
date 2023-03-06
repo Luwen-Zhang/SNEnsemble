@@ -1006,7 +1006,7 @@ class Trainer:
                         shuffle=False,
                     )
                     prediction, _, _ = modelbase._test_step(
-                        modelbase.model[model_name], loader, self.loss_fn
+                        modelbase.model[model_name], loader
                     )
                     loss = float(
                         self._metric_sklearn(ground_truth, prediction, self.loss)
