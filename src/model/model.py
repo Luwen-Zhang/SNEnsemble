@@ -676,6 +676,7 @@ class CatEmbedLSTM(TorchModel):
             lstm_embedding_dim=kwargs["lstm_embedding_dim"],
             cat_embedding_dim=kwargs["cat_embedding_dim"],
             n_hidden=kwargs["n_hidden"],
+            lstm_layers=kwargs["lstm_layers"],
         ).to(self.trainer.device)
 
     def _get_optimizer(self, model, warm_start, **kwargs):
@@ -696,19 +697,29 @@ class CatEmbedLSTM(TorchModel):
     def _space(self, model_name):
         return [
             Integer(
-                low=3, high=100, prior="uniform", name="lstm_embedding_dim", dtype=int
+                low=1,
+                high=1000,
+                prior="uniform",
+                name="lstm_embedding_dim",
+                dtype=int,
             ),
             Integer(
-                low=3, high=100, prior="uniform", name="cat_embedding_dim", dtype=int
+                low=1,
+                high=1000,
+                prior="uniform",
+                name="cat_embedding_dim",
+                dtype=int,
             ),
-            Integer(low=3, high=10, prior="uniform", name="n_hidden", dtype=int),
+            Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
+            Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
         ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
         return {
             "lstm_embedding_dim": 10,
             "cat_embedding_dim": 10,
-            "n_hidden": 3,
+            "n_hidden": 10,
+            "lstm_layers": 1,
             "lr": self.trainer.chosen_params["lr"],
             "weight_decay": self.trainer.chosen_params["weight_decay"],
             "batch_size": self.trainer.chosen_params["batch_size"],
