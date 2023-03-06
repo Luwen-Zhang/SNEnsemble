@@ -977,6 +977,22 @@ class TorchModel(AbstractModel):
         )
 
     def _loss_fn(self, y_true, y_pred, model=None):
+        """
+        User defined loss function.
+
+        Parameters
+        ----------
+        y_true:
+            Ground truth value.
+        y_pred:
+            Predicted value by the model.
+        model:
+            The model predicting y_pred.
+        Returns
+        -------
+        loss:
+            A torch-like loss.
+        """
         return self.trainer.loss_fn(y_pred, y_true)
 
     def count_params(self, model_name, trainable_only=False):
