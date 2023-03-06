@@ -9,7 +9,7 @@ class BaseConfig:
             "database": "composite",
             "loss": "mse",
             "bayes_opt": False,
-            "bayes_epoch": 3,
+            "bayes_epoch": 10,
             "patience": 50,
             "epoch": 200,
             "lr": 0.003,
