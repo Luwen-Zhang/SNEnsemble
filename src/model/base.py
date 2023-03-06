@@ -362,7 +362,8 @@ class AbstractModel:
             y_test,
         ) = self._train_data_preprocess(*data)
         self.total_epoch = self.trainer.args["epoch"]
-        self.model = {}
+        if self.model is None:
+            self.model = {}
 
         for model_name in (
             self.get_model_names() if model_subset is None else model_subset
