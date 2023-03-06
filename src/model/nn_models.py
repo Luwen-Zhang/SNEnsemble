@@ -200,7 +200,7 @@ class ThisWorkRidgeNN(AbstractNN):
         return output
 
 
-def get_sequential(layers, n_inputs, n_outputs, act_func, dropout=0.1):
+def get_sequential(layers, n_inputs, n_outputs, act_func, dropout=0):
     net = nn.Sequential()
     if len(layers) > 0:
         net.add_module("input", nn.Linear(n_inputs, layers[0]))
@@ -209,13 +209,15 @@ def get_sequential(layers, n_inputs, n_outputs, act_func, dropout=0.1):
             net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
             net.add_module(f"activate_{idx}", act_func())
             net.add_module(f"norm_{idx}", nn.LayerNorm(layers[idx + 1]))
-            net.add_module(f"dropout_{idx}", nn.Dropout(dropout))
+            if dropout != 0:
+                net.add_module(f"dropout_{idx}", nn.Dropout(dropout))
         net.add_module("output", nn.Linear(layers[-1], n_outputs))
     else:
         net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
         net.add_module("activate", act_func())
         net.add_module("norm", nn.LayerNorm(n_outputs))
-        net.add_module("dropout", nn.Dropout(dropout))
+        if dropout != 0:
+            net.add_module("dropout", nn.Dropout(dropout))
 
     net.apply(init_weights)
     return net
