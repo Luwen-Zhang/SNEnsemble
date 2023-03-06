@@ -446,15 +446,12 @@ class AbstractModel:
             test_pred = self._pred_single_model(
                 self.model[model_name], X_test, D_test, verbose=False
             )
-            test_res = metric_sklearn(test_pred, y_test, self.trainer.loss)
+            test_mse = metric_sklearn(test_pred, y_test, "mse")
 
             if verbose:
-                if self.trainer.loss == "mse":
-                    print(
-                        f"Test MSE loss: {test_res:.5f}, RMSE loss: {np.sqrt(test_res):.5f}"
-                    )
-                else:
-                    print(f"Test {self.trainer.loss} loss: {test_res:.5f}.")
+                print(
+                    f"Test MSE loss: {test_mse:.5f}, RMSE loss: {np.sqrt(test_mse):.5f}"
+                )
 
         # enable_tqdm()
         if dump_trainer:
@@ -734,18 +731,19 @@ class BayesCallback:
         self.bar = bar
         self.postfix = {
             "Current loss": 1e8,
+            "Current Params": [],
             "Minimum": 1e8,
-            "Params": [],
+            "Best Params": [],
             "Minimum at call": 0,
         }
         self.bar.set_postfix(**self.postfix)
 
     def call(self, result):
         self.postfix["Current loss"] = result.func_vals[-1]
-
+        self.postfix["Current Params"] = [round(x, 8) for x in result.x_iters[-1]]
         if result.fun < self.postfix["Minimum"]:
             self.postfix["Minimum"] = result.fun
-            self.postfix["Params"] = [round(x, 8) for x in result.x]
+            self.postfix["Best Params"] = [round(x, 8) for x in result.x]
             self.postfix["Minimum at call"] = len(result.func_vals)
 
         self.bar.set_postfix(**self.postfix)
