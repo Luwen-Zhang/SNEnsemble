@@ -1,44 +1,28 @@
 from src.utils import *
-from src.trainer import Trainer
 import torch.nn as nn
 from copy import deepcopy as cp
 import inspect
 
 
 class AbstractSN(nn.Module):
-    def __init__(self, trainer: Trainer):
+    def __init__(
+        self,
+        cont_feature_names,
+        derived_feature_names,
+        s_zero_slip,
+        sn_coeff_vars_idx,
+    ):
         super(AbstractSN, self).__init__()
-        self.sn_vars = self._get_sn_vars()
-        self.trainer = trainer
-        self.tabular_feature_names = self.trainer.cont_feature_names
-        self.derived_feature_names = list(self.trainer.derived_data.keys())
+        self.cont_feature_names = cp(cont_feature_names)
+        self.derived_feature_names = cp(derived_feature_names)
+        self.s_zero_slip = s_zero_slip
         self.feature_mapping = {}
         self.tabular_feature_indices = {}
-        self.to(trainer.device)
-        self.material_features = np.array(
-            list(self.trainer.args["feature_names_type"].keys())
-        )[
-            np.array(list(self.trainer.args["feature_names_type"].values()))
-            == self.trainer.args["feature_types"].index("Material")
-        ]
-        self.material_features_idx = np.array(
-            [
-                self.tabular_feature_names.index(name)
-                for name in self.material_features
-                if name in self.tabular_feature_names
-            ]
-        )
-        self.stress_unrelated_features_idx = np.array(
-            [
-                idx
-                for idx, name in enumerate(self.tabular_feature_names)
-                if "Stress" not in name
-            ]
-        )
+        self.sn_coeff_vars_idx = np.array(sn_coeff_vars_idx)
         from src.model.nn_models import get_sequential
 
         self.template_sequential = get_sequential(
-            n_inputs=len(self.stress_unrelated_features_idx),
+            n_inputs=len(self.sn_coeff_vars_idx),
             n_outputs=1,
             layers=[16, 32, 64, 32, 16],
             act_func=nn.ReLU,
@@ -49,12 +33,9 @@ class AbstractSN(nn.Module):
         self._get_sn_vars_idx()
 
     @classmethod
-    def test_sn_vars(cls, trainer):
-        for var in cls._get_sn_vars():
-            if (
-                not var in trainer.cont_feature_names
-                and not var in trainer.derived_data.keys()
-            ):
+    def test_sn_vars(cls, cont_feature_names, derived_feature_names):
+        for var in cls.get_sn_vars():
+            if not var in cont_feature_names and not var in derived_feature_names:
                 return False
         else:
             return True
@@ -64,25 +45,27 @@ class AbstractSN(nn.Module):
         return True
 
     def _check_sn_vars(self):
-        if not self.test_sn_vars(self.trainer):
+        if not self.test_sn_vars(self.cont_feature_names, self.derived_feature_names):
             raise Exception(
                 f"Required columns of {self.__class__.__name__} do not exist in Trainer.cont_feature_names, but "
                 f"it is included in selected SN models. Do not force adding any SN model."
             )
 
     def _get_sn_vars_idx(self):
-        for var in self.sn_vars:
-            if var in self.tabular_feature_names:
+        for var in self.get_sn_vars():
+            if var in self.cont_feature_names:
                 self.feature_mapping[var] = 0
-                self.tabular_feature_indices[var] = self.tabular_feature_names.index(
-                    var
-                )
+                self.tabular_feature_indices[var] = self.cont_feature_names.index(var)
             elif var in self.derived_feature_names:
                 self.feature_mapping[var] = 1
+            else:
+                raise Exception(
+                    f"Required sn variable {var} not found. Run test_sn_vars to check."
+                )
 
     def _get_var_slices(self, x, derived_tensors):
         var_slices = []
-        for var in self.sn_vars:
+        for var in self.get_sn_vars():
             if self.feature_mapping[var] == 0:
                 var_slices.append(x[:, self.tabular_feature_indices[var]].view(-1, 1))
             else:
@@ -90,7 +73,7 @@ class AbstractSN(nn.Module):
         return var_slices
 
     @staticmethod
-    def _get_sn_vars():
+    def get_sn_vars():
         raise NotImplementedError
 
     def _register_variable(self):
@@ -104,11 +87,8 @@ class AbstractSN(nn.Module):
 
 
 class linlogSN(AbstractSN):
-    def __init__(self, trainer: Trainer):
-        super(linlogSN, self).__init__(trainer)
-
     @staticmethod
-    def _get_sn_vars():
+    def get_sn_vars():
         return ["Absolute Maximum Stress"]
 
     def _register_variable(self):
@@ -117,7 +97,7 @@ class linlogSN(AbstractSN):
 
     def forward(self, x, derived_tensors):
         var_slices = self._get_var_slices(x, derived_tensors)
-        mat = x[:, self.stress_unrelated_features_idx]
+        mat = x[:, self.sn_coeff_vars_idx]
         a, b = -torch.abs(self.a(mat)), torch.abs(self.b(mat))
         return a * var_slices[0] + b
 
@@ -130,14 +110,10 @@ class linlogSN(AbstractSN):
 
 
 class loglogSN(linlogSN):
-    def __init__(self, trainer: Trainer):
-        super(loglogSN, self).__init__(trainer)
-        self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
-
     def forward(self, x, derived_tensors):
         var_slices = self._get_var_slices(x, derived_tensors)
         s = var_slices[0] - self.s_zero_slip
-        mat = x[:, self.stress_unrelated_features_idx]
+        mat = x[:, self.sn_coeff_vars_idx]
         a, b = -torch.abs(self.a(mat)), torch.abs(self.b(mat))
         return a * torch.log10(torch.abs(s) + 1e-5) + b
 
@@ -150,13 +126,9 @@ class loglogSN(linlogSN):
 
 
 class TrivialSN(linlogSN):
-    def __init__(self, trainer: Trainer):
-        super(TrivialSN, self).__init__(trainer)
-        self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
+    def _register_variable(self):
         self.s_min = 1e8
         self.s_max = -1e8
-
-    def _register_variable(self):
         self.a = cp(self.template_sequential)
         self.b = cp(self.template_sequential)
         self.c = cp(self.template_sequential)
@@ -173,7 +145,7 @@ class TrivialSN(linlogSN):
             self.s_min = np.min([self.s_min, torch.min(s).cpu().numpy()])
             self.s_max = np.max([self.s_max, torch.max(s).cpu().numpy()])
 
-        mat = x[:, self.stress_unrelated_features_idx]
+        mat = x[:, self.sn_coeff_vars_idx]
         a, b, c, d = (
             torch.clamp(torch.abs(self.a(mat)), self.s_min, self.s_max),
             -torch.abs(self.b(mat)),
@@ -188,17 +160,13 @@ class TrivialSN(linlogSN):
 
     @classmethod
     def activated(cls):
-        return True
+        return False
 
 
 class SigmoidSN(linlogSN):
-    def __init__(self, trainer: Trainer):
-        super(SigmoidSN, self).__init__(trainer)
-        self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
+    def _register_variable(self):
         self.s_min = 1e8
         self.s_max = -1e8
-
-    def _register_variable(self):
         self.a = cp(self.template_sequential)
         self.b = cp(self.template_sequential)
         self.c = cp(self.template_sequential)
@@ -215,7 +183,7 @@ class SigmoidSN(linlogSN):
             self.s_min = np.min([self.s_min, torch.min(s).cpu().numpy()])
             self.s_max = np.max([self.s_max, torch.max(s).cpu().numpy()])
 
-        mat = x[:, self.stress_unrelated_features_idx]
+        mat = x[:, self.sn_coeff_vars_idx]
         a, b, c, d = (
             -torch.abs(self.a(mat)),
             torch.abs(self.b(mat)).clamp(self.s_min, self.s_max),
@@ -230,17 +198,13 @@ class SigmoidSN(linlogSN):
 
 
 class KohoutSN(linlogSN):
-    def __init__(self, trainer: Trainer):
-        super(KohoutSN, self).__init__(trainer)
-        self.s_zero_slip = trainer.get_zero_slip(self._get_sn_vars()[0])
-
     def get_tex(self):
         raise NotImplementedError
 
     def forward(self, x, derived_tensors):
         var_slices = self._get_var_slices(x, derived_tensors)
         s = torch.abs(var_slices[0] - self.s_zero_slip) + 1
-        mat = x[:, self.stress_unrelated_features_idx]
+        mat = x[:, self.sn_coeff_vars_idx]
         a, b, B = (
             torch.abs(self.a(mat)) + 1e-4,
             -torch.abs(self.b(mat)) - 1e-4,

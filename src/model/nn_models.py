@@ -149,12 +149,10 @@ class ThisWorkNN(AbstractNN):
 
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
         self.activated_sn = nn.ModuleList(activated_sn)
-        self.stress_unrelated_features_idx = activated_sn[
-            0
-        ].stress_unrelated_features_idx
+        self.sn_coeff_vars_idx = activated_sn[0].sn_coeff_vars_idx
         self.component_weights = get_sequential(
             [16, 64, 128, 64, 16],
-            len(self.stress_unrelated_features_idx),
+            len(self.sn_coeff_vars_idx),
             len(self.activated_sn),
             nn.ReLU,
         )
@@ -168,9 +166,7 @@ class ThisWorkNN(AbstractNN):
         output = torch.mul(
             preds,
             nn.functional.normalize(
-                torch.abs(
-                    self.component_weights(x[:, self.stress_unrelated_features_idx])
-                ),
+                torch.abs(self.component_weights(x[:, self.sn_coeff_vars_idx])),
                 p=1,
                 dim=1,
             ),
@@ -187,9 +183,7 @@ class ThisWorkRidgeNN(AbstractNN):
 
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
         self.activated_sn = nn.ModuleList(activated_sn)
-        self.stress_unrelated_features_idx = activated_sn[
-            0
-        ].stress_unrelated_features_idx
+        self.sn_coeff_vars_idx = activated_sn[0].sn_coeff_vars_idx
         self.component_weights = torch.ones(
             [len(self.activated_sn), 1], requires_grad=False
         )

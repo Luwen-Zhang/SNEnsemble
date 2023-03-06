@@ -454,18 +454,8 @@ class ThisWork(TorchModel):
         return "ThisWork"
 
     def _new_model(self, model_name, verbose, **kwargs):
-        from src.model.sn_formulas import sn_mapping
-
         if self.activated_sn is None:
-            self.activated_sn = []
-            for key, sn in sn_mapping.items():
-                if sn.test_sn_vars(self.trainer) and (
-                    self.manual_activate is None or key in self.manual_activate
-                ):
-                    self.activated_sn.append(sn(self.trainer))
-            print(
-                f"Activated SN models: {[sn.__class__.__name__ for sn in self.activated_sn]}"
-            )
+            self.activated_sn = self._get_activated_sn()
         set_torch_random(0)
         return ThisWorkNN(
             len(self.trainer.cont_feature_names),
@@ -474,6 +464,31 @@ class ThisWork(TorchModel):
             activated_sn=self.activated_sn,
             trainer=self.trainer,
         ).to(self.trainer.device)
+
+    def _get_activated_sn(self):
+        from src.model.sn_formulas import sn_mapping
+
+        activated_sn = []
+        sn_coeff_vars_idx = [
+            self.trainer.cont_feature_names.index(name)
+            for name, type in self.trainer.args["feature_names_type"].items()
+            if self.trainer.args["feature_types"][type] == "Material"
+        ]
+        for key, sn in sn_mapping.items():
+            if sn.test_sn_vars(
+                self.trainer.cont_feature_names,
+                list(self.trainer.derived_data.keys()),
+            ) and (self.manual_activate is None or key in self.manual_activate):
+                activated_sn.append(
+                    sn(
+                        cont_feature_names=self.trainer.cont_feature_names,
+                        derived_feature_names=list(self.trainer.derived_data.keys()),
+                        s_zero_slip=self.trainer.get_zero_slip(sn.get_sn_vars()[0]),
+                        sn_coeff_vars_idx=sn_coeff_vars_idx,
+                    )
+                )
+        print(f"Activated SN models: {[sn.__class__.__name__ for sn in activated_sn]}")
+        return activated_sn
 
     def _get_model_names(self):
         return ["ThisWork"]
@@ -484,18 +499,8 @@ class ThisWorkRidge(ThisWork):
         return "ThisWorkRidge"
 
     def _new_model(self, model_name, verbose, **kwargs):
-        from src.model.sn_formulas import sn_mapping
-
         if self.activated_sn is None:
-            self.activated_sn = []
-            for key, sn in sn_mapping.items():
-                if sn.test_sn_vars(self.trainer) and (
-                    self.manual_activate is None or key in self.manual_activate
-                ):
-                    self.activated_sn.append(sn(self.trainer))
-            print(
-                f"Activated SN models: {[sn.__class__.__name__ for sn in self.activated_sn]}"
-            )
+            self.activated_sn = self._get_activated_sn()
         set_torch_random(0)
         return ThisWorkRidgeNN(
             len(self.trainer.cont_feature_names),

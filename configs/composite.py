@@ -37,12 +37,12 @@ class config(BaseConfig):
                 "Minimum Strain": 0,
                 "R-value": 0,
                 "Frequency": 0,
-                "Static Maximum Tensile Stress": 0,
-                "Static Maximum Compressive Stress": 0,
-                "Static Elastic Modulus": 0,
-                "Static Compressive Modulus": 0,
-                "Static Maximum Tensile Strain": 0,
-                "Static Maximum Compressive Strain": 0,
+                "Static Maximum Tensile Stress": 1,
+                "Static Maximum Compressive Stress": 1,
+                "Static Elastic Modulus": 1,
+                "Static Compressive Modulus": 1,
+                "Static Maximum Tensile Strain": 1,
+                "Static Maximum Compressive Strain": 1,
             },
             "data_derivers": [
                 (
