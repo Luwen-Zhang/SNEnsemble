@@ -56,7 +56,7 @@ class CatEmbedLSTMNN(AbstractNN):
         num_inputs = n_inputs
         num_outputs = n_outputs
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
-        self.cont_norm = nn.LayerNorm(num_inputs)
+        self.cont_norm = nn.BatchNorm1d(num_inputs)
         from src.model.sn_formulas import sn_mapping
 
         activated_sn = []
@@ -129,7 +129,7 @@ class CatEmbedLSTMNN(AbstractNN):
         self.run_any = self.run_sn or self.run_lstm or self.run_cat
         if self.run_any:
             self.w = get_sequential(
-                [32],
+                layers,
                 self.net.output.out_features
                 + int(self.run_sn)
                 + int(self.run_cat) * len(cat_num_unique)
@@ -256,14 +256,14 @@ def get_sequential(layers, n_inputs, n_outputs, act_func, dropout=0):
         for idx in range(len(layers) - 1):
             net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
             net.add_module(f"activate_{idx}", act_func())
-            net.add_module(f"norm_{idx}", nn.LayerNorm(layers[idx + 1]))
+            net.add_module(f"norm_{idx}", nn.BatchNorm1d(layers[idx + 1]))
             if dropout != 0:
                 net.add_module(f"dropout_{idx}", nn.Dropout(dropout))
         net.add_module("output", nn.Linear(layers[-1], n_outputs))
     else:
         net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
         net.add_module("activate", act_func())
-        net.add_module("norm", nn.LayerNorm(n_outputs))
+        net.add_module("norm", nn.BatchNorm1d(n_outputs))
         if dropout != 0:
             net.add_module("dropout", nn.Dropout(dropout))
 
