@@ -15,10 +15,12 @@ class MLPNN(AbstractNN):
         num_inputs = n_inputs
         num_outputs = n_outputs
         self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
-        self.nets = [
-            get_sequential(layers, dims[-1], 1, nn.ReLU)
-            for dims in self.derived_feature_dims
-        ]
+        self.nets = nn.ModuleList(
+            [
+                get_sequential(layers, dims[-1], 1, nn.ReLU)
+                for dims in self.derived_feature_dims
+            ]
+        )
         self.weight = get_sequential([32], len(self.nets) + 1, num_outputs, nn.ReLU)
 
     def _forward(self, x, derived_tensors):
@@ -87,14 +89,16 @@ class CatEmbedLSTMNN(AbstractNN):
         self.cat_embedding_dim = cat_embedding_dim
         if "categorical" in self.derived_feature_names:
             # See pytorch_widedeep.models.tabular.embeddings_layers.SameSizeCatEmbeddings
-            self.cat_embeds = [
-                nn.Embedding(
-                    num_embeddings=num_unique + 1,
-                    embedding_dim=cat_embedding_dim,
-                    padding_idx=0,
-                )
-                for num_unique in cat_num_unique
-            ]
+            self.cat_embeds = nn.ModuleList(
+                [
+                    nn.Embedding(
+                        num_embeddings=num_unique + 1,
+                        embedding_dim=cat_embedding_dim,
+                        padding_idx=0,
+                    )
+                    for num_unique in cat_num_unique
+                ]
+            )
             self.cat_dropout = nn.Dropout(0.1)
             self.cat_encoder = get_sequential(
                 [32], cat_embedding_dim, len(cat_num_unique), nn.ReLU
