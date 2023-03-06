@@ -979,6 +979,18 @@ class TorchModel(AbstractModel):
     def _loss_fn(self, y_true, y_pred, model=None):
         return self.trainer.loss_fn(y_pred, y_true)
 
+    def count_params(self, model_name, trainable_only=False):
+        if self.model is not None and model_name in self.model.keys():
+            model = self.model[model_name]
+        else:
+            model = self._new_model(
+                model_name, verbose=False, **self._get_params(model_name, verbose=False)
+            )
+        if trainable_only:
+            return sum(p.numel() for p in model.parameters() if p.requires_grad)
+        else:
+            return sum(p.numel() for p in model.parameters())
+
 
 class AbstractNN(nn.Module):
     def __init__(self, trainer: Trainer):
