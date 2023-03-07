@@ -443,15 +443,17 @@ class AbstractModel:
                 **tmp_params,
             )
 
-            test_pred = self._pred_single_model(
-                self.model[model_name], X_test, D_test, verbose=False
-            )
-            test_mse = metric_sklearn(test_pred, y_test, "mse")
-
-            if verbose:
-                print(
-                    f"Test MSE loss: {test_mse:.5f}, RMSE loss: {np.sqrt(test_mse):.5f}"
+            def pred_set(X, D, y, name):
+                pred = self._pred_single_model(
+                    self.model[model_name], X, D, verbose=False
                 )
+                mse = metric_sklearn(pred, y, "mse")
+                if verbose:
+                    print(f"{name} MSE loss: {mse:.5f}, RMSE loss: {np.sqrt(mse):.5f}")
+
+            pred_set(X_train, D_train, y_train, "Training")
+            pred_set(X_val, D_val, y_val, "Validation")
+            pred_set(X_test, D_test, y_test, "Testing")
 
         # enable_tqdm()
         if dump_trainer:
