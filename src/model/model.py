@@ -661,11 +661,6 @@ class CatEmbedLSTM(TorchModel):
             lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
             weight_decay=kwargs["weight_decay"],
         )
-        # return torch.optim.SGD(
-        #     model.parameters(),
-        #     lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
-        #     weight_decay=kwargs["weight_decay"],
-        # )
 
     def _get_model_names(self):
         return ["CatEmbedLSTM"]
