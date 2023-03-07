@@ -459,6 +459,68 @@ class SuppStressDeriver(AbstractDeriver):
         return stresses
 
 
+class SampleWeightDeriver(AbstractDeriver):
+    """
+    Derive weight for each sample in the dataset.
+    """
+
+    def __init__(self):
+        super(SampleWeightDeriver, self).__init__()
+
+    def _required_cols(self, **kwargs):
+        return []
+
+    def _required_params(self, **kwargs):
+        return []
+
+    def _defaults(self):
+        return dict(stacked=False, intermediate=False)
+
+    def _derive(
+        self,
+        df,
+        trainer,
+        **kwargs,
+    ):
+        train_idx = trainer.train_indices
+        cont_feature_names = trainer.cont_feature_names
+        cat_feature_names = trainer.cat_feature_names
+        weight = np.ones((len(df), 1))
+        for feature in cont_feature_names:
+            # We can only calculate distributions based on known data, i.e. the training set.
+            Q1 = np.percentile(
+                df.loc[train_idx, feature].dropna(axis=0), 25, interpolation="midpoint"
+            )
+            Q3 = np.percentile(
+                df.loc[train_idx, feature].dropna(axis=0), 75, interpolation="midpoint"
+            )
+            IQR = Q3 - Q1
+            if IQR == 0:
+                continue
+            upper = df.index[np.where(df[feature] >= (Q3 + 1.5 * IQR))[0]]
+            lower = df.index[np.where(df[feature] <= (Q1 - 1.5 * IQR))[0]]
+            idx = np.union1d(upper, lower)
+            if len(idx) == 0:
+                continue
+            p_outlier = len(idx) / len(df)
+            feature_weight = -np.log10(p_outlier)
+            weight[idx] *= 1.0 + 0.1 * feature_weight
+
+        for feature in cat_feature_names:
+            cnts = df[feature].value_counts()
+            unique_values = np.array(cnts.index)
+            p_unique_values = cnts.values / len(df)
+            feature_weight = np.abs(
+                np.log10(p_unique_values) - np.log10(max(p_unique_values))
+            )
+            for value, w in zip(unique_values, feature_weight):
+                where_value = df.index[np.where(df[feature] == value)[0]]
+                weight[where_value] *= 1.0 + 0.1 * w
+
+        weight = weight / np.sum(weight) * len(df)
+        return weight
+
+
 deriver_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:

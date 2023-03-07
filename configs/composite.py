@@ -106,7 +106,14 @@ class config(BaseConfig):
                         "derived_name": "Number of Layers",
                         "stacked": False,
                     },
-                )
+                ),
+                (
+                    "SampleWeightDeriver",
+                    {
+                        "derived_name": "Sample Weight",
+                        "stacked": False,
+                    },
+                ),
                 # (
                 #     "DriveCoeffDeriver",
                 #     {
