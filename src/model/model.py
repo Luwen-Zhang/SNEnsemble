@@ -697,6 +697,17 @@ class CatEmbedLSTM(TorchModel):
         }
 
 
+class BiasCatEmbedLSTM(CatEmbedLSTM):
+    def _loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        base_loss = self.trainer.loss_fn(y_pred, y_true)
+        if not model.training:
+            return base_loss
+        else:
+            where_weight = list(self.trainer.derived_data.keys()).index("Sample Weight")
+            w = data[1 + where_weight]
+            return (base_loss * w).mean()
+
+
 class RFE(TorchModel):
     def __init__(
         self,
