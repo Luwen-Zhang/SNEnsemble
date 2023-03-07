@@ -484,7 +484,7 @@ class ThisWorkRidge(ThisWork):
             trainer=self.trainer,
         ).to(self.trainer.device)
 
-    def _train_step(self, model, train_loader, optimizer):
+    def _train_step(self, model, train_loader, optimizer, **kwargs):
         model.train()
         avg_loss = 0
         for idx, tensors in enumerate(train_loader):
@@ -494,7 +494,9 @@ class ThisWorkRidge(ThisWork):
             additional_tensors = tensors[1 : len(tensors) - 1]
             y = model(*([data] + additional_tensors))
             self.ridge(model, yhat)
-            loss = self._loss_fn(yhat, y, model)
+            loss = self._loss_fn(
+                yhat, y, model, *([data] + additional_tensors), **kwargs
+            )
             loss.backward()
             optimizer.step()
             avg_loss += loss.item() * len(y)

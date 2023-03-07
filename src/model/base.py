@@ -769,6 +769,7 @@ class TorchModel(AbstractModel):
         model: nn.Module,
         train_loader: Data.DataLoader,
         optimizer: torch.optim.Optimizer,
+        **kwargs,
     ) -> float:
         """
         Train a torch.nn.Module model in a single epoch.
@@ -781,6 +782,8 @@ class TorchModel(AbstractModel):
             The DataLoader of the training dataset.
         optimizer:
             A torch optimizer.
+        **kwargs:
+            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
 
         Returns
         -------
@@ -795,7 +798,9 @@ class TorchModel(AbstractModel):
             data = tensors[0]
             additional_tensors = tensors[1 : len(tensors) - 1]
             y = model(*([data] + additional_tensors))
-            loss = self._loss_fn(yhat, y, model)
+            loss = self._loss_fn(
+                yhat, y, model, *([data] + additional_tensors), **kwargs
+            )
             loss.backward()
             optimizer.step()
             avg_loss += loss.item() * len(y)
@@ -804,7 +809,7 @@ class TorchModel(AbstractModel):
         return avg_loss
 
     def _test_step(
-        self, model: nn.Module, test_loader: Data.DataLoader
+        self, model: nn.Module, test_loader: Data.DataLoader, **kwargs
     ) -> Tuple[np.ndarray, np.ndarray, float]:
         """
         Evaluate a torch.nn.Module model in a single epoch.
@@ -815,6 +820,8 @@ class TorchModel(AbstractModel):
             The torch model initialized in :func:`_new_model`.
         test_loader:
             The DataLoader of the testing dataset.
+        **kwargs:
+            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
 
         Returns
         -------
@@ -832,7 +839,9 @@ class TorchModel(AbstractModel):
                 data = tensors[0]
                 additional_tensors = tensors[1 : len(tensors) - 1]
                 y = model(*([data] + additional_tensors))
-                loss = self._loss_fn(yhat, y, model)
+                loss = self._loss_fn(
+                    yhat, y, model, *([data] + additional_tensors), **kwargs
+                )
                 avg_loss += loss.item() * len(y)
                 pred += list(y.cpu().detach().numpy())
                 truth += list(yhat.cpu().detach().numpy())
@@ -931,9 +940,9 @@ class TorchModel(AbstractModel):
         )
 
         for i_epoch in range(epoch):
-            train_loss = self._train_step(model, train_loader, optimizer)
+            train_loss = self._train_step(model, train_loader, optimizer, **kwargs)
             train_ls.append(train_loss)
-            _, _, val_loss = self._test_step(model, val_loader)
+            _, _, val_loss = self._test_step(model, val_loader, **kwargs)
             val_ls.append(val_loss)
 
             if verbose and ((i_epoch + 1) % 20 == 0 or i_epoch == 0):
@@ -960,7 +969,7 @@ class TorchModel(AbstractModel):
             print(f"Minimum loss: {min_loss:.5f}")
 
     def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
-        y_test_pred, _, _ = self._test_step(model, X_test)
+        y_test_pred, _, _ = self._test_step(model, X_test, **kwargs)
         return y_test_pred
 
     def _space(self, model_name):
@@ -976,7 +985,7 @@ class TorchModel(AbstractModel):
             weight_decay=kwargs["weight_decay"],
         )
 
-    def _loss_fn(self, y_true, y_pred, model=None):
+    def _loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         """
         User defined loss function.
 
@@ -988,6 +997,11 @@ class TorchModel(AbstractModel):
             Predicted value by the model.
         model:
             The model predicting y_pred.
+        *data:
+            Tensors of continuous data and derived data.
+        **kwargs:
+            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
+
         Returns
         -------
         loss:
