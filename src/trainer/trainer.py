@@ -795,6 +795,7 @@ class Trainer:
     def cross_validation(
         self, programs, n_random, verbose, test_data_only, type="random"
     ):
+        set_random_seed(0)
         programs_predictions = {}
         for program in programs:
             programs_predictions[program] = {}
