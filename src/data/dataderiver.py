@@ -41,7 +41,7 @@ class DegLayerDeriver(AbstractDeriver):
         ]
 
         deg_layers = np.zeros(
-            (len(sequence), 4), dtype=np.int
+            (len(sequence), 4), dtype=int
         )  # for 0-deg, pm45-deg, 90-deg, and other directions respectively
 
         for idx, seq in enumerate(sequence):
@@ -79,7 +79,7 @@ class NumLayersDeriver(DegLayerDeriver):
             [int(y) if y != "nan" else 0 for y in str(x).split("/")]
             for x in df[sequence_column].values
         ]
-        n_layers = np.zeros((len(df), 1), dtype=np.int)
+        n_layers = np.zeros((len(df), 1), dtype=int)
         for idx, x in enumerate(sequence):
             n_layers[idx, 0] = len(x)
 
@@ -116,7 +116,7 @@ class LayUpSequenceDeriver(DegLayerDeriver):
         longest_dim = max([len(x) for x in sequence])
 
         padded_sequence = [x + [pad_value] * (longest_dim - len(x)) for x in sequence]
-        seq = np.array(padded_sequence, dtype=np.int)
+        seq = np.array(padded_sequence, dtype=int)
 
         return seq
 
