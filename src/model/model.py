@@ -1,3 +1,5 @@
+import warnings
+
 from src.utils import *
 from src.model import AbstractModel, TorchModel
 from src.trainer import Trainer, save_trainer
@@ -239,6 +241,11 @@ class WideDeep(AbstractModel):
         warm_start,
         **kwargs,
     ):
+        warnings.warn(
+            f"pytorch_widedeep uses an approximated loss calculation procedure that calculates the average loss across"
+            f"batches, which is not what we do (in a precise way for MSE) at the end of training and makes results from"
+            f"the callback differ from our final metrics."
+        )
         model.fit(
             X_train={"X_tab": X_train, "target": y_train},
             X_val={"X_tab": X_val, "target": y_val},
