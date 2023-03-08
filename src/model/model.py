@@ -207,9 +207,11 @@ class WideDeep(AbstractModel):
             continuous_cols=cont_feature_names,
             cat_embed_cols=cat_feature_names if len(cat_feature_names) != 0 else None,
         )
+        pd.set_option("mode.chained_assignment", "warn")
         X_tab_train = tab_preprocessor.fit_transform(X_train)
         X_tab_val = tab_preprocessor.transform(X_val)
         X_tab_test = tab_preprocessor.transform(X_test)
+        pd.set_option("mode.chained_assignment", "raise")
         self.tab_preprocessor = tab_preprocessor
         return (
             X_tab_train,
