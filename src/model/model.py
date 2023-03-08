@@ -244,6 +244,7 @@ class WideDeep(AbstractModel):
             X_val={"X_tab": X_val, "target": y_val},
             n_epochs=epoch,
             batch_size=int(kwargs["batch_size"]),
+            finetune=warm_start,
         )
 
     def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
@@ -379,6 +380,7 @@ class TabNet(AbstractModel):
             loss_fn=self.trainer.loss_fn,
             eval_metric=[self.trainer.loss],
             batch_size=int(kwargs["batch_size"]),
+            warm_start=warm_start,
         )
 
     def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
