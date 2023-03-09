@@ -80,8 +80,9 @@ class TransformerLSTMNN(AbstractNN):
         attn_heads=8,
     ):
         super(TransformerLSTMNN, self).__init__(trainer)
-        self.n_inputs = n_inputs
+        self.n_cont = n_inputs
         self.n_outputs = n_outputs
+        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
         self.last_dim = []
 
         # Module: Continuous embedding
