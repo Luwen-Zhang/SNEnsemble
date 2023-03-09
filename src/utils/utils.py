@@ -20,8 +20,6 @@ import torch
 import torch.optim
 from distutils.spawn import find_executable
 
-warnings.simplefilter(action="ignore", category=FutureWarning)
-warnings.simplefilter(action="ignore", category=DeprecationWarning)
 clr = sns.color_palette("deep")
 sns.reset_defaults()
 matplotlib.use("Agg")
@@ -45,12 +43,6 @@ def is_notebook() -> bool:
             return False  # Other type (?)
     except NameError:
         return False  # Probably standard Python interpreter
-
-
-if is_notebook():
-    from tqdm.notebook import tqdm
-else:
-    from tqdm import tqdm
 
 
 # https://stackoverflow.com/questions/65840698/how-to-make-r2-score-in-nn-lstm-pytorch

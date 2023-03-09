@@ -11,6 +11,7 @@ import torch.nn as nn
 from copy import deepcopy as cp
 from typing import *
 from skopt.space import Real, Integer, Categorical
+from tqdm.auto import tqdm
 
 
 class AbstractModel:

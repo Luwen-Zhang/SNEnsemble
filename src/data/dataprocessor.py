@@ -131,12 +131,8 @@ class IQRRemover(AbstractProcessor):
         for feature in list(trainer.args["feature_names_type"].keys()):
             if pd.isna(data[feature]).all():
                 raise Exception(f"All values of {feature} are NaN.")
-            Q1 = np.percentile(
-                data[feature].dropna(axis=0), 25, interpolation="midpoint"
-            )
-            Q3 = np.percentile(
-                data[feature].dropna(axis=0), 75, interpolation="midpoint"
-            )
+            Q1 = np.percentile(data[feature].dropna(axis=0), 25, method="midpoint")
+            Q3 = np.percentile(data[feature].dropna(axis=0), 75, method="midpoint")
             IQR = Q3 - Q1
             if IQR == 0:
                 continue

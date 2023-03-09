@@ -489,10 +489,10 @@ class SampleWeightDeriver(AbstractDeriver):
         for feature in cont_feature_names:
             # We can only calculate distributions based on known data, i.e. the training set.
             Q1 = np.percentile(
-                df.loc[train_idx, feature].dropna(axis=0), 25, interpolation="midpoint"
+                df.loc[train_idx, feature].dropna(axis=0), 25, method="midpoint"
             )
             Q3 = np.percentile(
-                df.loc[train_idx, feature].dropna(axis=0), 75, interpolation="midpoint"
+                df.loc[train_idx, feature].dropna(axis=0), 75, method="midpoint"
             )
             IQR = Q3 - Q1
             if IQR == 0:

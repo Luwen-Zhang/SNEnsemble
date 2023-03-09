@@ -212,7 +212,9 @@ class Trainer:
         if not os.path.exists(self.project_root):
             os.mkdir(self.project_root)
 
-        json.dump(self.args, open(self.project_root + "args.json", "w"), indent=4)
+        f = open(self.project_root + "args.json", "w")
+        json.dump(self.args, f, indent=4)
+        f.close()
         if verbose:
             print(f"Project will be saved to {self.project_root}")
 
