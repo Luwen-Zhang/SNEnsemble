@@ -719,6 +719,9 @@ class BiasCatEmbedLSTM(CatEmbedLSTM):
             w = data[1 + where_weight]
             return (base_loss * w).mean()
 
+    def _get_program_name(self):
+        return "BiasCatEmbedLSTM"
+
 
 class RFE(TorchModel):
     def __init__(
