@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import torch.optim.optimizer
-
+import src
 from src.utils import *
 from src.trainer import Trainer, save_trainer
 import skopt
@@ -947,7 +947,9 @@ class TorchModel(AbstractModel):
             _, _, val_loss = self._test_step(model, val_loader, **kwargs)
             val_ls.append(val_loss)
 
-            if verbose and ((i_epoch + 1) % 20 == 0 or i_epoch == 0):
+            if verbose and (
+                (i_epoch + 1) % src.setting["verbose_per_epoch"] == 0 or i_epoch == 0
+            ):
                 print(
                     f"Epoch: {i_epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min val loss: {np.min(val_ls):.4f}"
                 )
