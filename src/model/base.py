@@ -1072,3 +1072,45 @@ class AbstractNN(nn.Module):
         self, x: torch.Tensor, derived_tensors: Dict[str, torch.Tensor]
     ) -> torch.Tensor:
         raise NotImplementedError
+
+
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.kaiming_normal_(m.weight)
+
+
+def get_sequential(
+    layers, n_inputs, n_outputs, act_func, dropout=0, use_norm=True, norm_type="batch"
+):
+    net = nn.Sequential()
+    if norm_type == "batch":
+        norm = nn.BatchNorm1d
+    elif norm_type == "layer":
+        norm = nn.LayerNorm
+    else:
+        raise Exception(f"Normalization {norm_type} not implemented.")
+    if len(layers) > 0:
+        net.add_module("input", nn.Linear(n_inputs, layers[0]))
+        net.add_module("activate_0", act_func())
+        if use_norm:
+            net.add_module(f"norm_0", norm(layers[0]))
+        if dropout != 0:
+            net.add_module(f"dropout_0", nn.Dropout(dropout))
+        for idx in range(1, len(layers)):
+            net.add_module(str(idx), nn.Linear(layers[idx - 1], layers[idx]))
+            net.add_module(f"activate_{idx}", act_func())
+            if use_norm:
+                net.add_module(f"norm_{idx}", norm(layers[idx]))
+            if dropout != 0:
+                net.add_module(f"dropout_{idx}", nn.Dropout(dropout))
+        net.add_module("output", nn.Linear(layers[-1], n_outputs))
+    else:
+        net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
+        net.add_module("activate", act_func())
+        if use_norm:
+            net.add_module("norm", norm(n_outputs))
+        if dropout != 0:
+            net.add_module("dropout", nn.Dropout(dropout))
+
+    net.apply(init_weights)
+    return net

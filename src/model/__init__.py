@@ -2,18 +2,18 @@ from .base import AbstractModel
 from .base import AbstractNN
 from .base import TorchModel
 
-from .model import AutoGluon
-from .model import WideDeep
-from .model import TabNet
-from .model import ThisWork
-from .model import ThisWorkRidge
-from .model import ThisWorkPretrain
-from .model import MLP
-from .model import RFE
-from .model import CatEmbedLSTM
-from .model import BiasCatEmbedLSTM
-from .model import TransformerLSTM
-from .model import ModelAssembly
+from .autogluon import AutoGluon
+from .widedeep import WideDeep
+from .tabnet import TabNet
+from .thiswork_sn import ThisWork
+from .thiswork_sn import ThisWorkRidge
+from .thiswork_sn import ThisWorkPretrain
+from .mlp import MLP
+from .util_model import RFE
+from .catembed_lstm import CatEmbedLSTM
+from .catembed_lstm import BiasCatEmbedLSTM
+from .transformer_lstm import TransformerLSTM
+from .util_model import ModelAssembly
 
 __all__ = [
     "AbstractModel",

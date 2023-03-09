@@ -2,6 +2,7 @@ from src.utils import *
 import torch.nn as nn
 from copy import deepcopy as cp
 import inspect
+from .base import get_sequential
 
 
 class AbstractSN(nn.Module):
@@ -19,7 +20,6 @@ class AbstractSN(nn.Module):
         self.feature_mapping = {}
         self.tabular_feature_indices = {}
         self.sn_coeff_vars_idx = np.array(sn_coeff_vars_idx)
-        from src.model.nn_models import get_sequential
 
         self.template_sequential = get_sequential(
             n_inputs=len(self.sn_coeff_vars_idx),

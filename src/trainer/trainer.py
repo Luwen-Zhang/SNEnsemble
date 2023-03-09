@@ -988,7 +988,7 @@ class Trainer:
             plt.close()
 
     def cal_feature_importance(self, program, model_name, method="permutation"):
-        from src.model.model import TorchModel
+        from src.model.base import TorchModel
 
         modelbase = self.get_modelbase(program)
 
@@ -1097,7 +1097,7 @@ class Trainer:
         return attr, importance_names
 
     def cal_shap(self, program, model_name):
-        from src.model.model import TorchModel
+        from src.model.base import TorchModel
         import shap
 
         modelbase = self.get_modelbase(program)
