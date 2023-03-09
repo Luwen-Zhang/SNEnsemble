@@ -413,6 +413,9 @@ class UnscaledDataRecorder(AbstractTransformer):
         trainer._unscaled_label_data = label_data
         return data
 
+    def zero_slip(self, feature_name, x):
+        return 0
+
 
 class StandardScaler(AbstractTransformer):
     """
@@ -474,6 +477,9 @@ class CategoricalOrdinalEncoder(AbstractTransformer):
                     f"Categorical features are not compatible with the fitted OrdinalEncoder."
                 )
         return data
+
+    def zero_slip(self, feature_name, x):
+        return 0
 
 
 processor_mapping = {}
