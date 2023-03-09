@@ -78,12 +78,17 @@ class TransformerLSTMNN(AbstractNN):
         lstm_layers=1,
         attn_layers=4,
         attn_heads=8,
+        flatten_transformer=False,
+        embed_dropout=0.1,
+        transformer_ff_dim=256,
+        transformer_dropout=0.1,
     ):
         super(TransformerLSTMNN, self).__init__(trainer)
         self.n_cont = n_inputs
         self.n_outputs = n_outputs
         self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
         self.last_dim = []
+        self.flatten_transformer = flatten_transformer
 
         # Module: Continuous embedding
         self.embedding_dim = embedding_dim
@@ -94,7 +99,7 @@ class TransformerLSTMNN(AbstractNN):
         self.cont_embed_bias = nn.init.kaiming_uniform_(
             nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
         )
-        self.cont_dropout = nn.Dropout(0.1)
+        self.cont_dropout = nn.Dropout(embed_dropout)
 
         # Module: Categorical embedding
         if "categorical" in self.derived_feature_names:
@@ -109,7 +114,7 @@ class TransformerLSTMNN(AbstractNN):
                     for num_unique in cat_num_unique
                 ]
             )
-            self.cat_dropout = nn.Dropout(0.1)
+            self.cat_dropout = nn.Dropout(embed_dropout)
             self.run_cat = True
         else:
             self.run_cat = False
@@ -120,10 +125,21 @@ class TransformerLSTMNN(AbstractNN):
         for i in range(attn_layers):
             self.transformer.add_module(
                 f"block_{i}",
-                TransformerBlock(embed_dim=embedding_dim, attn_heads=attn_heads),
+                TransformerBlock(
+                    embed_dim=embedding_dim,
+                    attn_heads=attn_heads,
+                    transformer_ff_dim=transformer_ff_dim,
+                    transformer_dropout=transformer_dropout,
+                ),
             )
         self.transformer_head = get_sequential(
-            layers, embedding_dim, n_outputs, nn.ReLU, norm_type="layer"
+            layers,
+            (int(self.run_cat) * self.n_cat + self.n_cont) * embedding_dim
+            if self.flatten_transformer
+            else embedding_dim,
+            n_outputs,
+            nn.ReLU,
+            norm_type="layer",
         )
         self.last_dim.append(1)
 
@@ -212,7 +228,7 @@ class TransformerLSTMNN(AbstractNN):
         else:
             x_trans = x_cont
         x_trans = self.transformer(x_trans)
-        x_trans = torch.mean(x_trans, dim=1)
+        x_trans = x_trans.flatten(1) if self.flatten_transformer else x_trans.mean(1)
         x_trans = self.transformer_head(x_trans)
         all_res = [x_trans]
 
@@ -264,24 +280,27 @@ class ReGLU(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, embed_dim, attn_heads):
+    def __init__(self, embed_dim, attn_heads, transformer_ff_dim, transformer_dropout):
         super(TransformerBlock, self).__init__()
+        if transformer_ff_dim % 2 != 0:
+            raise Exception(f"transformer_ff_dim should be an even number.")
+
         self.attn = nn.MultiheadAttention(
             embed_dim=embed_dim, num_heads=attn_heads, batch_first=True
         )
         self.f = nn.Sequential(
             OrderedDict(
                 [
-                    ("first_linear", nn.Linear(embed_dim, 256)),
+                    ("first_linear", nn.Linear(embed_dim, transformer_ff_dim)),
                     ("activation", ReGLU()),
-                    ("dropout", nn.Dropout(0.1)),
-                    ("second_linear", nn.Linear(256 // 2, embed_dim)),
+                    ("dropout", nn.Dropout(transformer_dropout)),
+                    ("second_linear", nn.Linear(transformer_ff_dim // 2, embed_dim)),
                 ]
             )
         )
         self.attn_norm = nn.LayerNorm(embed_dim)
         self.f_norm = nn.LayerNorm(embed_dim)
-        self.dropout = nn.Dropout(0.1)
+        self.dropout = nn.Dropout(transformer_dropout)
 
     def forward(self, x):
         normed_x = self.attn_norm(x)
