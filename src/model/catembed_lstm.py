@@ -1,7 +1,7 @@
 from src.utils import *
 from src.model import TorchModel, AbstractNN
 from .base import get_sequential
-from skopt.space import Integer
+from skopt.space import Integer, Categorical
 import torch.nn as nn
 from typing import *
 
@@ -58,28 +58,18 @@ class CatEmbedLSTM(TorchModel):
 
     def _space(self, model_name):
         return [
-            Integer(
-                low=1,
-                high=1000,
-                prior="uniform",
-                name="lstm_embedding_dim",
-                dtype=int,
+            Categorical(
+                categories=[2, 4, 8, 16, 32, 64, 128], name="lstm_embedding_dim"
             ),
-            Integer(
-                low=1,
-                high=1000,
-                prior="uniform",
-                name="embedding_dim",
-                dtype=int,
-            ),
+            Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
             Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
             Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
         ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
         return {
-            "lstm_embedding_dim": 10,  # bayes-opt: 1000
-            "embedding_dim": 10,  # bayes-opt: 1
+            "lstm_embedding_dim": 16,  # bayes-opt: 1000
+            "embedding_dim": 64,  # bayes-opt: 1
             "n_hidden": 10,  # bayes-opt: 1
             "lstm_layers": 1,  # bayes-opt: 1
             "lr": 0.003,  # bayes-opt: 0.0218894
