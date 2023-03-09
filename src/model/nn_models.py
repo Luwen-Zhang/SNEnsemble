@@ -1,6 +1,8 @@
 from src.utils import *
 from src.model import AbstractNN
 import torch.nn as nn
+from torch import Tensor
+from torch.nn import functional as F
 from typing import *
 
 
@@ -223,7 +225,200 @@ class CatEmbedLSTMNN(AbstractNN):
 
         output = torch.concat(all_res, dim=1)
         output = self.w(output)
+        return output
+
+
+class TransformerLSTMNN(AbstractNN):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        manual_activate_sn=None,
+        sn_coeff_vars_idx=None,
+        cat_num_unique: List[int] = None,
+        embedding_dim=64,
+        lstm_embedding_dim=10,
+        n_hidden=3,
+        lstm_layers=1,
+        attn_layers=4,
+        attn_heads=8,
+    ):
+        super(TransformerLSTMNN, self).__init__(trainer)
+        self.n_inputs = n_inputs
+        self.n_outputs = n_outputs
+        self.last_dim = []
+
+        # Module: Continuous embedding
+        self.embedding_dim = embedding_dim
+        self.cont_norm = nn.BatchNorm1d(n_inputs)
+        self.cont_embed_weight = nn.init.kaiming_uniform_(
+            nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
+        )
+        self.cont_embed_bias = nn.init.kaiming_uniform_(
+            nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
+        )
+        self.cont_dropout = nn.Dropout(0.1)
+
+        # Module: Categorical embedding
+        if "categorical" in self.derived_feature_names:
+            # See pytorch_widedeep.models.tabular.embeddings_layers.SameSizeCatEmbeddings
+            self.cat_embeds = nn.ModuleList(
+                [
+                    nn.Embedding(
+                        num_embeddings=num_unique + 1,
+                        embedding_dim=embedding_dim,
+                        padding_idx=0,
+                    )
+                    for num_unique in cat_num_unique
+                ]
+            )
+            self.cat_dropout = nn.Dropout(0.1)
+            self.run_cat = True
+        else:
+            self.run_cat = False
+
+        # Module: Transformer
+        from src.utils.model.attention import TransformerBlock
+
+        self.transformer = nn.Sequential()
+
+        for i in range(attn_layers):
+            self.transformer.add_module(
+                f"block_{i}",
+                TransformerBlock(embed_dim=embedding_dim, attn_heads=attn_heads),
+            )
+        self.transformer_head = get_sequential(
+            layers, embedding_dim, n_outputs, nn.ReLU, norm_type="layer"
+        )
+        self.last_dim.append(1)
+
+        # Module: Sequence encoding by LSTM
+        self.n_hidden = n_hidden
+        self.lstm_embedding_dim = lstm_embedding_dim
+        self.lstm_layers = lstm_layers
+        if "Number of Layers" in self.derived_feature_names:
+            self.seq_lstm = nn.LSTM(
+                input_size=lstm_embedding_dim,
+                hidden_size=n_hidden,
+                num_layers=lstm_layers,
+                batch_first=True,
+            )
+            # The input degree would be in range [-90, 100] (where 100 is the padding value). It will be transformed to
+            # [0, 190] by adding 100, so the number of categories (vocab) will be 191
+            self.embedding = nn.Embedding(
+                num_embeddings=191, embedding_dim=lstm_embedding_dim
+            )
+            self.last_dim.append(1)
+            self.run_lstm = True
+        else:
+            self.run_lstm = False
+
+        # Module: SN models
+        from src.model.sn_formulas import sn_mapping
+
+        activated_sn = []
+        for key, sn in sn_mapping.items():
+            if (
+                sn.test_sn_vars(
+                    trainer.cont_feature_names, list(trainer.derived_data.keys())
+                )
+                and (manual_activate_sn is None or key in manual_activate_sn)
+                and sn.activated()
+            ):
+                activated_sn.append(
+                    sn(
+                        cont_feature_names=trainer.cont_feature_names,
+                        derived_feature_names=list(trainer.derived_data.keys()),
+                        s_zero_slip=trainer.get_zero_slip(sn.get_sn_vars()[0]),
+                        sn_coeff_vars_idx=sn_coeff_vars_idx,
+                    )
+                )
+        if len(activated_sn) > 0:
+            print(
+                f"Activated SN models: {[sn.__class__.__name__ for sn in activated_sn]}"
+            )
+            self.sn_coeff_vars_idx = sn_coeff_vars_idx
+            self.activated_sn = nn.ModuleList(activated_sn)
+            self.sn_component_weights = get_sequential(
+                [16, 64, 128, 64, 16],
+                len(sn_coeff_vars_idx),
+                len(self.activated_sn),
+                nn.ReLU,
+            )
+            self.last_dim.append(1)
+            self.run_sn = True
+        else:
+            self.run_sn = False
+
+        self.run_any = self.run_sn or self.run_lstm
         if self.run_any:
+            self.w = get_sequential(
+                layers,
+                sum(self.last_dim),
+                n_outputs,
+                nn.ReLU,
+            )
+        else:
+            self.w = nn.Identity()
+
+    def _forward(self, x, derived_tensors):
+        x_cont = self.cont_embed_weight.unsqueeze(0) * self.cont_norm(x).unsqueeze(
+            2
+        ) + self.cont_embed_bias.unsqueeze(0)
+        x_cont = self.cont_dropout(x_cont)
+        if self.run_cat:
+            cat = derived_tensors["categorical"].long()
+            x_cat_embeds = [
+                self.cat_embeds[i](cat[:, i]).unsqueeze(1) for i in range(cat.size(1))
+            ]
+            x_cat = torch.cat(x_cat_embeds, 1)
+            x_cat = self.cat_dropout(x_cat)
+            x_trans = torch.cat([x_cont, x_cat], dim=1)
+        else:
+            x_trans = x_cont
+        x_trans = self.transformer(x_trans)
+        x_trans = torch.mean(x_trans, dim=1)
+        x_trans = self.transformer_head(x_trans)
+        all_res = [x_trans]
+
+        if self.run_sn:
+            x_sn = torch.concat(
+                [sn(x, derived_tensors) for sn in self.activated_sn],
+                dim=1,
+            )
+            x_sn = torch.mul(
+                x_sn,
+                nn.functional.normalize(
+                    torch.abs(self.sn_component_weights(x[:, self.sn_coeff_vars_idx])),
+                    p=1,
+                    dim=1,
+                ),
+            )
+            x_sn = torch.sum(x_sn, dim=1).view(-1, 1)
+            all_res += [x_sn]
+
+        if self.run_lstm:
+            seq = derived_tensors["Lay-up Sequence"]
+            lens = derived_tensors["Number of Layers"]
+            h_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden)
+            c_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden)
+
+            seq_embed = self.embedding(seq.long() + 90)
+            seq_packed = nn.utils.rnn.pack_padded_sequence(
+                seq_embed,
+                torch.flatten(lens),
+                batch_first=True,
+                enforce_sorted=False,
+            )
+            # We don't need all hidden states for all hidden LSTM cell (which is the first returned value), but only
+            # the last hidden state.
+            _, (h_t, _) = self.seq_lstm(seq_packed, (h_0, c_0))
+            all_res += [torch.mean(h_t, dim=[0, 2]).view(-1, 1)]
+
+        output = torch.concat(all_res, dim=1)
+        output = self.w(output)
         return output
 
 

@@ -12,6 +12,7 @@ from .model import MLP
 from .model import RFE
 from .model import CatEmbedLSTM
 from .model import BiasCatEmbedLSTM
+from .model import TransformerLSTM
 from .model import ModelAssembly
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     "RFE",
     "CatEmbedLSTM",
     "BiasCatEmbedLSTM",
+    "TransformerLSTM",
     "ModelAssembly",
 ]

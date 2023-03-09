@@ -709,6 +709,59 @@ class CatEmbedLSTM(TorchModel):
         }
 
 
+class TransformerLSTM(CatEmbedLSTM):
+    def _get_program_name(self):
+        return "TransformerLSTM"
+
+    def _new_model(self, model_name, verbose, **kwargs):
+        set_torch_random(0)
+        sn_coeff_vars_idx = [
+            self.trainer.cont_feature_names.index(name)
+            for name, type in self.trainer.args["feature_names_type"].items()
+            if self.trainer.args["feature_types"][type] == "Material"
+        ]
+        return TransformerLSTMNN(
+            len(self.trainer.cont_feature_names),
+            len(self.trainer.label_name),
+            self.trainer.layers if self.layers is None else self.layers,
+            trainer=self.trainer,
+            manual_activate_sn=self.manual_activate_sn,
+            sn_coeff_vars_idx=sn_coeff_vars_idx,
+            cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
+            lstm_embedding_dim=kwargs["lstm_embedding_dim"],
+            embedding_dim=kwargs["embedding_dim"],
+            n_hidden=kwargs["n_hidden"],
+            lstm_layers=kwargs["lstm_layers"],
+            attn_layers=kwargs["attn_layers"],
+            attn_heads=kwargs["attn_heads"],
+        ).to(self.trainer.device)
+
+    def _space(self, model_name):
+        return [
+            Categorical(
+                categories=[2, 4, 8, 16, 32, 64, 128], name="lstm_embedding_dim"
+            ),
+            Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
+            Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
+            Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
+            Categorical(categories=[2, 4, 8], name="attn_layers"),
+            Categorical(categories=[2, 4, 8], name="attn_heads"),
+        ] + self.trainer.SPACE
+
+    def _initial_values(self, model_name):
+        return {
+            "lstm_embedding_dim": 16,
+            "embedding_dim": 64,
+            "n_hidden": 10,
+            "lstm_layers": 1,
+            "attn_layers": 4,
+            "attn_heads": 8,
+            "lr": 0.003,
+            "weight_decay": 0.002,
+            "batch_size": 1024,
+        }
+
+
 class BiasCatEmbedLSTM(CatEmbedLSTM):
     def _loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         base_loss = self.trainer.loss_fn(y_pred, y_true)
