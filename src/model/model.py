@@ -659,9 +659,10 @@ class CatEmbedLSTM(TorchModel):
             trainer=self.trainer,
             manual_activate_sn=self.manual_activate_sn,
             sn_coeff_vars_idx=sn_coeff_vars_idx,
+            embed_continuous=True,
             cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
             lstm_embedding_dim=kwargs["lstm_embedding_dim"],
-            cat_embedding_dim=kwargs["cat_embedding_dim"],
+            embedding_dim=kwargs["embedding_dim"],
             n_hidden=kwargs["n_hidden"],
             lstm_layers=kwargs["lstm_layers"],
         ).to(self.trainer.device)
@@ -689,7 +690,7 @@ class CatEmbedLSTM(TorchModel):
                 low=1,
                 high=1000,
                 prior="uniform",
-                name="cat_embedding_dim",
+                name="embedding_dim",
                 dtype=int,
             ),
             Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
@@ -699,7 +700,7 @@ class CatEmbedLSTM(TorchModel):
     def _initial_values(self, model_name):
         return {
             "lstm_embedding_dim": 10,  # bayes-opt: 1000
-            "cat_embedding_dim": 10,  # bayes-opt: 1
+            "embedding_dim": 10,  # bayes-opt: 1
             "n_hidden": 10,  # bayes-opt: 1
             "lstm_layers": 1,  # bayes-opt: 1
             "lr": 0.003,  # bayes-opt: 0.0218894

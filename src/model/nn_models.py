@@ -46,17 +46,18 @@ class CatEmbedLSTMNN(AbstractNN):
         trainer,
         manual_activate_sn=None,
         sn_coeff_vars_idx=None,
+        embed_continuous=False,
         cat_num_unique: List[int] = None,
-        cat_embedding_dim=10,
+        embedding_dim=10,
         lstm_embedding_dim=10,
         n_hidden=3,
         lstm_layers=1,
     ):
         super(CatEmbedLSTMNN, self).__init__(trainer)
-        num_inputs = n_inputs
-        num_outputs = n_outputs
-        self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
-        self.cont_norm = nn.BatchNorm1d(num_inputs)
+        self.n_inputs = n_inputs
+        self.n_outputs = n_outputs
+        self.last_dim = []
+        # Module 1: SN models
         from src.model.sn_formulas import sn_mapping
 
         activated_sn = []
@@ -72,8 +73,10 @@ class CatEmbedLSTMNN(AbstractNN):
                         sn_coeff_vars_idx=sn_coeff_vars_idx,
                     )
                 )
-        print(f"Activated SN models: {[sn.__class__.__name__ for sn in activated_sn]}")
         if len(activated_sn) > 0:
+            print(
+                f"Activated SN models: {[sn.__class__.__name__ for sn in activated_sn]}"
+            )
             self.sn_coeff_vars_idx = sn_coeff_vars_idx
             self.activated_sn = nn.ModuleList(activated_sn)
             self.sn_component_weights = get_sequential(
@@ -82,18 +85,42 @@ class CatEmbedLSTMNN(AbstractNN):
                 len(self.activated_sn),
                 nn.ReLU,
             )
+            self.last_dim.append(1)
             self.run_sn = True
         else:
             self.run_sn = False
 
-        self.cat_embedding_dim = cat_embedding_dim
+        # Module 2: Continuous embedding
+        self.embedding_dim = embedding_dim
+        self.cont_norm = nn.BatchNorm1d(n_inputs)
+        if (
+            embed_continuous
+        ):  # pytorch_widedeep.models.tabular.embeddings_layers.ContEmbeddings
+            self.cont_embed_weight = nn.init.kaiming_uniform_(
+                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
+            )
+            self.cont_embed_bias = nn.init.kaiming_uniform_(
+                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
+            )
+            self.cont_encoder = get_sequential(
+                [], embedding_dim, 1, nn.ReLU, norm_type="layer"
+            )
+            self.last_dim.append(n_inputs)
+            self.cont_dropout = nn.Dropout(0.1)
+            self.run_cont = True
+        else:
+            self.last_dim.append(n_inputs)
+            self.cont_encoder = get_sequential(layers, n_inputs, n_inputs, nn.ReLU)
+            self.run_cont = False
+
+        # Module 3: Categorical embedding
         if "categorical" in self.derived_feature_names:
             # See pytorch_widedeep.models.tabular.embeddings_layers.SameSizeCatEmbeddings
             self.cat_embeds = nn.ModuleList(
                 [
                     nn.Embedding(
                         num_embeddings=num_unique + 1,
-                        embedding_dim=cat_embedding_dim,
+                        embedding_dim=embedding_dim,
                         padding_idx=0,
                     )
                     for num_unique in cat_num_unique
@@ -101,12 +128,14 @@ class CatEmbedLSTMNN(AbstractNN):
             )
             self.cat_dropout = nn.Dropout(0.1)
             self.cat_encoder = get_sequential(
-                [32], cat_embedding_dim, len(cat_num_unique), nn.ReLU
+                [], embedding_dim, 1, nn.ReLU, norm_type="layer"
             )
+            self.last_dim.append(len(cat_num_unique))
             self.run_cat = True
         else:
             self.run_cat = False
 
+        # Module 4: Sequence encoding by LSTM
         self.n_hidden = n_hidden
         self.lstm_embedding_dim = lstm_embedding_dim
         self.lstm_layers = lstm_layers
@@ -122,24 +151,31 @@ class CatEmbedLSTMNN(AbstractNN):
             self.embedding = nn.Embedding(
                 num_embeddings=191, embedding_dim=lstm_embedding_dim
             )
+            self.last_dim.append(1)
             self.run_lstm = True
         else:
             self.run_lstm = False
 
         self.run_any = self.run_sn or self.run_lstm or self.run_cat
-        if self.run_any:
-            self.w = get_sequential(
-                layers,
-                self.net.output.out_features
-                + int(self.run_sn)
-                + int(self.run_cat) * len(cat_num_unique)
-                + int(self.run_lstm),
-                num_outputs,
-                nn.ReLU,
-            )
+        self.w = get_sequential(
+            layers if self.run_any else [],
+            sum(self.last_dim),
+            n_outputs,
+            nn.ReLU,
+        )
 
     def _forward(self, x, derived_tensors):
-        all_res = [self.net(self.cont_norm(x))]
+        all_res = []
+
+        if self.run_cont:
+            x_cont = self.cont_embed_weight.unsqueeze(0) * self.cont_norm(x).unsqueeze(
+                2
+            ) + self.cont_embed_bias.unsqueeze(0)
+            x_cont = self.cont_dropout(x_cont)
+            x_cont = self.cont_encoder(x_cont).squeeze(-1)
+            all_res += [x_cont]
+        else:
+            all_res += [self.cont_encoder(self.cont_norm(x))]
 
         if self.run_sn:
             x_sn = torch.concat(
@@ -156,6 +192,7 @@ class CatEmbedLSTMNN(AbstractNN):
             )
             x_sn = torch.sum(x_sn, dim=1).view(-1, 1)
             all_res += [x_sn]
+
         if self.run_cat:
             cat = derived_tensors["categorical"].long()
             x_cat_embeds = [
@@ -165,6 +202,7 @@ class CatEmbedLSTMNN(AbstractNN):
             x_cat = self.cat_dropout(x_cat)
             x_cat = self.cat_encoder(x_cat).squeeze(-1)
             all_res += [x_cat]
+
         if self.run_lstm:
             seq = derived_tensors["Lay-up Sequence"]
             lens = derived_tensors["Number of Layers"]
@@ -184,8 +222,8 @@ class CatEmbedLSTMNN(AbstractNN):
             all_res += [torch.mean(h_t, dim=[0, 2]).view(-1, 1)]
 
         output = torch.concat(all_res, dim=1)
+        output = self.w(output)
         if self.run_any:
-            output = self.w(output)
         return output
 
 
@@ -248,22 +286,36 @@ class ThisWorkRidgeNN(AbstractNN):
         return output
 
 
-def get_sequential(layers, n_inputs, n_outputs, act_func, dropout=0):
+def get_sequential(
+    layers, n_inputs, n_outputs, act_func, dropout=0, use_norm=True, norm_type="batch"
+):
     net = nn.Sequential()
+    if norm_type == "batch":
+        norm = nn.BatchNorm1d
+    elif norm_type == "layer":
+        norm = nn.LayerNorm
+    else:
+        raise Exception(f"Normalization {norm_type} not implemented.")
     if len(layers) > 0:
         net.add_module("input", nn.Linear(n_inputs, layers[0]))
-        net.add_module("activate", act_func())
-        for idx in range(len(layers) - 1):
-            net.add_module(str(idx), nn.Linear(layers[idx], layers[idx + 1]))
+        net.add_module("activate_0", act_func())
+        if use_norm:
+            net.add_module(f"norm_0", norm(layers[0]))
+        if dropout != 0:
+            net.add_module(f"dropout_0", nn.Dropout(dropout))
+        for idx in range(1, len(layers)):
+            net.add_module(str(idx), nn.Linear(layers[idx - 1], layers[idx]))
             net.add_module(f"activate_{idx}", act_func())
-            net.add_module(f"norm_{idx}", nn.BatchNorm1d(layers[idx + 1]))
+            if use_norm:
+                net.add_module(f"norm_{idx}", norm(layers[idx]))
             if dropout != 0:
                 net.add_module(f"dropout_{idx}", nn.Dropout(dropout))
         net.add_module("output", nn.Linear(layers[-1], n_outputs))
     else:
         net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
         net.add_module("activate", act_func())
-        net.add_module("norm", nn.BatchNorm1d(n_outputs))
+        if use_norm:
+            net.add_module("norm", norm(n_outputs))
         if dropout != 0:
             net.add_module("dropout", nn.Dropout(dropout))
 
