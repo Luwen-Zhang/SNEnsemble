@@ -78,7 +78,7 @@ class TransformerLSTMNN(AbstractNN):
         lstm_layers=1,
         attn_layers=4,
         attn_heads=8,
-        flatten_transformer=False,
+        flatten_transformer=True,
         embed_dropout=0.1,
         transformer_ff_dim=256,
         transformer_dropout=0.1,
