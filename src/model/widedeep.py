@@ -104,6 +104,7 @@ class WideDeep(AbstractModel):
         y_test,
     ):
         from pytorch_widedeep.preprocessing import TabPreprocessor
+        from pandas._config import option_context
 
         cont_feature_names = self.trainer.cont_feature_names
         cat_feature_names = self.trainer.cat_feature_names
@@ -111,11 +112,10 @@ class WideDeep(AbstractModel):
             continuous_cols=cont_feature_names,
             cat_embed_cols=cat_feature_names if len(cat_feature_names) != 0 else None,
         )
-        pd.set_option("mode.chained_assignment", "warn")
-        X_tab_train = tab_preprocessor.fit_transform(X_train)
-        X_tab_val = tab_preprocessor.transform(X_val)
-        X_tab_test = tab_preprocessor.transform(X_test)
-        pd.set_option("mode.chained_assignment", "raise")
+        with option_context("mode.chained_assignment", None):
+            X_tab_train = tab_preprocessor.fit_transform(X_train)
+            X_tab_val = tab_preprocessor.transform(X_val)
+            X_tab_test = tab_preprocessor.transform(X_test)
         self.tab_preprocessor = tab_preprocessor
         return (
             X_tab_train,
@@ -143,11 +143,12 @@ class WideDeep(AbstractModel):
         warm_start,
         **kwargs,
     ):
-        warnings.warn(
-            f"pytorch_widedeep uses an approximated loss calculation procedure that calculates the average loss \n"
-            f"across batches, which is not what we do (in a precise way for MSE) at the end of training and makes \n"
-            f"results from the callback differ from our final metrics."
-        )
+        if verbose:
+            warnings.warn(
+                f"pytorch_widedeep uses an approximated loss calculation procedure that calculates the average loss \n"
+                f"across batches, which is not what we do (in a precise way for MSE) at the end of training and makes \n"
+                f"results from the callback differ from our final metrics."
+            )
         model.fit(
             X_train={"X_tab": X_train, "target": y_train},
             X_val={"X_tab": X_val, "target": y_val},
@@ -162,9 +163,10 @@ class WideDeep(AbstractModel):
     def _data_preprocess(self, df, derived_data, model_name):
         # SettingWithCopyWarning in TabPreprocessor.transform
         # i.e. df_cont[self.standardize_cols] = self.scaler.transform(df_std.values)
-        pd.set_option("mode.chained_assignment", "warn")
-        X_df = self.tab_preprocessor.transform(df)
-        pd.set_option("mode.chained_assignment", "raise")
+        from pandas._config import option_context
+
+        with option_context("mode.chained_assignment", None):
+            X_df = self.tab_preprocessor.transform(df)
         return X_df, derived_data
 
     def _get_model_names(self):

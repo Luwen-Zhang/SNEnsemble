@@ -406,7 +406,10 @@ class AbstractModel:
 
                 with warnings.catch_warnings():
                     # To obtain clean progress bar.
-                    warnings.simplefilter("ignore")
+                    warnings.filterwarnings(
+                        "ignore",
+                        message="`np.int` is a deprecated alias for the builtin `int`.",
+                    )
                     result = gp_minimize(
                         _bayes_objective,
                         self._space(model_name=model_name),
