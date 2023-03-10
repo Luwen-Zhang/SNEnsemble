@@ -5,7 +5,6 @@ from src.data import (
     AbstractFeatureSelector,
     AbstractTransformer,
 )
-import shap
 import inspect
 from sklearn.model_selection import KFold
 from sklearn.feature_selection import VarianceThreshold
@@ -227,6 +226,7 @@ class RFEFeatureSelector(AbstractFeatureSelector):
         **kwargs,
     ):
         from src.utils.processors.rfecv import ExtendRFECV
+        import shap
 
         cv = KFold(5)
 

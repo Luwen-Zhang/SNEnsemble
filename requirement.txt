@@ -1,7 +1,7 @@
 torch==1.12.0
 torchvision
 autogluon==0.6.1
-captum==0.5.0
+captum==0.6.0
 matplotlib==3.3.4
 mxnet==1.9.1
 numpy==1.22.1
