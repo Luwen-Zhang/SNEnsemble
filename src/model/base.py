@@ -808,7 +808,7 @@ class TorchModel(AbstractModel):
             data = tensors[0]
             additional_tensors = tensors[1 : len(tensors) - 1]
             y = model(*([data] + additional_tensors))
-            loss = model._loss_fn(
+            loss = model.loss_fn(
                 yhat, y, model, *([data] + additional_tensors), **kwargs
             )
             loss.backward()
@@ -849,7 +849,7 @@ class TorchModel(AbstractModel):
                 data = tensors[0]
                 additional_tensors = tensors[1 : len(tensors) - 1]
                 y = model(*([data] + additional_tensors))
-                loss = model._loss_fn(
+                loss = model.loss_fn(
                     yhat, y, model, *([data] + additional_tensors), **kwargs
                 )
                 avg_loss += loss.item() * len(y)
@@ -1051,7 +1051,7 @@ class AbstractNN(nn.Module):
     ) -> torch.Tensor:
         raise NotImplementedError
 
-    def _loss_fn(self, y_true, y_pred, *data, **kwargs):
+    def loss_fn(self, y_true, y_pred, *data, **kwargs):
         """
         User defined loss function.
 
