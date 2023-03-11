@@ -143,12 +143,11 @@ class WideDeep(AbstractModel):
         warm_start,
         **kwargs,
     ):
-        if verbose:
-            warnings.warn(
-                f"pytorch_widedeep uses an approximated loss calculation procedure that calculates the average loss \n"
-                f"across batches, which is not what we do (in a precise way for MSE) at the end of training and makes \n"
-                f"results from the callback differ from our final metrics."
-            )
+        """
+        pytorch_widedeep uses an approximated loss calculation procedure that calculates the average loss
+        across batches, which is not what we do (in a precise way for MSE) at the end of training and makes
+        results from the callback differ from our final metrics.
+        """
         model.fit(
             X_train={"X_tab": X_train, "target": y_train},
             X_val={"X_tab": X_val, "target": y_val},

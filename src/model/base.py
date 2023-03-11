@@ -410,6 +410,10 @@ class AbstractModel:
                         "ignore",
                         message="`np.int` is a deprecated alias for the builtin `int`.",
                     )
+                    warnings.filterwarnings(
+                        "ignore",
+                        message="The objective has been evaluated at this point before",
+                    )
                     result = gp_minimize(
                         _bayes_objective,
                         self._space(model_name=model_name),
