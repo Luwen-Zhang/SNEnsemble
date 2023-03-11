@@ -1,5 +1,4 @@
-import numpy as np
-import pandas as pd
+import pickle
 import torch.optim.optimizer
 import src
 from src.utils import *
@@ -20,6 +19,7 @@ class AbstractModel:
         trainer: Trainer = None,
         program: str = None,
         model_subset: List[str] = None,
+        low_memory: bool = True,
         **kwargs,
     ):
         """
@@ -33,6 +33,9 @@ class AbstractModel:
             The name of the modelbase. If None, the name from :func:`_get_program_name` is used.
         model_subset:
             The names of specific models selected in the modelbase. Only these models will be trained.
+        low_memory:
+            Whether to save sub-models directly in a Dict (memory). If True, they will be saved locally. If the device
+            is `cpu`, low_memory=False is used.
         """
         self.trainer = trainer
         if not hasattr(trainer, "database"):
@@ -40,6 +43,7 @@ class AbstractModel:
         self.model = None
         self.leaderboard = None
         self.model_subset = model_subset
+        self.low_memory = low_memory and trainer.device == "cpu"
         self.program = self._get_program_name() if program is None else program
         self.model_params = {}
         self._mkdir()
@@ -365,7 +369,10 @@ class AbstractModel:
         ) = self._train_data_preprocess(*data)
         self.total_epoch = self.trainer.args["epoch"]
         if self.model is None:
-            self.model = {}
+            if self.low_memory:
+                self.model = ModelDict(path=self.root)
+            else:
+                self.model = {}
 
         for model_name in (
             self.get_model_names() if model_subset is None else model_subset
@@ -434,12 +441,12 @@ class AbstractModel:
                 )  # to announce the optimized params.
 
             if not warm_start or (warm_start and not self._trained):
-                self.model[model_name] = self._new_model(
+                model = self._new_model(
                     model_name=model_name, verbose=verbose, **tmp_params
                 )
 
             self._train_single_model(
-                self.model[model_name],
+                model,
                 epoch=self.total_epoch,
                 X_train=X_train,
                 D_train=D_train,
@@ -453,9 +460,7 @@ class AbstractModel:
             )
 
             def pred_set(X, D, y, name):
-                pred = self._pred_single_model(
-                    self.model[model_name], X, D, verbose=False
-                )
+                pred = self._pred_single_model(model, X, D, verbose=False)
                 mse = metric_sklearn(pred, y, "mse")
                 if verbose:
                     print(f"{name} MSE loss: {mse:.5f}, RMSE loss: {np.sqrt(mse):.5f}")
@@ -463,6 +468,7 @@ class AbstractModel:
             pred_set(X_train, D_train, y_train, "Training")
             pred_set(X_val, D_val, y_val, "Validation")
             pred_set(X_test, D_test, y_test, "Testing")
+            self.model[model_name] = model
 
         # enable_tqdm()
         if dump_trainer:
@@ -1077,6 +1083,25 @@ class AbstractNN(nn.Module):
             lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
             weight_decay=kwargs["weight_decay"],
         )
+
+
+class ModelDict:
+    def __init__(self, path):
+        self.root = path
+        self.model_path = {}
+
+    def __setitem__(self, key, value):
+        self.model_path[key] = os.path.join(self.root, key) + ".pkl"
+        with open(self.model_path[key], "wb") as file:
+            pickle.dump((key, value), file, pickle.HIGHEST_PROTOCOL)
+
+    def __getitem__(self, item):
+        with open(self.model_path[item], "rb") as file:
+            key, model = pickle.load(file)
+        return model
+
+    def keys(self):
+        return self.model_path.keys()
 
 
 def init_weights(m):
