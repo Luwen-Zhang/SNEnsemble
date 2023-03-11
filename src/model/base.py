@@ -930,7 +930,7 @@ class TorchModel(AbstractModel):
         warm_start,
         **kwargs,
     ):
-        optimizer = self._get_optimizer(model, warm_start, **kwargs)
+        optimizer = model.get_optimizer(warm_start, **kwargs)
 
         train_loader = Data.DataLoader(
             X_train.dataset,
@@ -989,13 +989,6 @@ class TorchModel(AbstractModel):
 
     def _initial_values(self, model_name):
         return self.trainer.chosen_params
-
-    def _get_optimizer(self, model, warm_start, **kwargs):
-        return torch.optim.Adam(
-            model.parameters(),
-            lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
-            weight_decay=kwargs["weight_decay"],
-        )
 
     def count_params(self, model_name, trainable_only=False):
         if self.model is not None and model_name in self.model.keys():
@@ -1081,6 +1074,13 @@ class AbstractNN(nn.Module):
             A torch-like loss.
         """
         return self.default_loss_fn(y_pred, y_true)
+
+    def get_optimizer(self, warm_start, **kwargs):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
+            weight_decay=kwargs["weight_decay"],
+        )
 
 
 def init_weights(m):
