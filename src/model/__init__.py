@@ -10,8 +10,6 @@ from .thiswork_sn import ThisWorkRidge
 from .thiswork_sn import ThisWorkPretrain
 from .mlp import MLP
 from .util_model import RFE
-from .catembed_lstm import CatEmbedLSTM
-from .catembed_lstm import BiasCatEmbedLSTM
 from .transformer_lstm import TransformerLSTM
 from .util_model import ModelAssembly
 
@@ -27,8 +25,6 @@ __all__ = [
     "ThisWorkPretrain",
     "MLP",
     "RFE",
-    "CatEmbedLSTM",
-    "BiasCatEmbedLSTM",
     "TransformerLSTM",
     "ModelAssembly",
 ]

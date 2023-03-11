@@ -1,7 +1,6 @@
 from src.utils import *
 from skopt.space import Integer, Categorical
-from .catembed_lstm import CatEmbedLSTM
-from src.model import AbstractNN
+from src.model import TorchModel, AbstractNN
 from .base import get_sequential
 import torch.nn as nn
 from typing import *
@@ -9,19 +8,33 @@ from torch import Tensor
 import torch.nn.functional as F
 
 
-class TransformerLSTM(CatEmbedLSTM):
+class TransformerLSTM(TorchModel):
+    def __init__(
+        self,
+        trainer=None,
+        manual_activate_sn=None,
+        program=None,
+        layers=None,
+        model_subset=None,
+    ):
+        super(TransformerLSTM, self).__init__(
+            trainer, program=program, model_subset=model_subset
+        )
+        self.manual_activate_sn = manual_activate_sn
+        self.layers = layers
+
     def _get_program_name(self):
         return "TransformerLSTM"
 
     def _get_model_names(self):
-        return ["TransformerLSTM", "TransformerSeq"]
+        return ["TransformerLSTM", "TransformerSeq", "CatEmbedLSTM", "BiasCatEmbedLSTM"]
 
     def _new_model(self, model_name, verbose, **kwargs):
         set_torch_random(0)
         sn_coeff_vars_idx = [
             self.trainer.cont_feature_names.index(name)
-            for name, type in self.trainer.args["feature_names_type"].items()
-            if self.trainer.args["feature_types"][type] == "Material"
+            for name, t in self.trainer.args["feature_names_type"].items()
+            if self.trainer.args["feature_types"][t] == "Material"
         ]
         if model_name == "TransformerLSTM":
             return TransformerLSTMNN(
@@ -57,6 +70,27 @@ class TransformerLSTM(CatEmbedLSTM):
                 attn_layers=kwargs["attn_layers"],
                 attn_heads=kwargs["attn_heads"],
             ).to(self.trainer.device)
+        elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
+            if model_name == "CatEmbedLSTM":
+                cls = CatEmbedLSTMNN
+            else:
+                cls = BiasCatEmbedLSTMNN
+            return cls(
+                len(self.trainer.cont_feature_names),
+                len(self.trainer.label_name),
+                self.trainer.layers if self.layers is None else self.layers,
+                trainer=self.trainer,
+                manual_activate_sn=self.manual_activate_sn,
+                sn_coeff_vars_idx=sn_coeff_vars_idx,
+                embed_continuous=True,
+                cat_num_unique=[
+                    len(x) for x in self.trainer.cat_feature_mapping.values()
+                ],
+                lstm_embedding_dim=kwargs["lstm_embedding_dim"],
+                embedding_dim=kwargs["embedding_dim"],
+                n_hidden=kwargs["n_hidden"],
+                lstm_layers=kwargs["lstm_layers"],
+            ).to(self.trainer.device)
 
     def _space(self, model_name):
         if model_name == "TransformerLSTM":
@@ -78,6 +112,15 @@ class TransformerLSTM(CatEmbedLSTM):
                 Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
                 Categorical(categories=[2, 4, 8], name="attn_layers"),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
+            ] + self.trainer.SPACE
+        elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
+            return [
+                Categorical(
+                    categories=[2, 4, 8, 16, 32, 64, 128], name="lstm_embedding_dim"
+                ),
+                Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
+                Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
+                Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
             ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
@@ -102,6 +145,16 @@ class TransformerLSTM(CatEmbedLSTM):
                 "lr": 0.003,
                 "weight_decay": 0.002,
                 "batch_size": 1024,
+            }
+        elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
+            return {
+                "lstm_embedding_dim": 16,  # bayes-opt: 1000
+                "embedding_dim": 64,  # bayes-opt: 1
+                "n_hidden": 10,  # bayes-opt: 1
+                "lstm_layers": 1,  # bayes-opt: 1
+                "lr": 0.003,  # bayes-opt: 0.0218894
+                "weight_decay": 0.002,  # bayes-opt: 0.05
+                "batch_size": 1024,  # bayes-opt: 32
             }
 
 
@@ -275,6 +328,110 @@ class TransformerSeqNN(AbstractNN):
         return output
 
 
+class CatEmbedLSTMNN(AbstractNN):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        manual_activate_sn=None,
+        sn_coeff_vars_idx=None,
+        embed_continuous=False,
+        cat_num_unique: List[int] = None,
+        embedding_dim=10,
+        lstm_embedding_dim=10,
+        n_hidden=3,
+        lstm_layers=1,
+    ):
+        super(CatEmbedLSTMNN, self).__init__(trainer)
+        self.n_cont = n_inputs
+        self.n_outputs = n_outputs
+        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
+
+        self.embed = _Embedding(
+            embedding_dim=embedding_dim,
+            n_inputs=n_inputs,
+            embed_dropout=0.1,
+            cat_num_unique=cat_num_unique,
+            run_cat="categorical" in self.derived_feature_names,
+            embed_cont=embed_continuous,
+            cont_encoder_layers=layers,
+        )
+        self.embed_encoder = get_sequential(
+            layers,
+            n_inputs=embedding_dim,
+            n_outputs=n_outputs,
+            act_func=nn.ReLU,
+            dropout=0.1,
+            norm_type="layer",
+        )
+        self.lstm = _LSTM(
+            n_hidden,
+            lstm_embedding_dim,
+            lstm_layers,
+            run="Number of Layers" in self.derived_feature_names,
+        )
+        self.sn = _SN(trainer, manual_activate_sn, sn_coeff_vars_idx)
+
+        self.run_any = self.sn.run or self.lstm.run
+        if self.run_any:
+            self.w = get_sequential(
+                layers,
+                n_inputs
+                + int(self.embed.run_cat) * self.n_cat
+                + int(self.sn.run)
+                + int(self.lstm.run),
+                n_outputs,
+                nn.ReLU,
+            )
+        else:
+            self.w = get_sequential(
+                [],
+                n_inputs + int(self.embed.run_cat) * self.n_cat,
+                n_outputs,
+                nn.ReLU,
+            )
+
+    def _forward(self, x, derived_tensors):
+        x_embed = self.embed(x, derived_tensors)
+        if type(x_embed) == tuple:
+            # x_cont is encoded, x_cat is embedded.
+            x_cont, x_cat = x_embed
+            x_cat_encode = self.embed_encoder(x_cat).squeeze(2)
+            x_embed_encode = torch.cat([x_cont, x_cat_encode], dim=1)
+        elif x_embed.ndim == 3:
+            # x_cont and x_cat (if exists) are embedded.
+            x_embed_encode = self.embed_encoder(x_embed).squeeze(2)
+        else:
+            # x_cont is encoded, x_cat does not exists.
+            x_embed_encode = x_embed
+        all_res = [x_embed_encode]
+
+        x_sn = self.sn(x, derived_tensors)
+        if x_sn is not None:
+            all_res += [x_sn]
+
+        x_lstm = self.lstm(x, derived_tensors)
+        if x_lstm is not None:
+            all_res += [x_lstm]
+
+        output = torch.concat(all_res, dim=1)
+        output = self.w(output)
+        return output
+
+
+class BiasCatEmbedLSTMNN(CatEmbedLSTMNN):
+    def loss_fn(self, y_true, y_pred, *data, **kwargs):
+        base_loss = self.default_loss_fn(y_pred, y_true)
+        if not self.training:
+            return base_loss
+        else:
+            where_weight = self.derived_feature_names.index("Sample Weight")
+            w = data[1 + where_weight]
+            return (base_loss * w).mean()
+
+
 class ReGLU(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         if x.shape[-1] % 2 != 0:
@@ -400,18 +557,36 @@ class _SN(nn.Module):
 
 
 class _Embedding(nn.Module):
-    def __init__(self, embedding_dim, n_inputs, embed_dropout, cat_num_unique, run_cat):
+    def __init__(
+        self,
+        embedding_dim,
+        n_inputs,
+        embed_dropout,
+        cat_num_unique,
+        run_cat,
+        embed_cont=True,
+        cont_encoder_layers=None,
+    ):
         super(_Embedding, self).__init__()
         # Module: Continuous embedding
-        self.embedding_dim = embedding_dim
-        self.cont_norm = nn.BatchNorm1d(n_inputs)
-        self.cont_embed_weight = nn.init.kaiming_uniform_(
-            nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
-        )
-        self.cont_embed_bias = nn.init.kaiming_uniform_(
-            nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
-        )
-        self.cont_dropout = nn.Dropout(embed_dropout)
+        self.embed_cont = embed_cont
+        if embed_cont:
+            self.embedding_dim = embedding_dim
+            self.cont_norm = nn.BatchNorm1d(n_inputs)
+            self.cont_embed_weight = nn.init.kaiming_uniform_(
+                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
+            )
+            self.cont_embed_bias = nn.init.kaiming_uniform_(
+                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
+            )
+            self.cont_dropout = nn.Dropout(embed_dropout)
+        else:
+            self.cont_encoder = get_sequential(
+                cont_encoder_layers,
+                n_inputs,
+                n_inputs,
+                nn.ReLU,
+            )
 
         # Module: Categorical embedding
         if run_cat:
@@ -432,10 +607,13 @@ class _Embedding(nn.Module):
             self.run_cat = False
 
     def forward(self, x, derived_tensors):
-        x_cont = self.cont_embed_weight.unsqueeze(0) * self.cont_norm(x).unsqueeze(
-            2
-        ) + self.cont_embed_bias.unsqueeze(0)
-        x_cont = self.cont_dropout(x_cont)
+        if self.embed_cont:
+            x_cont = self.cont_embed_weight.unsqueeze(0) * self.cont_norm(x).unsqueeze(
+                2
+            ) + self.cont_embed_bias.unsqueeze(0)
+            x_cont = self.cont_dropout(x_cont)
+        else:
+            x_cont = self.cont_encoder(x)
         if self.run_cat:
             cat = derived_tensors["categorical"].long()
             x_cat_embeds = [
@@ -443,7 +621,10 @@ class _Embedding(nn.Module):
             ]
             x_cat = torch.cat(x_cat_embeds, 1)
             x_cat = self.cat_dropout(x_cat)
-            x_res = torch.cat([x_cont, x_cat], dim=1)
+            if self.embed_cont:
+                x_res = torch.cat([x_cont, x_cat], dim=1)
+            else:
+                x_res = (x_cont, x_cat)
         else:
             x_res = x_cont
         return x_res
