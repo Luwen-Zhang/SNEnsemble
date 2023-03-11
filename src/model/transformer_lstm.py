@@ -82,6 +82,7 @@ class TransformerLSTMNN(AbstractNN):
         embed_dropout=0.1,
         transformer_ff_dim=256,
         transformer_dropout=0.1,
+        use_torch_transformer=False,
     ):
         super(TransformerLSTMNN, self).__init__(trainer)
         self.n_cont = n_inputs
@@ -120,18 +121,40 @@ class TransformerLSTMNN(AbstractNN):
             self.run_cat = False
 
         # Module: Transformer
-        self.transformer = nn.Sequential()
-
-        for i in range(attn_layers):
-            self.transformer.add_module(
-                f"block_{i}",
-                TransformerBlock(
-                    embed_dim=embedding_dim,
-                    attn_heads=attn_heads,
-                    transformer_ff_dim=transformer_ff_dim,
-                    transformer_dropout=transformer_dropout,
-                ),
+        # Indeed, the implementation of TransformerBlock is almost the same as torch.nn.TransformerEncoderLayer, except
+        # that the activation function in FT-Transformer is ReGLU instead of ReLU or GeLU in torch implementation.
+        # The performance of these two implementations can be verified after several epochs by changing
+        # `use_torch_transformer` and setting the activation of TransformerBlock to nn.GELU.
+        # In our scenario, ReGLU performs much better, which is why we implement our own version of transformer, just
+        # like FT-Transformer and WideDeep do.
+        # Also, dropout in MultiheadAttention improves performance.
+        if use_torch_transformer:
+            transformer_layer = nn.TransformerEncoderLayer(
+                d_model=self.embedding_dim,
+                nhead=attn_heads,
+                dim_feedforward=transformer_ff_dim,
+                dropout=transformer_dropout,
+                batch_first=True,
+                norm_first=True,
+                layer_norm_eps=1e-5,  # the default value of nn.LayerNorm
+                activation="gelu",
             )
+            self.transformer = nn.TransformerEncoder(
+                transformer_layer, num_layers=attn_layers
+            )
+        else:
+            self.transformer = nn.Sequential()
+            for i in range(attn_layers):
+                self.transformer.add_module(
+                    f"block_{i}",
+                    TransformerBlock(
+                        embed_dim=embedding_dim,
+                        attn_heads=attn_heads,
+                        ff_dim=transformer_ff_dim,
+                        dropout=transformer_dropout,
+                        activation=ReGLU,
+                    ),
+                )
         self.transformer_head = get_sequential(
             layers,
             (int(self.run_cat) * self.n_cat + self.n_cont) * embedding_dim
@@ -280,30 +303,48 @@ class ReGLU(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, embed_dim, attn_heads, transformer_ff_dim, transformer_dropout):
+    def __init__(
+        self,
+        embed_dim,
+        attn_heads,
+        ff_dim,
+        dropout,
+        activation,
+    ):
         super(TransformerBlock, self).__init__()
-        if transformer_ff_dim % 2 != 0:
+        if ff_dim % 2 != 0:
             raise Exception(f"transformer_ff_dim should be an even number.")
-
         self.attn = nn.MultiheadAttention(
-            embed_dim=embed_dim, num_heads=attn_heads, batch_first=True
+            embed_dim=embed_dim,
+            num_heads=attn_heads,
+            dropout=dropout,
+            batch_first=True,
         )
+        is_reglu = activation == ReGLU
         self.f = nn.Sequential(
             OrderedDict(
                 [
-                    ("first_linear", nn.Linear(embed_dim, transformer_ff_dim)),
-                    ("activation", ReGLU()),
-                    ("dropout", nn.Dropout(transformer_dropout)),
-                    ("second_linear", nn.Linear(transformer_ff_dim // 2, embed_dim)),
+                    ("first_linear", nn.Linear(embed_dim, ff_dim)),
+                    ("activation", activation()),
+                    ("dropout", nn.Dropout(dropout)),
+                    (
+                        "second_linear",
+                        nn.Linear(
+                            ff_dim // 2 if is_reglu else ff_dim,
+                            embed_dim,
+                        ),
+                    ),
                 ]
             )
         )
         self.attn_norm = nn.LayerNorm(embed_dim)
         self.f_norm = nn.LayerNorm(embed_dim)
-        self.dropout = nn.Dropout(transformer_dropout)
+        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
+    def forward(self, x, key_padding_mask=None):
         normed_x = self.attn_norm(x)
-        x_attn, _ = self.attn(normed_x, normed_x, normed_x)
+        x_attn, _ = self.attn(
+            normed_x, normed_x, normed_x, key_padding_mask=key_padding_mask
+        )
         x_attn = x + self.dropout(x_attn)
         return x + self.dropout(self.f(self.f_norm(x_attn)))
