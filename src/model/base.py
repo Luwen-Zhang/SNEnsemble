@@ -186,6 +186,35 @@ class AbstractModel:
             df, model_name, self.trainer.sort_derived_data(derived_data), **kwargs
         )
 
+    def detach_model(self, model_name: str, program: str):
+        """
+        Detach the chosen submodel to a seperate AbstractModel.
+        Parameters
+        ----------
+        model_name:
+            The name of the submodel to be detached.
+        program:
+            The new name of the detached database.
+
+        Returns
+        -------
+        model:
+            An AbstractModel containing the chosen model.
+        """
+        if not type(self.model) in [ModelDict, Dict]:
+            raise Exception(f"The modelbase does not support model detaching.")
+        tmp_model = self.__class__(
+            trainer=self.trainer, program=program, model_subset=[model_name]
+        )
+        if type(self.model) == ModelDict:
+            tmp_model.model = ModelDict(path=tmp_model.root)
+        else:
+            tmp_model.model = {}
+        tmp_model.model[model_name] = cp(self.model[model_name])
+        if model_name in self.model_params.keys():
+            tmp_model.model_params[model_name] = cp(self.model_params[model_name])
+        return tmp_model
+
     def _base_train_data_preprocess(
         self,
     ) -> Tuple[
