@@ -13,6 +13,9 @@ class TransformerLSTM(CatEmbedLSTM):
     def _get_program_name(self):
         return "TransformerLSTM"
 
+    def _get_model_names(self):
+        return ["TransformerLSTM", "TransformerSeq"]
+
     def _new_model(self, model_name, verbose, **kwargs):
         set_torch_random(0)
         sn_coeff_vars_idx = [
@@ -20,46 +23,86 @@ class TransformerLSTM(CatEmbedLSTM):
             for name, type in self.trainer.args["feature_names_type"].items()
             if self.trainer.args["feature_types"][type] == "Material"
         ]
-        return TransformerLSTMNN(
-            len(self.trainer.cont_feature_names),
-            len(self.trainer.label_name),
-            self.trainer.layers if self.layers is None else self.layers,
-            trainer=self.trainer,
-            manual_activate_sn=self.manual_activate_sn,
-            sn_coeff_vars_idx=sn_coeff_vars_idx,
-            cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
-            lstm_embedding_dim=kwargs["lstm_embedding_dim"],
-            embedding_dim=kwargs["embedding_dim"],
-            n_hidden=kwargs["n_hidden"],
-            lstm_layers=kwargs["lstm_layers"],
-            attn_layers=kwargs["attn_layers"],
-            attn_heads=kwargs["attn_heads"],
-        ).to(self.trainer.device)
+        if model_name == "TransformerLSTM":
+            return TransformerLSTMNN(
+                len(self.trainer.cont_feature_names),
+                len(self.trainer.label_name),
+                self.trainer.layers if self.layers is None else self.layers,
+                trainer=self.trainer,
+                manual_activate_sn=self.manual_activate_sn,
+                sn_coeff_vars_idx=sn_coeff_vars_idx,
+                cat_num_unique=[
+                    len(x) for x in self.trainer.cat_feature_mapping.values()
+                ],
+                seq_embedding_dim=kwargs["seq_embedding_dim"],
+                embedding_dim=kwargs["embedding_dim"],
+                n_hidden=kwargs["n_hidden"],
+                lstm_layers=kwargs["lstm_layers"],
+                attn_layers=kwargs["attn_layers"],
+                attn_heads=kwargs["attn_heads"],
+            ).to(self.trainer.device)
+        elif model_name == "TransformerSeq":
+            return TransformerSeqNN(
+                len(self.trainer.cont_feature_names),
+                len(self.trainer.label_name),
+                self.trainer.layers if self.layers is None else self.layers,
+                trainer=self.trainer,
+                manual_activate_sn=self.manual_activate_sn,
+                sn_coeff_vars_idx=sn_coeff_vars_idx,
+                cat_num_unique=[
+                    len(x) for x in self.trainer.cat_feature_mapping.values()
+                ],
+                seq_embedding_dim=kwargs["seq_embedding_dim"],
+                embedding_dim=kwargs["embedding_dim"],
+                attn_layers=kwargs["attn_layers"],
+                attn_heads=kwargs["attn_heads"],
+            ).to(self.trainer.device)
 
     def _space(self, model_name):
-        return [
-            Categorical(
-                categories=[2, 4, 8, 16, 32, 64, 128], name="lstm_embedding_dim"
-            ),
-            Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
-            Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
-            Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
-            Categorical(categories=[2, 4, 8], name="attn_layers"),
-            Categorical(categories=[2, 4, 8], name="attn_heads"),
-        ] + self.trainer.SPACE
+        if model_name == "TransformerLSTM":
+            return [
+                Categorical(
+                    categories=[2, 4, 8, 16, 32, 64, 128], name="seq_embedding_dim"
+                ),
+                Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
+                Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
+                Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
+                Categorical(categories=[2, 4, 8], name="attn_layers"),
+                Categorical(categories=[2, 4, 8], name="attn_heads"),
+            ] + self.trainer.SPACE
+        elif model_name == "TransformerSeq":
+            return [
+                Categorical(
+                    categories=[2, 4, 8, 16, 32, 64, 128], name="seq_embedding_dim"
+                ),
+                Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
+                Categorical(categories=[2, 4, 8], name="attn_layers"),
+                Categorical(categories=[2, 4, 8], name="attn_heads"),
+            ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
-        return {
-            "lstm_embedding_dim": 16,
-            "embedding_dim": 64,
-            "n_hidden": 10,
-            "lstm_layers": 1,
-            "attn_layers": 4,
-            "attn_heads": 8,
-            "lr": 0.003,
-            "weight_decay": 0.002,
-            "batch_size": 1024,
-        }
+        if model_name == "TransformerLSTM":
+            return {
+                "seq_embedding_dim": 16,
+                "embedding_dim": 64,
+                "n_hidden": 10,
+                "lstm_layers": 1,
+                "attn_layers": 4,
+                "attn_heads": 8,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            }
+        elif model_name == "TransformerSeq":
+            return {
+                "seq_embedding_dim": 16,
+                "embedding_dim": 64,
+                "attn_layers": 4,
+                "attn_heads": 8,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            }
 
 
 class TransformerLSTMNN(AbstractNN):
@@ -73,7 +116,7 @@ class TransformerLSTMNN(AbstractNN):
         sn_coeff_vars_idx=None,
         cat_num_unique: List[int] = None,
         embedding_dim=64,
-        lstm_embedding_dim=10,
+        seq_embedding_dim=10,
         n_hidden=3,
         lstm_layers=1,
         attn_layers=4,
@@ -110,7 +153,7 @@ class TransformerLSTMNN(AbstractNN):
         )
         self.lstm = _LSTM(
             n_hidden,
-            lstm_embedding_dim,
+            seq_embedding_dim,
             lstm_layers,
             run="Number of Layers" in self.derived_feature_names,
         )
@@ -129,7 +172,7 @@ class TransformerLSTMNN(AbstractNN):
 
     def _forward(self, x, derived_tensors):
         x_embed = self.embed(x, derived_tensors)
-        x_trans = self.transformer(x_embed)
+        x_trans = self.transformer(x_embed, derived_tensors)
         all_res = [x_trans]
 
         x_sn = self.sn(x, derived_tensors)
@@ -139,6 +182,93 @@ class TransformerLSTMNN(AbstractNN):
         x_lstm = self.lstm(x, derived_tensors)
         if x_lstm is not None:
             all_res += [x_lstm]
+
+        output = torch.concat(all_res, dim=1)
+        output = self.w(output)
+        return output
+
+
+class TransformerSeqNN(AbstractNN):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        manual_activate_sn=None,
+        sn_coeff_vars_idx=None,
+        cat_num_unique: List[int] = None,
+        embedding_dim=64,
+        seq_embedding_dim=10,
+        attn_layers=4,
+        attn_heads=8,
+        flatten_transformer=True,
+        embed_dropout=0.1,
+        transformer_ff_dim=256,
+        transformer_dropout=0.1,
+        use_torch_transformer=False,
+    ):
+        super(TransformerSeqNN, self).__init__(trainer)
+        self.n_cont = n_inputs
+        self.n_outputs = n_outputs
+        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
+
+        self.embed = _Embedding(
+            embedding_dim,
+            n_inputs,
+            embed_dropout,
+            cat_num_unique,
+            run_cat="categorical" in self.derived_feature_names,
+        )
+        self.embed_transformer = _Transformer(
+            n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_cont,
+            attn_heads=attn_heads,
+            attn_layers=attn_layers,
+            embedding_dim=embedding_dim,
+            ff_dim=transformer_ff_dim,
+            ff_layers=layers,
+            dropout=transformer_dropout,
+            n_outputs=n_outputs,
+            use_torch_transformer=use_torch_transformer,
+            flatten_transformer=flatten_transformer,
+        )
+        self.seq_transformer = _SeqTransformer(
+            n_inputs=None,
+            attn_heads=attn_heads,
+            attn_layers=attn_layers,
+            embedding_dim=seq_embedding_dim,
+            ff_dim=transformer_ff_dim,
+            ff_layers=layers,
+            dropout=transformer_dropout,
+            n_outputs=n_outputs,
+            run="Lay-up Sequence" in self.derived_feature_names
+            and "Number of Layers" in self.derived_feature_names,
+        )
+        self.sn = _SN(trainer, manual_activate_sn, sn_coeff_vars_idx)
+
+        self.run_any = self.sn.run or self.seq_transformer.run
+        if self.run_any:
+            self.w = get_sequential(
+                layers,
+                1 + int(self.sn.run) + int(self.seq_transformer.run),
+                n_outputs,
+                nn.ReLU,
+            )
+        else:
+            self.w = nn.Identity()
+
+    def _forward(self, x, derived_tensors):
+        x_embed = self.embed(x, derived_tensors)
+        x_trans = self.embed_transformer(x_embed, derived_tensors)
+        all_res = [x_trans]
+
+        x_sn = self.sn(x, derived_tensors)
+        if x_sn is not None:
+            all_res += [x_sn]
+
+        x_seq = self.seq_transformer(x, derived_tensors)
+        if x_seq is not None:
+            all_res += [x_seq]
 
         output = torch.concat(all_res, dim=1)
         output = self.w(output)
@@ -266,7 +396,7 @@ class _SN(nn.Module):
             return False
 
     def _manual_activate(self):
-        return False
+        return True
 
 
 class _Embedding(nn.Module):
@@ -370,7 +500,7 @@ class _LSTM(nn.Module):
             return False
 
     def _manual_activate(self):
-        return False
+        return True
 
 
 class _Transformer(nn.Module):
@@ -386,6 +516,7 @@ class _Transformer(nn.Module):
         n_outputs,
         use_torch_transformer,
         flatten_transformer,
+        **kwargs,
     ):
         super(_Transformer, self).__init__()
         # Indeed, the implementation of TransformerBlock is almost the same as torch.nn.TransformerEncoderLayer, except
@@ -398,7 +529,7 @@ class _Transformer(nn.Module):
         self.flatten_transformer = flatten_transformer
         if use_torch_transformer:
             transformer_layer = nn.TransformerEncoderLayer(
-                d_model=self.embedding_dim,
+                d_model=embedding_dim,
                 nhead=attn_heads,
                 dim_feedforward=ff_dim,
                 dropout=dropout,
@@ -431,8 +562,60 @@ class _Transformer(nn.Module):
             norm_type="layer",
         )
 
-    def forward(self, x):
+    def forward(self, x, derived_tensors):
         x_trans = self.transformer(x)
         x_trans = x_trans.flatten(1) if self.flatten_transformer else x_trans.mean(1)
         x_trans = self.transformer_head(x_trans)
         return x_trans
+
+
+class _SeqTransformer(_Transformer):
+    def __init__(
+        self,
+        embedding_dim,
+        run,
+        use_torch_transformer=None,
+        flatten_transformer=None,
+        *args,
+        **kwargs,
+    ):
+        if run and self._check_activate():
+            # flatten_transformer=False because the length of the padded sequence might be unknown.
+            super(_SeqTransformer, self).__init__(
+                embedding_dim=embedding_dim,
+                use_torch_transformer=True,
+                flatten_transformer=False,
+                *args,
+                **kwargs,
+            )
+            self.embedding = nn.Embedding(
+                num_embeddings=191, embedding_dim=embedding_dim
+            )
+            self.run = True
+        else:
+            self.run = False
+
+    def forward(self, x, derived_tensors):
+        if self.run:
+            seq = derived_tensors["Lay-up Sequence"]
+            lens = derived_tensors["Number of Layers"]
+            max_len = seq.size(1)
+            # for the definition of padding_mask, see nn.MultiheadAttention.forward
+            padding_mask = torch.arange(max_len).expand(len(lens), max_len) >= lens
+            x = self.embedding(seq.long() + 90)
+            x_trans = self.transformer(x, src_key_padding_mask=padding_mask)
+            x_trans = x_trans.mean(1)
+            x_trans = self.transformer_head(x_trans)
+            return x_trans
+        else:
+            return None
+
+    def _check_activate(self):
+        if self._manual_activate():
+            return True
+        else:
+            print(f"SeqTransformer module is manually deactivated.")
+            return False
+
+    def _manual_activate(self):
+        return True
