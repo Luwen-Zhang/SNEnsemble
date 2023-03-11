@@ -473,6 +473,8 @@ class AbstractModel:
                 model = self._new_model(
                     model_name=model_name, verbose=verbose, **tmp_params
                 )
+            else:
+                model = self.model[model_name]
 
             self._train_single_model(
                 model,
