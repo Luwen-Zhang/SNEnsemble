@@ -774,6 +774,7 @@ class _SeqTransformer(_Transformer):
             )
             self.run = True
         else:
+            super(_Transformer, self).__init__()
             self.run = False
 
     def forward(self, x, derived_tensors):
