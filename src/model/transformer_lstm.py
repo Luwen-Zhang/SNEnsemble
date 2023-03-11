@@ -376,23 +376,15 @@ class CatEmbedLSTMNN(AbstractNN):
         self.sn = _SN(trainer, manual_activate_sn, sn_coeff_vars_idx)
 
         self.run_any = self.sn.run or self.lstm.run
-        if self.run_any:
-            self.w = get_sequential(
-                layers,
-                n_inputs
-                + int(self.embed.run_cat) * self.n_cat
-                + int(self.sn.run)
-                + int(self.lstm.run),
-                n_outputs,
-                nn.ReLU,
-            )
-        else:
-            self.w = get_sequential(
-                [],
-                n_inputs + int(self.embed.run_cat) * self.n_cat,
-                n_outputs,
-                nn.ReLU,
-            )
+        self.w = get_sequential(
+            layers,
+            n_inputs
+            + int(self.embed.run_cat) * self.n_cat
+            + int(self.sn.run)
+            + int(self.lstm.run),
+            n_outputs,
+            nn.ReLU,
+        )
 
     def _forward(self, x, derived_tensors):
         x_embed = self.embed(x, derived_tensors)
@@ -740,8 +732,9 @@ class _Transformer(nn.Module):
             ff_layers,
             n_inputs * embedding_dim if self.flatten_transformer else embedding_dim,
             n_outputs,
-            nn.ReLU,
-            norm_type="layer",
+            nn.Identity if len(ff_layers) == 0 else nn.ReLU,
+            use_norm=False if len(ff_layers) == 0 else True,
+            dropout=0,
         )
 
     def forward(self, x, derived_tensors):
