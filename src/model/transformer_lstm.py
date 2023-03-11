@@ -223,7 +223,7 @@ class _SN(nn.Module):
                         sn_coeff_vars_idx=sn_coeff_vars_idx,
                     )
                 )
-        if len(activated_sn) > 0:
+        if len(activated_sn) > 0 and self._check_activate():
             print(
                 f"Activated SN models: {[sn.__class__.__name__ for sn in activated_sn]}"
             )
@@ -257,6 +257,16 @@ class _SN(nn.Module):
             return x_sn
         else:
             return None
+
+    def _check_activate(self):
+        if self._manual_activate():
+            return True
+        else:
+            print(f"SN module is manually deactivated.")
+            return False
+
+    def _manual_activate(self):
+        return False
 
 
 class _Embedding(nn.Module):
@@ -315,7 +325,7 @@ class _LSTM(nn.Module):
         self.n_hidden = n_hidden
         self.lstm_embedding_dim = embedding_dim
         self.lstm_layers = layers
-        if run:
+        if run and self._check_activate():
             self.seq_lstm = nn.LSTM(
                 input_size=embedding_dim,
                 hidden_size=n_hidden,
@@ -351,6 +361,16 @@ class _LSTM(nn.Module):
             return torch.mean(h_t, dim=[0, 2]).view(-1, 1)
         else:
             return None
+
+    def _check_activate(self):
+        if self._manual_activate():
+            return True
+        else:
+            print(f"LSTM module is manually deactivated.")
+            return False
+
+    def _manual_activate(self):
+        return False
 
 
 class _Transformer(nn.Module):
