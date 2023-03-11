@@ -808,7 +808,7 @@ class TorchModel(AbstractModel):
             data = tensors[0]
             additional_tensors = tensors[1 : len(tensors) - 1]
             y = model(*([data] + additional_tensors))
-            loss = self._loss_fn(
+            loss = model._loss_fn(
                 yhat, y, model, *([data] + additional_tensors), **kwargs
             )
             loss.backward()
@@ -849,7 +849,7 @@ class TorchModel(AbstractModel):
                 data = tensors[0]
                 additional_tensors = tensors[1 : len(tensors) - 1]
                 y = model(*([data] + additional_tensors))
-                loss = self._loss_fn(
+                loss = model._loss_fn(
                     yhat, y, model, *([data] + additional_tensors), **kwargs
                 )
                 avg_loss += loss.item() * len(y)
@@ -997,30 +997,6 @@ class TorchModel(AbstractModel):
             weight_decay=kwargs["weight_decay"],
         )
 
-    def _loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        """
-        User defined loss function.
-
-        Parameters
-        ----------
-        y_true:
-            Ground truth value.
-        y_pred:
-            Predicted value by the model.
-        model:
-            The model predicting y_pred.
-        *data:
-            Tensors of continuous data and derived data.
-        **kwargs:
-            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
-
-        Returns
-        -------
-        loss:
-            A torch-like loss.
-        """
-        return self.trainer.loss_fn(y_pred, y_true)
-
     def count_params(self, model_name, trainable_only=False):
         if self.model is not None and model_name in self.model.keys():
             model = self.model[model_name]
@@ -1045,6 +1021,7 @@ class AbstractNN(nn.Module):
             A Trainer instance.
         """
         super(AbstractNN, self).__init__()
+        self.default_loss_fn = trainer.loss_fn
         self.derived_feature_names = list(trainer.derived_data.keys())
         self.derived_feature_dims = trainer.get_derived_data_sizes()
         self.derived_feature_names_dims = {}
@@ -1080,6 +1057,30 @@ class AbstractNN(nn.Module):
         self, x: torch.Tensor, derived_tensors: Dict[str, torch.Tensor]
     ) -> torch.Tensor:
         raise NotImplementedError
+
+    def _loss_fn(self, y_true, y_pred, *data, **kwargs):
+        """
+        User defined loss function.
+
+        Parameters
+        ----------
+        y_true:
+            Ground truth value.
+        y_pred:
+            Predicted value by the model.
+        model:
+            The model predicting y_pred.
+        *data:
+            Tensors of continuous data and derived data.
+        **kwargs:
+            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
+
+        Returns
+        -------
+        loss:
+            A torch-like loss.
+        """
+        return self.default_loss_fn(y_pred, y_true)
 
 
 def init_weights(m):

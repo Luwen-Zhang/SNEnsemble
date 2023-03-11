@@ -91,7 +91,7 @@ class ThisWorkRidge(ThisWork):
             additional_tensors = tensors[1 : len(tensors) - 1]
             y = model(*([data] + additional_tensors))
             self.ridge(model, yhat)
-            loss = self._loss_fn(
+            loss = model._loss_fn(
                 yhat, y, model, *([data] + additional_tensors), **kwargs
             )
             loss.backward()
