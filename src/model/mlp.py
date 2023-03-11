@@ -5,8 +5,12 @@ import torch.nn as nn
 
 
 class MLP(TorchModel):
-    def __init__(self, trainer=None, program=None, layers=None, model_subset=None):
-        super(MLP, self).__init__(trainer, program=program, model_subset=model_subset)
+    def __init__(
+        self, trainer=None, program=None, layers=None, model_subset=None, **kwargs
+    ):
+        super(MLP, self).__init__(
+            trainer, program=program, model_subset=model_subset, **kwargs
+        )
         self.layers = layers
 
     def _get_program_name(self):

@@ -4,22 +4,8 @@ from skopt.space import Real, Integer, Categorical
 
 
 class TabNet(AbstractModel):
-    def __init__(self, trainer=None, program=None, model_subset=None):
-        super(TabNet, self).__init__(
-            trainer, program=program, model_subset=model_subset
-        )
-        self.additional_params = None
-
     def _get_program_name(self):
         return "TabNet"
-
-    def _get_additional_params(self, verbose=True):
-        if self.additional_params is None:
-            return [8, 8, 3, 1.3, 2, 2]
-        else:
-            if verbose:
-                print(f"Previous additional params loaded: {self.additional_params}.")
-            return list(self.additional_params.values())
 
     def _get_model_names(self):
         return ["TabNet"]

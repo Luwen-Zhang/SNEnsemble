@@ -16,9 +16,10 @@ class TransformerLSTM(TorchModel):
         program=None,
         layers=None,
         model_subset=None,
+        **kwargs,
     ):
         super(TransformerLSTM, self).__init__(
-            trainer, program=program, model_subset=model_subset
+            trainer, program=program, model_subset=model_subset, **kwargs
         )
         self.manual_activate_sn = manual_activate_sn
         self.layers = layers

@@ -7,10 +7,15 @@ import torch.nn as nn
 
 class ThisWork(TorchModel):
     def __init__(
-        self, trainer=None, manual_activate=None, program=None, model_subset=None
+        self,
+        trainer=None,
+        manual_activate=None,
+        program=None,
+        model_subset=None,
+        **kwargs,
     ):
         super(ThisWork, self).__init__(
-            trainer, program=program, model_subset=model_subset
+            trainer, program=program, model_subset=model_subset, **kwargs
         )
         self.activated_sn = None
         self.manual_activate = manual_activate

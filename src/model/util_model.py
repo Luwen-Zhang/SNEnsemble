@@ -15,6 +15,7 @@ class RFE(TorchModel):
         impor_method: str = "shap",
         cross_validation=5,
         min_features=1,
+        **kwargs,
     ):
         self.metric = metric
         self.impor_method = impor_method
@@ -27,7 +28,7 @@ class RFE(TorchModel):
         self._model_names = modelbase.get_model_names()
         self.model_class = modelbase.__class__
         super(RFE, self).__init__(
-            trainer=trainer, program=program, model_subset=model_subset
+            trainer=trainer, program=program, model_subset=model_subset, **kwargs
         )
         self.trainer_modelbase = {}
 
@@ -146,10 +147,10 @@ class RFE(TorchModel):
 
 
 class ModelAssembly(AbstractModel):
-    def __init__(self, trainer, models=None, program=None, model_subset=None):
+    def __init__(self, trainer, models=None, program=None, model_subset=None, **kwargs):
         self.program = "ModelAssembly" if program is None else program
         super(ModelAssembly, self).__init__(
-            trainer, program=self.program, model_subset=model_subset
+            trainer, program=self.program, model_subset=model_subset, **kwargs
         )
         self.models = {}
         if models is None:
@@ -158,8 +159,8 @@ class ModelAssembly(AbstractModel):
             else:
                 for model_name in model_subset:
                     self.models[model_name] = getattr(
-                        sys.modules[__name__], model_name
-                    )(trainer, model_subset=[model_name])
+                        sys.modules["src.model"], model_name
+                    )(trainer, model_subset=[model_name], **kwargs)
         else:
             for model in models:
                 if len(model.get_model_names()) > 1:

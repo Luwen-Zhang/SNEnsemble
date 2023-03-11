@@ -20,6 +20,7 @@ class AbstractModel:
         trainer: Trainer = None,
         program: str = None,
         model_subset: List[str] = None,
+        **kwargs,
     ):
         """
         The base class for all model-bases.
@@ -768,11 +769,6 @@ class TorchModel(AbstractModel):
     """
     The specific class for PyTorch-like models. Some abstract methods in AbstractModel are implemented.
     """
-
-    def __init__(self, trainer=None, program=None, model_subset=None):
-        super(TorchModel, self).__init__(
-            trainer, program=program, model_subset=model_subset
-        )
 
     def _train_step(
         self,

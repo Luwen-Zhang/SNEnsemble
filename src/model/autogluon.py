@@ -4,11 +4,6 @@ from src.trainer import save_trainer
 
 
 class AutoGluon(AbstractModel):
-    def __init__(self, trainer=None, program=None, model_subset=None):
-        super(AutoGluon, self).__init__(
-            trainer, program=program, model_subset=model_subset
-        )
-
     def _get_program_name(self):
         return "AutoGluon"
 
