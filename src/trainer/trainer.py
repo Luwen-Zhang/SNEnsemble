@@ -558,13 +558,14 @@ class Trainer:
                 df_tmp[col_names] = value
         return df_tmp, cont_feature_names
 
-    def derive_unstacked(self, df):
+    def derive_unstacked(self, df, categorical_only=False):
         derived_data = {}
-        for deriver, kwargs in self.dataderivers:
-            kwargs = deriver.make_defaults(**kwargs)
-            if not kwargs["stacked"]:
-                value, name, _ = deriver.derive(df, trainer=self, **kwargs)
-                derived_data[name] = value
+        if not categorical_only:
+            for deriver, kwargs in self.dataderivers:
+                kwargs = deriver.make_defaults(**kwargs)
+                if not kwargs["stacked"]:
+                    value, name, _ = deriver.derive(df, trainer=self, **kwargs)
+                    derived_data[name] = value
         if len(self.cat_feature_names) > 0:
             derived_data["categorical"] = df[self.cat_feature_names].values
         return derived_data
