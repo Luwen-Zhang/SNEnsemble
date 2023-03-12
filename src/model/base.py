@@ -410,7 +410,11 @@ class AbstractModel:
                 print(f"Training {model_name}")
             tmp_params = self._get_params(model_name, verbose=verbose)
 
-            if self.trainer.bayes_opt and not warm_start:
+            if (
+                self.trainer.bayes_opt
+                and not warm_start
+                and len(self._space(model_name=model_name)) > 0
+            ):
                 callback = BayesCallback(
                     tqdm(total=self.trainer.n_calls, disable=not verbose)
                 )
