@@ -3,6 +3,7 @@ from src.utils import *
 from src.model import AbstractModel
 from src.trainer import save_trainer
 from skopt.space import Integer, Categorical, Real
+from typing import Dict
 
 
 class AutoGluon(AbstractModel):
@@ -103,7 +104,7 @@ class AutoGluon(AbstractModel):
                 use_bag_holdout=True,
                 verbosity=0,
                 feature_generator=feature_generator,
-                hyperparameters={model[0]: kwargs},
+                hyperparameters={self._name_mapping[model[0]]: kwargs},
             )
 
         enable_tqdm()
@@ -114,34 +115,50 @@ class AutoGluon(AbstractModel):
 
     def _get_model_names(self):
         return [
-            "GBM",
-            "CAT",
-            "XGB",
-            "RF",
-            "XT",
-            "KNN",
-            "LR",
-            "NN_MXNET",
-            "NN_TORCH",
-            "FASTAI",
+            "LightGBM",
+            "CatBoost",
+            "XGBoost",
+            "Random Forest",
+            "Extremely Randomized Trees",
+            "K-Nearest Neighbors",
+            "Linear Regression",
+            "Neural Network with MXNet",
+            "Neural Network with PyTorch",
+            "Neural Network with FastAI",
         ]
+
+    @property
+    def _name_mapping(self) -> Dict:
+        name_mapping = {
+            "LightGBM": "GBM",
+            "CatBoost": "CAT",
+            "XGBoost": "XGB",
+            "Random Forest": "RF",
+            "Extremely Randomized Trees": "XT",
+            "K-Nearest Neighbors": "KNN",
+            "Linear Regression": "LR",
+            "Neural Network with MXNet": "NN_MXNET",
+            "Neural Network with PyTorch": "NN_TORCH",
+            "Neural Network with FastAI": "FASTAI",
+        }
+        return name_mapping
 
     def _space(self, model_name):
         space_dict = {
-            "GBM": [
+            "LightGBM": [
                 Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),
             ],
-            "CAT": [
+            "CatBoost": [
                 Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),
             ],
-            "XGB": [
+            "XGBoost": [
                 Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),
             ],
-            "RF": [],
-            "XT": [],
-            "KNN": [],
-            "LR": [],
-            "NN_MXNET": [
+            "Random Forest": [],
+            "Extremely Randomized Trees": [],
+            "K-Nearest Neighbors": [],
+            "Linear Regression": [],
+            "Neural Network with MXNet": [
                 Real(low=1e-4, high=3e-2, prior="log-uniform", name="learning_rate"),
                 Real(low=1e-12, high=0.1, prior="log-uniform", name="weight_decay"),
                 Categorical(
@@ -164,7 +181,7 @@ class AutoGluon(AbstractModel):
                 ),
                 Categorical(categories=[512, 1024, 2056, 128], name="batch_size"),
             ],
-            "NN_TORCH": [
+            "Neural Network with PyTorch": [
                 Real(low=1e-4, high=3e-2, prior="log-uniform", name="learning_rate"),
                 Real(low=1e-12, high=0.1, prior="log-uniform", name="weight_decay"),
                 Categorical(
@@ -188,7 +205,7 @@ class AutoGluon(AbstractModel):
                 Categorical(categories=[2, 3, 4], name="num_layers"),
                 Categorical(categories=[128, 256, 512], name="hidden_size"),
             ],
-            "FASTAI": [
+            "Neural Network with FastAI": [
                 Real(low=0.0, high=0.5, prior="uniform", name="emb_drop"),
                 Real(low=0.0, high=0.5, prior="uniform", name="ps"),
                 Categorical(
@@ -201,14 +218,14 @@ class AutoGluon(AbstractModel):
 
     def _initial_values(self, model_name):
         params_dict = {
-            "GBM": {"learning_rate": 0.03},
-            "CAT": {"learning_rate": 0.05},
-            "XGB": {"learning_rate": 0.1},
-            "RF": {},
-            "XT": {},
-            "KNN": {},
-            "LR": {},
-            "NN_MXNET": {
+            "LightGBM": {"learning_rate": 0.03},
+            "CatBoost": {"learning_rate": 0.05},
+            "XGBoost": {"learning_rate": 0.1},
+            "Random Forest": {},
+            "Extremely Randomized Trees": {},
+            "K-Nearest Neighbors": {},
+            "Linear Regression": {},
+            "Neural Network with MXNet": {
                 "learning_rate": 3e-4,
                 "weight_decay": 1e-6,
                 "dropout_prob": 0.1,
@@ -218,7 +235,7 @@ class AutoGluon(AbstractModel):
                 "proc.skew_threshold": 0.99,
                 "batch_size": 512,
             },
-            "NN_TORCH": {
+            "Neural Network with PyTorch": {
                 "learning_rate": 3e-4,
                 "weight_decay": 1e-6,
                 "dropout_prob": 0.1,
@@ -229,7 +246,7 @@ class AutoGluon(AbstractModel):
                 "num_layers": 4,  # number of layers
                 "hidden_size": 128,  # number of hidden units in each layer
             },
-            "FASTAI": {
+            "Neural Network with FastAI": {
                 "emb_drop": 0.1,
                 "ps": 0.1,
                 "bs": 256,
