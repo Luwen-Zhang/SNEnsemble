@@ -43,10 +43,7 @@ class AutoGluon(AbstractModel):
 
     def _data_preprocess(self, df, derived_data, model_name):
         all_feature_names = self.trainer.all_feature_names
-        label_name = self.trainer.label_name
-        df = self.trainer.categories_inverse_transform(
-            df[all_feature_names + label_name].copy()
-        )
+        df = self.trainer.categories_inverse_transform(df[all_feature_names].copy())
         return df, derived_data
 
     def _train_single_model(
@@ -114,7 +111,7 @@ class AutoGluon(AbstractModel):
         warnings.simplefilter(action="default")
 
     def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
-        return model[1].predict(X_test)
+        return model[1].predict(X_test).values.reshape(-1, 1)
 
     def _get_model_names(self):
         return [
