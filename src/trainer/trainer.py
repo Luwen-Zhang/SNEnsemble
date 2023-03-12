@@ -1034,17 +1034,7 @@ class Trainer:
                 ]
                 attr = np.abs(np.append(attr[0], attr[1:]))
             elif method == "shap":
-                shap_values, data = self.cal_shap(
-                    program=program, model_name=model_name
-                )
-                attr = (
-                    np.append(
-                        np.mean(np.abs(shap_values[0]), axis=0),
-                        [np.mean(np.abs(x), axis=0) for x in shap_values[1:]],
-                    )
-                    if type(shap_values) == list and len(shap_values) > 1
-                    else np.mean(np.abs(shap_values[0]), axis=0)
-                )
+                attr = self.cal_shap(program=program, model_name=model_name)
             else:
                 raise NotImplementedError
             dims = self.get_derived_data_sizes()
@@ -1086,17 +1076,7 @@ class Trainer:
                     )
                 attr /= np.sum(attr)
             elif method == "shap":
-                shap_values, data = self.cal_shap(
-                    program=program, model_name=model_name
-                )
-                attr = (
-                    np.append(
-                        np.mean(np.abs(shap_values[0]), axis=0),
-                        [np.mean(np.abs(x), axis=0) for x in shap_values[1:]],
-                    )
-                    if type(shap_values) == list and len(shap_values) > 1
-                    else np.mean(np.abs(shap_values), axis=0)
-                )
+                attr = self.cal_shap(program=program, model_name=model_name)
             else:
                 raise NotImplementedError
             importance_names = cp(self.all_feature_names)
@@ -1108,8 +1088,8 @@ class Trainer:
         import shap
 
         modelbase = self.get_modelbase(program)
-
-        if issubclass(type(modelbase), TorchModel):
+        is_torch = issubclass(type(modelbase), TorchModel)
+        if is_torch:
             bk_indices = np.random.choice(self.train_indices, size=100, replace=False)
             X_train_bk = self._get_first_tensor_slice(bk_indices)
             D_train_bk = self._get_additional_tensors_slice(bk_indices)
@@ -1125,11 +1105,22 @@ class Trainer:
             background_data = shap.kmeans(
                 self.df.loc[self.train_indices, self.all_feature_names], 10
             )
+            warnings.filterwarnings(
+                "ignore",
+                message="`np.int` is a deprecated alias for the builtin `int`",
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message="The default of 'normalize' will be set to False in version 1.2 and deprecated in version 1.4.",
+            )
 
             def func(data):
                 df = pd.DataFrame(columns=self.all_feature_names, data=data)
                 return modelbase.predict(
-                    df, model_name=model_name, derived_data=self.derive_unstacked(df)
+                    df,
+                    model_name=model_name,
+                    derived_data=self.derive_unstacked(df, categorical_only=True),
+                    ignore_absence=True,
                 ).flatten()
 
             test_indices = np.random.choice(self.test_indices, size=10, replace=False)
@@ -1137,7 +1128,15 @@ class Trainer:
             shap_values = shap.KernelExplainer(func, background_data).shap_values(
                 test_data
             )
-        return shap_values, test_data
+        attr = (
+            np.append(
+                np.mean(np.abs(shap_values[0]), axis=0),
+                [np.mean(np.abs(x), axis=0) for x in shap_values[1:]],
+            )
+            if type(shap_values) == list and len(shap_values) > 1
+            else np.mean(np.abs(shap_values[0] if is_torch else shap_values), axis=0)
+        )
+        return attr
 
     def plot_feature_importance(
         self, program, model_name, fig_size=(7, 4), method="permutation"
