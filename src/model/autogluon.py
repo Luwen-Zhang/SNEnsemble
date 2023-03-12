@@ -59,6 +59,7 @@ class AutoGluon(AbstractModel):
         y_val,
         verbose,
         warm_start,
+        in_bayes_opt,
         **kwargs,
     ):
         disable_tqdm()
@@ -99,7 +100,7 @@ class AutoGluon(AbstractModel):
             model[1].fit(
                 train_data,
                 tuning_data=val_data,
-                presets="best_quality",
+                presets="best_quality" if not in_bayes_opt else "medium_quality",
                 hyperparameter_tune_kwargs=None,
                 use_bag_holdout=True,
                 verbosity=0,

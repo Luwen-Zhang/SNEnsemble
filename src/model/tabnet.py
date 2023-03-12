@@ -83,6 +83,7 @@ class TabNet(AbstractModel):
         y_val,
         verbose,
         warm_start,
+        in_bayes_opt,
         **kwargs,
     ):
         eval_set = [(X_val, y_val)]

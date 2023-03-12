@@ -438,6 +438,7 @@ class AbstractModel:
                             y_val=y_val,
                             verbose=False,
                             warm_start=False,
+                            in_bayes_opt=True,
                             **params,
                         )
 
@@ -491,6 +492,7 @@ class AbstractModel:
                 y_val=y_val,
                 verbose=verbose,
                 warm_start=warm_start,
+                in_bayes_opt=False,
                 **tmp_params,
             )
 
@@ -683,6 +685,7 @@ class AbstractModel:
         y_val: Any,
         verbose: bool,
         warm_start: bool,
+        in_bayes_opt: bool,
         **kwargs,
     ):
         """
@@ -710,6 +713,8 @@ class AbstractModel:
             Verbosity.
         warm_start:
             Whether to train models based on previous trained models.
+        in_bayes_opt:
+            Whether is in bayes optimization loop.
         **kwargs:
             Parameters to train the model. It contains all arguments in :func:`_initial_values`.
         """
@@ -965,6 +970,7 @@ class TorchModel(AbstractModel):
         y_val,
         verbose,
         warm_start,
+        in_bayes_opt,
         **kwargs,
     ):
         optimizer = model.get_optimizer(warm_start, **kwargs)

@@ -136,6 +136,7 @@ class WideDeep(AbstractModel):
         y_val,
         verbose,
         warm_start,
+        in_bayes_opt,
         **kwargs,
     ):
         """
