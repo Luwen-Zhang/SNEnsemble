@@ -484,13 +484,17 @@ class Trainer:
         ]
         self._update_dataset_auto()
 
-    def sort_derived_data(self, derived_data):
+    def sort_derived_data(self, derived_data, ignore_absence=False):
         if derived_data is None:
             return None
         else:
             tmp_derived_data = {}
             for key in self.derived_data.keys():
-                tmp_derived_data[key] = derived_data[key]
+                if ignore_absence:
+                    if key in derived_data.keys():
+                        tmp_derived_data[key] = derived_data[key]
+                else:
+                    tmp_derived_data[key] = derived_data[key]
             return tmp_derived_data
 
     def categories_inverse_transform(self, X: pd.DataFrame):

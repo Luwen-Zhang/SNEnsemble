@@ -129,7 +129,12 @@ class AbstractModel:
             print(f"\n-------------{self.program} End-------------\n")
 
     def predict(
-        self, df: pd.DataFrame, model_name: str, derived_data: dict = None, **kwargs
+        self,
+        df: pd.DataFrame,
+        model_name: str,
+        derived_data: dict = None,
+        ignore_absence: bool = False,
+        **kwargs,
     ) -> np.ndarray:
         """
         Predict a new dataset using the selected model.
@@ -142,6 +147,8 @@ class AbstractModel:
             A selected name of a model, which is already trained.
         derived_data:
             Data derived from :func:`Trainer.derive_unstacked`. If not None, unstacked data will be re-derived.
+        ignore_absence:
+            Whether to ignore absent keys in derived_data. Use True only when the model does not use derived_data.
         **kwargs:
             Arguments of :func:`_predict` for models.
 
@@ -177,13 +184,16 @@ class AbstractModel:
                 for key in self.trainer.derived_data.keys()
                 if key not in derived_data.keys()
             ]
-            if len(absent_keys) > 0:
+            if len(absent_keys) > 0 and not ignore_absence:
                 raise Exception(
                     f"Additional feature {absent_keys} not in the input derived_data."
                 )
         df = self.trainer.dataimputer.transform(df.copy(), self.trainer)
         return self._predict(
-            df, model_name, self.trainer.sort_derived_data(derived_data), **kwargs
+            df,
+            model_name,
+            self.trainer.sort_derived_data(derived_data, ignore_absence=ignore_absence),
+            **kwargs,
         )
 
     def detach_model(self, model_name: str, program: str):
