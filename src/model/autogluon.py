@@ -125,7 +125,7 @@ class AutoGluon(AbstractModel):
             "Extremely Randomized Trees",
             "K-Nearest Neighbors",
             "Linear Regression",
-            "Neural Network with MXNet",
+            # "Neural Network with MXNet", Deprecated https://github.com/autogluon/autogluon/pull/1603
             "Neural Network with PyTorch",
             "Neural Network with FastAI",
         ]
