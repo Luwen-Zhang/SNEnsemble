@@ -481,6 +481,28 @@ class TransformerBlock(nn.Module):
         return x + self.dropout(self.f(self.f_norm(x_attn)))
 
 
+class PositionalEncoding(nn.Module):
+    # https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-np.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.register_buffer("pe", pe)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Args:
+            x: Tensor, shape [seq_len, batch_size, embedding_dim]
+        """
+        x = x + self.pe[: x.size(0)]
+        return self.dropout(x)
+
+
 class _SN(nn.Module):
     def __init__(self, trainer, manual_activate_sn, sn_coeff_vars_idx):
         super(_SN, self).__init__()
@@ -748,6 +770,7 @@ class _SeqTransformer(_Transformer):
     def __init__(
         self,
         embedding_dim,
+        dropout,
         run,
         use_torch_transformer=None,
         flatten_transformer=None,
@@ -758,6 +781,7 @@ class _SeqTransformer(_Transformer):
             # flatten_transformer=False because the length of the padded sequence might be unknown.
             super(_SeqTransformer, self).__init__(
                 embedding_dim=embedding_dim,
+                dropout=dropout,
                 use_torch_transformer=True,
                 flatten_transformer=False,
                 *args,
@@ -765,6 +789,9 @@ class _SeqTransformer(_Transformer):
             )
             self.embedding = nn.Embedding(
                 num_embeddings=191, embedding_dim=embedding_dim
+            )
+            self.pos_encoding = PositionalEncoding(
+                d_model=embedding_dim, dropout=dropout
             )
             self.run = True
         else:
@@ -779,7 +806,8 @@ class _SeqTransformer(_Transformer):
             # for the definition of padding_mask, see nn.MultiheadAttention.forward
             padding_mask = torch.arange(max_len).expand(len(lens), max_len) >= lens
             x = self.embedding(seq.long() + 90)
-            x_trans = self.transformer(x, src_key_padding_mask=padding_mask)
+            x_pos = self.pos_encoding(x)
+            x_trans = self.transformer(x_pos, src_key_padding_mask=padding_mask)
             x_trans = x_trans.mean(1)
             x_trans = self.transformer_head(x_trans)
             return x_trans
