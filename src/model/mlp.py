@@ -17,7 +17,6 @@ class MLP(TorchModel):
         return "MLP"
 
     def _new_model(self, model_name, verbose, **kwargs):
-        set_torch_random(0)
         return MLPNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),

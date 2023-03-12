@@ -32,7 +32,6 @@ class ThisWork(TorchModel):
     def _new_model(self, model_name, verbose, **kwargs):
         if self.activated_sn is None:
             self.activated_sn = self._get_activated_sn()
-        set_torch_random(0)
         return ThisWorkNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
@@ -77,7 +76,6 @@ class ThisWorkRidge(ThisWork):
     def _new_model(self, model_name, verbose, **kwargs):
         if self.activated_sn is None:
             self.activated_sn = self._get_activated_sn()
-        set_torch_random(0)
         return ThisWorkRidgeNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),

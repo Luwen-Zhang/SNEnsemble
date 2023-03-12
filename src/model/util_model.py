@@ -51,7 +51,7 @@ class RFE(TorchModel):
         return self._model_names
 
     def _new_model(self, model_name, verbose, **kwargs):
-        return self.trainer_modelbase[model_name][1]._new_model(
+        return self.trainer_modelbase[model_name][1].new_model(
             model_name, verbose, **kwargs
         )
 

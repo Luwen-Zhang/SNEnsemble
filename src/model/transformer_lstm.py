@@ -31,7 +31,6 @@ class TransformerLSTM(TorchModel):
         return ["TransformerLSTM", "TransformerSeq", "CatEmbedLSTM", "BiasCatEmbedLSTM"]
 
     def _new_model(self, model_name, verbose, **kwargs):
-        set_torch_random(0)
         sn_coeff_vars_idx = [
             self.trainer.cont_feature_names.index(name)
             for name, t in self.trainer.args["feature_names_type"].items()

@@ -215,6 +215,10 @@ class AbstractModel:
             tmp_model.model_params[model_name] = cp(self.model_params[model_name])
         return tmp_model
 
+    def new_model(self, model_name: str, verbose: bool, **kwargs):
+        set_random_seed(0)
+        return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
+
     def _base_train_data_preprocess(
         self,
     ) -> Tuple[
@@ -423,7 +427,7 @@ class AbstractModel:
                 @skopt.utils.use_named_args(self._space(model_name=model_name))
                 def _bayes_objective(**params):
                     with HiddenPrints(disable_logging=True):
-                        model = self._new_model(
+                        model = self.new_model(
                             model_name=model_name, verbose=False, **params
                         )
 
@@ -475,7 +479,7 @@ class AbstractModel:
                 )  # to announce the optimized params.
 
             if not warm_start or (warm_start and not self._trained):
-                model = self._new_model(
+                model = self.new_model(
                     model_name=model_name, verbose=verbose, **tmp_params
                 )
             else:
@@ -1037,7 +1041,7 @@ class TorchModel(AbstractModel):
         if self.model is not None and model_name in self.model.keys():
             model = self.model[model_name]
         else:
-            model = self._new_model(
+            model = self.new_model(
                 model_name, verbose=False, **self._get_params(model_name, verbose=False)
             )
         if trainable_only:
