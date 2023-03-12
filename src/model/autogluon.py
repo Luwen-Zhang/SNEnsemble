@@ -66,7 +66,7 @@ class AutoGluon(AbstractModel):
                 presets="best_quality"
                 if not debug_mode
                 else "medium_quality_faster_train",
-                hyperparameter_tune_kwargs="bayesopt"
+                hyperparameter_tune_kwargs="auto"
                 if (not debug_mode) and self.trainer.bayes_opt
                 else None,
                 use_bag_holdout=True,
