@@ -870,7 +870,7 @@ class Trainer:
             for modelbase in self.modelbases:
                 print(f"{modelbase.program} metrics")
                 programs_predictions[modelbase.program] = modelbase._predict_all(
-                    verbose=False, test_data_only=test_data_only
+                    verbose=verbose, test_data_only=test_data_only
                 )
 
         df_leaderboard = self._cal_leaderboard(
