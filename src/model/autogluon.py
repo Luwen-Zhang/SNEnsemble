@@ -1,3 +1,4 @@
+import os.path
 from src.utils import *
 from src.model import AbstractModel
 from src.trainer import save_trainer
@@ -11,11 +12,14 @@ class AutoGluon(AbstractModel):
     def _new_model(self, model_name, verbose, **kwargs):
         from autogluon.tabular import TabularPredictor
 
+        path = os.path.join(self.root, model_name)
         predictor = TabularPredictor(
             label=self.trainer.label_name[0],
-            path=self.root,
+            path=os.path.join(self.root, model_name),
             problem_type="regression",
         )
+        if not os.path.exists(path):
+            os.mkdir(path)
         return (model_name, predictor)
 
     def _train_data_preprocess(
