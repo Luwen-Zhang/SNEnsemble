@@ -25,6 +25,7 @@ class PytorchTabular(AbstractModel):
             TabTransformerConfig,
             AutoIntConfig,
             FTTransformerConfig,
+            GatedAdditiveTreeEnsembleConfig,
         )
         from pytorch_tabular.config import DataConfig, OptimizerConfig, TrainerConfig
 
@@ -49,6 +50,7 @@ class PytorchTabular(AbstractModel):
             "TabTransformer": TabTransformerConfig,
             "AutoInt": AutoIntConfig,
             "FTTransformer": FTTransformerConfig,
+            "GATE": GatedAdditiveTreeEnsembleConfig,
         }
         with HiddenPrints(disable_logging=True):
             model_config = (
@@ -154,6 +156,7 @@ class PytorchTabular(AbstractModel):
             "TabTransformer",
             "AutoInt",
             "FTTransformer",
+            "GATE",
         ]
 
     def _space(self, model_name):
@@ -268,6 +271,21 @@ class PytorchTabular(AbstractModel):
                     dtype=int,
                 ),  # 4
             ],
+            "GATE": [
+                Integer(low=2, high=10, prior="uniform", name="gflu_stages", dtype=int),
+                Real(low=0.0, high=0.3, prior="uniform", name="gflu_dropout"),
+                Integer(low=2, high=10, prior="uniform", name="tree_depth", dtype=int),
+                Integer(low=10, high=40, prior="uniform", name="num_trees", dtype=int),
+                Real(low=0.0, high=0.3, prior="uniform", name="tree_dropout"),
+                Real(
+                    low=0.0,
+                    high=0.3,
+                    prior="uniform",
+                    name="tree_wise_attention_dropout",
+                ),
+                Real(low=0.0, high=0.3, prior="uniform", name="embedding_dropout"),
+                Real(low=1e-5, high=0.1, prior="log-uniform", name="learning_rate"),
+            ],
         }
         return space_dict[model_name]
 
@@ -319,6 +337,16 @@ class PytorchTabular(AbstractModel):
                 "add_norm_dropout": 0.1,
                 "ff_dropout": 0.1,
                 "ff_hidden_multiplier": 4,
+            },
+            "GATE": {
+                "gflu_stages": 6,
+                "gflu_dropout": 0.0,
+                "tree_depth": 5,
+                "num_trees": 20,
+                "tree_dropout": 0.0,
+                "tree_wise_attention_dropout": 0.0,
+                "embedding_dropout": 0.1,
+                "learning_rate": 1e-3,
             },
         }
         return params_dict[model_name]
