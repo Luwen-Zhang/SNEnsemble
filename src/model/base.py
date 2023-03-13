@@ -37,6 +37,7 @@ class AbstractModel:
             Whether to save sub-models directly in a Dict (memory). If True, they will be saved locally. If the device
             is `cpu`, low_memory=False is used.
         """
+        self.device = trainer.device
         self.trainer = trainer
         if not hasattr(trainer, "database"):
             trainer.load_config(default_configfile="base_config")
@@ -939,20 +940,26 @@ class TorchModel(AbstractModel):
         D_test,
         y_test,
     ):
+        from torch.utils.data.dataloader import default_collate
+
+        collate_fn = lambda x: tuple(x_.to(self.device) for x_ in default_collate(x))
         train_loader = Data.DataLoader(
             self.trainer.train_dataset,
             batch_size=len(self.trainer.train_dataset),
             generator=torch.Generator().manual_seed(0),
+            collate_fn=collate_fn,
         )
         val_loader = Data.DataLoader(
             self.trainer.val_dataset,
             batch_size=len(self.trainer.val_dataset),
             generator=torch.Generator().manual_seed(0),
+            collate_fn=collate_fn,
         )
         test_loader = Data.DataLoader(
             self.trainer.test_dataset,
             batch_size=len(self.trainer.test_dataset),
             generator=torch.Generator().manual_seed(0),
+            collate_fn=collate_fn,
         )
         return (
             train_loader,
@@ -971,14 +978,12 @@ class TorchModel(AbstractModel):
         X = torch.tensor(
             df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
-        ).to(self.trainer.device)
+        ).to(self.device)
         D = [
-            torch.tensor(value, dtype=torch.float32).to(self.trainer.device)
+            torch.tensor(value, dtype=torch.float32).to(self.device)
             for value in derived_data.values()
         ]
-        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(
-            self.trainer.device
-        )
+        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(self.device)
 
         loader = Data.DataLoader(
             Data.TensorDataset(X, *D, y), batch_size=len(df), shuffle=False
@@ -1000,12 +1005,17 @@ class TorchModel(AbstractModel):
         in_bayes_opt,
         **kwargs,
     ):
+        from torch.utils.data.dataloader import default_collate
+
+        collate_fn = lambda x: tuple(x_.to(self.device) for x_ in default_collate(x))
+        model.to(self.device)
         optimizer = model.get_optimizer(warm_start, **kwargs)
 
         train_loader = Data.DataLoader(
             X_train.dataset,
             batch_size=int(kwargs["batch_size"]),
             generator=torch.Generator().manual_seed(0),
+            collate_fn=collate_fn,
         )
         val_loader = X_val
 
@@ -1044,14 +1054,16 @@ class TorchModel(AbstractModel):
 
         idx = val_ls.index(min(val_ls))
         min_loss = val_ls[idx]
-
+        model.to("cpu")
         model.load_state_dict(torch.load(self.trainer.project_root + "fatigue.pt"))
 
         if verbose:
             print(f"Minimum loss: {min_loss:.5f}")
 
     def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+        model.to(self.device)
         y_test_pred, _, _ = self._test_step(model, X_test, **kwargs)
+        model.to("cpu")
         return y_test_pred
 
     def _space(self, model_name):

@@ -81,7 +81,6 @@ class WideDeep(AbstractModel):
                 WideDeepCallback(total_epoch=self.total_epoch, verbose=verbose),
             ],
             optimizers={"deeptabular": optimizer} if self.trainer.bayes_opt else None,
-            num_workers=16,
             device=self.trainer.device,
         )
         return wd_trainer

@@ -22,7 +22,7 @@ class MLP(TorchModel):
             len(self.trainer.label_name),
             self.trainer.layers if self.layers is None else self.layers,
             trainer=self.trainer,
-        ).to(self.trainer.device)
+        )
 
     def _get_model_names(self):
         return ["MLP"]

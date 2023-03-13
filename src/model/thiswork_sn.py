@@ -38,7 +38,7 @@ class ThisWork(TorchModel):
             self.trainer.layers,
             activated_sn=self.activated_sn,
             trainer=self.trainer,
-        ).to(self.trainer.device)
+        )
 
     def _get_activated_sn(self):
         from src.model._thiswork_sn_formulas import sn_mapping
@@ -82,7 +82,7 @@ class ThisWorkRidge(ThisWork):
             self.trainer.layers,
             activated_sn=self.activated_sn,
             trainer=self.trainer,
-        ).to(self.trainer.device)
+        )
 
     def _train_step(self, model, train_loader, optimizer, **kwargs):
         model.train()

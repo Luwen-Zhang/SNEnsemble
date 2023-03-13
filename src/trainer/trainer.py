@@ -667,14 +667,10 @@ class Trainer:
     def _update_dataset_auto(self):
         X = torch.tensor(
             self.feature_data.values.astype(np.float32), dtype=torch.float32
-        ).to(self.device)
-        y = torch.tensor(
-            self.label_data.values.astype(np.float32), dtype=torch.float32
-        ).to(self.device)
+        )
+        y = torch.tensor(self.label_data.values.astype(np.float32), dtype=torch.float32)
 
-        D = [
-            torch.tensor(value).to(self.device) for value in self.derived_data.values()
-        ]
+        D = [torch.tensor(value) for value in self.derived_data.values()]
         dataset = Data.TensorDataset(X, *D, y)
 
         self.train_dataset = Subset(dataset, self.train_indices)

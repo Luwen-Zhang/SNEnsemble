@@ -55,7 +55,7 @@ class TransformerLSTM(TorchModel):
                 attn_heads=kwargs["attn_heads"],
                 embed_dropout=kwargs["embed_dropout"],
                 transformer_dropout=kwargs["transformer_dropout"],
-            ).to(self.trainer.device)
+            )
         elif model_name == "TransformerSeq":
             return TransformerSeqNN(
                 len(self.trainer.cont_feature_names),
@@ -73,7 +73,7 @@ class TransformerLSTM(TorchModel):
                 attn_heads=kwargs["attn_heads"],
                 embed_dropout=kwargs["embed_dropout"],
                 transformer_dropout=kwargs["transformer_dropout"],
-            ).to(self.trainer.device)
+            )
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
             if model_name == "CatEmbedLSTM":
                 cls = CatEmbedLSTMNN
@@ -95,7 +95,7 @@ class TransformerLSTM(TorchModel):
                 n_hidden=kwargs["n_hidden"],
                 lstm_layers=kwargs["lstm_layers"],
                 embed_dropout=kwargs["embed_dropout"],
-            ).to(self.trainer.device)
+            )
 
     def _space(self, model_name):
         if model_name == "TransformerLSTM":
