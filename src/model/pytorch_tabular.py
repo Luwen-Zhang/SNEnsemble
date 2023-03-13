@@ -51,9 +51,16 @@ class PytorchTabular(AbstractModel):
             "FTTransformer": FTTransformerConfig,
         }
         with HiddenPrints(disable_logging=True):
+            model_config = (
+                model_configs[model_name](task="regression", **kwargs)
+                if model_name != "NODE"
+                else model_configs[model_name](
+                    task="regression", embed_categorical=True, **kwargs
+                )
+            )
             tabular_model = TabularModel(
                 data_config=data_config,
-                model_config=model_configs[model_name](task="regression", **kwargs),
+                model_config=model_config,
                 optimizer_config=optimizer_config,
                 trainer_config=trainer_config,
             )
@@ -122,9 +129,22 @@ class PytorchTabular(AbstractModel):
 
     def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
         target = model.config.target[0]
-        return np.array(
-            model.predict(X_test, include_input_features=False)[f"{target}_prediction"]
-        ).reshape(-1, 1)
+        with HiddenPrints():
+            # Two annoying warnings that cannot be suppressed:
+            # 1. DeprecationWarning: Default for `include_input_features` will change from True to False in the next
+            # release. Please set it explicitly.
+            # 2. DeprecationWarning: "The `out_ff_layers`, `out_ff_activation`, `out_ff_dropoout`, and
+            # `out_ff_initialization` arguments are deprecated and will be removed next release. Please use head and
+            # head_config as an alternative.
+            warnings.filterwarnings(
+                "ignore", category=DeprecationWarning, module="pytorch_tabular"
+            )
+            res = np.array(
+                model.predict(X_test, include_input_features=False)[
+                    f"{target}_prediction"
+                ]
+            ).reshape(-1, 1)
+        return res
 
     def _get_model_names(self):
         return [
@@ -139,8 +159,8 @@ class PytorchTabular(AbstractModel):
     def _space(self, model_name):
         space_dict = {
             "Category Embedding": [
-                Real(low=0, high=0.3, prior="uniform", name="dropout"),  # 0.5
-                Real(low=0, high=0.3, prior="uniform", name="embedding_dropout"),  # 0.5
+                Real(low=0, high=0.5, prior="uniform", name="dropout"),  # 0.5
+                Real(low=0, high=0.5, prior="uniform", name="embedding_dropout"),  # 0.5
                 Real(
                     low=1e-5, high=0.1, prior="log-uniform", name="learning_rate"
                 ),  # 0.001
@@ -200,7 +220,6 @@ class PytorchTabular(AbstractModel):
                     name="ff_hidden_multiplier",
                     dtype=int,
                 ),  # 4
-                Real(low=0, high=0.3, prior="uniform", name="out_ff_dropout"),  # 0.0
                 Real(
                     low=1e-5, high=0.1, prior="log-uniform", name="learning_rate"
                 ),  # 0.001
@@ -248,7 +267,6 @@ class PytorchTabular(AbstractModel):
                     name="ff_hidden_multiplier",
                     dtype=int,
                 ),  # 4
-                Real(low=0, high=0.3, prior="uniform", name="out_ff_dropout"),  # 0.0
             ],
         }
         return space_dict[model_name]
@@ -284,7 +302,6 @@ class PytorchTabular(AbstractModel):
                 "attn_dropout": 0.1,
                 "add_norm_dropout": 0.1,
                 "ff_hidden_multiplier": 4,
-                "out_ff_dropout": 0.0,
                 "learning_rate": 0.001,
             },
             "AutoInt": {
@@ -302,7 +319,6 @@ class PytorchTabular(AbstractModel):
                 "add_norm_dropout": 0.1,
                 "ff_dropout": 0.1,
                 "ff_hidden_multiplier": 4,
-                "out_ff_dropout": 0.0,
             },
         }
         return params_dict[model_name]
