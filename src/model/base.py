@@ -398,6 +398,10 @@ class AbstractModel:
             Ignored.
         """
         # disable_tqdm()
+        warnings.filterwarnings(
+            "ignore",
+            message="`np.int` is a deprecated alias for the builtin `int`.",
+        )
         data = self._base_train_data_preprocess()
         (
             X_train,
@@ -462,10 +466,6 @@ class AbstractModel:
 
                 with warnings.catch_warnings():
                     # To obtain clean progress bar.
-                    warnings.filterwarnings(
-                        "ignore",
-                        message="`np.int` is a deprecated alias for the builtin `int`.",
-                    )
                     warnings.filterwarnings(
                         "ignore",
                         message="The objective has been evaluated at this point before",
