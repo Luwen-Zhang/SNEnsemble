@@ -35,11 +35,17 @@ class PytorchTabular(AbstractModel):
             categorical_cols=self.trainer.cat_feature_names,
             num_workers=8,
         )
-
+        if not os.path.exists(os.path.join(self.root, "ckpts")):
+            os.mkdir(os.path.join(self.root, "ckpts"))
         trainer_config = TrainerConfig(
             progress_bar="none",
             early_stopping="valid_mean_squared_error",
             early_stopping_patience=self.trainer.static_params["patience"],
+            checkpoints="valid_mean_squared_error",
+            checkpoints_path=os.path.join(self.root, "ckpts"),
+            checkpoints_save_top_k=1,
+            checkpoints_name=model_name,
+            load_best=True,
         )
         optimizer_config = OptimizerConfig()
 
@@ -66,7 +72,6 @@ class PytorchTabular(AbstractModel):
                 optimizer_config=optimizer_config,
                 trainer_config=trainer_config,
             )
-        tabular_model.config.checkpoints = None
         tabular_model.config["progress_bar_refresh_rate"] = 0
         return tabular_model
 
@@ -117,7 +122,7 @@ class PytorchTabular(AbstractModel):
         val_data[label_name[0]] = y_val
         with HiddenPrints(
             disable_std=not verbose,
-            disable_logging=True,
+            disable_logging=not verbose,
         ):
             model.fit(
                 train=train_data,
