@@ -1,5 +1,5 @@
 from src.utils import *
-from skopt.space import Integer, Categorical
+from skopt.space import Integer, Categorical, Real
 from src.model import TorchModel, AbstractNN
 from .base import get_sequential
 import torch.nn as nn
@@ -53,6 +53,8 @@ class TransformerLSTM(TorchModel):
                 lstm_layers=kwargs["lstm_layers"],
                 attn_layers=kwargs["attn_layers"],
                 attn_heads=kwargs["attn_heads"],
+                embed_dropout=kwargs["embed_dropout"],
+                transformer_dropout=kwargs["transformer_dropout"],
             ).to(self.trainer.device)
         elif model_name == "TransformerSeq":
             return TransformerSeqNN(
@@ -69,6 +71,8 @@ class TransformerLSTM(TorchModel):
                 embedding_dim=kwargs["embedding_dim"],
                 attn_layers=kwargs["attn_layers"],
                 attn_heads=kwargs["attn_heads"],
+                embed_dropout=kwargs["embed_dropout"],
+                transformer_dropout=kwargs["transformer_dropout"],
             ).to(self.trainer.device)
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
             if model_name == "CatEmbedLSTM":
@@ -90,6 +94,7 @@ class TransformerLSTM(TorchModel):
                 embedding_dim=kwargs["embedding_dim"],
                 n_hidden=kwargs["n_hidden"],
                 lstm_layers=kwargs["lstm_layers"],
+                embed_dropout=kwargs["embed_dropout"],
             ).to(self.trainer.device)
 
     def _space(self, model_name):
@@ -103,6 +108,8 @@ class TransformerLSTM(TorchModel):
                 Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
                 Categorical(categories=[2, 4, 8], name="attn_layers"),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
+                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
             ] + self.trainer.SPACE
         elif model_name == "TransformerSeq":
             return [
@@ -112,6 +119,8 @@ class TransformerLSTM(TorchModel):
                 Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
                 Categorical(categories=[2, 4, 8], name="attn_layers"),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
+                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
             ] + self.trainer.SPACE
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
             return [
@@ -121,6 +130,7 @@ class TransformerLSTM(TorchModel):
                 Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
                 Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
                 Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
+                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
             ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
@@ -132,6 +142,8 @@ class TransformerLSTM(TorchModel):
                 "lstm_layers": 1,
                 "attn_layers": 4,
                 "attn_heads": 8,
+                "embed_dropout": 0.1,
+                "transformer_dropout": 0.1,
                 "lr": 0.003,
                 "weight_decay": 0.002,
                 "batch_size": 1024,
@@ -142,6 +154,8 @@ class TransformerLSTM(TorchModel):
                 "embedding_dim": 64,
                 "attn_layers": 4,
                 "attn_heads": 8,
+                "embed_dropout": 0.1,
+                "transformer_dropout": 0.1,
                 "lr": 0.003,
                 "weight_decay": 0.002,
                 "batch_size": 1024,
@@ -152,6 +166,7 @@ class TransformerLSTM(TorchModel):
                 "embedding_dim": 64,  # bayes-opt: 1
                 "n_hidden": 10,  # bayes-opt: 1
                 "lstm_layers": 1,  # bayes-opt: 1
+                "embed_dropout": 0.1,
                 "lr": 0.003,  # bayes-opt: 0.0218894
                 "weight_decay": 0.002,  # bayes-opt: 0.05
                 "batch_size": 1024,  # bayes-opt: 32
@@ -343,6 +358,7 @@ class CatEmbedLSTMNN(AbstractNN):
         lstm_embedding_dim=10,
         n_hidden=3,
         lstm_layers=1,
+        embed_dropout=0.1,
     ):
         super(CatEmbedLSTMNN, self).__init__(trainer)
         self.n_cont = n_inputs
@@ -352,7 +368,7 @@ class CatEmbedLSTMNN(AbstractNN):
         self.embed = _Embedding(
             embedding_dim=embedding_dim,
             n_inputs=n_inputs,
-            embed_dropout=0.1,
+            embed_dropout=embed_dropout,
             cat_num_unique=cat_num_unique,
             run_cat="categorical" in self.derived_feature_names,
             embed_cont=embed_continuous,
@@ -363,7 +379,7 @@ class CatEmbedLSTMNN(AbstractNN):
             n_inputs=embedding_dim,
             n_outputs=n_outputs,
             act_func=nn.ReLU,
-            dropout=0.1,
+            dropout=embed_dropout,
             norm_type="layer",
         )
         self.lstm = _LSTM(
