@@ -46,6 +46,7 @@ class AbstractModel:
         self.low_memory = low_memory and trainer.device == "cpu"
         self.program = self._get_program_name() if program is None else program
         self.model_params = {}
+        self._check_space()
         self._mkdir()
 
     def fit(
@@ -427,18 +428,14 @@ class AbstractModel:
             if verbose:
                 print(f"Training {model_name}")
             tmp_params = self._get_params(model_name, verbose=verbose)
-
-            if (
-                self.trainer.bayes_opt
-                and not warm_start
-                and len(self._space(model_name=model_name)) > 0
-            ):
+            space = self._space(model_name=model_name)
+            if self.trainer.bayes_opt and not warm_start and len(space) > 0:
                 callback = BayesCallback(
                     tqdm(total=self.trainer.n_calls, disable=not verbose)
                 )
                 global _bayes_objective
 
-                @skopt.utils.use_named_args(self._space(model_name=model_name))
+                @skopt.utils.use_named_args(space)
                 def _bayes_objective(**params):
                     with HiddenPrints(disable_logging=True):
                         model = self.new_model(
@@ -563,6 +560,22 @@ class AbstractModel:
             return False
         else:
             return True
+
+    def _check_space(self):
+        any_mismatch = False
+        for model_name in self._get_model_names():
+            tmp_params = self._get_params(model_name, verbose=False)
+            space = self._space(model_name=model_name)
+            for k, s in zip(tmp_params.keys(), space):
+                if k != s.name:
+                    print(
+                        f"Keys of {self.program} - {model_name} in _initial_values and _space does not match.\n"
+                        f"_initial_values: {list(tmp_params.keys())}\n"
+                        f"_space: {[s.name for s in space]}"
+                    )
+                    any_mismatch = True
+        if any_mismatch:
+            raise Exception(f"Defined space and initial values do not match.")
 
     def _mkdir(self):
         """
