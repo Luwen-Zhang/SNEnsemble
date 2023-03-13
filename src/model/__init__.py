@@ -5,6 +5,7 @@ from .base import TorchModel
 from .autogluon import AutoGluon
 from .widedeep import WideDeep
 from .tabnet import TabNet
+from .pytorch_tabular import PytorchTabular
 from .thiswork_sn import ThisWork
 from .thiswork_sn import ThisWorkRidge
 from .thiswork_sn import ThisWorkPretrain
@@ -20,6 +21,7 @@ __all__ = [
     "AutoGluon",
     "WideDeep",
     "TabNet",
+    "PytorchTabular",
     "ThisWork",
     "ThisWorkRidge",
     "ThisWorkPretrain",
