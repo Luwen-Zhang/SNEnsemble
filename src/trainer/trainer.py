@@ -1580,6 +1580,7 @@ class Trainer:
         else:
             ax.set_xlabel(f"Percentile of {self.label_name[0]} for each material")
         ax.set_ylabel(f"ID of Material")
+        warnings.filterwarnings("ignore", message="Tight layout not applied.")
         plt.savefig(
             self.project_root
             + f"{self.datasplitter.__class__.__name__}_{percentile}.pdf",
