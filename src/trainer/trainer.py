@@ -1581,6 +1581,7 @@ class Trainer:
             self.project_root
             + f"{self.datasplitter.__class__.__name__}_{percentile}.pdf",
             bbox_inches="tight",
+            dpi=1000,
         )
         plt.close()
 
