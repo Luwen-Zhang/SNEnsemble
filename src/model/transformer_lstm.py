@@ -12,16 +12,13 @@ import torch.nn.functional as F
 class TransformerLSTM(TorchModel):
     def __init__(
         self,
-        trainer=None,
+        trainer,
         manual_activate_sn=None,
-        program=None,
         layers=None,
-        model_subset=None,
+        *args,
         **kwargs,
     ):
-        super(TransformerLSTM, self).__init__(
-            trainer, program=program, model_subset=model_subset, **kwargs
-        )
+        super(TransformerLSTM, self).__init__(trainer, *args, **kwargs)
         self.manual_activate_sn = manual_activate_sn
         self.layers = layers
 

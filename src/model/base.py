@@ -18,7 +18,7 @@ from contextlib import nullcontext
 class AbstractModel:
     def __init__(
         self,
-        trainer: Trainer = None,
+        trainer: Trainer,
         program: str = None,
         model_subset: List[str] = None,
         low_memory: bool = True,
