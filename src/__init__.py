@@ -9,3 +9,9 @@ setting = dict(
     test_with_no_grad=False,
     input_require_grad=True,
 )
+
+
+def check_grad_in_loss():
+    if setting["test_with_no_grad"] or not setting["input_require_grad"]:
+        return False
+    return True

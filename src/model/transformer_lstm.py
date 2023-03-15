@@ -187,6 +187,11 @@ class TransformerLSTM(TorchModel):
                 "batch_size": 1024,  # bayes-opt: 32
             }
 
+    def _conditional_validity(self, model_name: str) -> bool:
+        if model_name in ["ConsGradTransformerSeq"] and not src.check_grad_in_loss():
+            return False
+        return True
+
 
 class TransformerLSTMNN(AbstractNN):
     def __init__(
@@ -370,14 +375,6 @@ class BiasTransformerSeqNN(TransformerSeqNN):
 
 
 class ConsGradTransformerSeqNN(TransformerSeqNN):
-    def __init__(self, *args, **kwargs):
-        if src.setting["test_with_no_grad"] and not src.setting["input_require_grad"]:
-            raise Exception(
-                f"{self.__class__.__name__} needs the global settings `test_with_no_grad` == False and "
-                f"`input_require_grad` == True."
-            )
-        super(ConsGradTransformerSeqNN, self).__init__(*args, **kwargs)
-
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         base_loss = self.default_loss_fn(y_pred, y_true)
         grad = torch.autograd.grad(

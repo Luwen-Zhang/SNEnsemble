@@ -1,4 +1,5 @@
 import pickle
+import warnings
 import torch.optim.optimizer
 import src
 from src.utils import *
@@ -138,6 +139,8 @@ class AbstractModel:
         if verbose:
             print(f"\n-------------Run {self.program}-------------\n")
         self._train(*args, **kwargs)
+        if self.model is None or len(self.model) == 0:
+            warnings.warn(f"No model has been trained for {self.__class__.__name__}.")
         if verbose:
             print(f"\n-------------{self.program} End-------------\n")
 
@@ -610,13 +613,15 @@ class AbstractModel:
             for model in self.model_subset:
                 if model not in self._get_model_names():
                     raise Exception(f"Model {model} not available for {self.program}.")
-            return self.model_subset
+            res = self.model_subset
         elif self.exclude_models is not None:
             names = self._get_model_names()
             used_names = [x for x in names if x not in self.exclude_models]
-            return used_names
+            res = used_names
         else:
-            return self._get_model_names()
+            res = self._get_model_names()
+        res = [x for x in res if self._conditional_validity(x)]
+        return res
 
     def _get_model_names(self) -> List[str]:
         """
@@ -820,6 +825,21 @@ class AbstractModel:
             A dict of initial hyperparameters.
         """
         raise NotImplementedError
+
+    def _conditional_validity(self, model_name: str) -> bool:
+        """
+        Check the validity of a model.
+
+        Parameters
+        ----------
+        model_name:
+            The name of a model in _get_model_names().
+
+        Returns
+        -------
+            Whether the model is valid for training under certain settings.
+        """
+        return True
 
 
 class BayesCallback:
@@ -1201,6 +1221,9 @@ class ModelDict:
         with open(self.model_path[item], "rb") as file:
             key, model = pickle.load(file)
         return model
+
+    def __len__(self):
+        return len(self.model_path)
 
     def keys(self):
         return self.model_path.keys()
