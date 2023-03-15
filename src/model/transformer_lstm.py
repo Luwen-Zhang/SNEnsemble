@@ -430,7 +430,7 @@ class CatEmbedLSTMNN(AbstractNN):
 
 
 class BiasCatEmbedLSTMNN(CatEmbedLSTMNN):
-    def loss_fn(self, y_true, y_pred, *data, **kwargs):
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         base_loss = self.default_loss_fn(y_pred, y_true)
         if not self.training:
             return base_loss

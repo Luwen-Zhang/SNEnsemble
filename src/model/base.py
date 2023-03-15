@@ -1133,7 +1133,7 @@ class AbstractNN(nn.Module):
     ) -> torch.Tensor:
         raise NotImplementedError
 
-    def loss_fn(self, y_true, y_pred, *data, **kwargs):
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         """
         User defined loss function.
 
