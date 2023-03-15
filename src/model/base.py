@@ -1014,8 +1014,8 @@ class TorchModel(AbstractModel):
             df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
         ).to(self.device)
-        if src.setting["input_require_grad"]:
-            X.require_grad = True
+        if src.setting["input_requires_grad"]:
+            X.requires_grad = True
         D = [
             torch.tensor(value, dtype=torch.float32).to(self.device)
             for value in derived_data.values()

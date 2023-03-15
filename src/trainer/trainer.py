@@ -672,7 +672,7 @@ class Trainer:
         y = torch.tensor(self.label_data.values.astype(np.float32), dtype=torch.float32)
 
         D = [torch.tensor(value) for value in self.derived_data.values()]
-        if src.setting["input_require_grad"]:
+        if src.setting["input_requires_grad"]:
             X.requires_grad = True
         dataset = Data.TensorDataset(X, *D, y)
 
