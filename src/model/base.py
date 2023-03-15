@@ -21,6 +21,7 @@ class AbstractModel:
         trainer: Trainer,
         program: str = None,
         model_subset: List[str] = None,
+        exclude_models: List[str] = None,
         low_memory: bool = True,
         **kwargs,
     ):
@@ -34,7 +35,10 @@ class AbstractModel:
         program:
             The name of the modelbase. If None, the name from :func:`_get_program_name` is used.
         model_subset:
-            The names of specific models selected in the modelbase. Only these models will be trained.
+            The names of specific models selected to be trained in the modelbase.
+        exclude_models:
+            The names of specific models that should not be trained. Only one of `model_subset` and `exclude_models` can
+            be specified.
         low_memory:
             Whether to save sub-models directly in a Dict (memory). If True, they will be saved locally. If the device
             is `cpu`, low_memory=False is used.
@@ -46,6 +50,11 @@ class AbstractModel:
         self.model = None
         self.leaderboard = None
         self.model_subset = model_subset
+        self.exclude_models = exclude_models
+        if self.model_subset is not None and self.exclude_models is not None:
+            raise Exception(
+                f"Only one of model_subset and exclude_models can be specified."
+            )
         self.low_memory = low_memory and trainer.device == "cpu"
         self.program = self._get_program_name() if program is None else program
         self.model_params = {}
@@ -566,7 +575,7 @@ class AbstractModel:
 
     def _check_space(self):
         any_mismatch = False
-        for model_name in self._get_model_names():
+        for model_name in self.get_model_names():
             tmp_params = self._get_params(model_name, verbose=False)
             space = self._space(model_name=model_name)
             for k, s in zip(tmp_params.keys(), space):
@@ -602,6 +611,10 @@ class AbstractModel:
                 if model not in self._get_model_names():
                     raise Exception(f"Model {model} not available for {self.program}.")
             return self.model_subset
+        elif self.exclude_models is not None:
+            names = self._get_model_names()
+            used_names = [x for x in names if x not in self.exclude_models]
+            return used_names
         else:
             return self._get_model_names()
 
