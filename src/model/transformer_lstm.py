@@ -1,3 +1,4 @@
+import src
 from src.utils import *
 from skopt.space import Integer, Categorical, Real
 from src.model import TorchModel, AbstractNN
@@ -28,7 +29,14 @@ class TransformerLSTM(TorchModel):
         return "TransformerLSTM"
 
     def _get_model_names(self):
-        return ["TransformerLSTM", "TransformerSeq", "CatEmbedLSTM", "BiasCatEmbedLSTM"]
+        return [
+            "TransformerLSTM",
+            "TransformerSeq",
+            "BiasTransformerSeq",
+            "ConsGradTransformerSeq",
+            "CatEmbedLSTM",
+            "BiasCatEmbedLSTM",
+        ]
 
     def _new_model(self, model_name, verbose, **kwargs):
         sn_coeff_vars_idx = [
@@ -56,8 +64,13 @@ class TransformerLSTM(TorchModel):
                 embed_dropout=kwargs["embed_dropout"],
                 transformer_dropout=kwargs["transformer_dropout"],
             )
-        elif model_name == "TransformerSeq":
-            return TransformerSeqNN(
+        elif model_name in [
+            "TransformerSeq",
+            "BiasTransformerSeq",
+            "ConsGradTransformerSeq",
+        ]:
+            cls = getattr(sys.modules[__name__], f"{model_name}NN")
+            return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
                 self.trainer.layers if self.layers is None else self.layers,
@@ -75,10 +88,7 @@ class TransformerLSTM(TorchModel):
                 transformer_dropout=kwargs["transformer_dropout"],
             )
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
-            if model_name == "CatEmbedLSTM":
-                cls = CatEmbedLSTMNN
-            else:
-                cls = BiasCatEmbedLSTMNN
+            cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
@@ -111,7 +121,11 @@ class TransformerLSTM(TorchModel):
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
             ] + self.trainer.SPACE
-        elif model_name == "TransformerSeq":
+        elif model_name in [
+            "TransformerSeq",
+            "BiasTransformerSeq",
+            "ConsGradTransformerSeq",
+        ]:
             return [
                 Categorical(
                     categories=[2, 4, 8, 16, 32, 64, 128], name="seq_embedding_dim"
@@ -148,7 +162,11 @@ class TransformerLSTM(TorchModel):
                 "weight_decay": 0.002,
                 "batch_size": 1024,
             }
-        elif model_name == "TransformerSeq":
+        elif model_name in [
+            "TransformerSeq",
+            "BiasTransformerSeq",
+            "ConsGradTransformerSeq",
+        ]:
             return {
                 "seq_embedding_dim": 16,
                 "embedding_dim": 64,
@@ -341,6 +359,50 @@ class TransformerSeqNN(AbstractNN):
         output = torch.concat(all_res, dim=1)
         output = self.w(output)
         return output
+
+
+class BiasTransformerSeqNN(TransformerSeqNN):
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        base_loss = self.default_loss_fn(y_pred, y_true)
+        if not self.training:
+            return base_loss
+        else:
+            where_weight = self.derived_feature_names.index("Sample Weight")
+            w = data[1 + where_weight]
+            return (base_loss * w).mean()
+
+
+class ConsGradTransformerSeqNN(TransformerSeqNN):
+    def __init__(self, *args, **kwargs):
+        if src.setting["test_with_no_grad"] and not src.setting["input_require_grad"]:
+            raise Exception(
+                f"{self.__class__.__name__} needs the global settings `test_with_no_grad` == False and "
+                f"`input_require_grad` == True."
+            )
+        super(ConsGradTransformerSeqNN, self).__init__(*args, **kwargs)
+
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        base_loss = self.default_loss_fn(y_pred, y_true)
+        grad = torch.autograd.grad(
+            outputs=y_pred,
+            inputs=data[0],
+            grad_outputs=torch.ones_like(y_pred),
+            retain_graph=True,
+            create_graph=True,  # True to compute higher order derivatives.
+        )[0]
+        feature_loss = torch.zeros((self.n_cont,))
+        if "Relative Mean Stress" in self.cont_feature_names:
+            where_mean_stress = self.cont_feature_names.index("Relative Mean Stress")
+            grad_mean_stress = grad[:, where_mean_stress]
+            feature_loss[where_mean_stress] = torch.mean(
+                nn.ReLU()(grad_mean_stress) ** 2
+            )
+        base_loss += torch.sum(feature_loss) * 1e2
+        return base_loss
+
+    def _set_balance_w(self, idx, base_loss, feature_loss):
+        if self.balance_w[idx] == 0:
+            self.balance_w[idx] = base_loss / feature_loss[idx] / 10
 
 
 class CatEmbedLSTMNN(AbstractNN):

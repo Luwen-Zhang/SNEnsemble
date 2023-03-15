@@ -1104,6 +1104,8 @@ class AbstractNN(nn.Module):
         """
         super(AbstractNN, self).__init__()
         self.default_loss_fn = trainer.loss_fn
+        self.cont_feature_names = cp(trainer.cont_feature_names)
+        self.cat_feature_names = cp(trainer.cat_feature_names)
         self.derived_feature_names = list(trainer.derived_data.keys())
         self.derived_feature_dims = trainer.get_derived_data_sizes()
         self.derived_feature_names_dims = {}
