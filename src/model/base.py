@@ -942,7 +942,7 @@ class TorchModel(AbstractModel):
     ):
         from torch.utils.data.dataloader import default_collate
 
-        collate_fn = lambda x: tuple(x_.to(self.device) for x_ in default_collate(x))
+        collate_fn = lambda x: list(x_.to(self.device) for x_ in default_collate(x))
         train_loader = Data.DataLoader(
             self.trainer.train_dataset,
             batch_size=len(self.trainer.train_dataset),
@@ -1007,7 +1007,7 @@ class TorchModel(AbstractModel):
     ):
         from torch.utils.data.dataloader import default_collate
 
-        collate_fn = lambda x: tuple(x_.to(self.device) for x_ in default_collate(x))
+        collate_fn = lambda x: list(x_.to(self.device) for x_ in default_collate(x))
         model.to(self.device)
         optimizer = model.get_optimizer(warm_start, **kwargs)
 
