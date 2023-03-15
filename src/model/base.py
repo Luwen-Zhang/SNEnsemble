@@ -12,6 +12,7 @@ from typing import *
 from skopt.space import Real, Integer, Categorical
 from tqdm.auto import tqdm
 import time
+from contextlib import nullcontext
 
 
 class AbstractModel:
@@ -912,7 +913,7 @@ class TorchModel(AbstractModel):
         model.eval()
         pred = []
         truth = []
-        with torch.no_grad():
+        with torch.no_grad() if src.setting["test_with_no_grad"] else nullcontext():
             # print(test_dataset)
             avg_loss = 0
             for idx, tensors in enumerate(test_loader):
@@ -980,6 +981,8 @@ class TorchModel(AbstractModel):
             df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
         ).to(self.device)
+        if src.setting["input_require_grad"]:
+            X.require_grad = True
         D = [
             torch.tensor(value, dtype=torch.float32).to(self.device)
             for value in derived_data.values()

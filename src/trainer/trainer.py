@@ -2,6 +2,7 @@
 The basic class for the project. It includes configuration, data processing, plotting,
 and comparing baseline models.
 """
+import src
 from src.utils import *
 from copy import deepcopy as cp
 from importlib import import_module, reload
@@ -671,6 +672,8 @@ class Trainer:
         y = torch.tensor(self.label_data.values.astype(np.float32), dtype=torch.float32)
 
         D = [torch.tensor(value) for value in self.derived_data.values()]
+        if src.setting["input_require_grad"]:
+            X.requires_grad = True
         dataset = Data.TensorDataset(X, *D, y)
 
         self.train_dataset = Subset(dataset, self.train_indices)

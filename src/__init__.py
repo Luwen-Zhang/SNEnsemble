@@ -6,4 +6,6 @@ __all__ = ["data", "model", "trainer", "utils"]
 
 setting = dict(
     verbose_per_epoch=20,
+    test_with_no_grad=False,
+    input_require_grad=True,
 )
