@@ -29,14 +29,18 @@ class MLPNN(AbstractNN):
         super(MLPNN, self).__init__(trainer)
         num_inputs = n_inputs
         num_outputs = n_outputs
-        self.net = get_sequential(layers, num_inputs, num_outputs, nn.ReLU)
+        self.net = get_sequential(
+            layers, num_inputs, num_outputs, nn.ReLU, use_norm=False
+        )
         self.nets = nn.ModuleList(
             [
-                get_sequential(layers, dims[-1], 1, nn.ReLU)
+                get_sequential(layers, dims[-1], 1, nn.ReLU, use_norm=False)
                 for dims in self.derived_feature_dims
             ]
         )
-        self.weight = get_sequential([32], len(self.nets) + 1, num_outputs, nn.ReLU)
+        self.weight = get_sequential(
+            [32], len(self.nets) + 1, num_outputs, nn.ReLU, use_norm=False
+        )
 
     def _forward(self, x, derived_tensors):
         if len(derived_tensors) > 0:

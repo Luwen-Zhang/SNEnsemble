@@ -1068,6 +1068,9 @@ class TorchModel(AbstractModel):
 
         for i_epoch in range(epoch):
             t_start = time.time()
+            # Note that train_loss is calculated across batch-training, its result might differ from that by directly
+            # calling _test_step on train_loader. Also, using BatchNorm or LayerNorm that behaves differently during
+            # training and evaluating will cause this difference.
             train_loss = self._train_step(model, train_loader, optimizer, **kwargs)
             train_ls.append(train_loss)
             _, _, val_loss = self._test_step(model, val_loader, **kwargs)
