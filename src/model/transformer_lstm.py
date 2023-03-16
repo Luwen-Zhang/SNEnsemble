@@ -742,13 +742,17 @@ class _LSTM(nn.Module):
         if self.run:
             seq = derived_tensors["Lay-up Sequence"]
             lens = derived_tensors["Number of Layers"]
-            h_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden)
-            c_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden)
+            h_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden).to(
+                seq.get_device()
+            )
+            c_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden).to(
+                seq.get_device()
+            )
 
             seq_embed = self.embedding(seq.long() + 90)
             seq_packed = nn.utils.rnn.pack_padded_sequence(
                 seq_embed,
-                torch.flatten(lens),
+                torch.flatten(lens.cpu()),
                 batch_first=True,
                 enforce_sorted=False,
             )
