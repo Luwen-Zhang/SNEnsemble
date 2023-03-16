@@ -1,5 +1,6 @@
-from src.core.trainer import *
-from src.core.model import *
+import torch
+from src.trainer import Trainer
+from src.model import *
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using {} device".format(device))
@@ -10,15 +11,11 @@ trainer.load_data()
 trainer.describe()
 
 models = [
-    AutoGluon(trainer),
+    PytorchTabular(trainer),
     WideDeep(trainer),
-    ModelAssembly(
-        trainer, models=[TabNet(trainer), MLP(trainer)], program="ThisWorkBaselines"
-    ),
-    ThisWork(trainer),
+    AutoGluon(trainer),
 ]
 
 trainer.add_modelbases(models)
 
-trainer.train(verbose=True)
-trainer.get_leaderboard(test_data_only=False)
+trainer.get_leaderboard(test_data_only=False, cross_validation=10, verbose=True)
