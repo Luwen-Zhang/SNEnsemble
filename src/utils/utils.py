@@ -557,3 +557,32 @@ def pretty(value, htchar="\t", lfchar="\n", indent=0):
         return "(%s)" % (",".join(items) + lfchar + htchar * indent)
     else:
         return repr(value)
+
+
+# https://stackoverflow.com/questions/4675728/redirect-stdout-to-a-file-in-python
+# capture all outputs to a log file while still printing it
+class Logger:
+    def __init__(self, path):
+        self.terminal = sys.stdout
+        self.path = path
+
+    def write(self, message):
+        self.terminal.write(message)
+        with open(self.path, "a") as log:
+            log.write(message)
+
+    def __getattr__(self, attr):
+        return getattr(self.terminal, attr)
+
+
+class Logging:
+    def enter(self, path):
+        self.logger = Logger(path)
+        self._stdout = sys.stdout
+        self._stderr = sys.stderr
+        sys.stdout = self.logger
+        sys.stderr = self.logger
+
+    def exit(self):
+        sys.stdout = self._stdout
+        sys.stderr = self._stderr
