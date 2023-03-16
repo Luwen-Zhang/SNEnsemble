@@ -38,7 +38,7 @@ class BaseConfig:
                 },
             },
             "data_splitter": "MaterialCycleSplitter",
-            "data_imputer": "MeanImputer",
+            "data_imputer": "MissForestImputer",
             "data_processors": [
                 ("NaNFeatureRemover", {}),
                 ("SingleValueFeatureRemover", {}),
