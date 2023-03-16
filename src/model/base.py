@@ -41,8 +41,7 @@ class AbstractModel:
             The names of specific models that should not be trained. Only one of `model_subset` and `exclude_models` can
             be specified.
         low_memory:
-            Whether to save sub-models directly in a Dict (memory). If True, they will be saved locally. If the device
-            is `cpu`, low_memory=False is used.
+            Whether to save sub-models directly in a Dict (memory). If True, they will be saved locally.
         """
         self.device = trainer.device
         self.trainer = trainer
@@ -56,7 +55,7 @@ class AbstractModel:
             raise Exception(
                 f"Only one of model_subset and exclude_models can be specified."
             )
-        self.low_memory = low_memory and trainer.device == "cpu"
+        self.low_memory = low_memory
         self.program = self._get_program_name() if program is None else program
         self.model_params = {}
         self._check_space()
