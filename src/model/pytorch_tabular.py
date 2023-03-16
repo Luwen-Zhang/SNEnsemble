@@ -372,8 +372,8 @@ class PytorchTabularCallback(Callback):
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
     ) -> None:
         logs = trainer.callback_metrics
-        train_loss = logs["train_mean_squared_error"].detach().numpy()
-        val_loss = logs["valid_mean_squared_error"].detach().numpy()
+        train_loss = logs["train_mean_squared_error"].detach().cpu().numpy()
+        val_loss = logs["valid_mean_squared_error"].detach().cpu().numpy()
         self.val_ls.append(val_loss)
         epoch = trainer.current_epoch
         if epoch % src.setting["verbose_per_epoch"] == 0 and self.verbose:
