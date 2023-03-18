@@ -124,9 +124,7 @@ class TransformerLSTM(TorchModel):
             "ConsGradTransformerSeq",
         ]:
             return [
-                Categorical(
-                    categories=[2, 4, 8, 16, 32, 64, 128], name="seq_embedding_dim"
-                ),
+                Categorical(categories=[8, 16, 32, 64], name="seq_embedding_dim"),
                 Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
                 Categorical(categories=[2, 4, 8], name="attn_layers"),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
@@ -287,7 +285,7 @@ class TransformerSeqNN(AbstractNN):
         sn_coeff_vars_idx=None,
         cat_num_unique: List[int] = None,
         embedding_dim=64,
-        seq_embedding_dim=10,
+        seq_embedding_dim=16,
         attn_layers=4,
         attn_heads=8,
         flatten_transformer=True,
