@@ -2,6 +2,7 @@ from src.utils import *
 from src.model import AbstractModel
 from typing import Optional, Dict
 from pytorch_widedeep.callbacks import Callback
+from skopt.space import Integer, Categorical, Real
 import src
 
 
@@ -10,10 +11,224 @@ class WideDeep(AbstractModel):
         return "WideDeep"
 
     def _space(self, model_name):
-        return self.trainer.SPACE
+        _space_dict = {
+            "TabMlp": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+            ]
+            + self.trainer.SPACE,
+            "TabResnet": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="blocks_dropout"),
+            ]
+            + self.trainer.SPACE,
+            "TabTransformer": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+                Categorical(categories=[8, 16, 32], name="input_dim"),
+                Categorical(categories=[2, 4, 8], name="n_heads"),
+                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
+            ]
+            + self.trainer.SPACE,
+            "TabNet": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Integer(low=1, high=6, prior="uniform", name="n_steps", dtype=int),
+                Integer(low=4, high=16, prior="uniform", name="step_dim", dtype=int),
+                Integer(low=4, high=16, prior="uniform", name="attn_dim", dtype=int),
+                Real(low=0.0, high=0.3, prior="uniform", name="dropout"),
+                Integer(
+                    low=1,
+                    high=4,
+                    prior="uniform",
+                    name="n_glu_step_dependent",
+                    dtype=int,
+                ),
+                Integer(low=1, high=4, prior="uniform", name="n_glu_shared", dtype=int),
+                Real(low=1.0, high=1.5, prior="uniform", name="gamma"),
+            ]
+            + self.trainer.SPACE,
+            "SAINT": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+                Categorical(categories=[8, 16, 32], name="input_dim"),
+                Categorical(categories=[2, 4, 8], name="n_heads"),
+                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
+            ]
+            + self.trainer.SPACE,
+            "ContextAttentionMLP": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Categorical(categories=[8, 16, 32], name="input_dim"),
+                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+            ]
+            + self.trainer.SPACE,
+            "SelfAttentionMLP": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Categorical(categories=[8, 16, 32], name="input_dim"),
+                Categorical(categories=[2, 4, 8], name="n_heads"),
+                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+            ]
+            + self.trainer.SPACE,
+            "FTTransformer": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+                Categorical(categories=[8, 16, 32, 64], name="input_dim"),
+                Categorical(categories=[2, 4, 8], name="n_heads"),
+                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
+                Categorical(categories=[0.4, 0.5, 0.6], name="kv_compression_factor"),
+            ]
+            + self.trainer.SPACE,
+            "TabPerceiver": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+                Categorical(categories=[8, 16, 32], name="input_dim"),
+                Categorical(categories=[2, 4], name="n_cross_attn_heads"),
+                Categorical(categories=[2, 4, 8], name="n_latents"),
+                Categorical(categories=[16, 32, 64], name="latent_dim"),
+                Categorical(categories=[2, 4], name="n_latent_heads"),
+                Categorical(categories=[2, 3, 4], name="n_latent_blocks"),
+                Categorical(categories=[2, 3, 4], name="n_perceiver_blocks"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
+            ]
+            + self.trainer.SPACE,
+            "TabFastFormer": [
+                Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+                Categorical(categories=[8, 16, 32], name="input_dim"),
+                Categorical(categories=[2, 4, 8], name="n_heads"),
+                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
+            ]
+            + self.trainer.SPACE,
+        }
+        return _space_dict[model_name]
 
     def _initial_values(self, model_name):
-        return self.trainer.chosen_params
+        _value_dict = {
+            "TabMlp": {
+                "cat_embed_dropout": 0.1,
+                "mlp_dropout": 0.1,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+            "TabResnet": {
+                "cat_embed_dropout": 0.1,
+                "mlp_dropout": 0.1,
+                "blocks_dropout": 0.1,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+            "TabTransformer": {
+                "cat_embed_dropout": 0.1,
+                "mlp_dropout": 0.1,
+                "input_dim": 32,
+                "n_heads": 8,
+                "n_blocks": 4,
+                "attn_dropout": 0.2,
+                "ff_dropout": 0.1,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+            "TabNet": {
+                "cat_embed_dropout": 0.1,
+                "n_steps": 3,
+                "step_dim": 8,
+                "attn_dim": 8,
+                "dropout": 0.0,
+                "n_glu_step_dependent": 2,
+                "n_glu_shared": 2,
+                "gamma": 1.3,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+            "SAINT": {
+                "cat_embed_dropout": 0.1,
+                "mlp_dropout": 0.1,
+                "input_dim": 32,
+                "n_heads": 8,
+                "n_blocks": 2,
+                "attn_dropout": 0.2,
+                "ff_dropout": 0.1,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+            "ContextAttentionMLP": {
+                "cat_embed_dropout": 0.1,
+                "input_dim": 32,
+                "n_blocks": 3,
+                "attn_dropout": 0.2,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+            "SelfAttentionMLP": {
+                "cat_embed_dropout": 0.1,
+                "input_dim": 32,
+                "n_heads": 8,
+                "n_blocks": 3,
+                "attn_dropout": 0.2,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+            "FTTransformer": {
+                "cat_embed_dropout": 0.1,
+                "mlp_dropout": 0.1,
+                "input_dim": 64,
+                "n_heads": 8,
+                "n_blocks": 4,
+                "attn_dropout": 0.2,
+                "ff_dropout": 0.1,
+                "kv_compression_factor": 0.5,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+            "TabPerceiver": {
+                "cat_embed_dropout": 0.1,
+                "mlp_dropout": 0.1,
+                "input_dim": 32,
+                "n_cross_attn_heads": 4,
+                "n_latents": 8,  # 16 by default in widedeep.
+                "latent_dim": 64,  # 128 by default in widedeep.
+                "n_latent_heads": 4,
+                "n_latent_blocks": 4,
+                "n_perceiver_blocks": 4,
+                "attn_dropout": 0.2,
+                "ff_dropout": 0.1,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+            "TabFastFormer": {
+                "cat_embed_dropout": 0.1,
+                "mlp_dropout": 0.1,
+                "input_dim": 32,
+                "n_heads": 8,
+                "n_blocks": 4,
+                "attn_dropout": 0.2,
+                "ff_dropout": 0.1,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            },
+        }
+        return _value_dict[model_name]
 
     def _new_model(self, model_name, verbose, **kwargs):
         from pytorch_widedeep.models import (
@@ -35,12 +250,17 @@ class WideDeep(AbstractModel):
         cont_feature_names = self.trainer.cont_feature_names
         cat_feature_names = self.trainer.cat_feature_names
 
+        model_args = kwargs.copy()
+        del model_args["lr"]
+        del model_args["weight_decay"]
+        del model_args["batch_size"]
         args = dict(
             column_idx=self.tab_preprocessor.column_idx,
             continuous_cols=cont_feature_names,
             cat_embed_input=self.tab_preprocessor.cat_embed_input
             if len(cat_feature_names) != 0
             else None,
+            **model_args,
         )
 
         if model_name == "TabTransformer":
