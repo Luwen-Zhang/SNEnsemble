@@ -279,7 +279,7 @@ class PytorchTabular(AbstractModel):
             "GATE": [
                 Integer(low=2, high=10, prior="uniform", name="gflu_stages", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="gflu_dropout"),
-                Integer(low=2, high=10, prior="uniform", name="tree_depth", dtype=int),
+                Integer(low=2, high=5, prior="uniform", name="tree_depth", dtype=int),
                 Integer(low=10, high=40, prior="uniform", name="num_trees", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="tree_dropout"),
                 Real(
@@ -346,6 +346,8 @@ class PytorchTabular(AbstractModel):
             "GATE": {
                 "gflu_stages": 6,
                 "gflu_dropout": 0.0,
+                # `tree_depth` influences the memory usage a lot. `tree_depth`==10 with other default settings consumes
+                # about 4 GiBs of ram.
                 "tree_depth": 5,
                 "num_trees": 20,
                 "tree_dropout": 0.0,
