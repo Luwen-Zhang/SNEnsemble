@@ -448,11 +448,12 @@ class AbstractModel:
             tmp_params = self._get_params(model_name, verbose=verbose)
             space = self._space(model_name=model_name)
             if self.trainer.bayes_opt and not warm_start and len(space) > 0:
+                min_calls = len(tmp_params)
                 callback = BayesCallback(
                     tqdm(
                         total=self.trainer.n_calls
                         if not src.setting["debug_mode"]
-                        else 11,
+                        else min_calls,
                         disable=not verbose,
                     )
                 )
@@ -497,7 +498,8 @@ class AbstractModel:
                         self._space(model_name=model_name),
                         n_calls=self.trainer.n_calls
                         if not src.setting["debug_mode"]
-                        else 11,
+                        else min_calls,
+                        n_initial_points=10 if not src.setting["debug_mode"] else 0,
                         callback=callback.call,
                         random_state=0,
                         x0=list(tmp_params.values()),
