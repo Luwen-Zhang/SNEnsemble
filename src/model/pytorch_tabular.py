@@ -281,7 +281,7 @@ class PytorchTabular(AbstractModel):
                 Integer(low=2, high=10, prior="uniform", name="gflu_stages", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="gflu_dropout"),
                 Integer(low=2, high=5, prior="uniform", name="tree_depth", dtype=int),
-                Integer(low=10, high=40, prior="uniform", name="num_trees", dtype=int),
+                Integer(low=10, high=30, prior="uniform", name="num_trees", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="tree_dropout"),
                 Real(
                     low=0.0,
