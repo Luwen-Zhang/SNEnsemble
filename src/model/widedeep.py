@@ -82,7 +82,7 @@ class WideDeep(AbstractModel):
             ],
             optimizers={"deeptabular": optimizer} if self.trainer.bayes_opt else None,
             device=self.trainer.device,
-            num_workers=16,
+            num_workers=6,
         )
         return wd_trainer
 
