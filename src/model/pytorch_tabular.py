@@ -46,6 +46,7 @@ class PytorchTabular(AbstractModel):
             checkpoints_save_top_k=1,
             checkpoints_name=model_name,
             load_best=True,
+            accelerator="cpu" if self.device == "cpu" else "auto",
         )
         optimizer_config = OptimizerConfig()
 
