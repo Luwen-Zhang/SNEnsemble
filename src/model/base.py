@@ -23,7 +23,7 @@ class AbstractModel:
         program: str = None,
         model_subset: List[str] = None,
         exclude_models: List[str] = None,
-        low_memory: bool = True,
+        store_in_harddisk: bool = True,
         **kwargs,
     ):
         """
@@ -40,8 +40,8 @@ class AbstractModel:
         exclude_models:
             The names of specific models that should not be trained. Only one of `model_subset` and `exclude_models` can
             be specified.
-        low_memory:
-            Whether to save sub-models directly in a Dict (memory). If True, they will be saved locally.
+        store_in_harddisk:
+            Whether to save sub-models in the hard disk. If the global setting `low_memory` is True, True is used.
         """
         self.device = trainer.device
         self.trainer = trainer
@@ -55,7 +55,9 @@ class AbstractModel:
             raise Exception(
                 f"Only one of model_subset and exclude_models can be specified."
             )
-        self.low_memory = low_memory
+        self.store_in_harddisk = (
+            True if src.setting["low_memory"] else store_in_harddisk
+        )
         self.program = self._get_program_name() if program is None else program
         self.model_params = {}
         self._check_space()
@@ -431,7 +433,7 @@ class AbstractModel:
         ) = self._train_data_preprocess(*data)
         self.total_epoch = self.trainer.args["epoch"]
         if self.model is None:
-            if self.low_memory:
+            if self.store_in_harddisk:
                 self.model = ModelDict(path=self.root)
             else:
                 self.model = {}
@@ -1064,7 +1066,7 @@ class TorchModel(AbstractModel):
         early_stopping = EarlyStopping(
             patience=self.trainer.static_params["patience"],
             verbose=False,
-            path=self.trainer.project_root + "fatigue.pt",
+            path=self.root + "early_stopping_ckpt.pt",
         )
 
         for i_epoch in range(epoch):
@@ -1099,7 +1101,7 @@ class TorchModel(AbstractModel):
         idx = val_ls.index(min(val_ls))
         min_loss = val_ls[idx]
         model.to("cpu")
-        model.load_state_dict(torch.load(self.trainer.project_root + "fatigue.pt"))
+        model.load_state_dict(torch.load(self.root + "early_stopping_ckpt.pt"))
         torch.cuda.empty_cache()
         if verbose:
             print(f"Minimum loss: {min_loss:.5f}")

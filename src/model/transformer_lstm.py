@@ -122,6 +122,7 @@ class TransformerLSTM(TorchModel):
             "ConsGradTransformerSeq",
         ]:
             return [
+                # `seq_embedding_dim` should be able to divided by `attn_heads`.
                 Categorical(categories=[8, 16, 32], name="seq_embedding_dim"),
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
                 Categorical(categories=[2, 4], name="attn_layers"),
@@ -382,7 +383,7 @@ class ConsGradTransformerSeqNN(TransformerSeqNN):
             inputs=data[0],
             grad_outputs=torch.ones_like(y_pred),
             retain_graph=True,
-            create_graph=False,  # True to compute higher order derivatives.
+            create_graph=False,  # True to compute higher order derivatives, and is more expensive.
         )[0]
         feature_loss = torch.zeros((self.n_cont,))
         for feature, idx in feature_idx_mapping.items():
