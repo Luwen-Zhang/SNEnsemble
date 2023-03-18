@@ -431,7 +431,9 @@ class AbstractModel:
             D_test,
             y_test,
         ) = self._train_data_preprocess(*data)
-        self.total_epoch = self.trainer.args["epoch"]
+        self.total_epoch = (
+            self.trainer.args["epoch"] if not src.setting["debug_mode"] else 2
+        )
         if self.model is None:
             if self.store_in_harddisk:
                 self.model = ModelDict(path=self.root)
@@ -447,7 +449,12 @@ class AbstractModel:
             space = self._space(model_name=model_name)
             if self.trainer.bayes_opt and not warm_start and len(space) > 0:
                 callback = BayesCallback(
-                    tqdm(total=self.trainer.n_calls, disable=not verbose)
+                    tqdm(
+                        total=self.trainer.n_calls
+                        if not src.setting["debug_mode"]
+                        else 11,
+                        disable=not verbose,
+                    )
                 )
                 global _bayes_objective
 
@@ -460,7 +467,9 @@ class AbstractModel:
 
                         self._train_single_model(
                             model,
-                            epoch=self.trainer.args["bayes_epoch"],
+                            epoch=self.trainer.args["bayes_epoch"]
+                            if not src.setting["debug_mode"]
+                            else 1,
                             X_train=X_train,
                             D_train=D_train,
                             y_train=y_train,
@@ -486,7 +495,9 @@ class AbstractModel:
                     result = gp_minimize(
                         _bayes_objective,
                         self._space(model_name=model_name),
-                        n_calls=self.trainer.n_calls,
+                        n_calls=self.trainer.n_calls
+                        if not src.setting["debug_mode"]
+                        else 11,
                         callback=callback.call,
                         random_state=0,
                         x0=list(tmp_params.values()),
@@ -1061,7 +1072,6 @@ class TorchModel(AbstractModel):
 
         train_ls = []
         val_ls = []
-        stop_epoch = self.trainer.args["epoch"]
 
         early_stopping = EarlyStopping(
             patience=self.trainer.static_params["patience"],
@@ -1084,7 +1094,7 @@ class TorchModel(AbstractModel):
                 (i_epoch + 1) % src.setting["verbose_per_epoch"] == 0 or i_epoch == 0
             ):
                 print(
-                    f"Epoch: {i_epoch + 1}/{stop_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min "
+                    f"Epoch: {i_epoch + 1}/{epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min "
                     f"val loss: {np.min(val_ls):.4f}, Epoch time: {t_end-t_start:.4f}s."
                 )
 
