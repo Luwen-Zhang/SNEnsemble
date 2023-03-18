@@ -107,13 +107,11 @@ class TransformerLSTM(TorchModel):
     def _space(self, model_name):
         if model_name == "TransformerLSTM":
             return [
-                Categorical(
-                    categories=[2, 4, 8, 16, 32, 64, 128], name="seq_embedding_dim"
-                ),
-                Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
-                Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
+                Categorical(categories=[2, 4, 8, 16, 32], name="seq_embedding_dim"),
+                Categorical(categories=[8, 16, 32], name="embedding_dim"),
+                Integer(low=1, high=30, prior="uniform", name="n_hidden", dtype=int),
                 Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
-                Categorical(categories=[2, 4, 8], name="attn_layers"),
+                Categorical(categories=[2, 4], name="attn_layers"),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
@@ -124,20 +122,18 @@ class TransformerLSTM(TorchModel):
             "ConsGradTransformerSeq",
         ]:
             return [
-                Categorical(categories=[8, 16, 32, 64], name="seq_embedding_dim"),
-                Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
-                Categorical(categories=[2, 4, 8], name="attn_layers"),
+                Categorical(categories=[8, 16, 32], name="seq_embedding_dim"),
+                Categorical(categories=[8, 16, 32], name="embedding_dim"),
+                Categorical(categories=[2, 4], name="attn_layers"),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
             ] + self.trainer.SPACE
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
             return [
-                Categorical(
-                    categories=[2, 4, 8, 16, 32, 64, 128], name="lstm_embedding_dim"
-                ),
-                Categorical(categories=[8, 16, 32, 64], name="embedding_dim"),
-                Integer(low=1, high=100, prior="uniform", name="n_hidden", dtype=int),
+                Categorical(categories=[2, 4, 8, 16, 32], name="lstm_embedding_dim"),
+                Categorical(categories=[8, 16, 32], name="embedding_dim"),
+                Integer(low=1, high=30, prior="uniform", name="n_hidden", dtype=int),
                 Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
             ] + self.trainer.SPACE
@@ -146,7 +142,7 @@ class TransformerLSTM(TorchModel):
         if model_name == "TransformerLSTM":
             return {
                 "seq_embedding_dim": 16,
-                "embedding_dim": 64,
+                "embedding_dim": 32,
                 "n_hidden": 10,
                 "lstm_layers": 1,
                 "attn_layers": 4,
@@ -164,7 +160,7 @@ class TransformerLSTM(TorchModel):
         ]:
             return {
                 "seq_embedding_dim": 16,
-                "embedding_dim": 64,
+                "embedding_dim": 32,
                 "attn_layers": 4,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
@@ -176,7 +172,7 @@ class TransformerLSTM(TorchModel):
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
             return {
                 "lstm_embedding_dim": 16,  # bayes-opt: 1000
-                "embedding_dim": 64,  # bayes-opt: 1
+                "embedding_dim": 32,  # bayes-opt: 1
                 "n_hidden": 10,  # bayes-opt: 1
                 "lstm_layers": 1,  # bayes-opt: 1
                 "embed_dropout": 0.1,
@@ -201,7 +197,7 @@ class TransformerLSTMNN(AbstractNN):
         manual_activate_sn=None,
         sn_coeff_vars_idx=None,
         cat_num_unique: List[int] = None,
-        embedding_dim=64,
+        embedding_dim=32,
         seq_embedding_dim=10,
         n_hidden=3,
         lstm_layers=1,
@@ -284,7 +280,7 @@ class TransformerSeqNN(AbstractNN):
         manual_activate_sn=None,
         sn_coeff_vars_idx=None,
         cat_num_unique: List[int] = None,
-        embedding_dim=64,
+        embedding_dim=32,
         seq_embedding_dim=16,
         attn_layers=4,
         attn_heads=8,
