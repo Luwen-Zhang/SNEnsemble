@@ -34,7 +34,7 @@ class BaseConfig:
                 },
                 "batch_size": {
                     "type": "Categorical",
-                    "categories": [32, 64, 128, 256, 512, 1024, 2048, 4096],
+                    "categories": [32, 64, 128, 256, 512, 1024, 2048],
                 },
             },
             "data_splitter": "MaterialCycleSplitter",
