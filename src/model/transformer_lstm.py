@@ -736,11 +736,12 @@ class _LSTM(nn.Module):
         if self.run:
             seq = derived_tensors["Lay-up Sequence"]
             lens = derived_tensors["Number of Layers"]
-            h_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden).to(
-                seq.get_device()
+            device = "cpu" if seq.get_device() == -1 else seq.get_device()
+            h_0 = torch.zeros(
+                self.lstm_layers, seq.size(0), self.n_hidden, device=device
             )
-            c_0 = torch.zeros(self.lstm_layers, seq.size(0), self.n_hidden).to(
-                seq.get_device()
+            c_0 = torch.zeros(
+                self.lstm_layers, seq.size(0), self.n_hidden, device=device
             )
 
             seq_embed = self.embedding(seq.long() + 90)
@@ -872,7 +873,7 @@ class _SeqTransformer(_Transformer):
             seq = derived_tensors["Lay-up Sequence"]
             lens = derived_tensors["Number of Layers"]
             max_len = seq.size(1)
-            device = seq.get_device()
+            device = "cpu" if seq.get_device() == -1 else seq.get_device()
             # for the definition of padding_mask, see nn.MultiheadAttention.forward
             padding_mask = (
                 torch.arange(max_len, device=device).expand(len(lens), max_len) >= lens
