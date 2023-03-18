@@ -46,7 +46,7 @@ class AbstractModel:
         self.device = trainer.device
         self.trainer = trainer
         if not hasattr(trainer, "database"):
-            trainer.load_config(default_configfile="base_config")
+            trainer.load_config(configfile_path="base_config")
         self.model = None
         self.leaderboard = None
         self.model_subset = model_subset

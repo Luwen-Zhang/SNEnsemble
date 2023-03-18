@@ -1,11 +1,6 @@
-"""
-This is a base of all other configuration files. It is not a file for the input of the main script.
-"""
-
-
-class BaseConfig:
+class DefaultConfig:
     def __init__(self):
-        self.data = {
+        self.cfg = {
             "database": "composite",
             "loss": "mse",
             "bayes_opt": False,
@@ -56,3 +51,10 @@ class BaseConfig:
             "feature_types": ["Fatigue loading", "Material", "Derived"],
             "label_name": ["Cycles to Failure"],
         }
+        self.defaults = self.cfg.copy()
+
+    def available_keys(self):
+        return list(self.cfg.keys())
+
+    def defaults(self):
+        return self.defaults.copy()

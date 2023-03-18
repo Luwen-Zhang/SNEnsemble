@@ -2,8 +2,10 @@
 The basic class for the project. It includes configuration, data processing, plotting,
 and comparing baseline models.
 """
+import os.path
 import src
 from src.utils import *
+from src.config import DefaultConfig, UserConfig
 from copy import deepcopy as cp
 from importlib import import_module, reload
 from skopt.space import Real, Integer, Categorical
@@ -17,6 +19,7 @@ import itertools
 import scipy.stats as st
 from captum.attr import FeaturePermutation
 from sklearn.utils import resample as skresample
+import argparse
 
 set_random_seed(0)
 sys.path.append("configs/")
@@ -41,7 +44,7 @@ class Trainer:
         self.modelbases = []
         self.modelbases_names = []
 
-    def add_modelbases(self, models: list):
+    def add_modelbases(self, models: List):
         """
         Add a list of model-bases and check whether their names conflict.
 
@@ -62,9 +65,9 @@ class Trainer:
 
     def load_config(
         self,
-        default_configfile: str = None,
+        configfile_path: str = None,
         verbose: bool = True,
-        manual_config: dict = None,
+        manual_config: Dict = None,
         project_root_subfolder: str = None,
     ) -> None:
         """
@@ -74,16 +77,14 @@ class Trainer:
         :param verbose: Whether to output the loaded configs. Default to True.
         :return: None
         """
-        base_config = import_module("base_config").BaseConfig().data
+        base_config = DefaultConfig().cfg
 
         # The base config is loaded using the --base argument
-        if is_notebook() and default_configfile is None:
+        if is_notebook() and configfile_path is None:
             raise Exception("A config file must be assigned in notebook environment.")
-        elif is_notebook() or default_configfile is not None:
-            parse_res = {"base": default_configfile}
+        elif is_notebook() or configfile_path is not None:
+            parse_res = {"base": configfile_path}
         else:  # not notebook and configfile is None
-            import argparse
-
             parser = argparse.ArgumentParser()
             parser.add_argument("--base", required=True)
             for key in base_config.keys():
@@ -100,15 +101,11 @@ class Trainer:
             parse_res = parser.parse_args().__dict__
 
         self.configfile = parse_res["base"]
-
-        if self.configfile not in sys.modules:
-            arg_loaded = import_module(self.configfile).config().data
-        else:
-            arg_loaded = reload(sys.modules.get(self.configfile)).config().data
+        arg_loaded = UserConfig(path=self.configfile).cfg
 
         # Then, several args can be modified using other arguments like --lr, --weight_decay
         # only when a config file is not given so that configs depend on input arguments.
-        if not is_notebook() and default_configfile is None:
+        if not is_notebook() and configfile_path is None:
             for key, value in parse_res.items():
                 if value is not None:
                     arg_loaded[key] = value
@@ -122,6 +119,7 @@ class Trainer:
                         f"Manual configuration argument {key} not available."
                     )
 
+        json_backup = cp(arg_loaded)
         # Preprocess configs
         tmp_static_params = {}
         for key in arg_loaded["static_params"]:
@@ -188,9 +186,15 @@ class Trainer:
         self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
 
         self.project = self.database if self.project is None else self.project
-        self.create_dir(project_root_subfolder=project_root_subfolder)
+        self._create_dir(project_root_subfolder=project_root_subfolder)
 
-    def create_dir(self, verbose=True, project_root_subfolder=None):
+        with open(self.project_root + "args.json", "w") as f:
+            json.dump(json_backup, f, indent=4)
+
+    def _create_dir(self, verbose: bool = True, project_root_subfolder: str = None):
+
+        if not os.path.exists("output"):
+            os.mkdir("output")
         if project_root_subfolder is not None:
             if not os.path.exists(f"output/{project_root_subfolder}"):
                 os.mkdir(f"output/{project_root_subfolder}")
@@ -213,9 +217,6 @@ class Trainer:
         if not os.path.exists(self.project_root):
             os.mkdir(self.project_root)
 
-        f = open(self.project_root + "args.json", "w")
-        json.dump(self.args, f, indent=4)
-        f.close()
         if verbose:
             print(f"Project will be saved to {self.project_root}")
 
