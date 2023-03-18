@@ -876,8 +876,11 @@ class _SeqTransformer(_Transformer):
             seq = derived_tensors["Lay-up Sequence"]
             lens = derived_tensors["Number of Layers"]
             max_len = seq.size(1)
+            device = seq.get_device()
             # for the definition of padding_mask, see nn.MultiheadAttention.forward
-            padding_mask = torch.arange(max_len).expand(len(lens), max_len) >= lens
+            padding_mask = (
+                torch.arange(max_len, device=device).expand(len(lens), max_len) >= lens
+            )
             x = self.embedding(seq.long() + 90)
             x_pos = self.pos_encoding(x)
             x_trans = self.transformer(x_pos, src_key_padding_mask=padding_mask)
