@@ -7,7 +7,6 @@ import src
 from src.utils import *
 from src.config import DefaultConfig, UserConfig
 from copy import deepcopy as cp
-from importlib import import_module, reload
 from skopt.space import Real, Integer, Categorical
 import json
 import time
@@ -59,6 +58,18 @@ class Trainer:
             raise Exception(f"Conflicted modelbase names: {self.modelbases_names}")
 
     def get_modelbase(self, program: str):
+        """
+        Get the selected modelbase by its name.
+
+        Parameters
+        ----------
+        program
+            The name of the modelbase.
+
+        Returns
+        -------
+            An instance of AbstractModel.
+        """
         if program not in self.modelbases_names:
             raise Exception(f"Program {program} not added to the trainer.")
         return self.modelbases[self.modelbases_names.index(program)]
@@ -71,11 +82,33 @@ class Trainer:
         project_root_subfolder: str = None,
     ) -> None:
         """
-        Load a configfile.
-        :param default_configfile: The path to a configfile. If in notebook environment, this parameter is required.
-        If the parameter is assigned, the script will not take any input argument from command line. Default to None.
-        :param verbose: Whether to output the loaded configs. Default to True.
-        :return: None
+        Load a configfile in json format.
+        Arguments passed to python when executing the script is parsed if ``configfile_path`` is left None. All keys in
+        config.DefaultConfig().available_keys() can be parsed, for example:
+            For the loss function: ``--loss mse``,
+
+            For the total epoch: ``--epoch 200``,
+
+            For the option for bayes opt: ``--bayes_opt`` to turn on bayes opt, ``--no-bayes_opt`` to turn off.
+
+        Default values can be seen in config.DefaultConfig().defaults().
+
+        The loaded configuration will be saved in the project folder.
+
+        Parameters
+        ----------
+        configfile_path
+            The path to the configfile. Arguments passed to python will be parsed; therefore, do not leave it empty when
+            ``argparse.ArgumentParser`` is used for other purposes. If the path does not contain "/", the file
+            ``configs/{configfile_path}``(.json) will be read. The path can end with or without .json.
+        verbose
+            Whether to print the loaded configuration.
+        manual_config
+            Set configurations after the config file is loaded with a dict. For example:
+            ``manual_config={"bayes_opt": True}``
+        project_root_subfolder
+            The subfolder that the project will locate in. The folder name will be
+            ``{PATH OF THE MAIN SCRIPT}/output/{project_root_subfolder}/{TIME AT EXECUTION}-{configfile_path}``
         """
         base_config = DefaultConfig().cfg
 
@@ -192,7 +225,16 @@ class Trainer:
             json.dump(json_backup, f, indent=4)
 
     def _create_dir(self, verbose: bool = True, project_root_subfolder: str = None):
+        """
+        Create the folder for the project.
 
+        Parameters
+        ----------
+        verbose
+            Whether to print the path to the project.
+        project_root_subfolder
+            See `load_config`.
+        """
         if not os.path.exists("output"):
             os.mkdir("output")
         if project_root_subfolder is not None:
@@ -220,17 +262,56 @@ class Trainer:
         if verbose:
             print(f"Project will be saved to {self.project_root}")
 
-    def set_data_splitter(self, name, verbose=True):
+    def set_data_splitter(self, name: str, verbose=True):
+        """
+        Set the data splitter after ``load_config``. The specified splitter should be implemented in
+        data/datasplitter.py. Also, data splitter can be set directly using ``trainer.datasplitter = YourSplitter()``
+
+        Parameters
+        ----------
+        name
+            The name of a data splitter implemented in data/datasplitter.py.
+        verbose
+            Ignored.
+        """
         from src.data.datasplitter import get_data_splitter
 
         self.datasplitter = get_data_splitter(name)()
 
     def set_data_imputer(self, name, verbose=True):
+        """
+        Set the data imputer after ``load_config``. The specified splitter should be implemented in
+        data/dataimputer.py. Also, data imputer can be set directly using ``trainer.dataimputer = YourImputer()``
+
+        Parameters
+        ----------
+        name
+            The name of a data imputer implemented in data/dataimputer.py.
+        verbose
+            Ignored.
+        """
         from src.data.dataimputer import get_data_imputer
 
         self.dataimputer = get_data_imputer(name)()
 
-    def set_data_processors(self, config: List[Tuple], verbose=True):
+    def set_data_processors(self, config: List[Tuple[str, Dict]], verbose=True):
+        """
+        Set a list of data processors with the name and arguments for each data processors. The processor should be
+        implemented in data/dataprocessor.py. Also, data processors can be set directly using
+        ``trainer.dataprocessors = [(YourProcessor(), A Dict of kwargs) for EACH DATA PROCESSOR]``
+
+        Parameters
+        ----------
+        config
+            A list of tuple. The tuple includes the name of the processor and a dict of kwargs for the processor.
+        verbose
+            Ignored.
+
+        Notes
+        ----------
+        The UnscaledDataRecorder should be set before any scaling processor. If not found in the input, it will be
+        appended at the end.
+        """
         from src.data.dataprocessor import get_data_processor
 
         if "UnscaledDataRecorder" not in [name for name, _ in config]:
@@ -243,26 +324,46 @@ class Trainer:
             (get_data_processor(name)(), kwargs) for name, kwargs in config
         ]
 
-    def set_data_derivers(self, config: List[Tuple], verbose=True):
+    def set_data_derivers(self, config: List[Tuple[str, Dict]], verbose=True):
+        """
+        Set a list of data derivers with the name and arguments for each data derivers. The deriver should be
+        implemented in data/dataderiver.py. Also, data derivers can be set directly using
+        ``trainer.dataderivers = [(YourDeriver(), A Dict of kwargs) for EACH DATA DERIVER]``
+
+        Parameters
+        ----------
+        config
+            A list of tuple. The tuple includes the name of the deriver and a dict of kwargs for the deriver.
+        verbose
+            Ignored.
+        """
         from src.data.dataderiver import get_data_deriver
 
         self.dataderivers = [
             (get_data_deriver(name)(), kwargs) for name, kwargs in config
         ]
 
-    def load_data(self, data_path: str = None, file_type: str = "csv") -> None:
+    def load_data(
+        self, data_path: str = None, file_type: str = "csv", **kwargs
+    ) -> None:
         """
-        Load the data file in ../data directory specified by the 'project' argument in configfile. Data will be splitted
-         into training, validation, and testing datasets.
-        :param data_path: specify a data file different from 'project'. Default to None.
-        :return: None
+        Load tabular data. Either .csv or .xlsx is supported.
+
+        Parameters
+        ----------
+        data_path
+            Path to the tabular data. By default, the file ``data/{database}.{file_type}`` is loaded.
+        file_type
+            ``csv`` or ``xlsx``
+        **kwargs
+            Arguments for pd.read_excel or pd.read_csv, depending on file_type.
         """
         if data_path is None:
             data_path = f"data/{self.database}.{file_type}"
         if file_type == "xlsx":
-            self.df = pd.read_excel(data_path, engine="openpyxl")
+            self.df = pd.read_excel(data_path, engine="openpyxl", **kwargs)
         else:
-            self.df = pd.read_csv(data_path)
+            self.df = pd.read_csv(data_path, **kwargs)
         self.data_path = data_path
 
         cont_feature_names = self.extract_cont_feature_names(
@@ -284,27 +385,75 @@ class Trainer:
         self.save_data()
 
     @property
-    def all_feature_names(self):
+    def all_feature_names(self) -> List[str]:
+        """
+        Get continuous feature names and categorical feature names after ``load_data()``.
+
+        Returns
+        -------
+        names:
+            A list of continuous features and categorical features.
+        """
         return self.cont_feature_names + self.cat_feature_names
 
     @property
-    def derived_stacked_features(self):
+    def derived_stacked_features(self) -> List[str]:
+        """
+        Find derived features in ``all_feature_names`` derived by data derivers with the argument "stacked" to True,
+        i.e. stacked data.
+
+        Returns
+        -------
+        names:
+            A list of feature names.
+        """
         return self.extract_derived_stacked_feature_names(self.all_feature_names)
 
     def set_data(
         self,
-        df,
-        cont_feature_names,
-        cat_feature_names,
-        label_name,
-        derived_data=None,
-        warm_start=False,
-        verbose=True,
-        all_training=False,
-        train_indices=None,
-        val_indices=None,
-        test_indices=None,
+        df: pd.DataFrame,
+        cont_feature_names: List[str],
+        cat_feature_names: List[str],
+        label_name: List[str],
+        derived_data: Dict[str, np.ndarray] = None,
+        warm_start: bool = False,
+        verbose: bool = True,
+        all_training: bool = False,
+        train_indices: np.ndarray = None,
+        val_indices: np.ndarray = None,
+        test_indices: np.ndarray = None,
     ):
+        """
+        Set up the trainer with a dataframe. Data splitting, imputation, derivation, and processing will be performed.
+
+        Parameters
+        ----------
+        df
+            The tabular dataset.
+        cont_feature_names
+            A list of continuous features in the tabular dataset.
+        cat_feature_names
+            A list of categorical features in the tabular dataset.
+        label_name
+            A list of targets. Currently, only one target is supported.
+        derived_data
+            The derived data calculated using data derivers with the argument "stacked" to False, i.e. unstacked data.
+        warm_start
+            Whether to use fitted data imputers and processors to process the data.
+        verbose
+            Verbosity.
+        all_training
+            Whether all samples are used for training.
+        train_indices
+            Manually specify the training set by indices.
+        val_indices
+            Manually specify the validation set by indices.
+        test_indices
+            Manually specify the testing set by indices.
+        """
+        if len(label_name) > 1:
+            raise Exception(f"Only one target is supported.")
+
         self.cont_feature_names = cont_feature_names
         self.cat_feature_names = cat_feature_names
         self.cat_feature_mapping = {}
@@ -425,14 +574,43 @@ class Trainer:
         )
 
     @property
-    def cont_imputed_mask(self):
+    def cont_imputed_mask(self) -> pd.DataFrame:
+        """
+        A byte mask for continuous data, where 1 means the data is imputed, and 0 means the data originally exists.
+
+        Returns
+        -------
+        mask
+            A byte mask dataframe.
+        """
         return self._cont_imputed_mask[self.cont_feature_names]
 
     @property
-    def cat_imputed_mask(self):
+    def cat_imputed_mask(self) -> pd.DataFrame:
+        """
+        A byte mask for categorical data, where 1 means the data is imputed, and 0 means the data originally exists.
+
+        Returns
+        -------
+        mask
+            A byte mask dataframe.
+        """
         return self._cat_imputed_mask[self.cat_feature_names]
 
-    def extract_cont_feature_names(self, all_feature_names):
+    def extract_cont_feature_names(self, all_feature_names: List[str]) -> List[str]:
+        """
+        Get original continuous features specified in the config file.
+
+        Parameters
+        ----------
+        all_feature_names
+            A list of features that contains some original features in the config file.
+
+        Returns
+        -------
+        name
+            Names of continuous original features both in the config file and the input list.
+        """
         return [
             x
             for x in all_feature_names
@@ -441,6 +619,19 @@ class Trainer:
         ]
 
     def extract_cat_feature_names(self, all_feature_names):
+        """
+        Get original categorical features specified in the config file.
+
+        Parameters
+        ----------
+        all_feature_names
+            A list of features that contains some original features in the config file.
+
+        Returns
+        -------
+        name
+            Names of categorical original features that are both in the config file and the input list.
+        """
         return [
             str(x)
             for x in np.intersect1d(
@@ -449,7 +640,23 @@ class Trainer:
             )
         ]
 
-    def extract_derived_stacked_feature_names(self, all_feature_names):
+    def extract_derived_stacked_feature_names(
+        self, all_feature_names: List[str]
+    ) -> List[str]:
+        """
+        Find derived features in the input list derived by data derivers with the argument "stacked" to True,
+        i.e. stacked data.
+
+        Parameters
+        ----------
+        all_feature_names
+            A list of features that contains some stacked features.
+
+        Returns
+        -------
+        names
+            Names of stacked features in the input list.
+        """
         return [
             str(x)
             for x in np.setdiff1d(
@@ -461,7 +668,15 @@ class Trainer:
             )
         ]
 
-    def set_feature_names(self, all_feature_names):
+    def set_feature_names(self, all_feature_names: List[str]):
+        """
+        Set feature names to a subset of current features (i.e. ``all_feature_names``) and reload the data.
+
+        Parameters
+        ----------
+        all_feature_names
+            A subset of current features.
+        """
         cont_feature_names = self.extract_cont_feature_names(all_feature_names)
         cat_feature_names = self.extract_cat_feature_names(all_feature_names)
         derived_stacked_features = self.extract_derived_stacked_feature_names(
@@ -477,6 +692,7 @@ class Trainer:
             val_indices=self.val_indices,
             test_indices=self.test_indices,
         )
+        # Some derived stacked features are not in the specified list.
         self.cont_feature_names = [
             x
             for x in self.cont_feature_names
@@ -486,7 +702,24 @@ class Trainer:
         ]
         self._update_dataset_auto()
 
-    def sort_derived_data(self, derived_data, ignore_absence=False):
+    def sort_derived_data(
+        self, derived_data: Dict[str, np.ndarray], ignore_absence: bool = False
+    ) -> Union[Dict[str, np.ndarray], None]:
+        """
+        Sort the dict of derived unstacked data according to the order of derivation.
+
+        Parameters
+        ----------
+        derived_data
+            A dict of derived unstacked data calculated by ``Trainer.derive_unstacked()``
+        ignore_absence
+            Whether to ignore the absence of any derived unstacked data that does not exist in the input.
+
+        Returns
+        -------
+        derived_data
+            The sorted derived unstacked data.
+        """
         if derived_data is None:
             return None
         else:
@@ -499,7 +732,21 @@ class Trainer:
                     tmp_derived_data[key] = derived_data[key]
             return tmp_derived_data
 
-    def categories_inverse_transform(self, X: pd.DataFrame):
+    def categories_inverse_transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Inverse transformation of data.dataprocessor.OrdinalEncoder of categorical features (If there is one in
+        self.dataprocessors).
+
+        Parameters
+        ----------
+        X
+            The data to be inverse-transformed.
+
+        Returns
+        -------
+        data
+            The inverse-transformed data.
+        """
         from src.data.dataprocessor import CategoricalOrdinalEncoder
 
         for processor, _ in self.dataprocessors:
@@ -527,6 +774,15 @@ class Trainer:
         return X_copy
 
     def save_data(self, path: str = None):
+        """
+        Save the tabular data processed by ``set_data()``. Two files will be saved: ``data.csv`` contains all
+        information from the input dataframe, and ``tabular_data.csv`` contains merely used features.
+
+        Parameters
+        ----------
+        path
+            The path to save the data.
+        """
         if path is None:
             path = self.project_root
 
@@ -540,13 +796,47 @@ class Trainer:
 
         print(f"Data saved to {path} (data.csv and tabular_data.csv).")
 
-    def derive(self, df):
+    def derive(
+        self, df: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, List[str], Dict[str, np.ndarray]]:
+        """
+        Derive both stacked and unstacked features using the input dataframe.
+
+        Parameters
+        ----------
+        df
+            The tabular dataset.
+
+        Returns
+        -------
+        df_tmp
+            The tabular dataset with derived stacked features.
+        cont_feature_names
+            Continuous feature names with derived stacked features.
+        derived_data
+            The derived unstacked data.
+        """
         df_tmp, cont_feature_names = self.derive_stacked(df)
         derived_data = self.derive_unstacked(df_tmp)
 
-        return (df_tmp, cont_feature_names, derived_data)
+        return df_tmp, cont_feature_names, derived_data
 
-    def derive_stacked(self, df):
+    def derive_stacked(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+        """
+        Derive stacked features using the input dataframe.
+
+        Parameters
+        ----------
+        df
+            The tabular dataset.
+
+        Returns
+        -------
+        df_tmp
+            The tabular dataset with derived stacked features.
+        cont_feature_names
+            Continuous feature names with derived stacked features.
+        """
         df_tmp = df.copy()
         cont_feature_names = cp(self.cont_feature_names)
         for deriver, kwargs in self.dataderivers:
@@ -560,7 +850,24 @@ class Trainer:
                 df_tmp[col_names] = value
         return df_tmp, cont_feature_names
 
-    def derive_unstacked(self, df, categorical_only=False):
+    def derive_unstacked(
+        self, df: pd.DataFrame, categorical_only=False
+    ) -> Dict[str, np.ndarray]:
+        """
+        Derive unstacked features using the input dataframe.
+
+        Parameters
+        ----------
+        df
+            The tabular dataset.
+        categorical_only
+            Whether to get categorical features only in the returned dict.
+
+        Returns
+        -------
+        derived_data
+            The derived unstacked data.
+        """
         derived_data = {}
         if not categorical_only:
             for deriver, kwargs in self.dataderivers:
@@ -574,9 +881,20 @@ class Trainer:
 
     def _data_process(
         self,
-        warm_start=False,
-        verbose=True,
+        warm_start: bool = False,
+        verbose: bool = True,
     ):
+        """
+        Main procedure to process data after splitting and imputation. Both scaled and unscaled data will be recorded.
+        Note that processors will fit on training datasets and transform on validation and testing dataset.
+
+        Parameters
+        ----------
+        warm_start
+            Whether to use fitted data imputers and processors to process the data.
+        verbose
+            Verbosity.
+        """
         self._unscaled_feature_data = pd.DataFrame()
         self._unscaled_label_data = pd.DataFrame()
         self._categorical_data = pd.DataFrame()
@@ -627,26 +945,83 @@ class Trainer:
         self.scaled_df = process_df(self.scaled_df, training_data, testing_data)
 
     @property
-    def unscaled_feature_data(self):
+    def unscaled_feature_data(self) -> pd.DataFrame:
+        """
+        Get unscaled feature data.
+
+        Returns
+        -------
+        df
+            The unscaled feature data.
+        """
         return self.df[self.cont_feature_names].copy()
 
     @property
-    def unscaled_label_data(self):
+    def unscaled_label_data(self) -> pd.DataFrame:
+        """
+        Get unscaled label data.
+
+        Returns
+        -------
+        df
+            The unscaled label data.
+        """
         return self.df[self.label_name].copy()
 
     @property
-    def categorical_data(self):
+    def categorical_data(self) -> pd.DataFrame:
+        """
+        Get categorical data.
+
+        Returns
+        -------
+        df
+            The categorical data.
+        """
         return self.df[self.cat_feature_names].copy()
 
     @property
-    def feature_data(self):
+    def feature_data(self) -> pd.DataFrame:
+        """
+        Get scaled feature data.
+
+        Returns
+        -------
+        df
+            The scaled feature data.
+        """
         return self.scaled_df[self.cont_feature_names].copy()
 
     @property
-    def label_data(self):
+    def label_data(self) -> pd.DataFrame:
+        """
+        Get scaled label data.
+
+        Returns
+        -------
+        df
+            The scaled label data.
+        """
         return self.scaled_df[self.label_name].copy()
 
-    def _data_preprocess(self, input_data: pd.DataFrame, warm_start=False):
+    def _data_preprocess(
+        self, input_data: pd.DataFrame, warm_start: bool = False
+    ) -> pd.DataFrame:
+        """
+        Call data processors to fit and/or transform the input tabular dataset.
+
+        Parameters
+        ----------
+        input_data
+            The tabular dataset.
+        warm_start
+            True to fit and transform data processors, and False to transform.
+
+        Returns
+        -------
+        df
+            The processed data.
+        """
         data = input_data.copy()
         cont_feature_names = cp(self.cont_feature_names)
         cat_feature_names = cp(self.cat_feature_names)
@@ -664,9 +1039,25 @@ class Trainer:
         return data
 
     def data_transform(self, input_data: pd.DataFrame):
+        """
+        Transform the input tabular dataset using fitted data processors.
+
+        Parameters
+        ----------
+        input_data
+            The tabular dataset.
+
+        Returns
+        -------
+        df
+            Transformed tabular dataset.
+        """
         return self._data_preprocess(input_data.copy(), warm_start=True)
 
     def _update_dataset_auto(self):
+        """
+        Update PyTorch tensors and datasets for the trainer. This is called after features change.
+        """
         X = torch.tensor(
             self.feature_data.values.astype(np.float32), dtype=torch.float32
         )
@@ -682,13 +1073,43 @@ class Trainer:
         self.test_dataset = Subset(dataset, self.test_indices)
         self.tensors = (X, *D, y) if len(D) > 0 else (X, None, y)
 
-    def get_derived_data_slice(self, derived_data, indices):
+    def get_derived_data_slice(
+        self, derived_data: Dict[str, np.ndarray], indices: Iterable
+    ) -> Dict[str, np.ndarray]:
+        """
+        Get slices of the derived unstacked data.
+
+        Parameters
+        ----------
+        derived_data
+            Derived unstacked data.
+        indices
+            The indices to make slice.
+
+        Returns
+        -------
+        derived_data
+            The sliced derived stacked data.
+        """
         tmp_derived_data = {}
         for key, value in derived_data.items():
             tmp_derived_data[key] = value[indices, :]
         return tmp_derived_data
 
-    def get_zero_slip(self, feature_name):
+    def get_zero_slip(self, feature_name: str):
+        """
+        See how data processors act on a feature if its value is zero.
+
+        Parameters
+        ----------
+        feature_name
+            The investigated feature.
+
+        Returns
+        -------
+        value
+            The transformed value for the feature using data processors.
+        """
         if not hasattr(self, "dataprocessors"):
             raise Exception(f"Run load_config first.")
         elif len(self.dataprocessors) == 0 and feature_name in self.cont_feature_names:
@@ -702,7 +1123,22 @@ class Trainer:
                 x = processor.zero_slip(feature_name, x)
         return x
 
-    def describe(self, transformed=False, save=True):
+    def describe(self, transformed=False, save=True) -> pd.DataFrame:
+        """
+        Describe the dataset using pd.DataFrame.describe, skewness, gini index, mode values, etc.
+
+        Parameters
+        ----------
+        transformed
+            Whether to describe the transformed (scaled) data.
+        save
+            Whether to save descriptions to ``describe.csv``.
+
+        Returns
+        -------
+        desc
+            The descriptions of the dataset.
+        """
         tabular = self.get_tabular_dataset(transformed=transformed)[0]
         desc = tabular.describe()
 
@@ -730,21 +1166,54 @@ class Trainer:
         return desc
 
     def train(
-        self, programs: list = None, verbose: bool = False, debug_mode: bool = False
+        self,
+        programs: List[str] = None,
+        verbose: bool = False,
     ):
+        """
+        Train all added modelbases.
+
+        Parameters
+        ----------
+        programs
+            A selected subset of modelbases.
+        verbose
+            Verbosity.
+        """
         if programs is None:
             modelbases_to_train = self.modelbases
         else:
             modelbases_to_train = [self.get_modelbase(x) for x in programs]
 
         for modelbase in modelbases_to_train:
-            modelbase.train(verbose=verbose, debug_mode=debug_mode)
+            modelbase.train(verbose=verbose)
 
-    def get_derived_data_sizes(self):
+    def get_derived_data_sizes(self) -> List[Tuple]:
+        """
+        Get dimensions of derived unstacked features.
+
+        Returns
+        -------
+        sizes
+            A list of np.ndarray.shape representing dimensions of each derived unstacked features.
+        """
         return [x.shape for x in self.derived_data.values()]
 
     @staticmethod
-    def _get_gini(tabular):
+    def _get_gini(tabular: pd.DataFrame) -> pd.DataFrame:
+        """
+        Get the gini index for each feature in the tabular dataset.
+
+        Parameters
+        ----------
+        tabular
+            The tabular dataset.
+
+        Returns
+        -------
+        gini
+            The gini index for each feature in the dataset.
+        """
         return pd.DataFrame(
             data=np.array([[gini(tabular[x]) for x in tabular.columns]]),
             columns=tabular.columns,
@@ -752,7 +1221,22 @@ class Trainer:
         )
 
     @staticmethod
-    def _get_mode(tabular):
+    def _get_mode(
+        tabular: pd.DataFrame,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Get the mode value for each feature in the tabular dataset.
+
+        Parameters
+        ----------
+        tabular
+            The tabular dataset.
+
+        Returns
+        -------
+        mode
+            The mode value for each feature in the dataset, and the number and percentage of the mode value.
+        """
         mode = tabular.mode().loc[0, :]
         cnt_mode = pd.DataFrame(
             data=np.array(
@@ -774,7 +1258,26 @@ class Trainer:
         )
         return mode, cnt_mode, mode_percent
 
-    def divide_from_tabular_dataset(self, data: pd.DataFrame):
+    def divide_from_tabular_dataset(
+        self, data: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Get continuous feature data, categorical feature data, and label data respectively.
+
+        Parameters
+        ----------
+        data
+            The tabular dataset.
+
+        Returns
+        -------
+        feature_data
+            The continuous feature data.
+        categorical_data
+            The categorical feature data.
+        label_data
+            The label data.
+        """
         feature_data = data[self.cont_feature_names]
         categorical_data = data[self.cat_feature_names]
         label_data = data[self.label_name]
@@ -782,8 +1285,27 @@ class Trainer:
         return feature_data, categorical_data, label_data
 
     def get_tabular_dataset(
-        self, transformed=False
-    ) -> Tuple[pd.DataFrame, list, list, list]:
+        self, transformed: bool = False
+    ) -> Tuple[pd.DataFrame, List, List, List]:
+        """
+        Get the tabular dataset loaded in the trainer.
+
+        Parameters
+        ----------
+        transformed
+            Whether to return the scaled data or not.
+
+        Returns
+        -------
+        tabular_dataset
+            The tabular dataset.
+        cont_feature_names
+            The continuous feature names in the dataset.
+        cat_feature_names
+            The categorical feature names in the dataset.
+        label_names
+            The target names (only one target is currently supported).
+        """
         if transformed:
             feature_data = self.feature_data
         else:
@@ -800,8 +1322,40 @@ class Trainer:
         return tabular_dataset, cont_feature_names, cat_feature_names, label_name
 
     def cross_validation(
-        self, programs, n_random, verbose, test_data_only, type="random"
-    ):
+        self,
+        programs: List[str],
+        n_random: int,
+        verbose: bool,
+        test_data_only: bool,
+        type: str = "random",
+    ) -> Dict[str, Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray]]]]:
+        """
+        Repeat loading data, training modelbases, and evaluating all models for multiple times.
+
+        Parameters
+        ----------
+        programs
+            A selected subset of modelbases.
+        n_random
+            The number of repeats.
+        verbose
+            Verbosity.
+        test_data_only
+            Whether to evaluate models only on testing datasets.
+        type
+            The type of data splitting. "random" is currently supported.
+
+        Returns
+        -------
+        res
+            A dict in the following format:
+            keys: programs
+            values:
+                keys: model names
+                values:
+                    keys: ["Training", "Testing", "Validation"]
+                    values: (Predicted values, true values)
+        """
         set_random_seed(0)
         programs_predictions = {}
         for program in programs:
@@ -863,6 +1417,10 @@ class Trainer:
         :param test_data_only: False to get metrics on training and validation datasets. Default to True.
         :return: The leaderboard dataframe.
         """
+        if len(self.modelbases) == 0:
+            raise Exception(
+                f"No modelbase available. Run trainer.add_modelbases() first."
+            )
         if cross_validation != 0:
             programs_predictions = self.cross_validation(
                 programs=self.modelbases_names,
