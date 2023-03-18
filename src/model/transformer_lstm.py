@@ -371,20 +371,29 @@ class BiasTransformerSeqNN(TransformerSeqNN):
 class ConsGradTransformerSeqNN(TransformerSeqNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         base_loss = self.default_loss_fn(y_pred, y_true)
+        implemented_features = ["Relative Mean Stress"]
+        feature_idx_mapping = {
+            x: self.cont_feature_names.index(x)
+            for x in implemented_features
+            if x in self.cont_feature_names
+        }
         grad = torch.autograd.grad(
             outputs=y_pred,
             inputs=data[0],
             grad_outputs=torch.ones_like(y_pred),
             retain_graph=True,
-            create_graph=True,  # True to compute higher order derivatives.
+            create_graph=False,  # True to compute higher order derivatives.
         )[0]
         feature_loss = torch.zeros((self.n_cont,))
-        if "Relative Mean Stress" in self.cont_feature_names:
-            where_mean_stress = self.cont_feature_names.index("Relative Mean Stress")
-            grad_mean_stress = grad[:, where_mean_stress]
-            feature_loss[where_mean_stress] = torch.mean(
-                nn.ReLU()(grad_mean_stress) ** 2
-            )
+        for feature, idx in feature_idx_mapping.items():
+            grad_feature = grad[:, idx]
+            if feature == "Relative Mean Stress":
+                feature_loss[idx] = torch.mean(nn.ReLU()(grad_feature) ** 2)
+            else:
+                raise Exception(
+                    f"Operation on the gradient of feature {feature} is not implemented."
+                )
+
         base_loss += torch.sum(feature_loss) * 1e2
         return base_loss
 
