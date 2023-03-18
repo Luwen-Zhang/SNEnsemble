@@ -17,6 +17,7 @@ models = [
     AutoGluon(trainer),
 ]
 trainer.add_modelbases(models)
-
+trainer.train(verbose=True)
+trainer.bayes_opt = False
 trainer.get_leaderboard(test_data_only=False, cross_validation=10, verbose=True)
 log.exit()
