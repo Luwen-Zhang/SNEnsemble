@@ -531,6 +531,7 @@ class AbstractModel:
             pred_set(X_val, D_val, y_val, "Validation")
             pred_set(X_test, D_test, y_test, "Testing")
             self.model[model_name] = model
+            torch.cuda.empty_cache()
 
         # enable_tqdm()
         if dump_trainer:
@@ -871,6 +872,7 @@ class BayesCallback:
     def close(self):
         self.bar.close()
         del self.bar
+        torch.cuda.empty_cache()
 
 
 class TorchModel(AbstractModel):
@@ -1098,7 +1100,7 @@ class TorchModel(AbstractModel):
         min_loss = val_ls[idx]
         model.to("cpu")
         model.load_state_dict(torch.load(self.trainer.project_root + "fatigue.pt"))
-
+        torch.cuda.empty_cache()
         if verbose:
             print(f"Minimum loss: {min_loss:.5f}")
 
@@ -1106,6 +1108,7 @@ class TorchModel(AbstractModel):
         model.to(self.device)
         y_test_pred, _, _ = self._test_step(model, X_test, **kwargs)
         model.to("cpu")
+        torch.cuda.empty_cache()
         return y_test_pred
 
     def _space(self, model_name):
@@ -1218,8 +1221,11 @@ class ModelDict:
         self.model_path[key] = os.path.join(self.root, key) + ".pkl"
         with open(self.model_path[key], "wb") as file:
             pickle.dump((key, value), file, pickle.HIGHEST_PROTOCOL)
+        del value
+        torch.cuda.empty_cache()
 
     def __getitem__(self, item):
+        torch.cuda.empty_cache()
         with open(self.model_path[item], "rb") as file:
             key, model = pickle.load(file)
         return model
