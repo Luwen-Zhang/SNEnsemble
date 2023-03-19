@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import warnings
 
 np.int = int  # `np.int` is a deprecated alias for the builtin `int`.
 
@@ -20,6 +21,9 @@ setting = dict(
     # bayes_epoch to 1.
     debug_mode=False,
 )
+
+if setting["debug_mode"]:
+    warnings.warn("The debug mode is activated. Please confirm whether it is desired.")
 
 
 def check_grad_in_loss():

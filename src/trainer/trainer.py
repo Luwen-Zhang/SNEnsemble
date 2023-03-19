@@ -175,6 +175,8 @@ class Trainer:
 
         if verbose:
             print(pretty(arg_loaded))
+            print(f"Global settings:")
+            print(pretty(src.setting))
 
         self.args = arg_loaded
 
