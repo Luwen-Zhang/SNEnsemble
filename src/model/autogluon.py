@@ -61,7 +61,8 @@ class AutoGluon(AbstractModel):
         in_bayes_opt,
         **kwargs,
     ):
-        disable_tqdm()
+        tc = TqdmController()
+        tc.disable_tqdm()
         warnings.simplefilter(action="ignore")
 
         from autogluon.features.generators import PipelineFeatureGenerator
@@ -107,7 +108,7 @@ class AutoGluon(AbstractModel):
                 hyperparameters={self._name_mapping[model[0]]: kwargs},
             )
 
-        enable_tqdm()
+        tc.enable_tqdm()
         warnings.simplefilter(action="default")
 
     def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):

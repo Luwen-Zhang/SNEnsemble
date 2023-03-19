@@ -326,7 +326,8 @@ class AbstractModel:
         ) = self._base_train_data_preprocess()
 
         predictions = {}
-        disable_tqdm()
+        tc = TqdmController()
+        tc.disable_tqdm()
         for idx, model_name in enumerate(model_names):
             if verbose:
                 print(model_name, f"{idx + 1}/{len(model_names)}")
@@ -353,7 +354,7 @@ class AbstractModel:
                 "Validation": (y_val_pred, y_val),
             }
 
-        enable_tqdm()
+        tc.enable_tqdm()
         return predictions
 
     def _predict(
@@ -414,7 +415,6 @@ class AbstractModel:
         **kwargs:
             Ignored.
         """
-        # disable_tqdm()
         warnings.filterwarnings(
             "ignore",
             message="`np.int` is a deprecated alias for the builtin `int`.",
@@ -548,7 +548,6 @@ class AbstractModel:
             self.model[model_name] = model
             torch.cuda.empty_cache()
 
-        # enable_tqdm()
         if dump_trainer:
             save_trainer(self.trainer)
 

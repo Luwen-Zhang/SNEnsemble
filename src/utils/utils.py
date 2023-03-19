@@ -19,6 +19,8 @@ import seaborn as sns
 import torch
 import torch.optim
 from distutils.spawn import find_executable
+from importlib import import_module, reload
+from functools import partialmethod
 
 clr = sns.color_palette("deep")
 sns.reset_defaults()
@@ -479,36 +481,40 @@ class HiddenPltShow:
         plt.show = self.original
 
 
-def disable_tqdm():
-    from functools import partialmethod
-    from tqdm import tqdm
+class TqdmController:
+    def __init__(self):
+        self.original_init = {}
+        self.disabled = False
 
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-    from tqdm.notebook import tqdm
+    @staticmethod
+    def reload_tqdm(name):
+        if name not in sys.modules:
+            tqdm = import_module(name)
+        else:
+            tqdm = reload(sys.modules.get(name))
+        return tqdm
 
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-    from tqdm.autonotebook import tqdm
+    def disable_tqdm(self):
+        def disable_one(name):
+            tq = self.reload_tqdm(name).tqdm
+            self.original_init[name] = tq.__init__
+            tq.__init__ = partialmethod(tq.__init__, disable=True)
 
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-    from tqdm.auto import tqdm
+        disable_one("tqdm")
+        disable_one("tqdm.notebook")
+        disable_one("tqdm.auto")
+        self.disabled = True
 
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+    def enable_tqdm(self):
+        def enable_one(name):
+            tq = self.reload_tqdm(name).tqdm
+            tq.__init__ = self.original_init[name]
 
-
-def enable_tqdm():
-    from functools import partialmethod
-    from tqdm import tqdm
-
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
-    from tqdm.notebook import tqdm
-
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
-    from tqdm.autonotebook import tqdm
-
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
-    from tqdm.auto import tqdm
-
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=False)
+        if self.disabled:
+            enable_one("tqdm")
+            enable_one("tqdm.notebook")
+            enable_one("tqdm.auto")
+            self.disabled = False
 
 
 def debugger_is_active() -> bool:

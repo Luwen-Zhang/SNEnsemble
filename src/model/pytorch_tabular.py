@@ -114,7 +114,8 @@ class PytorchTabular(AbstractModel):
         in_bayes_opt,
         **kwargs,
     ):
-        disable_tqdm()
+        tc = TqdmController()
+        tc.disable_tqdm()
         warnings.simplefilter(action="ignore", category=UserWarning)
         label_name = self.trainer.label_name
         train_data = X_train.copy()
@@ -133,7 +134,7 @@ class PytorchTabular(AbstractModel):
                 callbacks=[PytorchTabularCallback(verbose=verbose, total_epoch=epoch)],
             )
         warnings.simplefilter(action="default", category=UserWarning)
-        enable_tqdm()
+        tc.enable_tqdm()
 
     def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
         target = model.config.target[0]
