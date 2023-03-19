@@ -85,7 +85,7 @@ class Trainer:
         """
         Load a configfile in json format.
         Arguments passed to python when executing the script is parsed if ``configfile_path`` is left None. All keys in
-        config.DefaultConfig().available_keys() can be parsed, for example:
+        ``config.DefaultConfig().available_keys()`` can be parsed, for example:
             For the loss function: ``--loss mse``,
 
             For the total epoch: ``--epoch 200``,
