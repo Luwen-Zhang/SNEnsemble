@@ -333,6 +333,37 @@ def plot_partial_err(
     return fig
 
 
+def plot_truth_pred(
+    predictions,
+    ax,
+    model_name,
+    log_trans=True,
+    verbose=True,
+):
+    def plot_one(name, color, marker):
+        pred_y, y = predictions[model_name][name]
+        r2 = metric_sklearn(y, pred_y, "r2")
+        loss = metric_sklearn(y, pred_y, "mse")
+        if verbose:
+            print(f"{name} MSE Loss: {loss:.4f}, R2: {r2:.4f}")
+        ax.scatter(
+            10**y if log_trans else y,
+            10**pred_y if log_trans else pred_y,
+            s=20,
+            color=color,
+            marker=marker,
+            label=f"{name} dataset ($R^2$={r2:.3f})",
+            linewidth=0.4,
+            edgecolors="k",
+        )
+
+    plot_one("Training", clr[0], "o")
+    plot_one("Validation", clr[2], "o")
+    plot_one("Testing", clr[1], "o")
+    ax.set_xlabel("Ground truth")
+    ax.set_ylabel("Prediction")
+
+
 def set_truth_pred(ax, log_trans=True, upper_lim=9):
     if log_trans:
         ax.set_xscale("log")

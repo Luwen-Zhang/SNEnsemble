@@ -1567,20 +1567,8 @@ class Trainer:
             plt.rcParams["font.size"] = 14
             ax = plt.subplot(111)
 
-            self._plot_truth_pred(
-                predictions, ax, model_name, "Training", clr[0], log_trans=log_trans
-            )
-            if "Validation" in predictions[model_name].keys():
-                self._plot_truth_pred(
-                    predictions,
-                    ax,
-                    model_name,
-                    "Validation",
-                    clr[2],
-                    log_trans=log_trans,
-                )
-            self._plot_truth_pred(
-                predictions, ax, model_name, "Testing", clr[1], log_trans=log_trans
+            plot_truth_pred(
+                predictions, ax, model_name, log_trans=log_trans, verbose=True
             )
 
             set_truth_pred(ax, log_trans, upper_lim=upper_lim)
@@ -3129,34 +3117,6 @@ class Trainer:
         """
         return metric_sklearn(y_true, y_pred, metric)
 
-    def _plot_truth_pred(
-        self,
-        predictions,
-        ax,
-        model_name,
-        name,
-        color,
-        marker="o",
-        log_trans=True,
-        verbose=True,
-    ):
-        pred_y, y = predictions[model_name][name]
-        r2 = Trainer._metric_sklearn(y, pred_y, "r2")
-        loss = self.loss_fn(torch.Tensor(y), torch.Tensor(pred_y))
-        if verbose:
-            print(f"{name} Loss: {loss:.4f}, R2: {r2:.4f}")
-        ax.scatter(
-            10**y if log_trans else y,
-            10**pred_y if log_trans else pred_y,
-            s=20,
-            color=color,
-            marker=marker,
-            label=f"{name} dataset ($R^2$={r2:.3f})",
-            linewidth=0.4,
-            edgecolors="k",
-        )
-        ax.set_xlabel("Ground truth")
-        ax.set_ylabel("Prediction")
 
     def _get_additional_tensors_slice(self, indices):
         res = []

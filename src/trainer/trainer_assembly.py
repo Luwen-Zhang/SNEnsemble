@@ -217,31 +217,10 @@ class TrainerAssembly:
                     plt.rcParams["font.size"] = 14
                     ax = plt.subplot(111)
 
-                    self.trainers[0]._plot_truth_pred(
+                    plot_truth_pred(
                         predictions_model,
                         ax,
                         model_name,
-                        "Training",
-                        clr[0],
-                        log_trans=log_trans,
-                        verbose=False,
-                    )
-                    if "Validation" in predictions_model[model_name].keys():
-                        self.trainers[0]._plot_truth_pred(
-                            predictions_model,
-                            ax,
-                            model_name,
-                            "Validation",
-                            clr[2],
-                            log_trans=log_trans,
-                            verbose=False,
-                        )
-                    self.trainers[0]._plot_truth_pred(
-                        predictions_model,
-                        ax,
-                        model_name,
-                        "Testing",
-                        clr[1],
                         log_trans=log_trans,
                         verbose=False,
                     )
