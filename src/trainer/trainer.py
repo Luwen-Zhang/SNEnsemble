@@ -1665,10 +1665,6 @@ class Trainer:
             )
             warnings.filterwarnings(
                 "ignore",
-                message="`np.int` is a deprecated alias for the builtin `int`",
-            )
-            warnings.filterwarnings(
-                "ignore",
                 message="The default of 'normalize' will be set to False in version 1.2 and deprecated in version 1.4.",
             )
 

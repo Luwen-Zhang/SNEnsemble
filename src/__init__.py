@@ -1,4 +1,7 @@
 import os
+import numpy as np
+
+np.int = int  # `np.int` is a deprecated alias for the builtin `int`.
 
 __root__ = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 

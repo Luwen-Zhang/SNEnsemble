@@ -415,10 +415,6 @@ class AbstractModel:
         **kwargs:
             Ignored.
         """
-        warnings.filterwarnings(
-            "ignore",
-            message="`np.int` is a deprecated alias for the builtin `int`.",
-        )
         data = self._base_train_data_preprocess()
         (
             X_train,
