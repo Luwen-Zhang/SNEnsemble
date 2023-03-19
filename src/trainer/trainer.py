@@ -1408,14 +1408,28 @@ class Trainer:
     def get_leaderboard(
         self,
         test_data_only: bool = False,
-        dump_trainer=True,
-        cross_validation=0,
-        verbose=False,
+        dump_trainer: bool = True,
+        cross_validation: int = 0,
+        verbose: bool = False,
     ) -> pd.DataFrame:
         """
-        Run all baseline models and the model in this work for a leaderboard.
-        :param test_data_only: False to get metrics on training and validation datasets. Default to True.
-        :return: The leaderboard dataframe.
+        Run all modelbases with/without cross validation for a leaderboard.
+
+        Parameters
+        ----------
+        test_data_only
+            Whether to evaluate models only on testing datasets.
+        dump_trainer
+            Whether to save trainer.
+        cross_validation
+            The number of cross validation. See Trainer.cross_validation. 0 to evaluate directly on current datasets.
+        verbose
+            Verbosity.
+
+        Returns
+        -------
+        leaderboard
+            The leaderboard dataframe.
         """
         if len(self.modelbases) == 0:
             raise Exception(
@@ -1445,10 +1459,32 @@ class Trainer:
 
     def _cal_leaderboard(
         self,
-        programs_predictions,
-        metrics=["rmse", "mse", "mae", "mape", "r2"],
-        test_data_only=False,
+        programs_predictions: Dict[
+            str, Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray]]]
+        ],
+        metrics: List[str] = None,
+        test_data_only: bool = False,
     ):
+        """
+        Calculate the leaderboard based on results from cross_validation or AbstractModel._predict_all.
+
+        Parameters
+        ----------
+        programs_predictions
+            Results from Trainer.cross_validation, or assembled results from AbstractModel._predict_all. See
+            Trainer.get_leaderboard for details.
+        metrics
+            The metrics that have been implemented in src.utils.metric_sklearn.
+        test_data_only
+            Whether to evaluate models only on testing datasets.
+
+        Returns
+        -------
+        leaderboard
+            The leaderboard dataframe.
+        """
+        if metrics is None:
+            metrics = ["rmse", "mse", "mae", "mape", "r2"]
         dfs = []
         for modelbase_name in self.modelbases_names:
             df = Trainer._metrics(
@@ -1469,10 +1505,16 @@ class Trainer:
         self.leaderboard = df_leaderboard
         return df_leaderboard
 
-    def plot_loss(self, train_ls, val_ls):
+    def plot_loss(self, train_ls: Any, val_ls: Any):
         """
-        Plot loss-epoch while training.
-        :return: None
+        A utility function to plot loss value during training.
+
+        Parameters
+        ----------
+        train_ls:
+            An array of training loss.
+        val_ls
+            An array of validation loss.
         """
         plt.figure()
         plt.rcParams["font.size"] = 20
@@ -1502,15 +1544,18 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_truth_pred(
-        self, program: str = "ThisWork", log_trans: bool = True, upper_lim=9
-    ):
+    def plot_truth_pred(self, program: str, log_trans: bool = True, upper_lim=9):
         """
-        Comparing ground truth and prediction for different models.
-        :param program: Choose a program from 'autogluon', 'pytorch_tabular', 'TabNet'.
-        :param log_trans: Whether the target is log10-transformed. Default to True.
-        :param upper_lim: The upper boundary of the plot. Default to 9.
-        :return: None
+        Comparing ground truth and prediction for all models in a modelbase.
+
+        Parameters
+        ----------
+        program
+            The selected modelbase.
+        log_trans
+            Whether the label data is in log scale.
+        upper_lim
+            The upper limit of x/y-axis.
         """
         modelbase = self.get_modelbase(program)
         model_names = modelbase.get_model_names()
@@ -1552,7 +1597,30 @@ class Trainer:
 
             plt.close()
 
-    def cal_feature_importance(self, program, model_name, method="permutation"):
+    def cal_feature_importance(
+        self, program: str, model_name: str, method: str = "permutation"
+    ) -> Tuple[np.ndarray, List[str]]:
+        """
+        Calculate feature importance with a specified model. If the modelbase is ``TorchModel``, ``captum`` and ``shap``
+        is called to make permutations. If the modelbase is only an ``AbstractModel``, calculation will be much slower.
+
+        Parameters
+        ----------
+        program
+            The selected modelbase.
+        model_name
+            The selected model in the modelbase.
+        method
+            The method to calculate importance. "permutation" or "shap".
+
+        Returns
+        ----------
+        attr
+            Values of feature importance.
+        importance_names
+            Corresponding feature names. If the modelbase is a ``TorchModel``, all features including derived unstacked
+            features will be included. Otherwise, only ``Trainer.all_feature_names`` will be considered.
+        """
         from src.model.base import TorchModel
 
         modelbase = self.get_modelbase(program)
@@ -1641,7 +1709,26 @@ class Trainer:
 
         return attr, importance_names
 
-    def cal_shap(self, program, model_name):
+    def cal_shap(self, program: str, model_name: str) -> np.ndarray:
+        """
+        Calculate SHAP values with a specified model. If the modelbase is a ``TorchModel``, the ``shap.DeepExplainer``
+        is used. Otherwise, ``shap.KernelExplainer`` is called, which is much slower, and shap.kmeans is called to
+        summarize training data to 10 samples as the background data and 10 random samples in the testing set is
+        explained, which will bias the results.
+
+        Parameters
+        ----------
+        program
+            The selected modelbase.
+        model_name
+            The selected model in the modelbase.
+
+        Returns
+        -------
+        attr
+            The SHAP values. If the modelbase is a TorchModel, all features including derived unstacked features will
+            be included. Otherwise, only Trainer.all_feature_names will be considered.
+        """
         from src.model.base import TorchModel
         import shap
 
@@ -1693,11 +1780,25 @@ class Trainer:
         return attr
 
     def plot_feature_importance(
-        self, program, model_name, fig_size=(7, 4), method="permutation"
+        self,
+        program: str,
+        model_name: str,
+        fig_size: Tuple = (7, 4),
+        method: str = "permutation",
     ):
         """
-        Calculate and plot permutation feature importance.
-        :return: None
+        Plot feature importance of a model using ``Trainer.cal_feature_importance``.
+
+        Parameters
+        ----------
+        program
+            The selected modelbase.
+        model_name
+            The selected model in the modelbase.
+        fig_size
+            The figure size.
+        method
+            The method to calculate importance. "permutation" or "shap".
         """
         attr, names = self.cal_feature_importance(
             program=program, model_name=model_name, method=method
@@ -1769,26 +1870,43 @@ class Trainer:
 
     def plot_partial_dependence(
         self,
-        program,
-        model_name,
-        refit=True,
+        program: str,
+        model_name: str,
+        refit: bool = True,
         log_trans: bool = True,
-        lower_lim=2,
-        upper_lim=7,
-        n_bootstrap=1,
-        grid_size=30,
-        CI=0.95,
-        verbose=True,
+        lower_lim: float = 2,
+        upper_lim: float = 7,
+        n_bootstrap: int = 1,
+        grid_size: int = 30,
+        CI: float = 0.95,
+        verbose: bool = True,
     ):
         """
-        Calculate and plot partial dependence plots.
-        :param log_trans: Whether the target is log10-transformed. Default to True.
-        :param lower_lim: Lower limit of y-axis when plotting.
-        :param upper_lim: Upper limit of y-axis when plotting.
-        :return: None
-        """
-        modelbase = self.get_modelbase(program)
+        Calculate and plot partial dependence plots with bootstrapping.
 
+        Parameters
+        ----------
+        program
+            The selected modelbase.
+        model_name
+            The selected model in the modelbase.
+        refit
+            Whether to refit models on bootstrapped datasets. See Trainer._bootstrap.
+        log_trans
+            Whether the label data is in log scale.
+        lower_lim
+            Lower limit of each pdp.
+        upper_lim
+            Upper limit of each pdp.
+        n_bootstrap
+            The number of bootstrap evaluations. It should be greater than 0.
+        grid_size
+            The grid of pdp.
+        CI
+            Confidence interval of pdp results across multiple bootstrap runs.
+        verbose
+            Verbosity
+        """
         (
             x_values_list,
             mean_pdp_list,
@@ -1833,14 +1951,31 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def cal_partial_dependence(self, feature_subset=None, **kwargs):
+    def cal_partial_dependence(
+        self, feature_subset: List[str] = None, **kwargs
+    ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
+        """
+        Calculate partial dependency. See ``Trainer.plot_partial_dependence`` for recommended usage.
+
+        Parameters
+        ----------
+        feature_subset
+            A subset of ``Trainer.all_feature_names``.
+        kwargs
+            Arguments for ``Trainer._bootstrap``.
+
+        Returns
+        -------
+        res
+            Lists of x values, pdp values, lower confidence limit, and upper confidence limit for each feature.
+        """
         x_values_list = []
         mean_pdp_list = []
         ci_left_list = []
         ci_right_list = []
 
         for feature_idx, feature_name in enumerate(
-            self.cont_feature_names if feature_subset is None else feature_subset
+            self.all_feature_names if feature_subset is None else feature_subset
         ):
             if kwargs["verbose"]:
                 print("Calculate PDP: ", feature_name)
@@ -1856,11 +1991,20 @@ class Trainer:
 
         return x_values_list, mean_pdp_list, ci_left_list, ci_right_list
 
-    def plot_partial_err(self, program, model_name, thres=0.8):
+    def plot_partial_err(self, program: str, model_name: str, thres: Any = 0.8):
         """
-        Calculate and plot partial error dependency for each feature.
-        :param thres: Points with loss higher than thres will be marked.
-        :return: None
+        Calculate prediction error on the testing dataset, and plot parallel histograms of high error samples and low
+        error samples (considering absolute error) respectively.
+
+        Parameters
+        ----------
+        program
+            The selected modelbase.
+        model_name
+            The selected model in the modelbase.
+        thres
+            The absolute error threshold to identify high error samples and low error samples.
+
         """
         modelbase = self.get_modelbase(program)
 
@@ -1886,7 +2030,25 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def cal_corr(self, imputed=False, features_only=False):
+    def cal_corr(
+        self, imputed: bool = False, features_only: bool = False
+    ) -> pd.DataFrame:
+        """
+        Calculate Pearson correlation among continuous features.
+
+        Parameters
+        ----------
+        imputed
+            Whether the imputed dataset should be considered. If False, some NaN values may exit for features with
+            missing value.
+        features_only
+            If False, the target is also considered.
+
+        Returns
+        -------
+        corr
+            The correlation dataframe.
+        """
         subset = (
             self.cont_feature_names
             if features_only
@@ -1898,7 +2060,15 @@ class Trainer:
         else:
             return self.df[subset].corr()
 
-    def get_not_imputed_df(self):
+    def get_not_imputed_df(self) -> pd.DataFrame:
+        """
+        Get the tabular data without imputation.
+
+        Returns
+        -------
+        df
+            The tabular dataset without imputation.
+        """
         tmp_cont_df = self.df.copy().loc[:, self.cont_feature_names]
         if np.sum(np.abs(self.cont_imputed_mask.values)) != 0:
             tmp_cont_df.values[
@@ -1917,10 +2087,19 @@ class Trainer:
         )
         return not_imputed_df
 
-    def plot_corr(self, fontsize=10, cmap="bwr", imputed=False):
+    def plot_corr(self, fontsize: Any = 10, cmap="bwr", imputed=False):
         """
         Plot Pearson correlation among features and the target.
-        :return: None
+
+        Parameters
+        ----------
+        fontsize
+            The fontsize for matplotlib.
+        cmap
+            The colormap for matplotlib.
+        imputed
+            Whether the imputed dataset should be considered. If False, some NaN values may exit for features with
+            missing value.
         """
         cont_feature_names = self.cont_feature_names + self.label_name
         # sns.reset_defaults()
@@ -1959,6 +2138,14 @@ class Trainer:
         plt.close()
 
     def plot_pairplot(self, **kwargs):
+        """
+        Plot ``seaborn.pairplot`` among features and label. Kernel Density Estimation plots are on the diagonal.
+
+        Parameters
+        ----------
+        kwargs
+            Arguments for ``seaborn.pairplot``.
+        """
         df_all = pd.concat(
             [self.unscaled_feature_data, self.unscaled_label_data], axis=1
         )
@@ -1969,7 +2156,15 @@ class Trainer:
             plt.show()
         plt.close()
 
-    def plot_feature_box(self, imputed=False):
+    def plot_feature_box(self, imputed: bool = False):
+        """
+        Plot boxplot of the tabular data.
+
+        Parameters
+        ----------
+        imputed
+            Whether the imputed dataset should be considered.
+        """
         # sns.reset_defaults()
         plt.figure(figsize=(6, 6))
         ax = plt.subplot(111)
@@ -2003,7 +2198,19 @@ class Trainer:
         plt.show()
         plt.close()
 
-    def _get_indices(self, partition="train"):
+    def _get_indices(self, partition: str = "train") -> np.ndarray:
+        """
+        Get training/validation/testing indices.
+
+        Parameters
+        ----------
+        partition
+            "train", "val", "test", or "all"
+        Returns
+        -------
+        indices
+            The indices of the selected partition.
+        """
         indices_map = {
             "train": self.train_indices,
             "val": self.val_indices,
@@ -2018,7 +2225,24 @@ class Trainer:
 
         return indices_map[partition]
 
-    def get_material_code(self, unique=False, partition="all"):
+    def get_material_code(
+        self, unique: bool = False, partition: str = "all"
+    ) -> pd.DataFrame:
+        """
+        Get Material_Code of the dataset.
+
+        Parameters
+        ----------
+        unique
+            If True, values in the Material_Code column will be counted.
+        partition
+            "train", "val", "test", or "all". See ``Trainer._get_indices``.
+        Returns
+        -------
+        m_code
+            If unique is True, the returned dataframe contains counts for each material code in the selected partition.
+            Otherwise, the original material codes in the selected partition are returned.
+        """
         if self._material_code is None:
             raise Exception(
                 f"The column Material_Code is not available in the dataset."
@@ -2038,11 +2262,36 @@ class Trainer:
         else:
             return self._material_code.loc[indices, :]
 
-    def _select_by_material_code(self, m_code: str, partition="all"):
+    def _select_by_material_code(self, m_code: str, partition: str = "all"):
+        """
+        Select samples with the specified material code.
+
+        Parameters
+        ----------
+        m_code
+            The selected material code.
+        partition
+            "train", "val", "test", or "all". See ``Trainer._get_indices``.
+        Returns
+        -------
+        indices
+            The pandas index where the material code exists.
+        """
         code_df = self.get_material_code(unique=False, partition=partition)
         return code_df.index[np.where(code_df["Material_Code"] == m_code)[0]]
 
-    def plot_data_split(self, bins=30, percentile="all"):
+    def plot_data_split(self, bins: int = 30, percentile: str = "all"):
+        """
+        Visualize how the dataset is split into training/validation/testing datasets.
+
+        Parameters
+        ----------
+        bins
+            Number of bins to divide the target value of each material.
+        percentile
+            If "all", the limits of x-axis will be the overall range of the target. Otherwise, the limits will be [0,1]
+            representing the individual percentile of target for each material.
+        """
         from matplotlib.gridspec import GridSpec
 
         train_m_code = list(
@@ -2143,7 +2392,21 @@ class Trainer:
         )
         plt.close()
 
-    def plot_multiple_S_N(self, m_codes, hide_plt_show=True, **kwargs):
+    def plot_multiple_S_N(
+        self, m_codes: List[str], hide_plt_show: bool = True, **kwargs
+    ):
+        """
+        A utility function to call ``Trainer.plot_S_N`` for multiple times with the same settings.
+
+        Parameters
+        ----------
+        m_codes
+            A list of material codes.
+        hide_plt_show
+            Whether to prevent the matplotlib figure showing in canvas.
+        kwargs
+            Arguments for ``Trainer.plot_S_N``.
+        """
         for m_code in m_codes:
             print(m_code)
             if hide_plt_show:
@@ -2170,6 +2433,44 @@ class Trainer:
         model_name="ThisWork",
         refit=True,
     ):
+        """
+        Calculate and plot the SN curve for the selected material using a selected model with bootstrap resampling.
+
+        Parameters
+        ----------
+        s_col
+            The name of the stress column.
+        n_col
+            The name of the log(fatigue life) column.
+        r_col
+            The name of the R-value column.
+        m_code
+            The selected material code.
+        r_value
+            The selected R-value to plot.
+        load_dir
+            "tension" or else. If "tension" is selected, samples with s_col>0 will be selected for evaluation.
+            Otherwise, those with s_col<0 will be selected.
+        ax
+            A matplotlib Axis instance. If not None, a new figure will be initialized.
+        grid_size
+            The grid for the predicted SN curve.
+        n_bootstrap
+            The number of bootstrap runs. See ``Trainer._bootstrap`` for details.
+        CI
+            The confidence interval for PSN curves and for predicted SN curves across multiple bootstrap runs and
+            multiple samples. The latter usage is different from the CI argument in``Trainer.cal_partial_dependence``.
+        method
+            The method to calculate the confidence interval. See ``Trainer._sn_interval`` for details.
+        verbose
+            Verbosity.
+        program
+            The selected database.
+        model_name
+            The selected model in the database.
+        refit
+            Whether to refit models on bootstrapped datasets. See Trainer._bootstrap.
+        """
         # Check whether columns exist.
         if s_col not in self.df.columns:
             raise Exception(f"{s_col} not in features.")
@@ -2453,15 +2754,51 @@ class Trainer:
             plt.close()
 
     @staticmethod
-    def _sn_interval(method, y, y_pred, x, xvals, CI):
+    def _sn_interval(
+        method: str,
+        y: np.ndarray,
+        y_pred: np.ndarray,
+        x: np.ndarray,
+        xvals: np.ndarray,
+        CI: float,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Calculate SN confidence intervals based on statistical or ASTM method.
+
+        Parameters
+        ----------
+        method
+            "statistical" or "astm".
+
+            "statistical": Schneider, C. R. A., and S. J. Maddox. "Best practice guide on statistical analysis of
+            fatigue data." Weld Inst Stat Rep (2003).
+
+            "astm": According to ASTM E739-10(2015). x can be stress, log(stress), strain, log(strain), etc. It is
+            valid when y and x follow the linear assumption. Barbosa, Joelton Fonseca, et al. "Probabilistic SN fields
+            based on statistical distributions applied to metallic and composite materials: State of the art." Advances
+            in Mechanical Engineering 11.8 (2019): 1687814019870395.
+        y
+            The true value of fatigue life (in log scale).
+        y_pred
+            The predicted value of fatigue life (in log scale).
+        x
+            The true value of stress.
+        xvals
+            The value of stress to be evaluated on.
+        CI
+            The confidence interval.
+
+        Returns
+        -------
+        ci
+            The widths of left and right confidence bounds.
+        """
         n = len(x)
         STEYX = (
             ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
         ) ** 0.5
         DEVSQ = ((x - np.mean(x)) ** 2).sum().reshape(1, -1)
         if method == "statistical":
-            # Schneider, C. R. A., and S. J. Maddox. "Best practice guide on statistical analysis of fatigue data."
-            # Weld Inst Stat Rep (2003).
             # The two-sided prediction limits are symmetrical, so we calculate one-sided limit instead; therefore, in
             # st.t.ppf or st.f.ppf, the first probability argument is (CI+1)/2 instead of CI for one-sided prediction limit.
             # Because, for example for two-sided CI=95%, the lower limit is equivalent to one-sided 97.5% limit.
@@ -2469,11 +2806,6 @@ class Trainer:
             CL = tinv * STEYX * (1 + 1 / n + (xvals - np.mean(x)) ** 2 / DEVSQ) ** 0.5
             return CL.flatten(), CL.flatten()
         elif method == "astm":
-            # According to ASTM E739-10(2015). x can be stress, log(stress), strain, log(strain), etc.
-            # It is valid when y and x follow the linear assumption.
-            # Barbosa, Joelton Fonseca, et al. "Probabilistic SN fields based on statistical distributions applied to
-            # metallic and composite materials: State of the art." Advances in Mechanical Engineering 11.8 (2019):
-            # 1687814019870395.
             # The first parameter is CI instead of (CI+1)/2 according to the ASTM standard. We verified have verified
             # this point by reproducing its given example in Section 8.3 using the following code:
             # from src.core.trainer import Trainer
@@ -2501,14 +2833,47 @@ class Trainer:
             raise Exception(f"S-N interval type {method} not implemented.")
 
     @staticmethod
-    def _psn(method, y, y_pred, x, xvals, CI, p):
+    def _psn(
+        method: str,
+        y: np.ndarray,
+        y_pred: np.ndarray,
+        x: np.ndarray,
+        xvals: np.ndarray,
+        CI: float,
+        p: float,
+    ) -> np.ndarray:
+        """
+        Calculate probabilistic SN curves.
+
+        Parameters
+        ----------
+        method
+            "iso" is currently supported. See ISO 12107.
+        y
+            The true value of fatigue life (in log scale).
+        y_pred
+            The predicted value of fatigue life (in log scale).
+        x
+            The true value of stress.
+        xvals
+            The value of stress to be evaluated on.
+        CI
+            The confidence interval.
+        p
+            The probability to failure.
+
+        Returns
+        -------
+        cl
+            The probabilistic SN curve.
+        """
         n = len(x)
         STEYX = (
             ((y.reshape(1, -1) - y_pred.reshape(1, -1)) ** 2).sum() / (n - 2)
         ) ** 0.5
         DEVSQ = ((x - np.mean(x)) ** 2).sum().reshape(1, -1)
         if method == "iso":
-            # ISO 12107
+
             def oneside_normal(p, CI, sample_size, n_random=100000, ddof=1):
                 # The one-sided tolerance limits of normal distribution in ISO are given in a table. We find that the
                 # analytical calculation is difficult to implement (https://statpages.info/tolintvl.html gives a
@@ -2535,25 +2900,77 @@ class Trainer:
 
     def _bootstrap(
         self,
-        program,
-        df,
-        derived_data,
-        focus_feature,
-        n_bootstrap,
-        grid_size,
-        verbose=True,
-        rederive=True,
-        refit=True,
-        resample=True,
-        percentile=100,
-        x_min=None,
-        x_max=None,
-        CI=0.95,
-        average=True,
-        model_name="ThisWork",
-    ):
-        # Cook, Thomas R., et al. Explaining Machine Learning by Bootstrapping Partial Dependence Functions and Shapley
-        # Values. No. RWP 21-12. 2021.
+        program: str,
+        df: pd.DataFrame,
+        derived_data: Dict[str, np.ndarray],
+        focus_feature: str,
+        n_bootstrap: int,
+        grid_size: int,
+        verbose: bool = True,
+        rederive: bool = True,
+        refit: bool = True,
+        resample: bool = True,
+        percentile: float = 100,
+        x_min: float = None,
+        x_max: float = None,
+        CI: float = 0.95,
+        average: bool = True,
+        model_name: str = "ThisWork",
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Make bootstrap resampling, fit the selected model on the resampled data, and assign sequential values to the
+        selected feature to see how the prediction changes with respect to the feature.
+
+        Cook, Thomas R., et al. Explaining Machine Learning by Bootstrapping Partial Dependence Functions and Shapley
+        Values. No. RWP 21-12. 2021.
+
+        Parameters
+        ----------
+        program
+            The selected modelbase.
+        df
+            The tabular dataset.
+        derived_data
+            The derived data calculated using ``Trainer.derive_unstacked``.
+        focus_feature
+            The feature to assign sequential values.
+        n_bootstrap
+            The number of bootstrapping, fitting, and assigning runs.
+        grid_size
+            The length of sequential values.
+        verbose
+            Ignored.
+        rederive
+            Ignored. If the focus_feature is a derived stacked feature, derivation will not perform on the bootstrap
+            dataset. Otherwise, stacked/unstacked features will be rederived.
+        refit
+            Whether to fit the model on the bootstrap dataset with warm_start=True.
+        resample
+            Whether to make bootstrap resample. Only recommended to False when n_bootstrap=1.
+        percentile
+            The percentile of the feature to generate sequential values for the selected feature.
+        x_min
+            The lower limit of the generated sequential values. It will override the left percentile.
+        x_max
+            The upper limit of the generated sequential values. It will override the right percentile.
+        CI
+            The confidence interval to evaluate bootstrapped predictions.
+        average
+            If True, CI will be calculated on results ``(grid_size, n_bootstrap)`` across multiple bootstrap runs.
+            Predictions for all samples are averaged for each bootstrap run. This case is used in `
+            `Trainer.cal_partial_dependence``
+
+            If False, CI will be calculated on results ``(grid_size, n_bootstrap*len(df))`` across multiple bootstrap
+            runs and all samples. This case is used in ``Trainer.plot_S_N``.
+        model_name
+            The selected model in the modelbase.
+
+        Returns
+        -------
+        res
+            The generated sequential values for the feature, averaged predictions on the sequential values across
+            multiple bootstrap runs and all samples, left confidence interval, and right confidence interval.
+        """
         modelbase = self.get_modelbase(program)
         derived_data = self.sort_derived_data(derived_data)
         if focus_feature in self.cont_feature_names:
@@ -2634,7 +3051,15 @@ class Trainer:
 
         return x_value, np.array(mean_pred), np.array(ci_left), np.array(ci_right)
 
-    def _get_best_model(self):
+    def get_best_model(self) -> Tuple[str, str]:
+        """
+        Get the best model in the leaderboard.
+
+        Returns
+        -------
+        program and model_name
+            The name of a modelbase which the best model is located and the name of the best model.
+        """
         if not hasattr(self, "leaderboard"):
             self.get_leaderboard(test_data_only=True, dump_trainer=False)
         return (
@@ -2643,7 +3068,28 @@ class Trainer:
         )
 
     @staticmethod
-    def _metrics(predictions, metrics, test_data_only):
+    def _metrics(
+        predictions: Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray]]],
+        metrics: List[str],
+        test_data_only: bool,
+    ) -> pd.DataFrame:
+        """
+        Calculate metrics for predictions.
+
+        Parameters
+        ----------
+        predictions
+            Results from AbstractModel._predict_all.
+        metrics
+            The metrics that have been implemented in src.utils.metric_sklearn.
+        test_data_only
+            Whether to evaluate models only on testing datasets.
+
+        Returns
+        -------
+        df_metrics
+            A dataframe of metrics.
+        """
         df_metrics = pd.DataFrame()
         for model_name, model_predictions in predictions.items():
             df = pd.DataFrame(index=[0])
@@ -2663,7 +3109,24 @@ class Trainer:
         return df_metrics
 
     @staticmethod
-    def _metric_sklearn(y_true, y_pred, metric):
+    def _metric_sklearn(y_true: np.ndarray, y_pred: np.ndarray, metric: str):
+        """
+        Evaluate a prediction using a certain metric. It is a wrapper method to call ``src.utils.metric_sklearn``.
+
+        Parameters
+        ----------
+        y_true
+            The true value of the target.
+        y_pred
+            The predicted value of the target.
+        metric
+            A metric that has been implemented in src.utils.metric_sklearn.
+
+        Returns
+        -------
+        metric_value
+            The metric of prediction.
+        """
         return metric_sklearn(y_true, y_pred, metric)
 
     def _plot_truth_pred(
