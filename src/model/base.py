@@ -457,7 +457,7 @@ class AbstractModel:
 
                 @skopt.utils.use_named_args(space)
                 def _bayes_objective(**params):
-                    with HiddenPrints(disable_logging=True):
+                    with HiddenPrints():
                         model = self.new_model(
                             model_name=model_name, verbose=False, **params
                         )

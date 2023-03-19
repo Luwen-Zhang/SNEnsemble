@@ -96,7 +96,7 @@ class AutoGluon(AbstractModel):
         train_data[label_name[0]] = y_train
         val_data = X_val.copy()
         val_data[label_name[0]] = y_val
-        with HiddenPrints(disable_logging=True):
+        with HiddenPrints():
             model[1].fit(
                 train_data,
                 tuning_data=val_data,

@@ -59,7 +59,7 @@ class PytorchTabular(AbstractModel):
             "FTTransformer": FTTransformerConfig,
             "GATE": GatedAdditiveTreeEnsembleConfig,
         }
-        with HiddenPrints(disable_logging=True):
+        with HiddenPrints():
             model_config = (
                 model_configs[model_name](task="regression", **kwargs)
                 if model_name != "NODE"
