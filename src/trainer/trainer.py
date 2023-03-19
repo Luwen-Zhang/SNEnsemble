@@ -3,6 +3,7 @@ The basic class for the project. It includes configuration, data processing, plo
 and comparing baseline models.
 """
 import os.path
+import sklearn.pipeline
 import src
 from src.utils import *
 from src.config import DefaultConfig, UserConfig
@@ -3117,22 +3118,62 @@ class Trainer:
         """
         return metric_sklearn(y_true, y_pred, metric)
 
+    def _get_additional_tensors_slice(self, indices) -> Union[Tuple[Any], Tuple]:
+        """
+        Get slices of the derived unstacked tensors.
 
-    def _get_additional_tensors_slice(self, indices):
+        Parameters
+        ----------
+        indices
+            The indices to make slice.
+
+        Returns
+        -------
+        res
+            Sliced derived unstacked tensors.
+        """
         res = []
         for tensor in self.tensors[1 : len(self.tensors) - 1]:
             if tensor is not None:
                 res.append(tensor[indices, :])
         return tuple(res)
 
-    def _get_first_tensor_slice(self, indices):
+    def _get_first_tensor_slice(self, indices) -> torch.Tensor:
+        """
+        Get slices of the continuous tensor.
+
+        Parameters
+        ----------
+        indices
+            The indices to make slice.
+
+        Returns
+        -------
+        res
+            The sliced continuous tensor.
+        """
         return self.tensors[0][indices, :]
 
     def get_base_predictor(
         self,
-        categorical=True,
+        categorical: bool = True,
         **kwargs,
-    ):
+    ) -> Union[sklearn.pipeline.Pipeline, sklearn.ensemble.RandomForestRegressor]:
+        """
+        Get a sklearn ``RandomForestRegressor`` for fundamental usages like pre-processing.
+
+        Parameters
+        ----------
+        categorical
+            Whether to include OneHotEncoder for categorical features.
+        kwargs
+            Arguments for ``sklearn.ensemble.RandomForestRegressor``
+
+        Returns
+        -------
+        model
+            A Pipeline if categorical is True, or a RandomForestRegressor if categorical is False.
+        """
         from sklearn.impute import SimpleImputer
         from sklearn.compose import ColumnTransformer
         from sklearn.pipeline import Pipeline
@@ -3173,7 +3214,19 @@ class Trainer:
             return rf
 
 
-def save_trainer(trainer, path=None, verbose=True):
+def save_trainer(trainer: Trainer, path: os.PathLike = None, verbose: bool = True):
+    """
+    Pickling the trainer instance.
+
+    Parameters
+    ----------
+    trainer
+        The trainer to be saved.
+    path
+        The folder path to save the trainer.
+    verbose
+        Verbosity.
+    """
     import pickle
 
     path = trainer.project_root + "trainer.pkl" if path is None else path
@@ -3185,7 +3238,20 @@ def save_trainer(trainer, path=None, verbose=True):
         )
 
 
-def load_trainer(path=None):
+def load_trainer(path: os.PathLike = None) -> Trainer:
+    """
+    Loading a pickled trainer.
+
+    Parameters
+    ----------
+    path
+        Path of the trainer.
+
+    Returns
+    -------
+    trainer
+        The loaded trainer.
+    """
     import pickle
 
     with open(path, "rb") as inp:
