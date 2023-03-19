@@ -109,7 +109,7 @@ class Trainer:
             ``manual_config={"bayes_opt": True}``
         project_root_subfolder
             The subfolder that the project will locate in. The folder name will be
-            ``{PATH OF THE MAIN SCRIPT}/output/{project_root_subfolder}/{TIME AT EXECUTION}-{configfile_path}``
+            ``{PATH OF THE MAIN SCRIPT}/output/{project}/{project_root_subfolder}/{TIME AT EXECUTION}-{configfile_path}``
         """
         base_config = DefaultConfig().cfg
 
@@ -1360,6 +1360,8 @@ class Trainer:
                     values: (Predicted values, true values)
         """
         set_random_seed(0)
+        if not os.path.exists(os.path.join(self.project_root, "cv")):
+            os.mkdir(os.path.join(self.project_root, "cv"))
         programs_predictions = {}
         for program in programs:
             programs_predictions[program] = {}
@@ -1375,12 +1377,14 @@ class Trainer:
             with HiddenPrints(disable_std=not verbose):
                 set_random_seed(i)
                 set_data_handler()
+            once_predictions = {}
             for program in programs:
                 modelbase = self.get_modelbase(program)
                 modelbase.train(dump_trainer=True, verbose=verbose)
                 predictions = modelbase._predict_all(
                     verbose=verbose, test_data_only=test_data_only
                 )
+                once_predictions[program] = predictions
                 for model_name, value in predictions.items():
                     if model_name in programs_predictions[program].keys():
                         current_predictions = programs_predictions[program][model_name]
@@ -1403,6 +1407,12 @@ class Trainer:
                             append_once("Validation")
                     else:
                         programs_predictions[program][model_name] = value
+            df_once = self._cal_leaderboard(
+                once_predictions, test_data_only=test_data_only, save=False
+            )
+            df_once.to_csv(
+                os.path.join(self.project_root, "cv", f"leaderboard_cv_{i}.csv")
+            )
             if verbose:
                 print(
                     f"--------------------------End {i + 1}/{n_random} {type} cross validation--------------------------"
@@ -1468,7 +1478,8 @@ class Trainer:
         ],
         metrics: List[str] = None,
         test_data_only: bool = False,
-    ):
+        save: bool = True,
+    ) -> pd.DataFrame:
         """
         Calculate the leaderboard based on results from cross_validation or AbstractModel._predict_all.
 
@@ -1481,6 +1492,8 @@ class Trainer:
             The metrics that have been implemented in src.utils.metric_sklearn.
         test_data_only
             Whether to evaluate models only on testing datasets.
+        save
+            Whether to save the leaderboard locally and as an attribute in the trainer.
 
         Returns
         -------
@@ -1505,8 +1518,9 @@ class Trainer:
         )
         df_leaderboard.reset_index(drop=True, inplace=True)
         df_leaderboard = df_leaderboard[["Program"] + list(df_leaderboard.columns)[:-1]]
-        df_leaderboard.to_csv(self.project_root + "leaderboard.csv")
-        self.leaderboard = df_leaderboard
+        if save:
+            df_leaderboard.to_csv(self.project_root + "leaderboard.csv")
+            self.leaderboard = df_leaderboard
         return df_leaderboard
 
     def plot_loss(self, train_ls: Any, val_ls: Any):
