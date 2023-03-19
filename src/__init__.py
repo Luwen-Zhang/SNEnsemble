@@ -5,7 +5,7 @@ np.int = int  # `np.int` is a deprecated alias for the builtin `int`.
 
 __root__ = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
-__all__ = ["data", "model", "trainer", "utils"]
+__all__ = ["data", "model", "trainer", "config", "utils"]
 
 setting = dict(
     # If the memory of the system (gpu or cpu) is lower than 6 GiBs, set `low_memory` to True.
