@@ -3221,7 +3221,7 @@ def save_trainer(trainer: Trainer, path: os.PathLike = None, verbose: bool = Tru
     Parameters
     ----------
     trainer
-        The trainer to be saved.
+        The Trainer to be saved.
     path
         The folder path to save the trainer.
     verbose
@@ -3238,19 +3238,19 @@ def save_trainer(trainer: Trainer, path: os.PathLike = None, verbose: bool = Tru
         )
 
 
-def load_trainer(path: os.PathLike = None) -> Trainer:
+def load_trainer(path: os.PathLike) -> Trainer:
     """
-    Loading a pickled trainer.
+    Loading a pickled Trainer.
 
     Parameters
     ----------
     path
-        Path of the trainer.
+        Path of the Trainer.
 
     Returns
     -------
     trainer
-        The loaded trainer.
+        The loaded Trainer.
     """
     import pickle
 

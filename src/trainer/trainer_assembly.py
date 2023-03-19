@@ -2,20 +2,31 @@ from src.trainer import Trainer, load_trainer
 from src.utils import *
 import time
 from copy import deepcopy as cp
+from typing import *
 
 
 class TrainerAssembly:
-    def __init__(self, trainer_paths: list = None, projects=None, trainers=None):
+    def __init__(
+        self, trainer_paths: List[os.PathLike] = None, trainers: List[Trainer] = None
+    ):
+        """
+        Combine multiple trainers to evaluate the overall performance of models on multiple datasets.
+
+        Parameters
+        ----------
+        trainer_paths
+            Paths to trainers.
+        trainers
+            A list of Trainer. One of ``trainer_paths`` and ``trainers`` should be passed.
+        """
+        if trainer_paths is None and trainers is None:
+            raise Exception(f"One of `trainer_paths` and `trainers` should be passed.")
         self.trainers = (
             [load_trainer(path) for path in trainer_paths]
             if trainers is None
             else trainers
         )
-        self.projects = (
-            [trainer.project for trainer in self.trainers]
-            if projects is None
-            else projects
-        )
+        self.projects = [trainer.project for trainer in self.trainers]
         t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         self.project_root = (
             f'output/assembly/{t}-{"".join([x[0] for x in self.projects])}/'
@@ -38,11 +49,24 @@ class TrainerAssembly:
         re_eval=False,
     ):
         """
-        Plot all truth_pred plots and get the leaderboard.
-        :param project_subset: Choose a list of projects from trainers.
-        :param log_trans: Whether the target is log10-transformed. Default to True.
-        :param upper_lim: The upper boundary of the plot. Default to 9.
-        :return: None
+        Run cross_validation on all trainers and get the leaderboard. Plot all truth_pred plots is optional.
+
+        Parameters
+        ----------
+        project_subset
+            The names of a subset of trainers.
+        programs
+            The names of a subset of modelbases.
+        log_trans
+            Whether the label is in log scale.
+        upper_lim
+            The upper limit of x/y-axis.
+        cross_validation
+            The number of cross_validation. See ``Trainer.cross_validation``.
+        plots
+            Whether to plot_truth_pred after cross_validation is done.
+        re_eval
+            Whether to ignore recorded results from the last execution and rerun cross validations.
         """
         markers = ["o", "v", "^", "s", "<", ">"]
         dfs = []
@@ -245,19 +269,46 @@ class TrainerAssembly:
         self.leaderboard = df_leaderboard
 
 
-def save_trainer_assem(trainer_assem, path=None, verbose=True):
+def save_trainer_assem(
+    trainer_assem: TrainerAssembly, path: os.PathLike = None, verbose: bool = True
+):
+    """
+    Pickling the TrainerAssembly instance.
+
+    Parameters
+    ----------
+    trainer_assem
+        The TrainerAssembly to be saved.
+    path
+        The folder path to save the trainer_assem.
+    verbose
+        Verbosity.
+    """
     import pickle
 
     path = trainer_assem.project_root + "trainer_assem.pkl" if path is None else path
+    with open(path, "wb") as outp:
+        pickle.dump(trainer_assem, outp, pickle.HIGHEST_PROTOCOL)
     if verbose:
         print(
             f"TrainerAssembly saved. To load the trainer_assem, run trainer_assem = load_trainer_assem(path='{path}')"
         )
-    with open(path, "wb") as outp:
-        pickle.dump(trainer_assem, outp, pickle.HIGHEST_PROTOCOL)
 
 
-def load_trainer_assem(path=None):
+def load_trainer_assem(path: os.PathLike) -> TrainerAssembly:
+    """
+    Loading a pickled TrainerAssembly.
+
+    Parameters
+    ----------
+    path
+        Path of the TrainerAssembly.
+
+    Returns
+    -------
+    trainer_assem
+        The loaded TrainerAssembly.
+    """
     import pickle
 
     with open(path, "rb") as inp:
