@@ -1371,6 +1371,7 @@ class Trainer:
                     f"----------------------------{i + 1}/{n_random} {type} cross validation----------------------------"
                 )
             with HiddenPrints(disable_std=not verbose):
+                set_random_seed(i)
                 set_data_handler()
             for program in programs:
                 modelbase = self.get_modelbase(program)
