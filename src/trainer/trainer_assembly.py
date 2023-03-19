@@ -27,40 +27,6 @@ class TrainerAssembly:
             os.mkdir(self.project_root)
         self.projects_program_predictions = None
 
-    def plot_loss(self, metric=None, model_name="ThisWork"):
-        plt.figure()
-        plt.rcParams["font.size"] = 15
-        ax = plt.subplot(111)
-
-        for idx, (project, trainer) in enumerate(zip(self.projects, self.trainers)):
-            modelbase = trainer.get_modelbase(model_name)
-            name = project.replace("_", " ")
-            ax.plot(
-                np.arange(len(modelbase.train_ls)),
-                modelbase.train_ls,
-                label=name + " training loss",
-                linewidth=2,
-                color=clr[idx],
-            )
-            ax.plot(
-                np.arange(len(modelbase.val_ls)),
-                modelbase.val_ls,
-                label=name + " validation loss",
-                linewidth=2,
-                color=clr[idx],
-            )
-        ax.legend()
-        ax.set_xlabel("Epoch")
-        ax.set_ylabel(
-            f"{self.trainers[0].loss.upper()} Loss"
-            if metric is None
-            else metric + " Loss"
-        )
-        plt.savefig(self.project_root + f"{model_name}_loss_epoch.pdf")
-        if is_notebook():
-            plt.show()
-        plt.close()
-
     def eval_all(
         self,
         project_subset: list = None,
