@@ -5,8 +5,8 @@ from src.model import TorchModel, AbstractNN
 from .base import get_sequential
 import torch.nn as nn
 from typing import *
-from torch import Tensor
-import torch.nn.functional as F
+from .transformers.fttransformer import PositionalEncoding, TransformerEncoder
+from .transformers.fasttransformer import FastformerEncoder
 
 
 class TransformerLSTM(TorchModel):
@@ -27,6 +27,7 @@ class TransformerLSTM(TorchModel):
 
     def _get_model_names(self):
         return [
+            "FastFormerSeq",
             "TransformerLSTM",
             "TransformerSeq",
             "BiasTransformerSeq",
@@ -62,6 +63,7 @@ class TransformerLSTM(TorchModel):
                 transformer_dropout=kwargs["transformer_dropout"],
             )
         elif model_name in [
+            "FastFormerSeq",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
@@ -117,6 +119,7 @@ class TransformerLSTM(TorchModel):
                 Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
             ] + self.trainer.SPACE
         elif model_name in [
+            "FastFormerSeq",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
@@ -149,12 +152,13 @@ class TransformerLSTM(TorchModel):
                 "attn_layers": 4,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
-                "transformer_dropout": 0.1,
+                "transformer_dropout": 0.2,
                 "lr": 0.003,
                 "weight_decay": 0.002,
                 "batch_size": 1024,
             }
         elif model_name in [
+            "FastFormerSeq",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
@@ -165,7 +169,7 @@ class TransformerLSTM(TorchModel):
                 "attn_layers": 4,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
-                "transformer_dropout": 0.1,
+                "transformer_dropout": 0.2,
                 "lr": 0.003,
                 "weight_decay": 0.002,
                 "batch_size": 1024,
@@ -222,7 +226,7 @@ class TransformerLSTMNN(AbstractNN):
             cat_num_unique,
             run_cat="categorical" in self.derived_feature_names,
         )
-        self.transformer = _Transformer(
+        self.transformer = _FTTransformer(
             n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_cont,
             attn_heads=attn_heads,
             attn_layers=attn_layers,
@@ -303,7 +307,7 @@ class TransformerSeqNN(AbstractNN):
             cat_num_unique,
             run_cat="categorical" in self.derived_feature_names,
         )
-        self.embed_transformer = _Transformer(
+        self.embed_transformer = _FTTransformer(
             n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_cont,
             attn_heads=attn_heads,
             attn_layers=attn_layers,
@@ -315,7 +319,7 @@ class TransformerSeqNN(AbstractNN):
             use_torch_transformer=use_torch_transformer,
             flatten_transformer=flatten_transformer,
         )
-        self.seq_transformer = _SeqTransformer(
+        self.seq_transformer = _SeqFTTransformer(
             n_inputs=None,
             attn_heads=attn_heads,
             attn_layers=attn_layers,
@@ -500,82 +504,89 @@ class BiasCatEmbedLSTMNN(CatEmbedLSTMNN):
             return (base_loss * w).mean()
 
 
-class ReGLU(nn.Module):
-    def forward(self, x: Tensor) -> Tensor:
-        if x.shape[-1] % 2 != 0:
-            raise ValueError("The size of the last dimension must be even.")
-        a, b = x.chunk(2, dim=-1)
-        return a * F.relu(b)
-
-
-class TransformerBlock(nn.Module):
+class FastFormerSeqNN(AbstractNN):
     def __init__(
         self,
-        embed_dim,
-        attn_heads,
-        ff_dim,
-        dropout,
-        activation,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        manual_activate_sn=None,
+        sn_coeff_vars_idx=None,
+        cat_num_unique: List[int] = None,
+        embedding_dim=32,
+        seq_embedding_dim=16,
+        attn_layers=4,
+        attn_heads=8,
+        flatten_transformer=True,
+        embed_dropout=0.1,
+        transformer_ff_dim=256,
+        transformer_dropout=0.1,
     ):
-        super(TransformerBlock, self).__init__()
-        if ff_dim % 2 != 0:
-            raise Exception(f"transformer_ff_dim should be an even number.")
-        self.attn = nn.MultiheadAttention(
-            embed_dim=embed_dim,
-            num_heads=attn_heads,
-            dropout=dropout,
-            batch_first=True,
+        super(FastFormerSeqNN, self).__init__(trainer)
+        self.n_cont = n_inputs
+        self.n_outputs = n_outputs
+        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
+
+        self.embed = _Embedding(
+            embedding_dim,
+            n_inputs,
+            embed_dropout,
+            cat_num_unique,
+            run_cat="categorical" in self.derived_feature_names,
         )
-        is_reglu = activation == ReGLU
-        self.f = nn.Sequential(
-            OrderedDict(
-                [
-                    ("first_linear", nn.Linear(embed_dim, ff_dim)),
-                    ("activation", activation()),
-                    ("dropout", nn.Dropout(dropout)),
-                    (
-                        "second_linear",
-                        nn.Linear(
-                            ff_dim // 2 if is_reglu else ff_dim,
-                            embed_dim,
-                        ),
-                    ),
-                ]
+        self.embed_transformer = _FastFormer(
+            n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_cont,
+            attn_heads=attn_heads,
+            attn_layers=attn_layers,
+            embedding_dim=embedding_dim,
+            ff_dim=transformer_ff_dim,
+            ff_layers=[],
+            dropout=transformer_dropout,
+            n_outputs=n_outputs,
+            flatten_transformer=flatten_transformer,
+        )
+        self.seq_transformer = _SeqFastFormer(
+            n_inputs=None,
+            attn_heads=attn_heads,
+            attn_layers=attn_layers,
+            embedding_dim=seq_embedding_dim,
+            ff_dim=transformer_ff_dim,
+            ff_layers=layers,
+            dropout=transformer_dropout,
+            n_outputs=n_outputs,
+            run="Lay-up Sequence" in self.derived_feature_names
+            and "Number of Layers" in self.derived_feature_names,
+        )
+        self.sn = _SN(trainer, manual_activate_sn, sn_coeff_vars_idx)
+
+        self.run_any = self.sn.run or self.seq_transformer.run
+        if self.run_any:
+            self.w = get_sequential(
+                layers,
+                1 + int(self.sn.run) + int(self.seq_transformer.run),
+                n_outputs,
+                nn.ReLU,
             )
-        )
-        self.attn_norm = nn.LayerNorm(embed_dim)
-        self.f_norm = nn.LayerNorm(embed_dim)
-        self.dropout = nn.Dropout(dropout)
+        else:
+            self.w = nn.Identity()
 
-    def forward(self, x, key_padding_mask=None):
-        normed_x = self.attn_norm(x)
-        x_attn, _ = self.attn(
-            normed_x, normed_x, normed_x, key_padding_mask=key_padding_mask
-        )
-        x_attn = x + self.dropout(x_attn)
-        return x + self.dropout(self.f(self.f_norm(x_attn)))
+    def _forward(self, x, derived_tensors):
+        x_embed = self.embed(x, derived_tensors)
+        x_trans = self.embed_transformer(x_embed, derived_tensors)
+        all_res = [x_trans]
 
+        x_sn = self.sn(x, derived_tensors)
+        if x_sn is not None:
+            all_res += [x_sn]
 
-class PositionalEncoding(nn.Module):
-    # https://pytorch.org/tutorials/beginner/transformer_tutorial.html
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
-        super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
+        x_seq = self.seq_transformer(x, derived_tensors)
+        if x_seq is not None:
+            all_res += [x_seq]
 
-        position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2) * (-np.log(10000.0) / d_model))
-        pe = torch.zeros(max_len, 1, d_model)
-        pe[:, 0, 0::2] = torch.sin(position * div_term)
-        pe[:, 0, 1::2] = torch.cos(position * div_term)
-        self.register_buffer("pe", pe)
-
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        Args:
-            x: Tensor, shape [seq_len, batch_size, embedding_dim]
-        """
-        x = x + self.pe[: x.size(0)]
-        return self.dropout(x)
+        output = torch.concat(all_res, dim=1)
+        output = self.w(output)
+        return output
 
 
 class _SN(nn.Module):
@@ -643,7 +654,7 @@ class _SN(nn.Module):
             return False
 
     def _manual_activate(self):
-        return True
+        return False
 
 
 class _Embedding(nn.Module):
@@ -776,10 +787,104 @@ class _LSTM(nn.Module):
             return False
 
     def _manual_activate(self):
-        return True
+        return False
 
 
-class _Transformer(nn.Module):
+class _FastFormer(nn.Module):
+    def __init__(
+        self,
+        n_inputs,
+        attn_heads,
+        attn_layers,
+        embedding_dim,
+        ff_dim,
+        ff_layers,
+        dropout,
+        n_outputs,
+        **kwargs,
+    ):
+        super(_FastFormer, self).__init__()
+        self.transformer = FastformerEncoder(
+            attn_heads=attn_heads,
+            attn_layers=attn_layers,
+            embed_dim=embedding_dim,
+            dropout=dropout,
+            ff_dim=ff_dim,
+            max_position_embeddings=256,
+        )
+
+        self.transformer_head = get_sequential(
+            ff_layers,
+            embedding_dim,
+            n_outputs,
+            nn.Identity if len(ff_layers) == 0 else nn.ReLU,
+            use_norm=False if len(ff_layers) == 0 else True,
+            dropout=0,
+        )
+
+    def forward(self, x, derived_tensors):
+        x_trans = self.transformer(x)
+        x_trans = self.transformer_head(x_trans)
+        return x_trans
+
+
+class _SeqFastFormer(_FastFormer):
+    def __init__(
+        self,
+        embedding_dim,
+        dropout,
+        run,
+        *args,
+        **kwargs,
+    ):
+        if run and self._check_activate():
+            super(_SeqFastFormer, self).__init__(
+                embedding_dim=embedding_dim,
+                dropout=dropout,
+                *args,
+                **kwargs,
+            )
+            self.embedding = nn.Embedding(
+                num_embeddings=191, embedding_dim=embedding_dim
+            )
+            self.pos_encoding = PositionalEncoding(
+                d_model=embedding_dim, dropout=dropout
+            )
+            self.run = True
+        else:
+            super(_FastFormer, self).__init__()
+            self.run = False
+
+    def forward(self, x, derived_tensors):
+        if self.run:
+            seq = derived_tensors["Lay-up Sequence"]
+            lens = derived_tensors["Number of Layers"]
+            max_len = seq.size(1)
+            device = "cpu" if seq.get_device() == -1 else seq.get_device()
+            # for the definition of padding_mask, see nn.MultiheadAttention.forward
+            padding_mask = (
+                torch.arange(max_len, device=device).expand(len(lens), max_len) >= lens
+            )
+            x = self.embedding(seq.long() + 90)
+            x_pos = self.pos_encoding(x)
+            x_trans = self.transformer(x_pos, src_key_padding_mask=padding_mask)
+            x_trans = self.transformer_head(x_trans)
+            return x_trans
+        else:
+            return None
+
+    def _check_activate(self):
+        if self._manual_activate():
+            return True
+        else:
+            print(f"SeqFastFormer module is manually deactivated.")
+            return False
+
+    def _manual_activate(self):
+        return False
+
+
+class _FTTransformer(nn.Module):
     def __init__(
         self,
         n_inputs,
@@ -794,7 +899,7 @@ class _Transformer(nn.Module):
         flatten_transformer,
         **kwargs,
     ):
-        super(_Transformer, self).__init__()
+        super(_FTTransformer, self).__init__()
         # Indeed, the implementation of TransformerBlock is almost the same as torch.nn.TransformerEncoderLayer, except
         # that the activation function in FT-Transformer is ReGLU instead of ReLU or GeLU in torch implementation.
         # The performance of these two implementations can be verified after several epochs by changing
@@ -818,18 +923,13 @@ class _Transformer(nn.Module):
                 transformer_layer, num_layers=attn_layers
             )
         else:
-            self.transformer = nn.Sequential()
-            for i in range(attn_layers):
-                self.transformer.add_module(
-                    f"block_{i}",
-                    TransformerBlock(
-                        embed_dim=embedding_dim,
-                        attn_heads=attn_heads,
-                        ff_dim=ff_dim,
-                        dropout=dropout,
-                        activation=ReGLU,
-                    ),
-                )
+            self.transformer = TransformerEncoder(
+                attn_layers=attn_layers,
+                embed_dim=embedding_dim,
+                attn_heads=attn_heads,
+                ff_dim=ff_dim,
+                dropout=dropout,
+            )
         self.transformer_head = get_sequential(
             ff_layers,
             n_inputs * embedding_dim if self.flatten_transformer else embedding_dim,
@@ -846,7 +946,7 @@ class _Transformer(nn.Module):
         return x_trans
 
 
-class _SeqTransformer(_Transformer):
+class _SeqFTTransformer(_FTTransformer):
     def __init__(
         self,
         embedding_dim,
@@ -859,7 +959,7 @@ class _SeqTransformer(_Transformer):
     ):
         if run and self._check_activate():
             # flatten_transformer=False because the length of the padded sequence might be unknown.
-            super(_SeqTransformer, self).__init__(
+            super(_SeqFTTransformer, self).__init__(
                 embedding_dim=embedding_dim,
                 dropout=dropout,
                 use_torch_transformer=True,
@@ -875,7 +975,7 @@ class _SeqTransformer(_Transformer):
             )
             self.run = True
         else:
-            super(_Transformer, self).__init__()
+            super(_FTTransformer, self).__init__()
             self.run = False
 
     def forward(self, x, derived_tensors):
@@ -905,4 +1005,4 @@ class _SeqTransformer(_Transformer):
             return False
 
     def _manual_activate(self):
-        return True
+        return False

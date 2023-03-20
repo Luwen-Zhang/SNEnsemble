@@ -11,7 +11,7 @@ from .thiswork_sn import ThisWorkRidge
 from .thiswork_sn import ThisWorkPretrain
 from .mlp import MLP
 from .util_model import RFE
-from .transformer_lstm import TransformerLSTM
+from .transformer import TransformerLSTM
 from .util_model import ModelAssembly
 
 __all__ = [
