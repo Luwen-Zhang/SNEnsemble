@@ -599,14 +599,14 @@ def pretty(value, htchar="\t", lfchar="\n", indent=0):
 # https://stackoverflow.com/questions/4675728/redirect-stdout-to-a-file-in-python
 # capture all outputs to a log file while still printing it
 class Logger:
-    def __init__(self, path):
-        self.terminal = sys.stdout
+    def __init__(self, path, stream):
+        self.terminal = stream
         self.path = path
 
     def write(self, message):
         self.terminal.write(message)
-        with open(self.path, "a") as log:
-            log.write(message)
+        with open(self.path, "ab") as log:
+            log.write(message.encode("utf-8"))
 
     def __getattr__(self, attr):
         return getattr(self.terminal, attr)
@@ -614,11 +614,12 @@ class Logger:
 
 class Logging:
     def enter(self, path):
-        self.logger = Logger(path)
+        self.out_logger = Logger(path, sys.stdout)
+        self.err_logger = Logger(path, sys.stderr)
         self._stdout = sys.stdout
         self._stderr = sys.stderr
-        sys.stdout = self.logger
-        sys.stderr = self.logger
+        sys.stdout = self.out_logger
+        sys.stderr = self.err_logger
 
     def exit(self):
         sys.stdout = self._stdout
