@@ -480,7 +480,13 @@ class AbstractModel:
                         )
 
                     pred = self._pred_single_model(model, X_val, D_val, verbose=False)
-                    res = metric_sklearn(pred, y_val, self.trainer.loss)
+                    try:
+                        res = metric_sklearn(pred, y_val, self.trainer.loss)
+                    except Exception as e:
+                        print(
+                            f"An exception occurs when evaluating a bayes call: {e}. Returning a large value instead."
+                        )
+                        res = 100
                     return res
 
                 with warnings.catch_warnings():
