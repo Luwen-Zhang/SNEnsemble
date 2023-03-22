@@ -10,7 +10,7 @@ print("Using {} device".format(device))
 
 trainer = Trainer(device=device)
 trainer.load_config()
-os.path.join(trainer.project_root, "log.txt")
+log.enter(os.path.join(trainer.project_root, "log.txt"))
 trainer.load_data()
 models = [
     PytorchTabular(trainer),
