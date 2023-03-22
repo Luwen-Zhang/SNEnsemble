@@ -868,24 +868,26 @@ class BayesCallback:
 
     def __init__(self, bar):
         self.bar = bar
-        self.postfix = {
-            "Current loss": 1e8,
-            "Current Params": [],
-            "Minimum": 1e8,
-            "Best Params": [],
-            "Minimum at call": 0,
-        }
-        self.bar.set_postfix(refresh=False, **self.postfix)
+        self.postfix = OrderedDict(
+            {
+                "ls": 1e8,
+                "param": [],
+                "min ls": 1e8,
+                "min param": [],
+                "min at": 0,
+            }
+        )
+        self.bar.set_postfix(refresh=False, ordered_dict=self.postfix)
 
     def call(self, result):
-        self.postfix["Current loss"] = result.func_vals[-1]
-        self.postfix["Current Params"] = [round(x, 8) for x in result.x_iters[-1]]
-        if result.fun < self.postfix["Minimum"]:
-            self.postfix["Minimum"] = result.fun
-            self.postfix["Best Params"] = [round(x, 8) for x in result.x]
-            self.postfix["Minimum at call"] = len(result.func_vals)
+        self.postfix["ls"] = result.func_vals[-1]
+        self.postfix["param"] = [round(x, 5) for x in result.x_iters[-1]]
+        if result.fun < self.postfix["min ls"]:
+            self.postfix["min ls"] = result.fun
+            self.postfix["min param"] = [round(x, 5) for x in result.x]
+            self.postfix["min at"] = len(result.func_vals)
 
-        self.bar.set_postfix(refresh=False, **self.postfix)
+        self.bar.set_postfix(refresh=False, ordered_dict=self.postfix)
         self.bar.update(1)
 
     def close(self):
