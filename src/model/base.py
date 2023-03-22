@@ -484,7 +484,8 @@ class AbstractModel:
                             f"An exception occurs when evaluating a bayes call: {e}. Returning a large value instead."
                         )
                         res = 100
-                    return res
+                    # To guarantee reproducibility on different machines.
+                    return round(res, 4)
 
                 with warnings.catch_warnings():
                     # To obtain clean progress bar.
