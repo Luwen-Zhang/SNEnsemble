@@ -1000,19 +1000,16 @@ class TorchModel(AbstractModel):
         train_loader = Data.DataLoader(
             self.trainer.train_dataset,
             batch_size=len(self.trainer.train_dataset),
-            generator=torch.Generator().manual_seed(0),
             collate_fn=collate_fn,
         )
         val_loader = Data.DataLoader(
             self.trainer.val_dataset,
             batch_size=len(self.trainer.val_dataset),
-            generator=torch.Generator().manual_seed(0),
             collate_fn=collate_fn,
         )
         test_loader = Data.DataLoader(
             self.trainer.test_dataset,
             batch_size=len(self.trainer.test_dataset),
-            generator=torch.Generator().manual_seed(0),
             collate_fn=collate_fn,
         )
         return (

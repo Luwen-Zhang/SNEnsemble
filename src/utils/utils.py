@@ -59,13 +59,35 @@ def r2_loss(output, target):
 
 
 def set_random_seed(seed=0):
+    set_torch_random(seed)
     np.random.seed(seed)
-    torch.manual_seed(seed)
     random.seed(seed)
+
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 
 def set_torch_random(seed=0):
     torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    if torch.cuda.is_available():
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    g = torch.Generator()
+    g.manual_seed(seed)
+    if "torch.utils.data" not in sys.modules:
+        dl = import_module("torch.utils.data").DataLoader
+    else:
+        dl = reload(sys.modules.get("torch.utils.data")).DataLoader
+
+    if not dl.__init__.__name__ == "_method":
+        dl.__init__ = partialmethod(
+            dl.__init__, worker_init_fn=seed_worker, generator=g
+        )
 
 
 def metric_sklearn(y_true, y_pred, metric):
