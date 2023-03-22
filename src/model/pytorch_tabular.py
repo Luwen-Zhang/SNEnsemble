@@ -33,7 +33,7 @@ class PytorchTabular(AbstractModel):
             target=self.trainer.label_name,
             continuous_cols=self.trainer.cont_feature_names,
             categorical_cols=self.trainer.cat_feature_names,
-            num_workers=6,
+            num_workers=0,
         )
         if not os.path.exists(os.path.join(self.root, "ckpts")):
             os.mkdir(os.path.join(self.root, "ckpts"))

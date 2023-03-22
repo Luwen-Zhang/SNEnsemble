@@ -77,17 +77,16 @@ def set_torch_random(seed=0):
     if torch.cuda.is_available():
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     os.environ["PYTHONHASHSEED"] = str(seed)
-    g = torch.Generator()
-    g.manual_seed(seed)
     if "torch.utils.data" not in sys.modules:
         dl = import_module("torch.utils.data").DataLoader
     else:
         dl = reload(sys.modules.get("torch.utils.data")).DataLoader
 
     if not dl.__init__.__name__ == "_method":
-        dl.__init__ = partialmethod(
-            dl.__init__, worker_init_fn=seed_worker, generator=g
-        )
+        # Actually, setting generator improves reproducibility, but torch._C.Generator does not support pickling.
+        # https://pytorch.org/docs/stable/notes/randomness.html
+        # https://github.com/pytorch/pytorch/issues/43672
+        dl.__init__ = partialmethod(dl.__init__, worker_init_fn=seed_worker)
 
 
 def metric_sklearn(y_true, y_pred, metric):
