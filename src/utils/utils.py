@@ -21,6 +21,8 @@ import torch.optim
 from distutils.spawn import find_executable
 from importlib import import_module, reload
 from functools import partialmethod
+import itertools
+from copy import deepcopy as cp
 
 clr = sns.color_palette("deep")
 sns.reset_defaults()
@@ -624,3 +626,22 @@ class Logging:
     def exit(self):
         sys.stdout = self._stdout
         sys.stderr = self._stderr
+
+
+def add_postfix(path):
+    postfix_iter = itertools.count()
+    s = cp(path)
+    root, ext = os.path.splitext(s)
+    is_folder = len(ext) == 0
+    last_cnt = postfix_iter.__next__()
+    while os.path.exists(s) if is_folder else os.path.isfile(s):
+        root_split = list(os.path.split(root))
+        last_postfix = f"-I{last_cnt}"
+        last_cnt = postfix_iter.__next__()
+        if root_split[-1].endswith(last_postfix):
+            root_split[-1].replace(last_postfix, f"-I{last_cnt}")
+        else:
+            root_split[-1] += f"-I{last_cnt}"
+        s = os.path.join(*root_split) + ext
+        root, ext = os.path.splitext(s)
+    return s

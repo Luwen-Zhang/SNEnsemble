@@ -511,7 +511,10 @@ class AbstractModel:
                     params[key] = value
                 self.model_params[model_name] = cp(params)
                 callback.close()
-                skopt.dump(result, self.trainer.project_root + "skopt.pt")
+                skopt.dump(
+                    result,
+                    add_postfix(os.path.join(self.root, f"{model_name}_skopt.pt")),
+                )
                 tmp_params = self._get_params(
                     model_name=model_name, verbose=verbose
                 )  # to announce the optimized params.
@@ -612,7 +615,7 @@ class AbstractModel:
         """
         Create a directory for the modelbase under the root of the trainer.
         """
-        self.root = self.trainer.project_root + self.program + "/"
+        self.root = os.path.join(self.trainer.project_root, self.program)
         if not os.path.exists(self.root):
             os.mkdir(self.root)
 
@@ -1079,7 +1082,7 @@ class TorchModel(AbstractModel):
         early_stopping = EarlyStopping(
             patience=self.trainer.static_params["patience"],
             verbose=False,
-            path=self.root + "early_stopping_ckpt.pt",
+            path=os.path.join(self.root, "early_stopping_ckpt.pt"),
         )
 
         for i_epoch in range(epoch):
@@ -1114,7 +1117,9 @@ class TorchModel(AbstractModel):
         idx = val_ls.index(min(val_ls))
         min_loss = val_ls[idx]
         model.to("cpu")
-        model.load_state_dict(torch.load(self.root + "early_stopping_ckpt.pt"))
+        model.load_state_dict(
+            torch.load(os.path.join(self.root, "early_stopping_ckpt.pt"))
+        )
         torch.cuda.empty_cache()
         if verbose:
             print(f"Minimum loss: {min_loss:.5f}")

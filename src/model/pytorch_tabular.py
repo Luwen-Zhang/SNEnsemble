@@ -15,7 +15,7 @@ class PytorchTabular(AbstractModel):
 
         ExperimentRunManager.__init__ = partialmethod(
             ExperimentRunManager.__init__,
-            exp_version_manager=self.root + "exp_version_manager.yml",
+            exp_version_manager=os.path.join(self.root, "exp_version_manager.yml"),
         )
         from pytorch_tabular import TabularModel
         from pytorch_tabular.models import (

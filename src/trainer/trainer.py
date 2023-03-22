@@ -224,7 +224,7 @@ class Trainer:
         self.project = self.database if self.project is None else self.project
         self._create_dir(project_root_subfolder=project_root_subfolder)
 
-        with open(self.project_root + "args.json", "w") as f:
+        with open(os.path.join(self.project_root, "args.json"), "w") as f:
             json.dump(json_backup, f, indent=4)
 
     def _create_dir(self, verbose: bool = True, project_root_subfolder: str = None):
@@ -241,24 +241,18 @@ class Trainer:
         if not os.path.exists("output"):
             os.mkdir("output")
         if project_root_subfolder is not None:
-            if not os.path.exists(f"output/{project_root_subfolder}"):
-                os.mkdir(f"output/{project_root_subfolder}")
+            if not os.path.exists(os.path.join("output", project_root_subfolder)):
+                os.makedirs(os.path.join("output", project_root_subfolder))
         subfolder = (
             self.project
             if project_root_subfolder is None
-            else f"{project_root_subfolder}/{self.project}"
+            else os.path.join(project_root_subfolder, self.project)
         )
         t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         folder_name = t + "-0" + "_" + self.configfile
-        self.project_root = f"output/{subfolder}/{folder_name}/"
-        if not os.path.exists(f"output/{subfolder}"):
-            os.mkdir(f"output/{subfolder}")
-        postfix_iter = itertools.count()
-        while os.path.exists(self.project_root):
-            tmp_folder_name = (
-                t + "-" + str(postfix_iter.__next__()) + "_" + self.configfile
-            )
-            self.project_root = f"output/{subfolder}/{tmp_folder_name}/"
+        if not os.path.exists(os.path.join("output", subfolder)):
+            os.mkdir(os.path.join("output", subfolder))
+        self.project_root = add_postfix(os.path.join("output", subfolder, folder_name))
         if not os.path.exists(self.project_root):
             os.mkdir(self.project_root)
 
@@ -1165,7 +1159,7 @@ class Trainer:
         desc = pd.concat([desc, mode, cnt_mode, mode_percent], axis=0)
 
         if save:
-            desc.to_csv(self.project_root + "describe.csv")
+            desc.to_csv(os.path.join(self.project_root, "describe.csv"))
         return desc
 
     def train(
@@ -1519,7 +1513,7 @@ class Trainer:
         df_leaderboard.reset_index(drop=True, inplace=True)
         df_leaderboard = df_leaderboard[["Program"] + list(df_leaderboard.columns)[:-1]]
         if save:
-            df_leaderboard.to_csv(self.project_root + "leaderboard.csv")
+            df_leaderboard.to_csv(os.path.join(self.project_root, "leaderboard.csv"))
             self.leaderboard = df_leaderboard
         return df_leaderboard
 
@@ -1557,7 +1551,7 @@ class Trainer:
         ax.set_ylabel("MSE Loss")
         ax.set_xlabel("Epoch")
         ax.set_ylabel(f"{self.loss.upper()} Loss")
-        plt.savefig(self.project_root + "loss_epoch.pdf")
+        plt.savefig(os.path.join(self.project_root, "loss_epoch.pdf"))
         if is_notebook():
             plt.show()
         plt.close()
@@ -1597,7 +1591,7 @@ class Trainer:
 
             s = model_name.replace("/", "_")
 
-            plt.savefig(self.project_root + f"{program}/{s}_truth_pred.pdf")
+            plt.savefig(os.path.join(self.project_root, program, f"{s}_truth_pred.pdf"))
             if is_notebook():
                 plt.show()
 
@@ -1951,7 +1945,9 @@ class Trainer:
         )
 
         plt.savefig(
-            self.project_root + f"partial_dependence_{program}_{model_name}.pdf"
+            os.path.join(
+                self.project_root, f"partial_dependence_{program}_{model_name}.pdf"
+            )
         )
         if is_notebook():
             plt.show()
@@ -2031,7 +2027,9 @@ class Trainer:
             thres=thres,
         )
 
-        plt.savefig(self.project_root + f"partial_err_{program}_{model_name}.pdf")
+        plt.savefig(
+            os.path.join(self.project_root, f"partial_err_{program}_{model_name}.pdf")
+        )
         if is_notebook():
             plt.show()
         plt.close()
@@ -2138,7 +2136,7 @@ class Trainer:
                 )
 
         plt.tight_layout()
-        plt.savefig(self.project_root + "corr.pdf")
+        plt.savefig(os.path.join(self.project_root, "corr.pdf"))
         if is_notebook():
             plt.show()
         plt.close()
@@ -2157,7 +2155,7 @@ class Trainer:
         )
         sns.pairplot(df_all, corner=True, diag_kind="kde", **kwargs)
         plt.tight_layout()
-        plt.savefig(self.project_root + "pair.jpg")
+        plt.savefig(os.path.join(self.project_root, "pair.jpg"))
         if is_notebook():
             plt.show()
         plt.close()
@@ -2200,7 +2198,7 @@ class Trainer:
         plt.ylabel("Values (Standard Scaled)")
         # ax.tick_params(axis='x', rotation=90)
         plt.tight_layout()
-        plt.savefig(self.project_root + "feature_box.pdf")
+        plt.savefig(os.path.join(self.project_root, "feature_box.pdf"))
         plt.show()
         plt.close()
 
@@ -3246,7 +3244,7 @@ def save_trainer(trainer: Trainer, path: os.PathLike = None, verbose: bool = Tru
     """
     import pickle
 
-    path = trainer.project_root + "trainer.pkl" if path is None else path
+    path = os.path.join(trainer.project_root, "trainer.pkl") if path is None else path
     with open(path, "wb") as outp:
         pickle.dump(trainer, outp, pickle.HIGHEST_PROTOCOL)
     if verbose:

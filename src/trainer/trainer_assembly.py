@@ -226,7 +226,9 @@ class TrainerAssembly:
 
                     # plt.legend(loc='upper left', markerscale=1.5, handlelength=0.2, handleheight=0.9)
                     s = model_name.replace("/", "_")
-                    plt.savefig(self.project_root + f"{program}_{s}_truth_pred.pdf")
+                    plt.savefig(
+                        os.path.join(self.project_root, f"{program}_{s}_truth_pred.pdf")
+                    )
                     if is_notebook():
                         plt.show()
 
@@ -265,7 +267,7 @@ class TrainerAssembly:
         columns_back = list(sorted(np.setdiff1d(df_leaderboard.columns, columns_ahead)))
 
         df_leaderboard = df_leaderboard[columns_ahead + columns_back]
-        df_leaderboard.to_csv(self.project_root + "leaderboard.csv")
+        df_leaderboard.to_csv(os.path.join(self.project_root, "leaderboard.csv"))
         self.leaderboard = df_leaderboard
 
 
@@ -286,7 +288,11 @@ def save_trainer_assem(
     """
     import pickle
 
-    path = trainer_assem.project_root + "trainer_assem.pkl" if path is None else path
+    path = (
+        os.path.join(trainer_assem.project_root, "trainer_assem.pkl")
+        if path is None
+        else path
+    )
     with open(path, "wb") as outp:
         pickle.dump(trainer_assem, outp, pickle.HIGHEST_PROTOCOL)
     if verbose:
