@@ -872,7 +872,7 @@ class BayesCallback:
             "Best Params": [],
             "Minimum at call": 0,
         }
-        self.bar.set_postfix(**self.postfix)
+        self.bar.set_postfix(refresh=False, **self.postfix)
 
     def call(self, result):
         self.postfix["Current loss"] = result.func_vals[-1]
@@ -882,7 +882,7 @@ class BayesCallback:
             self.postfix["Best Params"] = [round(x, 8) for x in result.x]
             self.postfix["Minimum at call"] = len(result.func_vals)
 
-        self.bar.set_postfix(**self.postfix)
+        self.bar.set_postfix(refresh=False, **self.postfix)
         self.bar.update(1)
 
     def close(self):
