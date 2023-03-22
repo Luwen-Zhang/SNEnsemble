@@ -446,12 +446,9 @@ class AbstractModel:
             if self.trainer.bayes_opt and not warm_start and len(space) > 0:
                 min_calls = len(tmp_params)
                 callback = BayesCallback(
-                    tqdm(
-                        total=self.trainer.n_calls
-                        if not src.setting["debug_mode"]
-                        else min_calls,
-                        disable=not verbose,
-                    )
+                    total=self.trainer.n_calls
+                    if not src.setting["debug_mode"]
+                    else min_calls
                 )
                 global _bayes_objective
 
@@ -866,18 +863,17 @@ class BayesCallback:
     Show a tqdm progress bar when performing bayes optimization.
     """
 
-    def __init__(self, bar):
-        self.bar = bar
-        self.postfix = OrderedDict(
-            {
-                "ls": 1e8,
-                "param": [],
-                "min ls": 1e8,
-                "min param": [],
-                "min at": 0,
-            }
-        )
-        self.bar.set_postfix(refresh=False, ordered_dict=self.postfix)
+    def __init__(self, total):
+        self.total = total
+        self.cnt = 0
+        self.init_time = time.time()
+        self.postfix = {
+            "ls": 1e8,
+            "param": [],
+            "min ls": 1e8,
+            "min param": [],
+            "min at": 0,
+        }
 
     def call(self, result):
         self.postfix["ls"] = result.func_vals[-1]
@@ -886,13 +882,13 @@ class BayesCallback:
             self.postfix["min ls"] = result.fun
             self.postfix["min param"] = [round(x, 5) for x in result.x]
             self.postfix["min at"] = len(result.func_vals)
-
-        self.bar.set_postfix(refresh=False, ordered_dict=self.postfix)
-        self.bar.update(1)
+        self.cnt += 1
+        tot_time = time.time() - self.init_time
+        print(
+            f"Bayes-opt {self.cnt}/{self.total}, tot {tot_time:.2f}s, avg {tot_time/self.cnt:.2f}it/s: {self.postfix}"
+        )
 
     def close(self):
-        self.bar.close()
-        del self.bar
         torch.cuda.empty_cache()
 
 
