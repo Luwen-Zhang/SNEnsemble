@@ -13,6 +13,7 @@ import json
 import time
 from typing import *
 import torch.nn as nn
+import torch.cuda
 import torch.utils.data as Data
 from torch.utils.data import Subset
 import itertools
@@ -20,6 +21,7 @@ import scipy.stats as st
 from captum.attr import FeaturePermutation
 from sklearn.utils import resample as skresample
 import argparse
+import platform, psutil, subprocess
 
 set_random_seed(0)
 sys.path.append("configs/")
@@ -172,11 +174,6 @@ class Trainer:
                 raise Exception(
                     "Variables in 'chosen_params' and 'SPACEs' should be in the same order."
                 )
-
-        if verbose:
-            print(pretty(arg_loaded))
-            print(f"Global settings:")
-            print(pretty(src.setting))
 
         self.args = arg_loaded
 
@@ -339,6 +336,81 @@ class Trainer:
         self.dataderivers = [
             (get_data_deriver(name)(), kwargs) for name, kwargs in config
         ]
+
+    def summarize_setting(self):
+        print("Device:")
+        print(pretty(self.summarize_device()))
+        print("Configurations:")
+        print(pretty(self.args))
+        print(f"Global settings:")
+        print(pretty(src.setting))
+
+    def summarize_device(self):
+        """
+        Print a summary of the environment.
+        https://www.thepythoncode.com/article/get-hardware-system-information-python
+        """
+
+        def get_size(bytes, suffix="B"):
+            """
+            Scale bytes to its proper format
+            e.g:
+                1253656 => '1.20MB'
+                1253656678 => '1.17GB'
+            """
+            factor = 1024
+            for unit in ["", "K", "M", "G", "T", "P"]:
+                if bytes < factor:
+                    return f"{bytes:.2f}{unit}{suffix}"
+                bytes /= factor
+
+        def get_processor_info():
+            if platform.system() == "Windows":
+                return platform.processor()
+            elif platform.system() == "Darwin":
+                return (
+                    subprocess.check_output(
+                        ["/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string"]
+                    )
+                    .strip()
+                    .decode("utf-8")
+                )
+            elif platform.system() == "Linux":
+                command = "cat /proc/cpuinfo"
+                all_info = (
+                    subprocess.check_output(command, shell=True).strip().decode("utf-8")
+                )
+
+                for string in all_info.split("\n"):
+                    if "model name\t: " in string:
+                        return string.split("\t: ")[1]
+            return ""
+
+        uname = platform.uname()
+        cpufreq = psutil.cpu_freq()
+        svmem = psutil.virtual_memory()
+        self.sys_summary = {
+            "System": uname.system,
+            "Node name": uname.node,
+            "System release": uname.release,
+            "System version": uname.version,
+            "Machine architecture": uname.machine,
+            "Processor architecture": uname.processor,
+            "Processor model": get_processor_info(),
+            "Physical cores": psutil.cpu_count(logical=False),
+            "Total cores": psutil.cpu_count(logical=True),
+            "Max core frequency": f"{cpufreq.max:.2f}Mhz",
+            "Total memory": get_size(svmem.total),
+            "Python version": platform.python_version(),
+            "Python implementation": platform.python_implementation(),
+            "Python compiler": platform.python_compiler(),
+            "Cuda availability": torch.cuda.is_available(),
+            "GPU devices": [
+                torch.cuda.get_device_properties(i).name
+                for i in range(torch.cuda.device_count())
+            ],
+        }
+        return self.sys_summary
 
     def load_data(
         self, data_path: str = None, file_type: str = "csv", **kwargs

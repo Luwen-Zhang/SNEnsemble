@@ -11,6 +11,7 @@ print("Using {} device".format(device))
 trainer = Trainer(device=device)
 trainer.load_config()
 log.enter(os.path.join(trainer.project_root, "log.txt"))
+trainer.summarize_setting()
 trainer.load_data()
 models = [
     PytorchTabular(trainer),
@@ -18,7 +19,5 @@ models = [
     AutoGluon(trainer),
 ]
 trainer.add_modelbases(models)
-trainer.train(verbose=True)
-trainer.bayes_opt = False
 trainer.get_leaderboard(test_data_only=False, cross_validation=10, verbose=True)
 log.exit()
