@@ -106,6 +106,7 @@ class AutoGluon(AbstractModel):
                 verbosity=0,
                 feature_generator=feature_generator,
                 hyperparameters={self._name_mapping[model[0]]: kwargs},
+                num_gpus=0 if self.device is "cpu" else "auto",
             )
 
         tc.enable_tqdm()
