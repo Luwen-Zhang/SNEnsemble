@@ -162,48 +162,52 @@ class AutoGluon(AbstractModel):
             "Neural Network with MXNet": [
                 Real(low=1e-4, high=3e-2, prior="log-uniform", name="learning_rate"),
                 Real(low=1e-12, high=0.1, prior="log-uniform", name="weight_decay"),
-                Categorical(
-                    categories=[0.1, 0.0, 0.5, 0.2, 0.3, 0.4], name="dropout_prob"
+                Real(low=0.0, high=0.5, prior="uniform", name="dropout_prob"),
+                Real(low=0.5, high=1.5, prior="uniform", name="embedding_size_factor"),
+                Integer(
+                    low=4,
+                    high=1000,
+                    prior="log-uniform",
+                    name="proc.embed_min_categories",
+                    dtype=int,
                 ),
-                Categorical(
-                    categories=[1.0, 0.5, 1.5, 0.7, 0.6, 0.8, 0.9, 1.1, 1.2, 1.3, 1.4],
-                    name="embedding_size_factor",
-                ),
-                Categorical(
-                    categories=[4, 3, 10, 100, 1000], name="proc.embed_min_categories"
-                ),
-                Categorical(
-                    categories=[100, 10, 20, 200, 300, 400, 500, 1000, 10000],
+                Integer(
+                    low=10,
+                    high=10000,
+                    prior="log-uniform",
                     name="proc.max_category_levels",
+                    dtype=int,
                 ),
-                Categorical(
-                    categories=[0.99, 0.2, 0.3, 0.5, 0.8, 0.9, 0.999, 1.0, 10.0, 100.0],
-                    name="proc.skew_threshold",
-                ),
+                Real(low=0.2, high=1.0, prior="uniform", name="proc.skew_threshold"),
                 Categorical(categories=[512, 1024, 2056, 128], name="batch_size"),
             ],
             "Neural Network with PyTorch": [
                 Real(low=1e-4, high=3e-2, prior="log-uniform", name="learning_rate"),
                 Real(low=1e-12, high=0.1, prior="log-uniform", name="weight_decay"),
-                Categorical(
-                    categories=[0.1, 0.0, 0.5, 0.2, 0.3, 0.4], name="dropout_prob"
+                Real(low=0.0, high=0.5, prior="uniform", name="dropout_prob"),
+                Real(low=0.5, high=1.5, prior="uniform", name="embedding_size_factor"),
+                Integer(
+                    low=4,
+                    high=1000,
+                    prior="log-uniform",
+                    name="proc.embed_min_categories",
+                    dtype=int,
                 ),
-                Categorical(
-                    categories=[1.0, 0.5, 1.5, 0.7, 0.6, 0.8, 0.9, 1.1, 1.2, 1.3, 1.4],
-                    name="embedding_size_factor",
-                ),
-                Categorical(
-                    categories=[4, 3, 10, 100, 1000], name="proc.embed_min_categories"
-                ),
-                Categorical(
-                    categories=[100, 10, 20, 200, 300, 400, 500, 1000, 10000],
+                Integer(
+                    low=10,
+                    high=10000,
+                    prior="log-uniform",
                     name="proc.max_category_levels",
+                    dtype=int,
                 ),
-                Categorical(
-                    categories=[0.99, 0.2, 0.3, 0.5, 0.8, 0.9, 0.999, 1.0, 10.0, 100.0],
-                    name="proc.skew_threshold",
+                Real(low=0.2, high=1.0, prior="uniform", name="proc.skew_threshold"),
+                Integer(
+                    low=2,
+                    high=4,
+                    prior="uniform",
+                    name="num_layers",
+                    dtype=int,
                 ),
-                Categorical(categories=[2, 3, 4], name="num_layers"),
                 Categorical(categories=[128, 256, 512], name="hidden_size"),
             ],
             "Neural Network with FastAI": [

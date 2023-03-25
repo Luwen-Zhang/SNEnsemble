@@ -28,7 +28,7 @@ class WideDeep(AbstractModel):
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
                 Categorical(categories=[8, 16, 32], name="input_dim"),
                 Categorical(categories=[2, 4, 8], name="n_heads"),
-                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Integer(low=2, high=4, prior="uniform", name="n_blocks", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
             ]
@@ -55,7 +55,7 @@ class WideDeep(AbstractModel):
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
                 Categorical(categories=[8, 16, 32], name="input_dim"),
                 Categorical(categories=[2, 4, 8], name="n_heads"),
-                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Integer(low=2, high=4, prior="uniform", name="n_blocks", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
             ]
@@ -63,7 +63,7 @@ class WideDeep(AbstractModel):
             "ContextAttentionMLP": [
                 Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
                 Categorical(categories=[8, 16, 32], name="input_dim"),
-                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Integer(low=2, high=4, prior="uniform", name="n_blocks", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
             ]
             + self.trainer.SPACE,
@@ -71,7 +71,7 @@ class WideDeep(AbstractModel):
                 Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
                 Categorical(categories=[8, 16, 32], name="input_dim"),
                 Categorical(categories=[2, 4, 8], name="n_heads"),
-                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Integer(low=2, high=4, prior="uniform", name="n_blocks", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
             ]
             + self.trainer.SPACE,
@@ -80,10 +80,10 @@ class WideDeep(AbstractModel):
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
                 Categorical(categories=[8, 16, 32, 64], name="input_dim"),
                 Categorical(categories=[2, 4, 8], name="n_heads"),
-                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Integer(low=2, high=4, prior="uniform", name="n_blocks", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
-                Categorical(categories=[0.4, 0.5, 0.6], name="kv_compression_factor"),
+                Real(low=0.4, high=0.6, prior="uniform", name="kv_compression_factor"),
             ]
             + self.trainer.SPACE,
             "TabPerceiver": [
@@ -94,8 +94,12 @@ class WideDeep(AbstractModel):
                 Categorical(categories=[2, 4, 8], name="n_latents"),
                 Categorical(categories=[16, 32, 64], name="latent_dim"),
                 Categorical(categories=[2, 4], name="n_latent_heads"),
-                Categorical(categories=[2, 3, 4], name="n_latent_blocks"),
-                Categorical(categories=[2, 3, 4], name="n_perceiver_blocks"),
+                Integer(
+                    low=2, high=4, prior="uniform", name="n_latent_blocks", dtype=int
+                ),
+                Integer(
+                    low=2, high=4, prior="uniform", name="n_perceiver_blocks", dtype=int
+                ),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
             ]
@@ -105,7 +109,7 @@ class WideDeep(AbstractModel):
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
                 Categorical(categories=[8, 16, 32], name="input_dim"),
                 Categorical(categories=[2, 4, 8], name="n_heads"),
-                Categorical(categories=[2, 3, 4], name="n_blocks"),
+                Integer(low=2, high=4, prior="uniform", name="n_blocks", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
             ]

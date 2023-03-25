@@ -113,7 +113,7 @@ class TransformerLSTM(TorchModel):
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
                 Integer(low=1, high=30, prior="uniform", name="n_hidden", dtype=int),
                 Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
-                Categorical(categories=[2, 3, 4], name="attn_layers"),
+                Integer(low=2, high=4, prior="uniform", name="attn_layers", dtype=int),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
@@ -128,7 +128,7 @@ class TransformerLSTM(TorchModel):
                 # `seq_embedding_dim` should be able to divided by `attn_heads`.
                 Categorical(categories=[8, 16, 32], name="seq_embedding_dim"),
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
-                Categorical(categories=[2, 3, 4], name="attn_layers"),
+                Integer(low=2, high=4, prior="uniform", name="attn_layers", dtype=int),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
