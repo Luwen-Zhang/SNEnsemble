@@ -3,6 +3,7 @@ The basic class for the project. It includes configuration, data processing, plo
 and comparing baseline models.
 """
 import os.path
+import warnings
 import sklearn.pipeline
 import src
 from src.utils import *
@@ -1253,6 +1254,11 @@ class Trainer:
             modelbases_to_train = self.modelbases
         else:
             modelbases_to_train = [self.get_modelbase(x) for x in programs]
+
+        if len(modelbases_to_train) == 0:
+            warnings.warn(
+                f"No modelbase is trained. Please confirm that trainer.add_modelbases is called."
+            )
 
         for modelbase in modelbases_to_train:
             modelbase.train(verbose=verbose)
