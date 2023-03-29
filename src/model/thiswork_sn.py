@@ -16,7 +16,7 @@ class ThisWork(TorchModel):
         super(ThisWork, self).__init__(trainer, *args, **kwargs)
         self.activated_sn = None
         self.manual_activate = manual_activate
-        from src.model._thiswork_sn_formulas import sn_mapping
+        from src.model._transformer.sn_formulas import sn_mapping
 
         if self.manual_activate is not None:
             for sn in self.manual_activate:
@@ -38,7 +38,7 @@ class ThisWork(TorchModel):
         )
 
     def _get_activated_sn(self):
-        from src.model._thiswork_sn_formulas import sn_mapping
+        from src.model._transformer.sn_formulas import sn_mapping
 
         activated_sn = []
         sn_coeff_vars_idx = [

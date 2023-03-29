@@ -13,7 +13,7 @@ class MLP(TorchModel):
         return "MLP"
 
     def _new_model(self, model_name, verbose, **kwargs):
-        return MLPNN(
+        return _MLPNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
             self.trainer.layers if self.layers is None else self.layers,
@@ -24,9 +24,9 @@ class MLP(TorchModel):
         return ["MLP"]
 
 
-class MLPNN(AbstractNN):
+class _MLPNN(AbstractNN):
     def __init__(self, n_inputs, n_outputs, layers, trainer):
-        super(MLPNN, self).__init__(trainer)
+        super(_MLPNN, self).__init__(trainer)
         num_inputs = n_inputs
         num_outputs = n_outputs
         self.net = get_sequential(

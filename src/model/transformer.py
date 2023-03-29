@@ -5,8 +5,8 @@ from src.model import TorchModel, AbstractNN
 from .base import get_sequential
 import torch.nn as nn
 from typing import *
-from .transformers.fttransformer import PositionalEncoding, TransformerEncoder
-from .transformers.fasttransformer import FastformerEncoder
+from ._transformer.fttransformer import PositionalEncoding, TransformerEncoder
+from ._transformer.fasttransformer import FastformerEncoder
 
 
 class TransformerLSTM(TorchModel):
@@ -43,7 +43,7 @@ class TransformerLSTM(TorchModel):
             if self.trainer.args["feature_types"][t] == "Material"
         ]
         if model_name == "TransformerLSTM":
-            return TransformerLSTMNN(
+            return _TransformerLSTMNN(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
                 self.trainer.layers if self.layers is None else self.layers,
@@ -68,7 +68,7 @@ class TransformerLSTM(TorchModel):
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
         ]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
+            cls = getattr(sys.modules[__name__], f"_{model_name}NN")
             return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
@@ -87,7 +87,7 @@ class TransformerLSTM(TorchModel):
                 transformer_dropout=kwargs["transformer_dropout"],
             )
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
+            cls = getattr(sys.modules[__name__], f"_{model_name}NN")
             return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
@@ -192,7 +192,7 @@ class TransformerLSTM(TorchModel):
         return True
 
 
-class TransformerLSTMNN(AbstractNN):
+class _TransformerLSTMNN(AbstractNN):
     def __init__(
         self,
         n_inputs,
@@ -214,7 +214,7 @@ class TransformerLSTMNN(AbstractNN):
         transformer_dropout=0.1,
         use_torch_transformer=False,
     ):
-        super(TransformerLSTMNN, self).__init__(trainer)
+        super(_TransformerLSTMNN, self).__init__(trainer)
         self.n_cont = n_inputs
         self.n_outputs = n_outputs
         self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
@@ -275,7 +275,7 @@ class TransformerLSTMNN(AbstractNN):
         return output
 
 
-class TransformerSeqNN(AbstractNN):
+class _TransformerSeqNN(AbstractNN):
     def __init__(
         self,
         n_inputs,
@@ -295,7 +295,7 @@ class TransformerSeqNN(AbstractNN):
         transformer_dropout=0.1,
         use_torch_transformer=False,
     ):
-        super(TransformerSeqNN, self).__init__(trainer)
+        super(_TransformerSeqNN, self).__init__(trainer)
         self.n_cont = n_inputs
         self.n_outputs = n_outputs
         self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
@@ -362,7 +362,7 @@ class TransformerSeqNN(AbstractNN):
         return output
 
 
-class BiasTransformerSeqNN(TransformerSeqNN):
+class _BiasTransformerSeqNN(_TransformerSeqNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         base_loss = self.default_loss_fn(y_pred, y_true)
         if not self.training:
@@ -373,7 +373,7 @@ class BiasTransformerSeqNN(TransformerSeqNN):
             return (base_loss * w).mean()
 
 
-class ConsGradTransformerSeqNN(TransformerSeqNN):
+class _ConsGradTransformerSeqNN(_TransformerSeqNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         base_loss = self.default_loss_fn(y_pred, y_true)
         implemented_features = ["Relative Mean Stress"]
@@ -407,7 +407,7 @@ class ConsGradTransformerSeqNN(TransformerSeqNN):
             self.balance_w[idx] = base_loss / feature_loss[idx] / 10
 
 
-class CatEmbedLSTMNN(AbstractNN):
+class _CatEmbedLSTMNN(AbstractNN):
     def __init__(
         self,
         n_inputs,
@@ -424,7 +424,7 @@ class CatEmbedLSTMNN(AbstractNN):
         lstm_layers=1,
         embed_dropout=0.1,
     ):
-        super(CatEmbedLSTMNN, self).__init__(trainer)
+        super(_CatEmbedLSTMNN, self).__init__(trainer)
         self.n_cont = n_inputs
         self.n_outputs = n_outputs
         self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
@@ -493,7 +493,7 @@ class CatEmbedLSTMNN(AbstractNN):
         return output
 
 
-class BiasCatEmbedLSTMNN(CatEmbedLSTMNN):
+class _BiasCatEmbedLSTMNN(_CatEmbedLSTMNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         base_loss = self.default_loss_fn(y_pred, y_true)
         if not self.training:
@@ -504,7 +504,7 @@ class BiasCatEmbedLSTMNN(CatEmbedLSTMNN):
             return (base_loss * w).mean()
 
 
-class FastFormerSeqNN(AbstractNN):
+class _FastFormerSeqNN(AbstractNN):
     def __init__(
         self,
         n_inputs,
@@ -523,7 +523,7 @@ class FastFormerSeqNN(AbstractNN):
         transformer_ff_dim=256,
         transformer_dropout=0.1,
     ):
-        super(FastFormerSeqNN, self).__init__(trainer)
+        super(_FastFormerSeqNN, self).__init__(trainer)
         self.n_cont = n_inputs
         self.n_outputs = n_outputs
         self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
@@ -592,7 +592,7 @@ class FastFormerSeqNN(AbstractNN):
 class _SN(nn.Module):
     def __init__(self, trainer, manual_activate_sn, sn_coeff_vars_idx):
         super(_SN, self).__init__()
-        from src.model._thiswork_sn_formulas import sn_mapping
+        from ._transformer.sn_formulas import sn_mapping
 
         activated_sn = []
         for key, sn in sn_mapping.items():

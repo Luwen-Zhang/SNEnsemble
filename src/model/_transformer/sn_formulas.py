@@ -2,7 +2,7 @@ from src.utils import *
 import torch.nn as nn
 from copy import deepcopy as cp
 import inspect
-from .base import get_sequential
+from src.model.base import get_sequential
 
 
 class AbstractSN(nn.Module):
