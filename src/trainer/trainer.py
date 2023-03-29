@@ -1573,7 +1573,7 @@ class Trainer:
             The leaderboard dataframe.
         """
         if metrics is None:
-            metrics = ["rmse", "mse", "mae", "mape", "r2"]
+            metrics = ["rmse", "mse", "mae", "mape", "r2", "rmse_conserv"]
         dfs = []
         for modelbase_name in self.modelbases_names:
             df = Trainer._metrics(

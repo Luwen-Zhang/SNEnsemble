@@ -110,6 +110,16 @@ def metric_sklearn(y_true, y_pred, metric):
         from sklearn.metrics import r2_score
 
         return r2_score(y_true, y_pred)
+    elif metric == "rmse_conserv":
+        from sklearn.metrics import mean_squared_error
+
+        where_not_conserv = np.array(y_pred) > np.array(y_true)
+        if np.any(where_not_conserv):
+            return mean_squared_error(
+                np.array(y_true)[where_not_conserv], np.array(y_pred)[where_not_conserv]
+            )
+        else:
+            return 0.0
     else:
         raise Exception(f"Metric {metric} not implemented.")
 
