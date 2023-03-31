@@ -466,6 +466,7 @@ class SampleWeightDeriver(AbstractDeriver):
 
     def __init__(self):
         super(SampleWeightDeriver, self).__init__()
+        self.percentile_dict = {}
 
     def _required_cols(self, **kwargs):
         return []
@@ -488,12 +489,16 @@ class SampleWeightDeriver(AbstractDeriver):
         weight = np.ones((len(df), 1))
         for feature in cont_feature_names:
             # We can only calculate distributions based on known data, i.e. the training set.
-            Q1 = np.percentile(
-                df.loc[train_idx, feature].dropna(axis=0), 25, method="midpoint"
-            )
-            Q3 = np.percentile(
-                df.loc[train_idx, feature].dropna(axis=0), 75, method="midpoint"
-            )
+            if trainer.training:
+                Q1 = np.percentile(
+                    df.loc[train_idx, feature].dropna(axis=0), 25, method="midpoint"
+                )
+                Q3 = np.percentile(
+                    df.loc[train_idx, feature].dropna(axis=0), 75, method="midpoint"
+                )
+                self.percentile_dict[feature] = (Q1, Q3)
+            else:
+                Q1, Q3 = self.percentile_dict[feature]
             IQR = Q3 - Q1
             if IQR == 0:
                 continue

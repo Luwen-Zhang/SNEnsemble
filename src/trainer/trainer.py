@@ -46,6 +46,7 @@ class Trainer:
         self.project = project
         self.modelbases = []
         self.modelbases_names = []
+        self.training = True
 
     def add_modelbases(self, models: List):
         """
@@ -453,6 +454,18 @@ class Trainer:
         )
 
         self.save_data()
+
+    def set_status(self, training: bool):
+        """
+        Set the status of the trainer. If a trainer is not training, some data derivers will use learned characteristics
+        from training data to derive for new data.
+
+        Parameters
+        ----------
+        training
+            The training status of the trainer.
+        """
+        self.training = training
 
     @property
     def all_feature_names(self) -> List[str]:

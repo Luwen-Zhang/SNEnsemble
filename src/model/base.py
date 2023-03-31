@@ -100,6 +100,7 @@ class AbstractModel:
         bayes_opt:
             Whether to perform Gaussian-process-based Bayesian Hyperparameter Optimization for each model.
         """
+        self.trainer.set_status(training=True)
         self.trainer.set_data(
             df,
             cont_feature_names=cont_feature_names,
@@ -135,7 +136,7 @@ class AbstractModel:
         **kwargs:
             Arguments of :func:`_train` for models.
         """
-
+        self.trainer.set_status(training=True)
         verbose = "verbose" not in kwargs.keys() or kwargs["verbose"]
         if verbose:
             print(f"\n-------------Run {self.program}-------------\n")
@@ -174,6 +175,7 @@ class AbstractModel:
         prediction:
             Predicted target.
         """
+        self.trainer.set_status(training=False)
         if self.model is None:
             raise Exception("Run fit() before predict().")
         if model_name not in self.get_model_names():
