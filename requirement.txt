@@ -1,5 +1,3 @@
-torch==1.12.0
-torchvision
 autogluon.tabular[all]==0.7.0
 autogluon.common==0.7.0
 autogluon.core==0.7.0
