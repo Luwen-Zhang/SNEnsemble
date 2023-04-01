@@ -113,10 +113,12 @@ def metric_sklearn(y_true, y_pred, metric):
     elif metric == "rmse_conserv":
         from sklearn.metrics import mean_squared_error
 
-        where_not_conserv = np.array(y_pred) > np.array(y_true)
+        y_pred = np.array(cp(y_pred)).reshape(-1, 1)
+        y_true = np.array(cp(y_true)).reshape(-1, 1)
+        where_not_conserv = y_pred > y_true
         if np.any(where_not_conserv):
             return mean_squared_error(
-                np.array(y_true)[where_not_conserv], np.array(y_pred)[where_not_conserv]
+                y_true[where_not_conserv], y_pred[where_not_conserv]
             )
         else:
             return 0.0
