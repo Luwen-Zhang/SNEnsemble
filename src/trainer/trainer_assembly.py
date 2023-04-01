@@ -7,7 +7,9 @@ from typing import *
 
 class TrainerAssembly:
     def __init__(
-        self, trainer_paths: List[os.PathLike] = None, trainers: List[Trainer] = None
+        self,
+        trainer_paths: List[Union[os.PathLike, str]] = None,
+        trainers: List[Trainer] = None,
     ):
         """
         Combine multiple trainers to evaluate the overall performance of models on multiple datasets.
@@ -272,7 +274,9 @@ class TrainerAssembly:
 
 
 def save_trainer_assem(
-    trainer_assem: TrainerAssembly, path: os.PathLike = None, verbose: bool = True
+    trainer_assem: TrainerAssembly,
+    path: Union[os.PathLike, str] = None,
+    verbose: bool = True,
 ):
     """
     Pickling the TrainerAssembly instance.
@@ -301,7 +305,7 @@ def save_trainer_assem(
         )
 
 
-def load_trainer_assem(path: os.PathLike) -> TrainerAssembly:
+def load_trainer_assem(path: Union[os.PathLike, str]) -> TrainerAssembly:
     """
     Loading a pickled TrainerAssembly.
 

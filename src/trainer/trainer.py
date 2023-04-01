@@ -3320,7 +3320,9 @@ class Trainer:
             return rf
 
 
-def save_trainer(trainer: Trainer, path: os.PathLike = None, verbose: bool = True):
+def save_trainer(
+    trainer: Trainer, path: Union[os.PathLike, str] = None, verbose: bool = True
+):
     """
     Pickling the trainer instance.
 
@@ -3344,7 +3346,7 @@ def save_trainer(trainer: Trainer, path: os.PathLike = None, verbose: bool = Tru
         )
 
 
-def load_trainer(path: os.PathLike) -> Trainer:
+def load_trainer(path: Union[os.PathLike, str]) -> Trainer:
     """
     Loading a pickled Trainer.
 
