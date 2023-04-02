@@ -4,7 +4,7 @@ class DefaultConfig:
             "database": "composite",
             "loss": "mse",
             "bayes_opt": False,
-            "bayes_epoch": 10,
+            "bayes_epoch": 30,
             "patience": 50,
             "epoch": 200,
             "lr": 0.003,
