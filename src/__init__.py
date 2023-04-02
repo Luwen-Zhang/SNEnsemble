@@ -17,7 +17,7 @@ setting = dict(
     # some models that need gradients within the loss function invalid.
     test_with_no_grad=False,
     input_requires_grad=True,
-    # Debug mode might change behaviors of models. By default, epoch will be set to 2, n_calls to 11, and
+    # Debug mode might change behaviors of models. By default, epoch will be set to 2, n_calls to minimum, and
     # bayes_epoch to 1.
     debug_mode=False,
 )

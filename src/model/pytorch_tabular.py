@@ -59,12 +59,15 @@ class PytorchTabular(AbstractModel):
             "FTTransformer": FTTransformerConfig,
             "GATE": GatedAdditiveTreeEnsembleConfig,
         }
+        special_configs = {
+            "NODE": {"embed_categorical": True},
+        }
         with HiddenPrints():
             model_config = (
                 model_configs[model_name](task="regression", **kwargs)
-                if model_name != "NODE"
+                if model_name not in special_configs.keys()
                 else model_configs[model_name](
-                    task="regression", embed_categorical=True, **kwargs
+                    task="regression", **special_configs[model_name], **kwargs
                 )
             )
             tabular_model = TabularModel(
