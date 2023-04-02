@@ -168,7 +168,7 @@ class PytorchTabular(AbstractModel):
             "TabTransformer",
             "AutoInt",
             "FTTransformer",
-            "GATE",
+            # "GATE", Low efficiency
         ]
 
     def _space(self, model_name):
