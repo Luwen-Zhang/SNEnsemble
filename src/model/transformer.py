@@ -28,10 +28,14 @@ class TransformerLSTM(TorchModel):
     def _get_model_names(self):
         return [
             "FastFormerSeq",
+            "BiasFastFormerSeq",
+            "ConsGradFastFormerSeq",
+            "BiasConsGradFastFormerSeq",
             "TransformerLSTM",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
+            "BiasConsGradTransformerSeq",
             "CatEmbedLSTM",
             "BiasCatEmbedLSTM",
         ]
@@ -64,9 +68,13 @@ class TransformerLSTM(TorchModel):
             )
         elif model_name in [
             "FastFormerSeq",
+            "BiasFastFormerSeq",
+            "ConsGradFastFormerSeq",
+            "BiasConsGradFastFormerSeq",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
+            "BiasConsGradTransformerSeq",
         ]:
             cls = getattr(sys.modules[__name__], f"_{model_name}NN")
             return cls(
@@ -120,9 +128,13 @@ class TransformerLSTM(TorchModel):
             ] + self.trainer.SPACE
         elif model_name in [
             "FastFormerSeq",
+            "BiasFastFormerSeq",
+            "ConsGradFastFormerSeq",
+            "BiasConsGradFastFormerSeq",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
+            "BiasConsGradTransformerSeq",
         ]:
             return [
                 # `seq_embedding_dim` should be able to divided by `attn_heads`.
@@ -159,9 +171,13 @@ class TransformerLSTM(TorchModel):
             }
         elif model_name in [
             "FastFormerSeq",
+            "BiasFastFormerSeq",
+            "ConsGradFastFormerSeq",
+            "BiasConsGradFastFormerSeq",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
+            "BiasConsGradTransformerSeq",
         ]:
             return {
                 "seq_embedding_dim": 16,
@@ -364,47 +380,40 @@ class _TransformerSeqNN(AbstractNN):
 
 class _BiasTransformerSeqNN(_TransformerSeqNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        base_loss = self.default_loss_fn(y_pred, y_true)
-        if not self.training:
-            return base_loss
-        else:
-            where_weight = self.derived_feature_names.index("Sample Weight")
-            w = data[1 + where_weight]
-            return (base_loss * w).mean()
+        loss = self.default_loss_fn(y_pred, y_true)
+        where_weight = self.derived_feature_names.index("Sample Weight")
+        w = data[1 + where_weight]
+        loss = _BiasLoss()(loss, w)
+        return loss
 
 
 class _ConsGradTransformerSeqNN(_TransformerSeqNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        base_loss = self.default_loss_fn(y_pred, y_true)
-        implemented_features = ["Relative Mean Stress"]
-        feature_idx_mapping = {
-            x: self.cont_feature_names.index(x)
-            for x in implemented_features
-            if x in self.cont_feature_names
-        }
-        grad = torch.autograd.grad(
-            outputs=y_pred,
-            inputs=data[0],
-            grad_outputs=torch.ones_like(y_pred),
-            retain_graph=True,
-            create_graph=False,  # True to compute higher order derivatives, and is more expensive.
-        )[0]
-        feature_loss = torch.zeros((self.n_cont,))
-        for feature, idx in feature_idx_mapping.items():
-            grad_feature = grad[:, idx]
-            if feature == "Relative Mean Stress":
-                feature_loss[idx] = torch.mean(nn.ReLU()(grad_feature) ** 2)
-            else:
-                raise Exception(
-                    f"Operation on the gradient of feature {feature} is not implemented."
-                )
+        loss = self.default_loss_fn(y_pred, y_true)
+        loss = _ConsGrad()(
+            base_loss=loss,
+            y_pred=y_pred,
+            n_cont=self.n_cont,
+            cont_feature_names=self.cont_feature_names,
+            *data,
+        )
+        return loss
 
-        base_loss += torch.sum(feature_loss) * 1e2
-        return base_loss
 
-    def _set_balance_w(self, idx, base_loss, feature_loss):
-        if self.balance_w[idx] == 0:
-            self.balance_w[idx] = base_loss / feature_loss[idx] / 10
+class _BiasConsGradTransformerSeqNN(_TransformerSeqNN):
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        where_weight = self.derived_feature_names.index("Sample Weight")
+        w = data[1 + where_weight]
+        loss = _BiasLoss()(loss, w)
+        loss = _ConsGrad()(
+            base_loss=loss,
+            y_pred=y_pred,
+            n_cont=self.n_cont,
+            cont_feature_names=self.cont_feature_names,
+            *data,
+        )
+        return loss
 
 
 class _CatEmbedLSTMNN(AbstractNN):
@@ -495,13 +504,11 @@ class _CatEmbedLSTMNN(AbstractNN):
 
 class _BiasCatEmbedLSTMNN(_CatEmbedLSTMNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        base_loss = self.default_loss_fn(y_pred, y_true)
-        if not self.training:
-            return base_loss
-        else:
-            where_weight = self.derived_feature_names.index("Sample Weight")
-            w = data[1 + where_weight]
-            return (base_loss * w).mean()
+        loss = self.default_loss_fn(y_pred, y_true)
+        where_weight = self.derived_feature_names.index("Sample Weight")
+        w = data[1 + where_weight]
+        loss = _BiasLoss()(loss, w)
+        return loss
 
 
 class _FastFormerSeqNN(AbstractNN):
@@ -587,6 +594,44 @@ class _FastFormerSeqNN(AbstractNN):
         output = torch.concat(all_res, dim=1)
         output = self.w(output)
         return output
+
+
+class _ConsGradFastFormerSeqNN(_FastFormerSeqNN):
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        loss = _ConsGrad()(
+            base_loss=loss,
+            y_pred=y_pred,
+            n_cont=self.n_cont,
+            cont_feature_names=self.cont_feature_names,
+            *data,
+        )
+        return loss
+
+
+class _BiasFastFormerSeqNN(_FastFormerSeqNN):
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        where_weight = self.derived_feature_names.index("Sample Weight")
+        w = data[1 + where_weight]
+        loss = _BiasLoss()(loss, w)
+        return loss
+
+
+class _BiasConsGradFastFormerSeqNN(_FastFormerSeqNN):
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        where_weight = self.derived_feature_names.index("Sample Weight")
+        w = data[1 + where_weight]
+        loss = _BiasLoss()(loss, w)
+        loss = _ConsGrad()(
+            base_loss=loss,
+            y_pred=y_pred,
+            n_cont=self.n_cont,
+            cont_feature_names=self.cont_feature_names,
+            *data,
+        )
+        return loss
 
 
 class _SN(nn.Module):
@@ -1006,3 +1051,49 @@ class _SeqFTTransformer(_FTTransformer):
 
     def _manual_activate(self):
         return False
+
+
+class _BiasLoss(nn.Module):
+    def forward(self, base_loss, w):
+        if not self.training:
+            return base_loss
+        return (base_loss * w).mean()
+
+
+class _ConsGrad(nn.Module):
+    def forward(
+        self,
+        *data,
+        **kwargs,
+    ):
+        base_loss: torch.Tensor = kwargs["base_loss"]
+        y_pred: torch.Tensor = kwargs["y_pred"]
+        n_cont: int = kwargs["n_cont"]
+        cont_feature_names: List[str] = kwargs["cont_feature_names"]
+        implemented_features = ["Relative Mean Stress"]
+        if not self.training:
+            return base_loss
+        feature_idx_mapping = {
+            x: cont_feature_names.index(x)
+            for x in implemented_features
+            if x in cont_feature_names
+        }
+        grad = torch.autograd.grad(
+            outputs=y_pred,
+            inputs=data[0],
+            grad_outputs=torch.ones_like(y_pred),
+            retain_graph=True,
+            create_graph=False,  # True to compute higher order derivatives, and is more expensive.
+        )[0]
+        feature_loss = torch.zeros((n_cont,))
+        for feature, idx in feature_idx_mapping.items():
+            grad_feature = grad[:, idx]
+            if feature == "Relative Mean Stress":
+                feature_loss[idx] = torch.mean(nn.ReLU()(grad_feature) ** 2)
+            else:
+                raise Exception(
+                    f"Operation on the gradient of feature {feature} is not implemented."
+                )
+
+        base_loss = base_loss + torch.sum(feature_loss) * 1e3
+        return base_loss
