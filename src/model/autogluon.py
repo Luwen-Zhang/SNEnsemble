@@ -146,6 +146,10 @@ class AutoGluon(AbstractModel):
         return name_mapping
 
     def _space(self, model_name):
+        """
+        Spaces are selected according to the official definitions of AutoGluon.
+        See autogluon.tabular.predictor.predictor.py for references of each model.
+        """
         space_dict = {
             "LightGBM": [
                 Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),

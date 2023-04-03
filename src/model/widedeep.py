@@ -8,6 +8,9 @@ class WideDeep(AbstractModel):
         return "WideDeep"
 
     def _space(self, model_name):
+        """
+        Spaces are selected around default parameters.
+        """
         _space_dict = {
             "TabMlp": [
                 Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),

@@ -172,6 +172,9 @@ class PytorchTabular(AbstractModel):
         ]
 
     def _space(self, model_name):
+        """
+        Spaces are selected around default parameters.
+        """
         space_dict = {
             "Category Embedding": [
                 Real(low=0, high=0.5, prior="uniform", name="dropout"),  # 0.5
