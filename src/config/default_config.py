@@ -12,7 +12,7 @@ class DefaultConfig:
             "batch_size": 1024,
             "static_params": ["patience", "epoch"],
             "chosen_params": ["lr", "weight_decay", "batch_size"],
-            "layers": [16, 64, 128, 128, 64, 16],
+            "layers": [64, 128, 256, 128, 64],
             "n_calls": 50,
             "SPACEs": {
                 "lr": {
