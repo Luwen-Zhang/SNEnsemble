@@ -13,6 +13,7 @@ class PytorchTabular(AbstractModel):
         from functools import partialmethod
         from pytorch_tabular.config import ExperimentRunManager
 
+        erm_original_init = ExperimentRunManager.__init__
         ExperimentRunManager.__init__ = partialmethod(
             ExperimentRunManager.__init__,
             exp_version_manager=os.path.join(self.root, "exp_version_manager.yml"),
@@ -77,6 +78,7 @@ class PytorchTabular(AbstractModel):
                 trainer_config=trainer_config,
             )
         tabular_model.config["progress_bar_refresh_rate"] = 0
+        ExperimentRunManager.__init__ = erm_original_init
         return tabular_model
 
     def _train_data_preprocess(
