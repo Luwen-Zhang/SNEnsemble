@@ -9,7 +9,7 @@ from ._transformer.fttransformer import PositionalEncoding, TransformerEncoder
 from ._transformer.fasttransformer import FastformerEncoder
 
 
-class TransformerLSTM(TorchModel):
+class Transformer(TorchModel):
     def __init__(
         self,
         trainer,
@@ -18,19 +18,21 @@ class TransformerLSTM(TorchModel):
         *args,
         **kwargs,
     ):
-        super(TransformerLSTM, self).__init__(trainer, *args, **kwargs)
+        super(Transformer, self).__init__(trainer, *args, **kwargs)
         self.manual_activate_sn = manual_activate_sn
         self.layers = layers
 
     def _get_program_name(self):
-        return "TransformerLSTM"
+        return "Transformer"
 
     def _get_model_names(self):
         return [
+            "FastFormer",
             "FastFormerSeq",
             "BiasFastFormerSeq",
             "ConsGradFastFormerSeq",
             "BiasConsGradFastFormerSeq",
+            "FTTransformer",
             "TransformerLSTM",
             "TransformerSeq",
             "BiasTransformerSeq",
@@ -64,7 +66,25 @@ class TransformerLSTM(TorchModel):
                 attn_layers=kwargs["attn_layers"],
                 attn_heads=kwargs["attn_heads"],
                 embed_dropout=kwargs["embed_dropout"],
-                transformer_dropout=kwargs["transformer_dropout"],
+                attn_dropout=kwargs["attn_dropout"],
+            )
+        elif model_name in [
+            "FTTransformer",
+            "FastFormer",
+        ]:
+            cls = getattr(sys.modules[__name__], f"_{model_name}NN")
+            return cls(
+                len(self.trainer.cont_feature_names),
+                len(self.trainer.label_name),
+                trainer=self.trainer,
+                cat_num_unique=[
+                    len(x) for x in self.trainer.cat_feature_mapping.values()
+                ],
+                embedding_dim=kwargs["embedding_dim"],
+                embed_dropout=kwargs["embed_dropout"],
+                attn_layers=kwargs["attn_layers"],
+                attn_heads=kwargs["attn_heads"],
+                attn_dropout=kwargs["attn_dropout"],
             )
         elif model_name in [
             "FastFormerSeq",
@@ -89,10 +109,13 @@ class TransformerLSTM(TorchModel):
                 ],
                 seq_embedding_dim=kwargs["seq_embedding_dim"],
                 embedding_dim=kwargs["embedding_dim"],
+                embed_dropout=kwargs["embed_dropout"],
                 attn_layers=kwargs["attn_layers"],
                 attn_heads=kwargs["attn_heads"],
-                embed_dropout=kwargs["embed_dropout"],
-                transformer_dropout=kwargs["transformer_dropout"],
+                attn_dropout=kwargs["attn_dropout"],
+                seq_attn_layers=kwargs["seq_attn_layers"],
+                seq_attn_heads=kwargs["seq_attn_heads"],
+                seq_attn_dropout=kwargs["seq_attn_dropout"],
             )
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
             cls = getattr(sys.modules[__name__], f"_{model_name}NN")
@@ -124,7 +147,18 @@ class TransformerLSTM(TorchModel):
                 Integer(low=2, high=4, prior="uniform", name="attn_layers", dtype=int),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+            ] + self.trainer.SPACE
+        elif model_name in [
+            "FTTransformer",
+            "FastFormer",
+        ]:
+            return [
+                Categorical(categories=[8, 16, 32], name="embedding_dim"),
+                Integer(low=2, high=4, prior="uniform", name="attn_layers", dtype=int),
+                Categorical(categories=[2, 4, 8], name="attn_heads"),
+                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
             ] + self.trainer.SPACE
         elif model_name in [
             "FastFormerSeq",
@@ -143,7 +177,12 @@ class TransformerLSTM(TorchModel):
                 Integer(low=2, high=4, prior="uniform", name="attn_layers", dtype=int),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Real(low=0.0, high=0.3, prior="uniform", name="transformer_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+                Integer(
+                    low=2, high=4, prior="uniform", name="seq_attn_layers", dtype=int
+                ),
+                Categorical(categories=[2, 4, 8], name="seq_attn_heads"),
+                Real(low=0.0, high=0.3, prior="uniform", name="seq_attn_dropout"),
             ] + self.trainer.SPACE
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
             return [
@@ -164,7 +203,21 @@ class TransformerLSTM(TorchModel):
                 "attn_layers": 4,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
-                "transformer_dropout": 0.2,
+                "attn_dropout": 0.2,
+                "lr": 0.003,
+                "weight_decay": 0.002,
+                "batch_size": 1024,
+            }
+        elif model_name in [
+            "FTTransformer",
+            "FastFormer",
+        ]:
+            return {
+                "embedding_dim": 32,
+                "attn_layers": 4,
+                "attn_heads": 8,
+                "embed_dropout": 0.1,
+                "attn_dropout": 0.2,
                 "lr": 0.003,
                 "weight_decay": 0.002,
                 "batch_size": 1024,
@@ -185,7 +238,10 @@ class TransformerLSTM(TorchModel):
                 "attn_layers": 4,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
-                "transformer_dropout": 0.2,
+                "attn_dropout": 0.2,
+                "seq_attn_layers": 4,
+                "seq_attn_heads": 8,
+                "seq_attn_dropout": 0.2,
                 "lr": 0.003,
                 "weight_decay": 0.002,
                 "batch_size": 1024,
@@ -208,7 +264,54 @@ class TransformerLSTM(TorchModel):
         return True
 
 
-class _TransformerLSTMNN(AbstractNN):
+class _FTTransformerNN(AbstractNN):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        trainer,
+        cat_num_unique: List[int] = None,
+        embedding_dim=32,
+        embed_dropout=0.1,
+        attn_layers=4,
+        attn_heads=8,
+        attn_ff_dim=256,
+        attn_dropout=0.1,
+        use_torch_transformer=False,
+        flatten_transformer=True,
+    ):
+        super(_FTTransformerNN, self).__init__(trainer)
+        self.n_cont = n_inputs
+        self.n_outputs = n_outputs
+        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
+
+        self.embed = _Embedding(
+            embedding_dim,
+            n_inputs,
+            embed_dropout,
+            cat_num_unique,
+            run_cat="categorical" in self.derived_feature_names,
+        )
+        self.embed_transformer = _FTTransformer(
+            n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_cont,
+            attn_heads=attn_heads,
+            attn_layers=attn_layers,
+            embedding_dim=embedding_dim,
+            ff_dim=attn_ff_dim,
+            ff_layers=[],
+            dropout=attn_dropout,
+            n_outputs=n_outputs,
+            use_torch_transformer=use_torch_transformer,
+            flatten_transformer=flatten_transformer,
+        )
+
+    def _forward(self, x, derived_tensors):
+        x_embed = self.embed(x, derived_tensors)
+        x_trans = self.embed_transformer(x_embed, derived_tensors)
+        return x_trans
+
+
+class _TransformerLSTMNN(_FTTransformerNN):
     def __init__(
         self,
         n_inputs,
@@ -226,34 +329,25 @@ class _TransformerLSTMNN(AbstractNN):
         attn_heads=8,
         flatten_transformer=True,
         embed_dropout=0.1,
-        transformer_ff_dim=256,
-        transformer_dropout=0.1,
+        attn_ff_dim=256,
+        attn_dropout=0.1,
         use_torch_transformer=False,
     ):
-        super(_TransformerLSTMNN, self).__init__(trainer)
-        self.n_cont = n_inputs
-        self.n_outputs = n_outputs
-        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
-
-        self.embed = _Embedding(
-            embedding_dim,
-            n_inputs,
-            embed_dropout,
-            cat_num_unique,
-            run_cat="categorical" in self.derived_feature_names,
-        )
-        self.transformer = _FTTransformer(
-            n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_cont,
-            attn_heads=attn_heads,
-            attn_layers=attn_layers,
-            embedding_dim=embedding_dim,
-            ff_dim=transformer_ff_dim,
-            ff_layers=[],
-            dropout=transformer_dropout,
+        super(_TransformerLSTMNN, self).__init__(
+            n_inputs=n_inputs,
             n_outputs=n_outputs,
+            trainer=trainer,
+            cat_num_unique=cat_num_unique,
+            embedding_dim=embedding_dim,
+            embed_dropout=embed_dropout,
+            attn_layers=attn_layers,
+            attn_heads=attn_heads,
+            attn_ff_dim=attn_ff_dim,
+            attn_dropout=attn_dropout,
             use_torch_transformer=use_torch_transformer,
             flatten_transformer=flatten_transformer,
         )
+
         self.lstm = _LSTM(
             n_hidden,
             seq_embedding_dim,
@@ -291,7 +385,7 @@ class _TransformerLSTMNN(AbstractNN):
         return output
 
 
-class _TransformerSeqNN(AbstractNN):
+class _TransformerSeqNN(_FTTransformerNN):
     def __init__(
         self,
         n_inputs,
@@ -303,46 +397,40 @@ class _TransformerSeqNN(AbstractNN):
         cat_num_unique: List[int] = None,
         embedding_dim=32,
         seq_embedding_dim=16,
+        embed_dropout=0.1,
         attn_layers=4,
         attn_heads=8,
-        flatten_transformer=True,
-        embed_dropout=0.1,
-        transformer_ff_dim=256,
-        transformer_dropout=0.1,
+        attn_ff_dim=256,
+        attn_dropout=0.1,
+        seq_attn_layers=4,
+        seq_attn_heads=8,
+        seq_attn_dropout=0.1,
         use_torch_transformer=False,
+        flatten_transformer=True,
     ):
-        super(_TransformerSeqNN, self).__init__(trainer)
-        self.n_cont = n_inputs
-        self.n_outputs = n_outputs
-        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
-
-        self.embed = _Embedding(
-            embedding_dim,
-            n_inputs,
-            embed_dropout,
-            cat_num_unique,
-            run_cat="categorical" in self.derived_feature_names,
-        )
-        self.embed_transformer = _FTTransformer(
-            n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_cont,
-            attn_heads=attn_heads,
-            attn_layers=attn_layers,
-            embedding_dim=embedding_dim,
-            ff_dim=transformer_ff_dim,
-            ff_layers=[],
-            dropout=transformer_dropout,
+        super(_TransformerSeqNN, self).__init__(
+            n_inputs=n_inputs,
             n_outputs=n_outputs,
+            trainer=trainer,
+            cat_num_unique=cat_num_unique,
+            embedding_dim=embedding_dim,
+            embed_dropout=embed_dropout,
+            attn_layers=attn_layers,
+            attn_heads=attn_heads,
+            attn_ff_dim=attn_ff_dim,
+            attn_dropout=attn_dropout,
             use_torch_transformer=use_torch_transformer,
             flatten_transformer=flatten_transformer,
         )
+
         self.seq_transformer = _SeqFTTransformer(
             n_inputs=None,
-            attn_heads=attn_heads,
-            attn_layers=attn_layers,
+            attn_heads=seq_attn_heads,
+            attn_layers=seq_attn_layers,
             embedding_dim=seq_embedding_dim,
-            ff_dim=transformer_ff_dim,
+            ff_dim=attn_ff_dim,
             ff_layers=layers,
-            dropout=transformer_dropout,
+            dropout=seq_attn_dropout,
             n_outputs=n_outputs,
             run="Lay-up Sequence" in self.derived_feature_names
             and "Number of Layers" in self.derived_feature_names,
@@ -513,26 +601,22 @@ class _BiasCatEmbedLSTMNN(_CatEmbedLSTMNN):
         return loss
 
 
-class _FastFormerSeqNN(AbstractNN):
+class _FastFormerNN(AbstractNN):
     def __init__(
         self,
         n_inputs,
         n_outputs,
-        layers,
         trainer,
-        manual_activate_sn=None,
-        sn_coeff_vars_idx=None,
         cat_num_unique: List[int] = None,
         embedding_dim=32,
-        seq_embedding_dim=16,
+        embed_dropout=0.1,
         attn_layers=4,
         attn_heads=8,
+        attn_ff_dim=256,
+        attn_dropout=0.1,
         flatten_transformer=True,
-        embed_dropout=0.1,
-        transformer_ff_dim=256,
-        transformer_dropout=0.1,
     ):
-        super(_FastFormerSeqNN, self).__init__(trainer)
+        super(_FastFormerNN, self).__init__(trainer)
         self.n_cont = n_inputs
         self.n_outputs = n_outputs
         self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
@@ -549,20 +633,62 @@ class _FastFormerSeqNN(AbstractNN):
             attn_heads=attn_heads,
             attn_layers=attn_layers,
             embedding_dim=embedding_dim,
-            ff_dim=transformer_ff_dim,
+            ff_dim=attn_ff_dim,
             ff_layers=[],
-            dropout=transformer_dropout,
+            dropout=attn_dropout,
             n_outputs=n_outputs,
+            flatten_transformer=flatten_transformer,
+        )
+
+    def _forward(self, x, derived_tensors):
+        x_embed = self.embed(x, derived_tensors)
+        x_trans = self.embed_transformer(x_embed, derived_tensors)
+        return x_trans
+
+
+class _FastFormerSeqNN(_FastFormerNN):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        manual_activate_sn=None,
+        sn_coeff_vars_idx=None,
+        cat_num_unique: List[int] = None,
+        embedding_dim=32,
+        seq_embedding_dim=16,
+        embed_dropout=0.1,
+        attn_layers=4,
+        attn_heads=8,
+        attn_ff_dim=256,
+        attn_dropout=0.1,
+        seq_attn_layers=4,
+        seq_attn_heads=8,
+        seq_attn_dropout=0.1,
+        flatten_transformer=True,
+    ):
+        super(_FastFormerSeqNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            cat_num_unique=cat_num_unique,
+            embedding_dim=embedding_dim,
+            embed_dropout=embed_dropout,
+            attn_layers=attn_layers,
+            attn_heads=attn_heads,
+            attn_ff_dim=attn_ff_dim,
+            attn_dropout=attn_dropout,
             flatten_transformer=flatten_transformer,
         )
         self.seq_transformer = _SeqFastFormer(
             n_inputs=None,
-            attn_heads=attn_heads,
-            attn_layers=attn_layers,
+            attn_heads=seq_attn_heads,
+            attn_layers=seq_attn_layers,
             embedding_dim=seq_embedding_dim,
-            ff_dim=transformer_ff_dim,
+            ff_dim=attn_ff_dim,
             ff_layers=layers,
-            dropout=transformer_dropout,
+            dropout=seq_attn_dropout,
             n_outputs=n_outputs,
             run="Lay-up Sequence" in self.derived_feature_names
             and "Number of Layers" in self.derived_feature_names,

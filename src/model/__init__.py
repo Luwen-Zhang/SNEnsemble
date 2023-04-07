@@ -11,7 +11,7 @@ from .thiswork_sn import ThisWorkRidge
 from .thiswork_sn import ThisWorkPretrain
 from .mlp import MLP
 from .util_model import RFE
-from .transformer import TransformerLSTM
+from .transformer import Transformer
 from .util_model import ModelAssembly
 
 __all__ = [
@@ -27,6 +27,6 @@ __all__ = [
     "ThisWorkPretrain",
     "MLP",
     "RFE",
-    "TransformerLSTM",
+    "Transformer",
     "ModelAssembly",
 ]
