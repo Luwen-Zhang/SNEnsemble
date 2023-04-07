@@ -88,15 +88,15 @@ class Trainer:
     ) -> None:
         """
         Load a configfile in json format.
-        Arguments passed to python when executing the script is parsed if ``configfile_path`` is left None. All keys in
-        ``config.DefaultConfig().available_keys()`` can be parsed, for example:
+        Arguments passed to python when executing the script are parsed if ``configfile_path`` is left None. All keys in
+        ``src.config.DefaultConfig().available_keys()`` can be parsed, for example:
             For the loss function: ``--loss mse``,
 
             For the total epoch: ``--epoch 200``,
 
             For the option for bayes opt: ``--bayes_opt`` to turn on bayes opt, ``--no-bayes_opt`` to turn off.
 
-        Default values can be seen in config.DefaultConfig().defaults().
+        Default values can be seen in ``src.config.DefaultConfig().defaults()``.
 
         The loaded configuration will be saved in the project folder.
 
@@ -113,7 +113,7 @@ class Trainer:
             ``manual_config={"bayes_opt": True}``
         project_root_subfolder
             The subfolder that the project will locate in. The folder name will be
-            ``{PATH OF THE MAIN SCRIPT}/output/{project}/{project_root_subfolder}/{TIME AT EXECUTION}-{configfile_path}``
+            ``{PATH OF THE MAIN SCRIPT}/output/{project}/{project_root_subfolder}/{TIME OF EXECUTION}-{configfile_path}``
         """
         base_config = DefaultConfig().cfg
 
@@ -261,12 +261,12 @@ class Trainer:
     def set_data_splitter(self, name: str, verbose=True):
         """
         Set the data splitter after ``load_config``. The specified splitter should be implemented in
-        data/datasplitter.py. Also, data splitter can be set directly using ``trainer.datasplitter = YourSplitter()``
+        `data/datasplitter.py`. Also, data splitter can be set directly using ``trainer.datasplitter = YourSplitter()``
 
         Parameters
         ----------
         name
-            The name of a data splitter implemented in data/datasplitter.py.
+            The name of a data splitter implemented in `data/datasplitter.py`.
         verbose
             Ignored.
         """
@@ -277,12 +277,12 @@ class Trainer:
     def set_data_imputer(self, name, verbose=True):
         """
         Set the data imputer after ``load_config``. The specified splitter should be implemented in
-        data/dataimputer.py. Also, data imputer can be set directly using ``trainer.dataimputer = YourImputer()``
+        `data/dataimputer.py`. Also, data imputer can be set directly using ``trainer.dataimputer = YourImputer()``
 
         Parameters
         ----------
         name
-            The name of a data imputer implemented in data/dataimputer.py.
+            The name of a data imputer implemented in `data/dataimputer.py`.
         verbose
             Ignored.
         """
@@ -293,7 +293,7 @@ class Trainer:
     def set_data_processors(self, config: List[Tuple[str, Dict]], verbose=True):
         """
         Set a list of data processors with the name and arguments for each data processors. The processor should be
-        implemented in data/dataprocessor.py. Also, data processors can be set directly using
+        implemented in `data/dataprocessor.py`. Also, data processors can be set directly using
         ``trainer.dataprocessors = [(YourProcessor(), A Dict of kwargs) for EACH DATA PROCESSOR]``
 
         Parameters
@@ -305,7 +305,7 @@ class Trainer:
 
         Notes
         ----------
-        The UnscaledDataRecorder should be set before any scaling processor. If not found in the input, it will be
+        The `UnscaledDataRecorder` should be set before any scaling processor. If not found in the input, it will be
         appended at the end.
         """
         from src.data.dataprocessor import get_data_processor
@@ -817,8 +817,8 @@ class Trainer:
 
     def categories_inverse_transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Inverse transformation of data.dataprocessor.OrdinalEncoder of categorical features (If there is one in
-        self.dataprocessors).
+        Inverse transformation of `data.dataprocessor.OrdinalEncoder` of categorical features (If there is one in
+        `self.dataprocessors`).
 
         Parameters
         ----------
@@ -1817,8 +1817,8 @@ class Trainer:
         Returns
         -------
         attr
-            The SHAP values. If the modelbase is a TorchModel, all features including derived unstacked features will
-            be included. Otherwise, only Trainer.all_feature_names will be considered.
+            The SHAP values. If the modelbase is a `TorchModel`, all features including derived unstacked features will
+            be included. Otherwise, only `Trainer.all_feature_names` will be considered.
         """
         from src.model.base import TorchModel
         import shap
