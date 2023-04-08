@@ -106,7 +106,7 @@ class Trainer:
             ``argparse.ArgumentParser`` is used for other purposes. If the path does not contain "/" or is not a file,
             the file ``configs/{config}``(.json/.py) will be read. The path can end with or without .json/.py.
         verbose
-            Whether to print the loaded configuration.
+            Verbosity.
         manual_config
             Set configurations after the config file is loaded with a dict. For example:
             ``manual_config={"bayes_opt": True}``
