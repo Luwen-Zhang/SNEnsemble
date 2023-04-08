@@ -1,6 +1,6 @@
 from src.utils import *
 from src.model import AbstractModel
-from skopt.space import Real, Integer, Categorical
+from skopt.space import Real, Integer
 
 
 class TabNet(AbstractModel):
@@ -93,9 +93,9 @@ class TabNet(AbstractModel):
             y_train,
             eval_set=eval_set,
             max_epochs=epoch,
-            patience=self.trainer.bayes_epoch,
-            loss_fn=self.trainer.loss_fn,
-            eval_metric=[self.trainer.loss],
+            patience=self.trainer.args["global_params"]["patience"],
+            loss_fn=self.trainer.get_loss_fn(),
+            eval_metric=[self.trainer.args["loss"]],
             batch_size=int(kwargs["batch_size"]),
             warm_start=warm_start,
         )
@@ -123,7 +123,7 @@ class TabNet(AbstractModel):
             "gamma": 1.3,
             "n_independent": 2,
             "n_shared": 2,
-            "lr": self.trainer.chosen_params["lr"],
-            "weight_decay": self.trainer.chosen_params["weight_decay"],
-            "batch_size": self.trainer.chosen_params["batch_size"],
+            "lr": self.trainer.args["global_params"]["lr"],
+            "weight_decay": self.trainer.args["global_params"]["weight_decay"],
+            "batch_size": self.trainer.args["global_params"]["batch_size"],
         }

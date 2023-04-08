@@ -23,7 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Any, List, Tuple, Union
+from typing import Tuple, Union
 import numpy as np
 from sklearn.base import TransformerMixin
 import torch

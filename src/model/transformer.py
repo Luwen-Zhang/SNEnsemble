@@ -52,7 +52,9 @@ class Transformer(TorchModel):
             return _TransformerLSTMNN(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
-                self.trainer.layers if self.layers is None else self.layers,
+                self.trainer.args["global_params"]["layers"]
+                if self.layers is None
+                else self.layers,
                 trainer=self.trainer,
                 manual_activate_sn=self.manual_activate_sn,
                 sn_coeff_vars_idx=sn_coeff_vars_idx,
@@ -100,7 +102,9 @@ class Transformer(TorchModel):
             return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
-                self.trainer.layers if self.layers is None else self.layers,
+                self.trainer.args["global_params"]["layers"]
+                if self.layers is None
+                else self.layers,
                 trainer=self.trainer,
                 manual_activate_sn=self.manual_activate_sn,
                 sn_coeff_vars_idx=sn_coeff_vars_idx,
@@ -122,7 +126,9 @@ class Transformer(TorchModel):
             return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
-                self.trainer.layers if self.layers is None else self.layers,
+                self.trainer.args["global_params"]["layers"]
+                if self.layers is None
+                else self.layers,
                 trainer=self.trainer,
                 manual_activate_sn=self.manual_activate_sn,
                 sn_coeff_vars_idx=sn_coeff_vars_idx,
@@ -1183,7 +1189,7 @@ class _SeqFTTransformer(_FTTransformer):
         return False
 
 
-def _BiasLoss(training, base_loss, w):
+def _BiasLoss(training, base_loss: torch.Tensor, w: torch.Tensor):
     if not training:
         return base_loss
     return (base_loss * w).mean()
@@ -1219,5 +1225,5 @@ def _ConsGrad(training, *data, **kwargs):
                 f"Operation on the gradient of feature {feature} is not implemented."
             )
 
-    base_loss = base_loss + torch.sum(feature_loss) * 1e3
+    base_loss = base_loss + torch.mul(torch.sum(feature_loss), 1e3)
     return base_loss

@@ -1,5 +1,4 @@
 import pickle
-import warnings
 import torch.optim.optimizer
 import src
 from src.utils import *
@@ -11,7 +10,6 @@ import torch.nn as nn
 from copy import deepcopy as cp
 from typing import *
 from skopt.space import Real, Integer, Categorical
-from tqdm.auto import tqdm
 import time
 from contextlib import nullcontext
 
@@ -45,8 +43,8 @@ class AbstractModel:
         """
         self.device = trainer.device
         self.trainer = trainer
-        if not hasattr(trainer, "database"):
-            trainer.load_config(configfile_path="base_config")
+        if not hasattr(trainer, "args"):
+            trainer.load_config(configfile="base_config")
         self.model = None
         self.leaderboard = None
         self.model_subset = model_subset
@@ -111,8 +109,8 @@ class AbstractModel:
             verbose=verbose,
             all_training=True,
         )
-        if bayes_opt != self.trainer.bayes_opt:
-            self.trainer.bayes_opt = bayes_opt
+        if bayes_opt != self.trainer.args["bayes_opt"]:
+            self.trainer.args["bayes_opt"] = bayes_opt
             if verbose:
                 print(
                     f"The argument bayes_opt of fit() conflicts with Trainer.bayes_opt. Use the former one."
@@ -430,7 +428,9 @@ class AbstractModel:
             y_test,
         ) = self._train_data_preprocess(*data)
         self.total_epoch = (
-            self.trainer.args["epoch"] if not src.setting["debug_mode"] else 2
+            self.trainer.args["global_params"]["epoch"]
+            if not src.setting["debug_mode"]
+            else 2
         )
         if self.model is None:
             if self.store_in_harddisk:
@@ -445,10 +445,10 @@ class AbstractModel:
                 print(f"Training {model_name}")
             tmp_params = self._get_params(model_name, verbose=verbose)
             space = self._space(model_name=model_name)
-            if self.trainer.bayes_opt and not warm_start and len(space) > 0:
+            if self.trainer.args["bayes_opt"] and not warm_start and len(space) > 0:
                 min_calls = len(tmp_params)
                 callback = BayesCallback(
-                    total=self.trainer.n_calls
+                    total=self.trainer.args["global_params"]["n_calls"]
                     if not src.setting["debug_mode"]
                     else min_calls
                 )
@@ -463,7 +463,7 @@ class AbstractModel:
 
                         self._train_single_model(
                             model,
-                            epoch=self.trainer.args["bayes_epoch"]
+                            epoch=self.trainer.args["global_params"]["bayes_epoch"]
                             if not src.setting["debug_mode"]
                             else 1,
                             X_train=X_train,
@@ -480,7 +480,7 @@ class AbstractModel:
 
                     pred = self._pred_single_model(model, X_val, D_val, verbose=False)
                     try:
-                        res = metric_sklearn(pred, y_val, self.trainer.loss)
+                        res = metric_sklearn(pred, y_val, self.trainer.args["loss"])
                     except Exception as e:
                         print(
                             f"An exception occurs when evaluating a bayes call: {e}. Returning a large value instead."
@@ -498,7 +498,7 @@ class AbstractModel:
                     result = gp_minimize(
                         _bayes_objective,
                         self._space(model_name=model_name),
-                        n_calls=self.trainer.n_calls
+                        n_calls=self.trainer.args["global_params"]["n_calls"]
                         if not src.setting["debug_mode"]
                         else min_calls,
                         n_initial_points=10 if not src.setting["debug_mode"] else 0,
@@ -1159,7 +1159,7 @@ class AbstractNN(nn.Module):
             A Trainer instance.
         """
         super(AbstractNN, self).__init__()
-        self.default_loss_fn = trainer.loss_fn
+        self.default_loss_fn = trainer.get_loss_fn()
         self.cont_feature_names = cp(trainer.cont_feature_names)
         self.cat_feature_names = cp(trainer.cat_feature_names)
         self.derived_feature_names = list(trainer.derived_data.keys())

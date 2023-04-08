@@ -11,6 +11,7 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import StandardScaler as skStandardScaler
 from sklearn.preprocessing import OrdinalEncoder
 from typing import Type
+import shap
 
 
 class LackDataMaterialRemover(AbstractProcessor):

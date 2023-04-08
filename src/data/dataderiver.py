@@ -275,7 +275,7 @@ class DriveCoeffDeriver(AbstractDeriver):
 
         mlp = MLP(mlp_trainer)
         mlp_trainer.modelbases = []
-        mlp_trainer.bayes_opt = False
+        mlp_trainer.args["bayes_opt"] = False
         mlp_trainer.add_modelbases([mlp])
         mlp.train(verbose=False)
         with HiddenPrints():

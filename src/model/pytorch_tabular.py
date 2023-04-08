@@ -1,7 +1,6 @@
 from src.utils import *
 from src.model import AbstractModel
-from skopt.space import Integer, Categorical, Real
-import src
+from skopt.space import Integer, Real
 import shutil
 
 
@@ -137,7 +136,7 @@ class PytorchTabular(AbstractModel):
             model.fit(
                 train=train_data,
                 validation=val_data,
-                loss=self.trainer.loss_fn,
+                loss=self.trainer.get_loss_fn(),
                 max_epochs=epoch,
                 callbacks=[PytorchTabularCallback(verbose=verbose, total_epoch=epoch)],
             )

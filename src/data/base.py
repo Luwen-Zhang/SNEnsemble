@@ -1,11 +1,7 @@
-import numpy as np
-import pandas as pd
-
 from src.utils import *
 from src.trainer import Trainer
 from copy import deepcopy as cp
 from typing import *
-import sklearn
 
 
 class AbstractDeriver:

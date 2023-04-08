@@ -32,7 +32,7 @@ class ThisWork(TorchModel):
         return ThisWorkNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
-            self.trainer.layers,
+            self.trainer.args["global_params"]["layers"],
             activated_sn=self.activated_sn,
             trainer=self.trainer,
         )
@@ -76,7 +76,7 @@ class ThisWorkRidge(ThisWork):
         return ThisWorkRidgeNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
-            self.trainer.layers,
+            self.trainer.args["global_params"]["layers"],
             activated_sn=self.activated_sn,
             trainer=self.trainer,
         )
@@ -180,10 +180,10 @@ class ThisWorkPretrain(ThisWork):
         )
         tmp_kwargs["warm_start"] = True
         tmp_kwargs["verbose"] = verbose
-        tmp_bayes_opt = cp(self.trainer.bayes_opt)
-        self.trainer.bayes_opt = False
+        tmp_bayes_opt = cp(self.trainer.args["bayes_opt"])
+        self.trainer.args["bayes_opt"] = False
         self._train(*args, **tmp_kwargs)
-        self.trainer.bayes_opt = tmp_bayes_opt
+        self.trainer.args["bayes_opt"] = tmp_bayes_opt
 
         if verbose:
             print(f"\n-------------{self.program} End-------------\n")

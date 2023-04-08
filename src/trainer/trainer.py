@@ -3,7 +3,6 @@ The basic class for the project. It includes configuration, data processing, plo
 and comparing baseline models.
 """
 import os.path
-import warnings
 import sklearn.pipeline
 import src
 from src.utils import *
@@ -17,7 +16,6 @@ import torch.nn as nn
 import torch.cuda
 import torch.utils.data as Data
 from torch.utils.data import Subset
-import itertools
 import scipy.stats as st
 from captum.attr import FeaturePermutation
 from sklearn.utils import resample as skresample
@@ -81,7 +79,7 @@ class Trainer:
 
     def load_config(
         self,
-        configfile_path: str = None,
+        configfile: Union[str, UserConfig] = None,
         verbose: bool = True,
         manual_config: Dict = None,
         project_root_subfolder: str = None,
@@ -102,8 +100,9 @@ class Trainer:
 
         Parameters
         ----------
-        configfile_path
-            The path to the configfile. Arguments passed to python will be parsed; therefore, do not leave it empty when
+        configfile
+            Can be the path to the configfile or a UserConfig instance.
+            If it is a path. Arguments passed to python will be parsed; therefore, do not leave it empty when
             ``argparse.ArgumentParser`` is used for other purposes. If the path does not contain "/", the file
             ``configs/{configfile_path}``(.json) will be read. The path can end with or without .json.
         verbose
@@ -115,83 +114,85 @@ class Trainer:
             The subfolder that the project will locate in. The folder name will be
             ``{PATH OF THE MAIN SCRIPT}/output/{project}/{project_root_subfolder}/{TIME OF EXECUTION}-{configfile_path}``
         """
-        base_config = DefaultConfig().cfg
-
-        # The base config is loaded using the --base argument
-        if is_notebook() and configfile_path is None:
-            raise Exception("A config file must be assigned in notebook environment.")
-        elif is_notebook() or configfile_path is not None:
-            parse_res = {"base": configfile_path}
-        else:  # not notebook and configfile is None
-            parser = argparse.ArgumentParser()
-            parser.add_argument("--base", required=True)
-            for key in base_config.keys():
-                if type(base_config[key]) in [str, int, float]:
-                    parser.add_argument(
-                        f"--{key}", type=type(base_config[key]), required=False
-                    )
-                elif type(base_config[key]) == list:
-                    parser.add_argument(f"--{key}", nargs="+", required=False)
-                elif type(base_config[key]) == bool:
-                    parser.add_argument(f"--{key}", dest=key, action="store_true")
-                    parser.add_argument(f"--no-{key}", dest=key, action="store_false")
-                    parser.set_defaults(**{key: base_config[key]})
-            parse_res = parser.parse_args().__dict__
-
-        self.configfile = parse_res["base"]
-        arg_loaded = UserConfig(path=self.configfile).cfg
-
-        # Then, several args can be modified using other arguments like --lr, --weight_decay
-        # only when a config file is not given so that configs depend on input arguments.
-        if not is_notebook() and configfile_path is None:
-            for key, value in parse_res.items():
-                if value is not None:
-                    arg_loaded[key] = value
-
-        if manual_config is not None:
-            for key, value in manual_config.items():
-                if key in arg_loaded.keys():
-                    arg_loaded[key] = value
-                else:
-                    raise Exception(
-                        f"Manual configuration argument {key} not available."
-                    )
-
-        json_backup = cp(arg_loaded)
-        # Preprocess configs
-        tmp_static_params = {}
-        for key in arg_loaded["static_params"]:
-            tmp_static_params[key] = arg_loaded[key]
-        arg_loaded["static_params"] = tmp_static_params
-
-        tmp_chosen_params = {}
-        for key in arg_loaded["chosen_params"]:
-            tmp_chosen_params[key] = arg_loaded[key]
-        arg_loaded["chosen_params"] = tmp_chosen_params
-
-        key_chosen = list(arg_loaded["chosen_params"].keys())
-        key_space = list(arg_loaded["SPACEs"].keys())
-        for a, b in zip(key_chosen, key_space):
-            if a != b:
+        if isinstance(configfile, str) or configfile is None:
+            base_config = DefaultConfig().cfg
+            # The base config is loaded using the --base argument
+            if is_notebook() and configfile is None:
                 raise Exception(
-                    "Variables in 'chosen_params' and 'SPACEs' should be in the same order."
+                    "A config file must be assigned in notebook environment."
                 )
+            elif is_notebook() or configfile is not None:
+                parse_res = {"base": configfile}
+            else:  # not notebook and configfile is None
+                parser = argparse.ArgumentParser()
+                parser.add_argument("--base", required=True)
+                for key in base_config.keys():
+                    if type(base_config[key]) in [str, int, float]:
+                        parser.add_argument(
+                            f"--{key}", type=type(base_config[key]), required=False
+                        )
+                    elif type(base_config[key]) == list:
+                        parser.add_argument(f"--{key}", nargs="+", required=False)
+                    elif type(base_config[key]) == bool:
+                        parser.add_argument(f"--{key}", dest=key, action="store_true")
+                        parser.add_argument(
+                            f"--no-{key}", dest=key, action="store_false"
+                        )
+                        parser.set_defaults(**{key: base_config[key]})
+                parse_res = parser.parse_args().__dict__
 
-        self.args = arg_loaded
+            self.configfile = parse_res["base"]
+            config = UserConfig(path=self.configfile)
+            # Then, several args can be modified using other arguments like --lr, --weight_decay
+            # only when a config file is not given so that configs depend on input arguments.
+            if not is_notebook() and configfile is None:
+                config.merge_config(parse_res)
+            if manual_config is not None:
+                config.modify_config(manual_config)
+            self.args = config.cfg
+        else:
+            self.args = configfile.cfg
 
-        self.loss = self.args["loss"]
-        self.bayes_opt = self.args["bayes_opt"]
+        self.set_data_splitter(name=self.args["data_splitter"], verbose=verbose)
+        self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
+        self.set_data_processors(self.args["data_processors"], verbose=verbose)
+        self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
 
-        self.database = self.args["database"]
+        self.project = self.args["database"] if self.project is None else self.project
+        self._create_dir(project_root_subfolder=project_root_subfolder)
+        with open(os.path.join(self.project_root, "args.json"), "w") as f:
+            json.dump(self.args, f, indent=4)
 
-        self.static_params = self.args["static_params"]
-        self.chosen_params = self.args["chosen_params"]
-        self.layers = self.args["layers"]
-        self.n_calls = self.args["n_calls"]
+    @property
+    def static_params(self):
+        return {
+            "patience": self.args["global_params"]["patience"],
+            "epoch": self.args["global_params"]["epoch"],
+        }
 
+    @property
+    def chosen_params(self):
+        return {
+            "lr": self.args["global_params"]["lr"],
+            "weight_decay": self.args["global_params"]["weight_decay"],
+            "batch_size": self.args["global_params"]["batch_size"],
+        }
+
+    def get_loss_fn(self) -> Callable[[torch.Tensor, torch.Tensor], torch.Tensor]:
+        if self.args["loss"] == "mse":
+            return nn.MSELoss()
+        elif self.args["loss"] == "r2":
+            return r2_loss
+        elif self.args["loss"] == "mae":
+            return nn.L1Loss()
+        else:
+            raise Exception(f"Loss function {self.args['loss']} not implemented.")
+
+    @property
+    def SPACE(self):
         SPACE = []
-        for var in key_space:
-            setting = arg_loaded["SPACEs"][var]
+        for var in self.args["SPACEs"].keys():
+            setting = cp(self.args["SPACEs"][var])
             ty = setting["type"]
             setting.pop("type")
             if ty == "Real":
@@ -202,29 +203,7 @@ class Trainer:
                 SPACE.append(Integer(name=var, **setting))
             else:
                 raise Exception("Invalid type of skopt space.")
-        self.SPACE = SPACE
-
-        if self.loss == "mse":
-            self.loss_fn = nn.MSELoss()
-        elif self.loss == "r2":
-            self.loss_fn = r2_loss
-        elif self.loss == "mae":
-            self.loss_fn = nn.L1Loss()
-        else:
-            raise Exception(f"Loss function {self.loss} not implemented.")
-
-        self.bayes_epoch = self.args["bayes_epoch"]
-
-        self.set_data_splitter(name=self.args["data_splitter"], verbose=verbose)
-        self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
-        self.set_data_processors(self.args["data_processors"], verbose=verbose)
-        self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
-
-        self.project = self.database if self.project is None else self.project
-        self._create_dir(project_root_subfolder=project_root_subfolder)
-
-        with open(os.path.join(self.project_root, "args.json"), "w") as f:
-            json.dump(json_backup, f, indent=4)
+        return SPACE
 
     def _create_dir(self, verbose: bool = True, project_root_subfolder: str = None):
         """
@@ -430,7 +409,7 @@ class Trainer:
             Arguments for pd.read_excel or pd.read_csv, depending on file_type.
         """
         if data_path is None:
-            data_path = f"data/{self.database}.{file_type}"
+            data_path = f"data/{self.args['database']}.{file_type}"
         if file_type == "xlsx":
             self.df = pd.read_excel(data_path, engine="openpyxl", **kwargs)
         else:
@@ -833,7 +812,7 @@ class Trainer:
         from src.data.dataprocessor import CategoricalOrdinalEncoder
 
         for processor, _ in self.dataprocessors:
-            if type(processor) == CategoricalOrdinalEncoder:
+            if isinstance(processor, CategoricalOrdinalEncoder):
                 encoder = processor.transformer
                 cat_features = processor.record_cat_features
                 if len(cat_features) == 0:
@@ -1639,9 +1618,8 @@ class Trainer:
         # minposs = val_ls.index(min(val_ls))+1
         # ax.axvline(minposs, linestyle='--', color='r',label='Early Stopping Checkpoint')
         ax.legend()
-        ax.set_ylabel("MSE Loss")
         ax.set_xlabel("Epoch")
-        ax.set_ylabel(f"{self.loss.upper()} Loss")
+        ax.set_ylabel(f"{self.args['loss'].upper()} Loss")
         plt.savefig(os.path.join(self.project_root, "loss_epoch.pdf"))
         if is_notebook():
             plt.show()
@@ -1733,7 +1711,9 @@ class Trainer:
                         modelbase.model[model_name], loader
                     )
                     loss = float(
-                        self._metric_sklearn(ground_truth, prediction, self.loss)
+                        self._metric_sklearn(
+                            ground_truth, prediction, self.args["loss"]
+                        )
                     )
                     return loss
 

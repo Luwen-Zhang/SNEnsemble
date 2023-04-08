@@ -1,7 +1,6 @@
 import os.path
 from src.utils import *
 from src.model import AbstractModel
-from src.trainer import save_trainer
 from skopt.space import Integer, Categorical, Real
 from typing import Dict
 import shutil
