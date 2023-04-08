@@ -1233,7 +1233,7 @@ class Trainer:
     def train(
         self,
         programs: List[str] = None,
-        verbose: bool = False,
+        verbose: bool = True,
     ):
         """
         Train all added modelbases.
@@ -1491,7 +1491,7 @@ class Trainer:
         test_data_only: bool = False,
         dump_trainer: bool = True,
         cross_validation: int = 0,
-        verbose: bool = False,
+        verbose: bool = True,
     ) -> pd.DataFrame:
         """
         Run all modelbases with/without cross validation for a leaderboard.
