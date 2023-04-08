@@ -217,7 +217,7 @@ class Trainer:
         verbose
             Whether to print the path to the project.
         project_root_subfolder
-            See `load_config`.
+            See ``load_config``.
         """
         if not os.path.exists("output"):
             os.mkdir("output")
@@ -243,12 +243,12 @@ class Trainer:
     def set_data_splitter(self, name: str, verbose=True):
         """
         Set the data splitter after ``load_config``. The specified splitter should be implemented in
-        `data/datasplitter.py`. Also, data splitter can be set directly using ``trainer.datasplitter = YourSplitter()``
+        ``data/datasplitter.py``. Also, data splitter can be set directly using ``trainer.datasplitter = YourSplitter()``
 
         Parameters
         ----------
         name
-            The name of a data splitter implemented in `data/datasplitter.py`.
+            The name of a data splitter implemented in ``data/datasplitter.py``.
         verbose
             Ignored.
         """
@@ -259,12 +259,12 @@ class Trainer:
     def set_data_imputer(self, name, verbose=True):
         """
         Set the data imputer after ``load_config``. The specified splitter should be implemented in
-        `data/dataimputer.py`. Also, data imputer can be set directly using ``trainer.dataimputer = YourImputer()``
+        ``data/dataimputer.py``. Also, data imputer can be set directly using ``trainer.dataimputer = YourImputer()``
 
         Parameters
         ----------
         name
-            The name of a data imputer implemented in `data/dataimputer.py`.
+            The name of a data imputer implemented in ``data/dataimputer.py``.
         verbose
             Ignored.
         """
@@ -275,7 +275,7 @@ class Trainer:
     def set_data_processors(self, config: List[Tuple[str, Dict]], verbose=True):
         """
         Set a list of data processors with the name and arguments for each data processors. The processor should be
-        implemented in `data/dataprocessor.py`. Also, data processors can be set directly using
+        implemented in ``data/dataprocessor.py``. Also, data processors can be set directly using
         ``trainer.dataprocessors = [(YourProcessor(), A Dict of kwargs) for EACH DATA PROCESSOR]``
 
         Parameters
@@ -3331,7 +3331,8 @@ def save_trainer(
 
 def load_trainer(path: Union[os.PathLike, str]) -> Trainer:
     """
-    Loading a pickled Trainer.
+    Loading a pickled Trainer. Paths of the trainer and its model bases will be changed (i.e. ``Trainer.project_root``,
+    ``AbstractModel.root``, ``AbstractModel.model.root``, and ``AbstractModel.model.model_path.keys()``)
 
     Parameters
     ----------

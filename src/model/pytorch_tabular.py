@@ -149,10 +149,10 @@ class PytorchTabular(AbstractModel):
         target = model.config.target[0]
         with HiddenPrints():
             # Two annoying warnings that cannot be suppressed:
-            # 1. DeprecationWarning: Default for `include_input_features` will change from True to False in the next
+            # 1. DeprecationWarning: Default for ``include_input_features`` will change from True to False in the next
             # release. Please set it explicitly.
-            # 2. DeprecationWarning: "The `out_ff_layers`, `out_ff_activation`, `out_ff_dropoout`, and
-            # `out_ff_initialization` arguments are deprecated and will be removed next release. Please use head and
+            # 2. DeprecationWarning: "The ``out_ff_layers``, ``out_ff_activation``, ``out_ff_dropoout``, and
+            # ``out_ff_initialization`` arguments are deprecated and will be removed next release. Please use head and
             # head_config as an alternative.
             warnings.filterwarnings(
                 "ignore", category=DeprecationWarning, module="pytorch_tabular"
@@ -360,7 +360,7 @@ class PytorchTabular(AbstractModel):
             "GATE": {
                 "gflu_stages": 6,
                 "gflu_dropout": 0.0,
-                # `tree_depth` influences the memory usage a lot. `tree_depth`==10 with other default settings consumes
+                # ``tree_depth`` influences the memory usage a lot. ``tree_depth``==10 with other default settings consumes
                 # about 4 GiBs of ram.
                 # When "tree_depth" larger than 4, and num_trees larger than 20 (approximately), performance on GPU
                 # decreases dramatically.

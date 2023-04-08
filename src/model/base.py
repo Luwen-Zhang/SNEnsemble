@@ -33,14 +33,14 @@ class AbstractModel:
         trainer:
             A trainer instance that contains all information and datasets. The trainer has loaded configs and data.
         program:
-            The name of the modelbase. If None, the name from :func:`_get_program_name` is used.
+            The name of the modelbase. If None, the name from :func:``_get_program_name`` is used.
         model_subset:
             The names of specific models selected to be trained in the modelbase.
         exclude_models:
-            The names of specific models that should not be trained. Only one of `model_subset` and `exclude_models` can
+            The names of specific models that should not be trained. Only one of ``model_subset`` and ``exclude_models`` can
             be specified.
         store_in_harddisk:
-            Whether to save sub-models in the hard disk. If the global setting `low_memory` is True, True is used.
+            Whether to save sub-models in the hard disk. If the global setting ``low_memory`` is True, True is used.
         """
         self.device = trainer.device
         self.trainer = trainer
@@ -88,10 +88,10 @@ class AbstractModel:
         label_name:
             The name of the target.
         model_subset:
-            The names of a subset of all available models (in :func:`get_model_names`). Only these models will be
+            The names of a subset of all available models (in :func:``get_model_names``). Only these models will be
             trained.
         derived_data:
-            Data derived from :func:`Trainer.derive_unstacked`. If not None, unstacked data will be re-derived.
+            Data derived from :func:``Trainer.derive_unstacked``. If not None, unstacked data will be re-derived.
         verbose:
             Verbosity.
         warm_start:
@@ -131,9 +131,9 @@ class AbstractModel:
         Parameters
         ----------
         *args:
-            Arguments of :func:`_train` for models.
+            Arguments of :func:``_train`` for models.
         **kwargs:
-            Arguments of :func:`_train` for models.
+            Arguments of :func:``_train`` for models.
         """
         self.trainer.set_status(training=True)
         verbose = "verbose" not in kwargs.keys() or kwargs["verbose"]
@@ -163,11 +163,11 @@ class AbstractModel:
         model_name:
             A selected name of a model, which is already trained.
         derived_data:
-            Data derived from :func:`Trainer.derive_unstacked`. If not None, unstacked data will be re-derived.
+            Data derived from :func:``Trainer.derive_unstacked``. If not None, unstacked data will be re-derived.
         ignore_absence:
             Whether to ignore absent keys in derived_data. Use True only when the model does not use derived_data.
         **kwargs:
-            Arguments of :func:`_predict` for models.
+            Arguments of :func:``_predict`` for models.
 
         Returns
         -------
@@ -244,6 +244,15 @@ class AbstractModel:
         return tmp_model
 
     def set_path(self, path: Union[os.PathLike, str]):
+        """
+        Set the path of the model base (usually a trained one), including paths of its models. It is used when migrating
+        models to another directory.
+
+        Parameters
+        ----------
+        path
+            The path of the model base.
+        """
         if hasattr(self, "root"):
             self.root = path
         if self.store_in_harddisk:
@@ -253,6 +262,24 @@ class AbstractModel:
                     self.model.model_path[name] = os.path.join(self.root, name) + ".pkl"
 
     def new_model(self, model_name: str, verbose: bool, **kwargs):
+        """
+        A wrapper method to generate a new model while keeping the random seed constant.
+
+        Parameters
+        ----------
+        model_name:
+            The name of a selected model.
+        verbose:
+            Verbosity.
+        **kwargs:
+            Parameters to generate the model. It should contain all arguments in :func:``_initial_values``.
+
+        Returns
+        -------
+        model:
+            A new model (without any restriction to its type). It will be passed to :func:``_train_single_model`` and
+            :func:``_pred_single_model``.
+        """
         set_random_seed(0)
         return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
 
@@ -380,7 +407,7 @@ class AbstractModel:
         model_name:
             A name of a selected model, which is already trained.
         derived_data:
-            Data derived from :func:`Trainer.derive_unstacked`. If not None, unstacked data will be re-derived.
+            Data derived from :func:``Trainer.derive_unstacked``. If not None, unstacked data will be re-derived.
         **kwargs:
             Ignored.
 
@@ -414,7 +441,7 @@ class AbstractModel:
         Parameters
         ----------
         model_subset:
-            The names of a subset of all available models (in :func:`get_model_names`). Only these models will be
+            The names of a subset of all available models (in :func:``get_model_names`). Only these models will be
             trained.
         dump_trainer:
             Whether to save the trainer after models are trained.
@@ -690,7 +717,7 @@ class AbstractModel:
         Returns
         -------
         model:
-            A new model (without any restriction). It will be passed to :func:`_train_single_model` and
+            A new model (without any restriction to its type). It will be passed to :func:`_train_single_model` and
             :func:`_pred_single_model`.
         """
         raise NotImplementedError

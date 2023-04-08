@@ -171,7 +171,7 @@ class Transformer(TorchModel):
             "BiasConsGradTransformerSeq",
         ]:
             return [
-                # `seq_embedding_dim` should be able to divided by `attn_heads`.
+                # ``seq_embedding_dim`` should be able to divided by ``attn_heads``.
                 Categorical(categories=[8, 16, 32], name="seq_embedding_dim"),
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
                 Integer(low=2, high=4, prior="uniform", name="attn_layers", dtype=int),
@@ -1078,7 +1078,7 @@ class _FTTransformer(nn.Module):
         # Indeed, the implementation of TransformerBlock is almost the same as torch.nn.TransformerEncoderLayer, except
         # that the activation function in FT-Transformer is ReGLU instead of ReLU or GeLU in torch implementation.
         # The performance of these two implementations can be verified after several epochs by changing
-        # `use_torch_transformer` and setting the activation of TransformerBlock to nn.GELU.
+        # ``use_torch_transformer`` and setting the activation of TransformerBlock to nn.GELU.
         # In our scenario, ReGLU performs much better, which is why we implement our own version of transformer, just
         # like FT-Transformer and WideDeep do.
         # Also, dropout in MultiheadAttention improves performance.

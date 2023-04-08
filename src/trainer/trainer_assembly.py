@@ -22,7 +22,9 @@ class TrainerAssembly:
             A list of Trainer. One of ``trainer_paths`` and ``trainers`` should be passed.
         """
         if trainer_paths is None and trainers is None:
-            raise Exception(f"One of `trainer_paths` and `trainers` should be passed.")
+            raise Exception(
+                f"One of ``trainer_paths`` and ``trainers`` should be passed."
+            )
         self.trainers = (
             [load_trainer(path) for path in trainer_paths]
             if trainers is None
@@ -151,7 +153,6 @@ class TrainerAssembly:
                 for proj_idx, (model_names, predictions) in enumerate(
                     zip(all_model_names, all_predictions)
                 ):
-
                     if model_name in model_names:
                         y_train_pred += (
                             list(predictions[model_name]["Training"][0].flatten())

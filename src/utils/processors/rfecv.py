@@ -202,8 +202,8 @@ class ExtendRFECV(ExtendRFE, RFECV):
         Parameters
         ----------
         X : {array-like, sparse matrix} of shape (n_samples, n_features)
-            Training vector, where `n_samples` is the number of samples and
-            `n_features` is the total number of features.
+            Training vector, where ``n_samples`` is the number of samples and
+            ``n_features`` is the total number of features.
 
         y : array-like of shape (n_samples,)
             Target values (integers for classification, real numbers for
@@ -211,8 +211,8 @@ class ExtendRFECV(ExtendRFE, RFECV):
 
         groups : array-like of shape (n_samples,) or None, default=None
             Group labels for the samples used while splitting the dataset into
-            train/test set. Only used in conjunction with a "Group" :term:`cv`
-            instance (e.g., :class:`~sklearn.model_selection.GroupKFold`).
+            train/test set. Only used in conjunction with a "Group" :term:``cv``
+            instance (e.g., :class:``~sklearn.model_selection.GroupKFold``).
 
             .. versionadded:: 0.20
 
@@ -331,7 +331,7 @@ def _get_feature_importances(estimator, getter, X, transform_func=None, norm_ord
                 getter = attrgetter("feature_importances_")
             else:
                 raise ValueError(
-                    "when `importance_getter=='auto'`, the underlying "
+                    "when ``importance_getter=='auto'`, the underlying "
                     f"estimator {estimator.__class__.__name__} should have "
                     "`coef_` or `feature_importances_` attribute. Either "
                     "pass a fitted estimator to feature selector or call fit "

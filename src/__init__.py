@@ -2,14 +2,14 @@ import os
 import numpy as np
 import warnings
 
-np.int = int  # `np.int` is a deprecated alias for the builtin `int`.
+np.int = int  # ``np.int`` is a deprecated alias for the builtin ``int``.
 
 __root__ = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 __all__ = ["data", "model", "trainer", "config", "utils"]
 
 setting = dict(
-    # If the memory of the system (gpu or cpu) is lower than 6 GiBs, set `low_memory` to True.
+    # If the memory of the system (gpu or cpu) is lower than 6 GiBs, set ``low_memory`` to True.
     # TODO: Enlarge bayes search space when low_memory is set to False.
     low_memory=True,
     verbose_per_epoch=20,

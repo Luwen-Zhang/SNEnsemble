@@ -21,7 +21,7 @@ class AbstractDeriver:
         **kwargs,
     ) -> Tuple[np.ndarray, str, List]:
         """
-        The method automatically checks input column names and the dataframe, calls the :func:`_derive` method, and check output
+        The method automatically checks input column names and the dataframe, calls the :func:``_derive`` method, and check output
         of the derived data.
 
         Parameters
@@ -33,7 +33,7 @@ class AbstractDeriver:
         derived_name:
             The name of the derived feature.
         **kwargs:
-            Other arguments for :py:meth: `src.data.AbstractDeriver._derive`. These arguments are specified in configuration files.
+            Other arguments for :py:meth: ``src.data.AbstractDeriver._derive``. These arguments are specified in configuration files.
 
         Returns
         -------
@@ -61,12 +61,12 @@ class AbstractDeriver:
 
     def make_defaults(self, **kwargs) -> Dict:
         """
-        Complete absent arguments in ``kwargs`` using default values specified in :func:`_defaults`.
+        Complete absent arguments in ``kwargs`` using default values specified in :func:``_defaults``.
 
         Parameters
         ----------
         kwargs:
-            Arguments pass to :func:`derive`.
+            Arguments pass to :func:``derive``.
 
         Returns
         -------
@@ -94,7 +94,7 @@ class AbstractDeriver:
         trainer:
             A Trainer instance. Data-derivers might use information in the Trainer, but would not change its contents.
         **kwargs:
-            Arguments specified in configuration files and :func:`_defaults`.
+            Arguments specified in configuration files and :func:``_defaults``.
 
         Returns
         -------
@@ -121,7 +121,7 @@ class AbstractDeriver:
         Parameters
         ----------
         **kwargs:
-            Arguments specified in configuration files and :func:`_defaults`.
+            Arguments specified in configuration files and :func:``_defaults``.
 
         Returns
         -------
@@ -143,7 +143,7 @@ class AbstractDeriver:
         length:
             The number of columns of the derived data.
         **kwargs:
-            Arguments specified in configuration files and :func:`_defaults`.
+            Arguments specified in configuration files and :func:``_defaults``.
 
         Returns
         -------
@@ -163,12 +163,12 @@ class AbstractDeriver:
     def _required_cols(self, **kwargs) -> List[str]:
         """
         Required column names in the tabular dataset by the data-deriver. Whether these names exist in the tabular
-        dataset would be checked in :func:`derive`.
+        dataset would be checked in :func:``derive``.
 
         Parameters
         ----------
         **kwargs:
-            Arguments specified in configuration files and :func:`_defaults`.
+            Arguments specified in configuration files and :func:``_defaults``.
 
         Returns
         -------
@@ -179,8 +179,8 @@ class AbstractDeriver:
 
     def _required_params(self, **kwargs) -> List[str]:
         """
-        Required parameter names by the data-deriver. Whether these names exist in :func:`_defaults` or the
-        configuration file would be checked in :func:`derive`.
+        Required parameter names by the data-deriver. Whether these names exist in :func:``_defaults`` or the
+        configuration file would be checked in :func:``derive``.
 
         Parameters
         ----------
