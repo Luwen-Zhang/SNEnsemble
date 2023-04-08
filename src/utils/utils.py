@@ -483,7 +483,6 @@ class EarlyStopping:
         self.trace_func = trace_func
 
     def __call__(self, val_loss, model):
-
         score = -val_loss
 
         if self.best_score is None:
@@ -672,7 +671,7 @@ def add_postfix(path):
         last_postfix = f"-I{last_cnt}"
         last_cnt = postfix_iter.__next__()
         if root_split[-1].endswith(last_postfix):
-            root_split[-1].replace(last_postfix, f"-I{last_cnt}")
+            root_split[-1] = root_split[-1].replace(last_postfix, f"-I{last_cnt}")
         else:
             root_split[-1] += f"-I{last_cnt}"
         s = os.path.join(*root_split) + ext
