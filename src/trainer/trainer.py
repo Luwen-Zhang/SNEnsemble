@@ -21,6 +21,7 @@ from captum.attr import FeaturePermutation
 from sklearn.utils import resample as skresample
 import argparse
 import platform, psutil, subprocess
+import shutil
 
 set_random_seed(0)
 sys.path.append("configs/")
@@ -77,6 +78,37 @@ class Trainer:
             raise Exception(f"Program {program} not added to the trainer.")
         return self.modelbases[self.modelbases_names.index(program)]
 
+    def clear_modelbase(self):
+        """
+        Delete all modelbases in the trainer.
+        """
+        self.modelbases = []
+        self.modelbases_names = []
+
+    def detach_modelbase(self, program: str):
+        """
+        Detach the selected modelbase to a separate trainer.
+
+        Parameters
+        ----------
+        program
+            The selected modelbase.
+        Returns
+        -------
+        trainer
+            An ``Trainer`` instance.
+        """
+        modelbase = cp(self.get_modelbase(program=program))
+        tmp_trainer = modelbase.trainer
+        tmp_trainer.clear_modelbase()
+        new_path = add_postfix(self.project_root)
+        tmp_trainer.set_path(new_path, verbose=True)
+        modelbase.set_path(os.path.join(new_path, modelbase.program))
+        tmp_trainer.add_modelbases([modelbase])
+        shutil.copytree(self.get_modelbase(program=program).root, modelbase.root)
+        save_trainer(tmp_trainer)
+        return tmp_trainer
+
     def load_config(
         self,
         config: Union[str, UserConfig] = None,
@@ -87,14 +119,14 @@ class Trainer:
         """
         Load a config in json format.
         Arguments passed to python when executing the script are parsed if ``configfile_path`` is left None. All keys in
-        ``src.config.DefaultConfig().available_keys()`` can be parsed, for example:
+        ``src.config.UserConfig().available_keys()`` can be parsed, for example:
             For the loss function: ``--loss mse``,
 
             For the total epoch: ``--epoch 200``,
 
             For the option for bayes opt: ``--bayes_opt`` to turn on bayes opt, ``--no-bayes_opt`` to turn off.
 
-        Default values can be seen in ``src.config.DefaultConfig().defaults()``.
+        Default values can be seen in ``src.config.UserConfig().defaults()``.
 
         The loaded configuration will be saved in the project folder.
 
@@ -208,6 +240,21 @@ class Trainer:
                 raise Exception("Invalid type of skopt space.")
         return SPACE
 
+    def set_path(self, path: Union[os.PathLike, str], verbose=False):
+        """
+        Set the work directory of the trainer.
+
+        Parameters
+        ----------
+        path
+            The work directory.
+        """
+        self.project_root = path
+        if not os.path.exists(self.project_root):
+            os.mkdir(self.project_root)
+        if verbose:
+            print(f"Project will be saved to {self.project_root}")
+
     def _create_dir(self, verbose: bool = True, project_root_subfolder: str = None):
         """
         Create the folder for the project.
@@ -233,12 +280,9 @@ class Trainer:
         folder_name = t + "-0" + "_" + self.configfile
         if not os.path.exists(os.path.join("output", subfolder)):
             os.mkdir(os.path.join("output", subfolder))
-        self.project_root = add_postfix(os.path.join("output", subfolder, folder_name))
-        if not os.path.exists(self.project_root):
-            os.mkdir(self.project_root)
-
-        if verbose:
-            print(f"Project will be saved to {self.project_root}")
+        self.set_path(
+            add_postfix(os.path.join("output", subfolder, folder_name)), verbose=verbose
+        )
 
     def set_data_splitter(self, name: str, verbose=True):
         """
@@ -3349,7 +3393,7 @@ def load_trainer(path: Union[os.PathLike, str]) -> Trainer:
     with open(path, "rb") as inp:
         trainer = pickle.load(inp)
     root = os.path.join(*os.path.split(path)[:-1])
-    trainer.project_root = root
+    trainer.set_path(path, verbose=False)
     for modelbase in trainer.modelbases:
         modelbase.set_path(os.path.join(root, modelbase.program))
     return trainer
