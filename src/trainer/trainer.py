@@ -3347,4 +3347,8 @@ def load_trainer(path: Union[os.PathLike, str]) -> Trainer:
 
     with open(path, "rb") as inp:
         trainer = pickle.load(inp)
+    root = os.path.join(*os.path.split(path)[:-1])
+    trainer.project_root = root
+    for modelbase in trainer.modelbases:
+        modelbase.set_path(os.path.join(root, modelbase.program))
     return trainer

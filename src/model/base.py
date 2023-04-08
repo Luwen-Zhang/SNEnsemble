@@ -1,3 +1,4 @@
+import os
 import pickle
 import torch.optim.optimizer
 import src
@@ -241,6 +242,15 @@ class AbstractModel:
         if model_name in self.model_params.keys():
             tmp_model.model_params[model_name] = cp(self.model_params[model_name])
         return tmp_model
+
+    def set_path(self, path: Union[os.PathLike, str]):
+        if hasattr(self, "root"):
+            self.root = path
+        if self.store_in_harddisk:
+            if hasattr(self, "model"):
+                self.model.root = path
+                for name in self.model.model_path.keys():
+                    self.model.model_path[name] = os.path.join(self.root, name) + ".pkl"
 
     def new_model(self, model_name: str, verbose: bool, **kwargs):
         set_random_seed(0)
