@@ -4,6 +4,7 @@ from src.model import AbstractModel
 from src.trainer import save_trainer
 from skopt.space import Integer, Categorical, Real
 from typing import Dict
+import shutil
 
 
 class AutoGluon(AbstractModel):
@@ -108,7 +109,9 @@ class AutoGluon(AbstractModel):
                 hyperparameters={self._name_mapping[model[0]]: kwargs},
                 num_gpus=0 if self.device is "cpu" else "auto",
             )
-
+        model[1].persist_models()
+        if os.path.exists(os.path.join(self.root, model[0])):
+            shutil.rmtree(os.path.join(self.root, model[0]))
         tc.enable_tqdm()
         warnings.simplefilter(action="default")
 
