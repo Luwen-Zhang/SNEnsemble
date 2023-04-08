@@ -369,7 +369,7 @@ class _TransformerLSTMNN(_FTTransformerNN):
 
     def _forward(self, x, derived_tensors):
         x_embed = self.embed(x, derived_tensors)
-        x_trans = self.transformer(x_embed, derived_tensors)
+        x_trans = self.embed_transformer(x_embed, derived_tensors)
         all_res = [x_trans]
 
         x_sn = self.sn(x, derived_tensors)
