@@ -2954,7 +2954,7 @@ class Trainer:
 
             def oneside_normal(p, CI, sample_size, n_random=100000, ddof=1):
                 # The one-sided tolerance limits of normal distribution in ISO are given in a table. We find that the
-                # analytical calculation is difficult to implement (https://statpages.info/tolintvl.html gives a
+                # analytical calculation is difficult to implement (https://statpages.info/tolintvl.html gives an
                 # interactive implementation and a .xls file). We use Monte Carlo simulation to get a more precise
                 # value. Since the value is calculated once per plot, the cost is affordable.
                 # Refs:

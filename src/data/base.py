@@ -664,7 +664,7 @@ class AbstractSplitter:
 
     def _check_split(self, train_indices, val_indices, test_indices):
         """
-        Check whether splitted indices coincide with each other.
+        Check whether split indices coincide with each other.
 
         Parameters
         ----------
