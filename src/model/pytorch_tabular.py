@@ -2,6 +2,7 @@ from src.utils import *
 from src.model import AbstractModel
 from skopt.space import Integer, Categorical, Real
 import src
+import shutil
 
 
 class PytorchTabular(AbstractModel):
@@ -140,6 +141,8 @@ class PytorchTabular(AbstractModel):
                 max_epochs=epoch,
                 callbacks=[PytorchTabularCallback(verbose=verbose, total_epoch=epoch)],
             )
+        if os.path.exists(os.path.join(self.root, "ckpts")):
+            shutil.rmtree(os.path.join(self.root, "ckpts"))
         warnings.simplefilter(action="default", category=UserWarning)
         tc.enable_tqdm()
 
