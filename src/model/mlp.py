@@ -16,9 +16,7 @@ class MLP(TorchModel):
         return _MLPNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
-            self.trainer.args["global_params"]["layers"]
-            if self.layers is None
-            else self.layers,
+            self.trainer.args["layers"] if self.layers is None else self.layers,
             trainer=self.trainer,
         )
 

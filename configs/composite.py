@@ -1,4 +1,4 @@
-{
+cfg = {
     "database": "composite_database_03012023",
     "feature_names_type": {
         "Resin Type": 2,
@@ -28,40 +28,40 @@
         "Static Elastic Modulus": 1,
         "Static Compressive Modulus": 1,
         "Static Maximum Tensile Strain": 1,
-        "Static Maximum Compressive Strain": 1
+        "Static Maximum Compressive Strain": 1,
     },
     "data_derivers": [
         [
             "MinStressDeriver",
             {
                 "derived_name": "Minimum Stress",
-                "stacked": true,
-                "intermediate": true,
+                "stacked": True,
+                "intermediate": True,
                 "max_stress_col": "Maximum Stress",
-                "r_value_col": "R-value"
-            }
+                "r_value_col": "R-value",
+            },
         ],
         [
             "WalkerStressDeriver",
             {
                 "derived_name": "Walker Eq Stress",
-                "stacked": true,
+                "stacked": True,
                 "max_stress_col": "Maximum Stress",
                 "r_value_col": "R-value",
-                "power_index": 0.5
-            }
+                "power_index": 0.5,
+            },
         ],
         [
             "SuppStressDeriver",
             {
                 "derived_name": "Support Stress",
-                "stacked": true,
+                "stacked": True,
                 "max_stress_col": "Maximum Stress",
                 "min_stress_col": "Minimum Stress",
                 "ucs_col": "Static Maximum Compressive Stress",
                 "uts_col": "Static Maximum Tensile Stress",
-                "relative": true
-            }
+                "relative": True,
+            },
         ],
         [
             "DegLayerDeriver",
@@ -72,42 +72,36 @@
                     "0-deg layers",
                     "45-deg layers",
                     "90-deg layers",
-                    "Other-deg layers"
+                    "Other-deg layers",
                 ],
-                "stacked": true
-            }
+                "stacked": True,
+            },
         ],
         [
             "LayUpSequenceDeriver",
             {
                 "sequence_column": "Sequence",
                 "derived_name": "Lay-up Sequence",
-                "stacked": false
-            }
+                "stacked": False,
+            },
         ],
         [
             "NumLayersDeriver",
             {
                 "sequence_column": "Sequence",
                 "derived_name": "Number of Layers",
-                "stacked": false
-            }
+                "stacked": False,
+            },
         ],
-        [
-            "SampleWeightDeriver",
-            {
-                "derived_name": "Sample Weight",
-                "stacked": false
-            }
-        ]
+        ["SampleWeightDeriver", {"derived_name": "Sample Weight", "stacked": False}],
     ],
     "data_processors": [
         ["CategoricalOrdinalEncoder", {}],
         ["NaNFeatureRemover", {}],
         ["VarianceFeatureSelector", {"thres": 1}],
         ["UnscaledDataRecorder", {}],
-        ["StandardScaler", {}]
+        ["StandardScaler", {}],
     ],
     "feature_types": ["Fatigue loading", "Material", "Categorical", "Derived"],
-    "label_name": ["log(Cycles to Failure)"]
+    "label_name": ["log(Cycles to Failure)"],
 }

@@ -52,9 +52,7 @@ class Transformer(TorchModel):
             return _TransformerLSTMNN(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
-                self.trainer.args["global_params"]["layers"]
-                if self.layers is None
-                else self.layers,
+                self.trainer.args["layers"] if self.layers is None else self.layers,
                 trainer=self.trainer,
                 manual_activate_sn=self.manual_activate_sn,
                 sn_coeff_vars_idx=sn_coeff_vars_idx,
@@ -102,9 +100,7 @@ class Transformer(TorchModel):
             return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
-                self.trainer.args["global_params"]["layers"]
-                if self.layers is None
-                else self.layers,
+                self.trainer.args["layers"] if self.layers is None else self.layers,
                 trainer=self.trainer,
                 manual_activate_sn=self.manual_activate_sn,
                 sn_coeff_vars_idx=sn_coeff_vars_idx,
@@ -126,9 +122,7 @@ class Transformer(TorchModel):
             return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
-                self.trainer.args["global_params"]["layers"]
-                if self.layers is None
-                else self.layers,
+                self.trainer.args["layers"] if self.layers is None else self.layers,
                 trainer=self.trainer,
                 manual_activate_sn=self.manual_activate_sn,
                 sn_coeff_vars_idx=sn_coeff_vars_idx,

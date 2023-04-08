@@ -32,7 +32,7 @@ class ThisWork(TorchModel):
         return ThisWorkNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
-            self.trainer.args["global_params"]["layers"],
+            self.trainer.args["layers"],
             activated_sn=self.activated_sn,
             trainer=self.trainer,
         )
@@ -76,7 +76,7 @@ class ThisWorkRidge(ThisWork):
         return ThisWorkRidgeNN(
             len(self.trainer.cont_feature_names),
             len(self.trainer.label_name),
-            self.trainer.args["global_params"]["layers"],
+            self.trainer.args["layers"],
             activated_sn=self.activated_sn,
             trainer=self.trainer,
         )

@@ -6,7 +6,7 @@ import os.path
 import sklearn.pipeline
 import src
 from src.utils import *
-from src.config import DefaultConfig, UserConfig
+from src.config import UserConfig
 from copy import deepcopy as cp
 from skopt.space import Real, Integer, Categorical
 import json
@@ -79,13 +79,13 @@ class Trainer:
 
     def load_config(
         self,
-        configfile: Union[str, UserConfig] = None,
+        config: Union[str, UserConfig] = None,
         verbose: bool = True,
         manual_config: Dict = None,
         project_root_subfolder: str = None,
     ) -> None:
         """
-        Load a configfile in json format.
+        Load a config in json format.
         Arguments passed to python when executing the script are parsed if ``configfile_path`` is left None. All keys in
         ``src.config.DefaultConfig().available_keys()`` can be parsed, for example:
             For the loss function: ``--loss mse``,
@@ -100,11 +100,11 @@ class Trainer:
 
         Parameters
         ----------
-        configfile
-            Can be the path to the configfile or a UserConfig instance.
+        config
+            Can be the path to the config in json or python format, or a UserConfig instance.
             If it is a path. Arguments passed to python will be parsed; therefore, do not leave it empty when
-            ``argparse.ArgumentParser`` is used for other purposes. If the path does not contain "/", the file
-            ``configs/{configfile_path}``(.json) will be read. The path can end with or without .json.
+            ``argparse.ArgumentParser`` is used for other purposes. If the path does not contain "/" or is not a file,
+            the file ``configs/{config}``(.json/.py) will be read. The path can end with or without .json/.py.
         verbose
             Whether to print the loaded configuration.
         manual_config
@@ -114,16 +114,17 @@ class Trainer:
             The subfolder that the project will locate in. The folder name will be
             ``{PATH OF THE MAIN SCRIPT}/output/{project}/{project_root_subfolder}/{TIME OF EXECUTION}-{configfile_path}``
         """
-        if isinstance(configfile, str) or configfile is None:
-            base_config = DefaultConfig().cfg
+        input_config = config is not None
+        if isinstance(config, str) or not input_config:
+            base_config = UserConfig().cfg
             # The base config is loaded using the --base argument
-            if is_notebook() and configfile is None:
+            if is_notebook() and not input_config:
                 raise Exception(
                     "A config file must be assigned in notebook environment."
                 )
-            elif is_notebook() or configfile is not None:
-                parse_res = {"base": configfile}
-            else:  # not notebook and configfile is None
+            elif is_notebook() or input_config:
+                parse_res = {"base": config}
+            else:  # not notebook and config is None
                 parser = argparse.ArgumentParser()
                 parser.add_argument("--base", required=True)
                 for key in base_config.keys():
@@ -145,13 +146,16 @@ class Trainer:
             config = UserConfig(path=self.configfile)
             # Then, several args can be modified using other arguments like --lr, --weight_decay
             # only when a config file is not given so that configs depend on input arguments.
-            if not is_notebook() and configfile is None:
+            if not is_notebook() and not input_config:
                 config.merge_config(parse_res)
             if manual_config is not None:
-                config.modify_config(manual_config)
+                config.merge_config(manual_config)
             self.args = config.cfg
         else:
-            self.args = configfile.cfg
+            self.configfile = "UserInputConfig"
+            if manual_config is not None:
+                warnings.warn(f"manual_config is ignored when config is an UserConfig.")
+            self.args = config.cfg
 
         self.set_data_splitter(name=self.args["data_splitter"], verbose=verbose)
         self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
@@ -160,22 +164,21 @@ class Trainer:
 
         self.project = self.args["database"] if self.project is None else self.project
         self._create_dir(project_root_subfolder=project_root_subfolder)
-        with open(os.path.join(self.project_root, "args.json"), "w") as f:
-            json.dump(self.args, f, indent=4)
+        config.to_file(os.path.join(self.project_root, "args.py"))
 
     @property
     def static_params(self):
         return {
-            "patience": self.args["global_params"]["patience"],
-            "epoch": self.args["global_params"]["epoch"],
+            "patience": self.args["patience"],
+            "epoch": self.args["epoch"],
         }
 
     @property
     def chosen_params(self):
         return {
-            "lr": self.args["global_params"]["lr"],
-            "weight_decay": self.args["global_params"]["weight_decay"],
-            "batch_size": self.args["global_params"]["batch_size"],
+            "lr": self.args["lr"],
+            "weight_decay": self.args["weight_decay"],
+            "batch_size": self.args["batch_size"],
         }
 
     def get_loss_fn(self) -> Callable[[torch.Tensor, torch.Tensor], torch.Tensor]:

@@ -44,7 +44,7 @@ class AbstractModel:
         self.device = trainer.device
         self.trainer = trainer
         if not hasattr(trainer, "args"):
-            trainer.load_config(configfile="base_config")
+            trainer.load_config(config="default")
         self.model = None
         self.leaderboard = None
         self.model_subset = model_subset
@@ -428,9 +428,7 @@ class AbstractModel:
             y_test,
         ) = self._train_data_preprocess(*data)
         self.total_epoch = (
-            self.trainer.args["global_params"]["epoch"]
-            if not src.setting["debug_mode"]
-            else 2
+            self.trainer.args["epoch"] if not src.setting["debug_mode"] else 2
         )
         if self.model is None:
             if self.store_in_harddisk:
@@ -448,7 +446,7 @@ class AbstractModel:
             if self.trainer.args["bayes_opt"] and not warm_start and len(space) > 0:
                 min_calls = len(tmp_params)
                 callback = BayesCallback(
-                    total=self.trainer.args["global_params"]["n_calls"]
+                    total=self.trainer.args["n_calls"]
                     if not src.setting["debug_mode"]
                     else min_calls
                 )
@@ -463,7 +461,7 @@ class AbstractModel:
 
                         self._train_single_model(
                             model,
-                            epoch=self.trainer.args["global_params"]["bayes_epoch"]
+                            epoch=self.trainer.args["bayes_epoch"]
                             if not src.setting["debug_mode"]
                             else 1,
                             X_train=X_train,
@@ -498,7 +496,7 @@ class AbstractModel:
                     result = gp_minimize(
                         _bayes_objective,
                         self._space(model_name=model_name),
-                        n_calls=self.trainer.args["global_params"]["n_calls"]
+                        n_calls=self.trainer.args["n_calls"]
                         if not src.setting["debug_mode"]
                         else min_calls,
                         n_initial_points=10 if not src.setting["debug_mode"] else 0,
