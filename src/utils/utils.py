@@ -671,7 +671,10 @@ def add_postfix(path):
         last_postfix = f"-I{last_cnt}"
         last_cnt = postfix_iter.__next__()
         if root_split[-1].endswith(last_postfix):
-            root_split[-1] = root_split[-1].replace(last_postfix, f"-I{last_cnt}")
+            # https://stackoverflow.com/questions/2556108/rreplace-how-to-replace-the-last-occurrence-of-an-expression-in-a-string
+            root_split[-1] = f"-I{last_cnt}".join(
+                root_split[-1].rsplit(last_postfix, 1)
+            )
         else:
             root_split[-1] += f"-I{last_cnt}"
         s = os.path.join(*root_split) + ext
