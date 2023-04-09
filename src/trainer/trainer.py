@@ -3237,6 +3237,18 @@ class Trainer:
 
         return x_value, np.array(mean_pred), np.array(ci_left), np.array(ci_right)
 
+    def load_state(self, trainer: "Trainer"):
+        """
+        Restore the trainer from a deepcopied state.
+
+        Parameters
+        ----------
+        trainer
+            A deepcopied previous status of the trainer.
+        """
+        # https://stackoverflow.com/questions/1216356/is-it-safe-to-replace-a-self-object-by-another-object-of-the-same-type-in-a-meth
+        self.__dict__.update(trainer.__dict__)
+
     def get_best_model(self) -> Tuple[str, str]:
         """
         Get the best model in the leaderboard.

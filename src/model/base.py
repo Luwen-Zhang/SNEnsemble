@@ -101,6 +101,7 @@ class AbstractModel:
         bayes_opt:
             Whether to perform Gaussian-process-based Bayesian Hyperparameter Optimization for each model.
         """
+        trainer_state = cp(self.trainer)
         self.trainer.set_status(training=True)
         self.trainer.set_data(
             df,
@@ -124,6 +125,7 @@ class AbstractModel:
             model_subset=model_subset,
             warm_start=warm_start if self._trained else False,
         )
+        self.trainer.load_state(trainer_state)
 
     def train(self, *args, **kwargs):
         """
