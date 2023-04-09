@@ -1205,6 +1205,8 @@ class AbstractNN(nn.Module):
         self.default_loss_fn = trainer.get_loss_fn()
         self.cont_feature_names = cp(trainer.cont_feature_names)
         self.cat_feature_names = cp(trainer.cat_feature_names)
+        self.n_cont = len(self.cont_feature_names)
+        self.n_cat = len(self.cat_feature_names)
         self.derived_feature_names = list(trainer.derived_data.keys())
         self.derived_feature_dims = trainer.get_derived_data_sizes()
         self.derived_feature_names_dims = {}
@@ -1231,6 +1233,8 @@ class AbstractNN(nn.Module):
         """
         x = tensors[0]
         additional_tensors = tensors[1:]
+        if type(additional_tensors[0]) == dict:
+            return self._forward(x, additional_tensors[0])
         derived_tensors = {}
         for tensor, name in zip(additional_tensors, self.derived_feature_names):
             derived_tensors[name] = tensor

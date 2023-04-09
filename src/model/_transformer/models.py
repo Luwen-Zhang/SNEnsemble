@@ -28,9 +28,6 @@ class FTTransformerNN(AbstractNN):
         flatten_transformer=True,
     ):
         super(FTTransformerNN, self).__init__(trainer)
-        self.n_cont = n_inputs
-        self.n_outputs = n_outputs
-        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
 
         self.embed = Embedding(
             embedding_dim,
@@ -58,7 +55,7 @@ class FTTransformerNN(AbstractNN):
         return x_trans
 
 
-class TransformerLSTMNN(FTTransformerNN):
+class TransformerLSTMNN(AbstractNN):
     def __init__(
         self,
         n_inputs,
@@ -78,7 +75,8 @@ class TransformerLSTMNN(FTTransformerNN):
         attn_dropout=0.1,
         use_torch_transformer=False,
     ):
-        super(TransformerLSTMNN, self).__init__(
+        super(TransformerLSTMNN, self).__init__(trainer)
+        self.transformer = FTTransformerNN(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
             trainer=trainer,
@@ -111,8 +109,7 @@ class TransformerLSTMNN(FTTransformerNN):
             self.w = nn.Identity()
 
     def _forward(self, x, derived_tensors):
-        x_embed = self.embed(x, derived_tensors)
-        x_trans = self.embed_transformer(x_embed, derived_tensors)
+        x_trans = self.transformer(x, derived_tensors)
         all_res = [x_trans]
 
         x_lstm = self.lstm(x, derived_tensors)
@@ -124,7 +121,7 @@ class TransformerLSTMNN(FTTransformerNN):
         return output
 
 
-class TransformerSeqNN(FTTransformerNN):
+class TransformerSeqNN(AbstractNN):
     def __init__(
         self,
         n_inputs,
@@ -145,7 +142,8 @@ class TransformerSeqNN(FTTransformerNN):
         use_torch_transformer=False,
         flatten_transformer=True,
     ):
-        super(TransformerSeqNN, self).__init__(
+        super(TransformerSeqNN, self).__init__(trainer)
+        self.transformer = FTTransformerNN(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
             trainer=trainer,
@@ -184,8 +182,7 @@ class TransformerSeqNN(FTTransformerNN):
             self.w = nn.Identity()
 
     def _forward(self, x, derived_tensors):
-        x_embed = self.embed(x, derived_tensors)
-        x_trans = self.embed_transformer(x_embed, derived_tensors)
+        x_trans = self.transformer(x, derived_tensors)
         all_res = [x_trans]
 
         x_seq = self.seq_transformer(x, derived_tensors)
@@ -253,9 +250,6 @@ class CatEmbedLSTMNN(AbstractNN):
         embed_dropout=0.1,
     ):
         super(CatEmbedLSTMNN, self).__init__(trainer)
-        self.n_cont = n_inputs
-        self.n_outputs = n_outputs
-        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
 
         self.embed = Embedding(
             embedding_dim=embedding_dim,
@@ -337,9 +331,6 @@ class FastFormerNN(AbstractNN):
         flatten_transformer=True,
     ):
         super(FastFormerNN, self).__init__(trainer)
-        self.n_cont = n_inputs
-        self.n_outputs = n_outputs
-        self.n_cat = len(cat_num_unique) if cat_num_unique is not None else 0
 
         self.embed = Embedding(
             embedding_dim,
@@ -366,15 +357,13 @@ class FastFormerNN(AbstractNN):
         return x_trans
 
 
-class FastFormerSeqNN(FastFormerNN):
+class FastFormerSeqNN(AbstractNN):
     def __init__(
         self,
         n_inputs,
         n_outputs,
         layers,
         trainer,
-        manual_activate_sn=None,
-        sn_coeff_vars_idx=None,
         cat_num_unique: List[int] = None,
         embedding_dim=32,
         seq_embedding_dim=16,
@@ -388,7 +377,8 @@ class FastFormerSeqNN(FastFormerNN):
         seq_attn_dropout=0.1,
         flatten_transformer=True,
     ):
-        super(FastFormerSeqNN, self).__init__(
+        super(FastFormerSeqNN, self).__init__(trainer)
+        self.transformer = FastFormerNN(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
             trainer=trainer,
@@ -425,8 +415,7 @@ class FastFormerSeqNN(FastFormerNN):
             self.w = nn.Identity()
 
     def _forward(self, x, derived_tensors):
-        x_embed = self.embed(x, derived_tensors)
-        x_trans = self.embed_transformer(x_embed, derived_tensors)
+        x_trans = self.transformer(x, derived_tensors)
         all_res = [x_trans]
 
         x_seq = self.seq_transformer(x, derived_tensors)
