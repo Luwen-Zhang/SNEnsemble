@@ -3,6 +3,7 @@ import torch.nn as nn
 from copy import deepcopy as cp
 import inspect
 from src.model.base import get_sequential
+from . import manual_activate
 
 
 class AbstractSN(nn.Module):
@@ -223,6 +224,73 @@ class KohoutSN(linlogSN):
     @classmethod
     def activated(cls):
         return False
+
+
+class SN(nn.Module):
+    def __init__(self, trainer, manual_activate_sn, sn_coeff_vars_idx):
+        super(SN, self).__init__()
+
+        activated_sn = []
+        for key, sn in sn_mapping.items():
+            if (
+                sn.test_sn_vars(
+                    trainer.cont_feature_names, list(trainer.derived_data.keys())
+                )
+                and (manual_activate_sn is None or key in manual_activate_sn)
+                and sn.activated()
+            ):
+                activated_sn.append(
+                    sn(
+                        cont_feature_names=trainer.cont_feature_names,
+                        derived_feature_names=list(trainer.derived_data.keys()),
+                        s_zero_slip=trainer.get_zero_slip(sn.get_sn_vars()[0]),
+                        sn_coeff_vars_idx=sn_coeff_vars_idx,
+                    )
+                )
+        if len(activated_sn) > 0 and self._check_activate():
+            print(
+                f"Activated SN models: {[sn.__class__.__name__ for sn in activated_sn]}"
+            )
+            self.sn_coeff_vars_idx = sn_coeff_vars_idx
+            self.activated_sn = nn.ModuleList(activated_sn)
+            self.sn_component_weights = get_sequential(
+                [16, 64, 128, 64, 16],
+                len(sn_coeff_vars_idx),
+                len(self.activated_sn),
+                nn.ReLU,
+            )
+            self.run = True
+        else:
+            self.run = False
+
+    def forward(self, x, derived_tensors):
+        if self.run:
+            x_sn = torch.concat(
+                [sn(x, derived_tensors) for sn in self.activated_sn],
+                dim=1,
+            )
+            x_sn = torch.mul(
+                x_sn,
+                nn.functional.normalize(
+                    torch.abs(self.sn_component_weights(x[:, self.sn_coeff_vars_idx])),
+                    p=1,
+                    dim=1,
+                ),
+            )
+            x_sn = torch.sum(x_sn, dim=1).view(-1, 1)
+            return x_sn
+        else:
+            return None
+
+    def _check_activate(self):
+        if self._manual_activate():
+            return True
+        else:
+            print(f"SN module is manually deactivated.")
+            return False
+
+    def _manual_activate(self):
+        return manual_activate["SN"]
 
 
 sn_mapping = {}

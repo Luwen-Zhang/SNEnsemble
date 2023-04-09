@@ -4,6 +4,7 @@ import torch
 from torch import Tensor
 import torch.nn.functional as F
 import numpy as np
+from ..base import get_sequential
 
 
 class ReGLU(nn.Module):
@@ -102,3 +103,65 @@ class PositionalEncoding(nn.Module):
         """
         x = x + self.pe[: x.size(0)]
         return self.dropout(x)
+
+
+class FTTransformer(nn.Module):
+    def __init__(
+        self,
+        n_inputs,
+        attn_heads,
+        attn_layers,
+        embedding_dim,
+        ff_dim,
+        ff_layers,
+        dropout,
+        n_outputs,
+        use_torch_transformer,
+        flatten_transformer,
+        **kwargs,
+    ):
+        super(FTTransformer, self).__init__()
+        # Indeed, the implementation of TransformerBlock is almost the same as torch.nn.TransformerEncoderLayer, except
+        # that the activation function in FT-Transformer is ReGLU instead of ReLU or GeLU in torch implementation.
+        # The performance of these two implementations can be verified after several epochs by changing
+        # ``use_torch_transformer`` and setting the activation of TransformerBlock to nn.GELU.
+        # In our scenario, ReGLU performs much better, which is why we implement our own version of transformer, just
+        # like FT-Transformer and WideDeep do.
+        # Also, dropout in MultiheadAttention improves performance.
+        self.flatten_transformer = flatten_transformer
+        if use_torch_transformer:
+            transformer_layer = nn.TransformerEncoderLayer(
+                d_model=embedding_dim,
+                nhead=attn_heads,
+                dim_feedforward=ff_dim,
+                dropout=dropout,
+                batch_first=True,
+                norm_first=True,
+                layer_norm_eps=1e-5,  # the default value of nn.LayerNorm
+                activation="gelu",
+            )
+            self.transformer = nn.TransformerEncoder(
+                transformer_layer, num_layers=attn_layers
+            )
+        else:
+            self.transformer = TransformerEncoder(
+                attn_layers=attn_layers,
+                embed_dim=embedding_dim,
+                attn_heads=attn_heads,
+                ff_dim=ff_dim,
+                dropout=dropout,
+            )
+        self.transformer_head = get_sequential(
+            ff_layers,
+            n_inputs * embedding_dim if self.flatten_transformer else embedding_dim,
+            n_outputs,
+            nn.Identity if len(ff_layers) == 0 else nn.ReLU,
+            use_norm=False if len(ff_layers) == 0 else True,
+            dropout=0,
+        )
+
+    def forward(self, x, derived_tensors):
+        x_trans = self.transformer(x)
+        x_trans = x_trans.flatten(1) if self.flatten_transformer else x_trans.mean(1)
+        x_trans = self.transformer_head(x_trans)
+        return x_trans

@@ -8,6 +8,7 @@ See https://arxiv.org/abs/2108.09084 for the paper.
 from torch import nn
 import torch
 from typing import *
+from ..base import get_sequential
 
 
 class AttentionPooling(nn.Module):
@@ -258,3 +259,41 @@ class FastformerEncoder(nn.Module):
         output = self.poolers[pooler_index](all_hidden_states[-1], src_key_padding_mask)
 
         return output
+
+
+class FastFormer(nn.Module):
+    def __init__(
+        self,
+        n_inputs,
+        attn_heads,
+        attn_layers,
+        embedding_dim,
+        ff_dim,
+        ff_layers,
+        dropout,
+        n_outputs,
+        **kwargs,
+    ):
+        super(FastFormer, self).__init__()
+        self.transformer = FastformerEncoder(
+            attn_heads=attn_heads,
+            attn_layers=attn_layers,
+            embed_dim=embedding_dim,
+            dropout=dropout,
+            ff_dim=ff_dim,
+            max_position_embeddings=256,
+        )
+
+        self.transformer_head = get_sequential(
+            ff_layers,
+            embedding_dim,
+            n_outputs,
+            nn.Identity if len(ff_layers) == 0 else nn.ReLU,
+            use_norm=False if len(ff_layers) == 0 else True,
+            dropout=0,
+        )
+
+    def forward(self, x, derived_tensors):
+        x_trans = self.transformer(x)
+        x_trans = self.transformer_head(x_trans)
+        return x_trans
