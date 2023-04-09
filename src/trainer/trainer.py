@@ -80,32 +80,94 @@ class Trainer:
 
     def clear_modelbase(self):
         """
-        Delete all modelbases in the trainer.
+        Delete all model bases in the trainer.
         """
         self.modelbases = []
         self.modelbases_names = []
 
-    def detach_modelbase(self, program: str):
+    def detach_modelbase(self, program: str, verbose: bool = True) -> "Trainer":
         """
-        Detach the selected modelbase to a separate trainer.
+        Detach the selected modelbase to a separate trainer and save it to another directory. It is much cheaper than
+        ``Trainer.copy()`` if only one model base is needed.
 
         Parameters
         ----------
         program
             The selected modelbase.
+        verbose
+            Verbosity
+
         Returns
         -------
         trainer
             An ``Trainer`` instance.
+
+        See Also
+        -------
+        ``Trainer.copy``, ``Trainer.detach_model``, ``AbstractModel.detach_model``
         """
         modelbase = cp(self.get_modelbase(program=program))
         tmp_trainer = modelbase.trainer
         tmp_trainer.clear_modelbase()
         new_path = add_postfix(self.project_root)
-        tmp_trainer.set_path(new_path, verbose=True)
+        tmp_trainer.set_path(new_path, verbose=False)
         modelbase.set_path(os.path.join(new_path, modelbase.program))
         tmp_trainer.add_modelbases([modelbase])
         shutil.copytree(self.get_modelbase(program=program).root, modelbase.root)
+        save_trainer(tmp_trainer, verbose=verbose)
+        return tmp_trainer
+
+    def detach_model(
+        self, program: str, model_name: str, verbose: bool = True
+    ) -> "Trainer":
+        """
+        Detach the selected model of the selected model base to a separate trainer and save it to another directory.
+
+        Parameters
+        ----------
+        program
+            The selected modelbase.
+        model_name
+            The selected model.
+        verbose
+            Verbosity.
+
+        Returns
+        -------
+        trainer
+            An ``Trainer`` instance.
+        """
+        tmp_trainer = self.detach_modelbase(program=program, verbose=False)
+        tmp_modelbase = tmp_trainer.get_modelbase(program=program)
+        detached_model = tmp_modelbase.detach_model(
+            model_name=model_name, program=f"{program}_{model_name}"
+        )
+        tmp_trainer.clear_modelbase()
+        tmp_trainer.add_modelbases([detached_model])
+        shutil.rmtree(tmp_modelbase.root)
+        save_trainer(tmp_trainer, verbose=verbose)
+        return tmp_trainer
+
+    def copy(self) -> "Trainer":
+        """
+        Copy the trainer and save it to another directory. It might be time and space consuming because all model bases
+        are copied as well.
+
+        Returns
+        -------
+        trainer
+            A ``Trainer`` instance.
+
+        See Also
+        -------
+        ``Trainer.detach_modelbase``, ``Trainer.detach_model``, ``AbstractModel.detach_model``
+        """
+        tmp_trainer = cp(self)
+        new_path = add_postfix(self.project_root)
+        tmp_trainer.set_path(new_path, verbose=True)
+        for modelbase in tmp_trainer.modelbases:
+            modelbase.set_path(os.path.join(new_path, modelbase.program))
+        shutil.copytree(self.project_root, tmp_trainer.project_root, dirs_exist_ok=True)
         save_trainer(tmp_trainer)
         return tmp_trainer
 
