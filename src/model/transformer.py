@@ -34,6 +34,7 @@ class Transformer(TorchModel):
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
             "BiasConsGradTransformerSeq",
+            "SNTransformerSeq",
             "CatEmbedLSTM",
             "BiasCatEmbedLSTM",
         ]
@@ -84,6 +85,7 @@ class Transformer(TorchModel):
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
             "BiasConsGradTransformerSeq",
+            "SNTransformerSeq",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -154,6 +156,7 @@ class Transformer(TorchModel):
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
             "BiasConsGradTransformerSeq",
+            "SNTransformerSeq",
         ]:
             return [
                 # ``seq_embedding_dim`` should be able to divided by ``attn_heads``.
@@ -216,6 +219,7 @@ class Transformer(TorchModel):
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
             "BiasConsGradTransformerSeq",
+            "SNTransformerSeq",
         ]:
             return {
                 "seq_embedding_dim": 16,
@@ -244,6 +248,11 @@ class Transformer(TorchModel):
             }
 
     def _conditional_validity(self, model_name: str) -> bool:
-        if model_name in ["ConsGradTransformerSeq"] and not src.check_grad_in_loss():
+        if "ConsGrad" in model_name and not src.check_grad_in_loss():
+            return False
+        if (
+            model_name in ["SNTransformerSeq"]
+            and "Relative Mean Stress" not in self.trainer.cont_feature_names
+        ):
             return False
         return True

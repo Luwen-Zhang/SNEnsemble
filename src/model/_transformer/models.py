@@ -5,6 +5,7 @@ from .lstm import LSTM
 from .loss import BiasLoss, ConsGrad
 from .seq_fastformer import SeqFastFormer
 from .seq_fttransformer import SeqFTTransformer
+from .sn import SN
 from ..base import get_sequential, AbstractNN
 import torch
 import torch.nn as nn
@@ -465,3 +466,23 @@ class BiasConsGradFastFormerSeqNN(FastFormerSeqNN):
             *data,
         )
         return loss
+
+
+class SNTransformerSeqNN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
+        super(SNTransformerSeqNN, self).__init__(trainer)
+        self.sn = SN()
+        self.transformer = TransformerSeqNN(
+            n_inputs=n_inputs,
+            n_outputs=sum(self.sn.n_coeff_ls) + len(self.sn.n_coeff_ls),
+            layers=layers,
+            trainer=trainer,
+            **kwargs,
+        )
+        self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
+        self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
+
+    def _forward(self, x, derived_tensors):
+        coeffs = self.transformer(x, derived_tensors)
+        x_out = self.sn(x[:, self.s_idx] - self.s_zero_slip, coeffs)
+        return x_out
