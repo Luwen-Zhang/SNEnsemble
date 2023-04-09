@@ -3122,7 +3122,7 @@ class Trainer:
                 derived_data, list(df_bootstrap.index)
             )
             df_bootstrap = df_bootstrap.reset_index(drop=True)
-            bootstrap_model = cp(modelbase)
+            bootstrap_model = modelbase.detach_model(model_name=model_name)
             if refit:
                 bootstrap_model.fit(
                     df_bootstrap,

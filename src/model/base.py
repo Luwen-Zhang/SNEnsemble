@@ -41,6 +41,8 @@ class AbstractModel:
             be specified.
         store_in_harddisk:
             Whether to save sub-models in the hard disk. If the global setting ``low_memory`` is True, True is used.
+        **kwargs:
+            Ignored.
         """
         self.device = trainer.device
         self.trainer = trainer
@@ -214,15 +216,17 @@ class AbstractModel:
             **kwargs,
         )
 
-    def detach_model(self, model_name: str, program: str):
+    def detach_model(self, model_name: str, program: str = None) -> "AbstractModel":
         """
-        Detach the chosen submodel to a seperate AbstractModel.
+        Detach the chosen sub-model to a separate AbstractModel with the same trainer.
+
         Parameters
         ----------
         model_name:
-            The name of the submodel to be detached.
+            The name of the sub-model to be detached.
         program:
-            The new name of the detached database.
+            The new name of the detached database. If the name is the same as the original one, the detached model is
+            stored in memory to avoid overwriting the original model.
 
         Returns
         -------
@@ -231,12 +235,14 @@ class AbstractModel:
         """
         if not type(self.model) in [ModelDict, Dict]:
             raise Exception(f"The modelbase does not support model detaching.")
+        program = program if program is not None else self.program
         tmp_model = self.__class__(
             trainer=self.trainer, program=program, model_subset=[model_name]
         )
-        if type(self.model) == ModelDict:
+        if tmp_model.store_in_harddisk and program != self.program:
             tmp_model.model = ModelDict(path=tmp_model.root)
         else:
+            tmp_model.store_in_harddisk = False
             tmp_model.model = {}
         tmp_model.model[model_name] = cp(self.model[model_name])
         if model_name in self.model_params.keys():
