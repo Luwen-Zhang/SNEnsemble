@@ -3,7 +3,6 @@ from .fttransformer import FTTransformer
 from .fasttransformer import FastFormer
 from .lstm import LSTM
 from .loss import BiasLoss, ConsGrad
-from .sn_formulas import SN
 from .seq_fastformer import SeqFastFormer
 from .seq_fttransformer import SeqFTTransformer
 from ..base import get_sequential, AbstractNN
@@ -66,8 +65,6 @@ class TransformerLSTMNN(FTTransformerNN):
         n_outputs,
         layers,
         trainer,
-        manual_activate_sn=None,
-        sn_coeff_vars_idx=None,
         cat_num_unique: List[int] = None,
         embedding_dim=32,
         seq_embedding_dim=10,
@@ -102,13 +99,11 @@ class TransformerLSTMNN(FTTransformerNN):
             lstm_layers,
             run="Number of Layers" in self.derived_feature_names,
         )
-        self.sn = SN(trainer, manual_activate_sn, sn_coeff_vars_idx)
 
-        self.run_any = self.sn.run or self.lstm.run
-        if self.run_any:
+        if self.lstm.run:
             self.w = get_sequential(
                 layers,
-                1 + int(self.sn.run) + int(self.lstm.run),
+                1 + int(self.lstm.run),
                 n_outputs,
                 nn.ReLU,
             )
@@ -119,10 +114,6 @@ class TransformerLSTMNN(FTTransformerNN):
         x_embed = self.embed(x, derived_tensors)
         x_trans = self.embed_transformer(x_embed, derived_tensors)
         all_res = [x_trans]
-
-        x_sn = self.sn(x, derived_tensors)
-        if x_sn is not None:
-            all_res += [x_sn]
 
         x_lstm = self.lstm(x, derived_tensors)
         if x_lstm is not None:
@@ -140,8 +131,6 @@ class TransformerSeqNN(FTTransformerNN):
         n_outputs,
         layers,
         trainer,
-        manual_activate_sn=None,
-        sn_coeff_vars_idx=None,
         cat_num_unique: List[int] = None,
         embedding_dim=32,
         seq_embedding_dim=16,
@@ -183,13 +172,11 @@ class TransformerSeqNN(FTTransformerNN):
             run="Lay-up Sequence" in self.derived_feature_names
             and "Number of Layers" in self.derived_feature_names,
         )
-        self.sn = SN(trainer, manual_activate_sn, sn_coeff_vars_idx)
 
-        self.run_any = self.sn.run or self.seq_transformer.run
-        if self.run_any:
+        if self.seq_transformer.run:
             self.w = get_sequential(
                 layers,
-                1 + int(self.sn.run) + int(self.seq_transformer.run),
+                1 + int(self.seq_transformer.run),
                 n_outputs,
                 nn.ReLU,
             )
@@ -200,10 +187,6 @@ class TransformerSeqNN(FTTransformerNN):
         x_embed = self.embed(x, derived_tensors)
         x_trans = self.embed_transformer(x_embed, derived_tensors)
         all_res = [x_trans]
-
-        x_sn = self.sn(x, derived_tensors)
-        if x_sn is not None:
-            all_res += [x_sn]
 
         x_seq = self.seq_transformer(x, derived_tensors)
         if x_seq is not None:
@@ -261,8 +244,6 @@ class CatEmbedLSTMNN(AbstractNN):
         n_outputs,
         layers,
         trainer,
-        manual_activate_sn=None,
-        sn_coeff_vars_idx=None,
         embed_continuous=False,
         cat_num_unique: List[int] = None,
         embedding_dim=10,
@@ -299,15 +280,10 @@ class CatEmbedLSTMNN(AbstractNN):
             lstm_layers,
             run="Number of Layers" in self.derived_feature_names,
         )
-        self.sn = SN(trainer, manual_activate_sn, sn_coeff_vars_idx)
 
-        self.run_any = self.sn.run or self.lstm.run
         self.w = get_sequential(
             layers,
-            n_inputs
-            + int(self.embed.run_cat) * self.n_cat
-            + int(self.sn.run)
-            + int(self.lstm.run),
+            n_inputs + int(self.embed.run_cat) * self.n_cat + int(self.lstm.run),
             n_outputs,
             nn.ReLU,
         )
@@ -326,10 +302,6 @@ class CatEmbedLSTMNN(AbstractNN):
             # x_cont is encoded, x_cat does not exists.
             x_embed_encode = x_embed
         all_res = [x_embed_encode]
-
-        x_sn = self.sn(x, derived_tensors)
-        if x_sn is not None:
-            all_res += [x_sn]
 
         x_lstm = self.lstm(x, derived_tensors)
         if x_lstm is not None:
@@ -441,13 +413,11 @@ class FastFormerSeqNN(FastFormerNN):
             run="Lay-up Sequence" in self.derived_feature_names
             and "Number of Layers" in self.derived_feature_names,
         )
-        self.sn = SN(trainer, manual_activate_sn, sn_coeff_vars_idx)
 
-        self.run_any = self.sn.run or self.seq_transformer.run
-        if self.run_any:
+        if self.seq_transformer.run:
             self.w = get_sequential(
                 layers,
-                1 + int(self.sn.run) + int(self.seq_transformer.run),
+                1 + int(self.seq_transformer.run),
                 n_outputs,
                 nn.ReLU,
             )
@@ -458,10 +428,6 @@ class FastFormerSeqNN(FastFormerNN):
         x_embed = self.embed(x, derived_tensors)
         x_trans = self.embed_transformer(x_embed, derived_tensors)
         all_res = [x_trans]
-
-        x_sn = self.sn(x, derived_tensors)
-        if x_sn is not None:
-            all_res += [x_sn]
 
         x_seq = self.seq_transformer(x, derived_tensors)
         if x_seq is not None:

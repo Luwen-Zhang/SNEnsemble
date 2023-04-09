@@ -39,19 +39,12 @@ class Transformer(TorchModel):
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
-        sn_coeff_vars_idx = [
-            self.trainer.cont_feature_names.index(name)
-            for name, t in self.trainer.args["feature_names_type"].items()
-            if self.trainer.args["feature_types"][t] == "Material"
-        ]
         if model_name == "TransformerLSTM":
             return TransformerLSTMNN(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
                 self.trainer.args["layers"] if self.layers is None else self.layers,
                 trainer=self.trainer,
-                manual_activate_sn=self.manual_activate_sn,
-                sn_coeff_vars_idx=sn_coeff_vars_idx,
                 cat_num_unique=[
                     len(x) for x in self.trainer.cat_feature_mapping.values()
                 ],
@@ -98,8 +91,6 @@ class Transformer(TorchModel):
                 len(self.trainer.label_name),
                 self.trainer.args["layers"] if self.layers is None else self.layers,
                 trainer=self.trainer,
-                manual_activate_sn=self.manual_activate_sn,
-                sn_coeff_vars_idx=sn_coeff_vars_idx,
                 cat_num_unique=[
                     len(x) for x in self.trainer.cat_feature_mapping.values()
                 ],
@@ -120,8 +111,6 @@ class Transformer(TorchModel):
                 len(self.trainer.label_name),
                 self.trainer.args["layers"] if self.layers is None else self.layers,
                 trainer=self.trainer,
-                manual_activate_sn=self.manual_activate_sn,
-                sn_coeff_vars_idx=sn_coeff_vars_idx,
                 embed_continuous=True,
                 cat_num_unique=[
                     len(x) for x in self.trainer.cat_feature_mapping.values()
