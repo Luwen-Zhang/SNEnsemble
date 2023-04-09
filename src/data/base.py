@@ -438,6 +438,12 @@ class AbstractSklearnImputer(AbstractImputer):
 class AbstractProcessor:
     """
     The base class for data-processors that change the number of data.
+
+    Notes
+    -------
+    If any attribute of the trainer is set by the processor in ``_fit_transform``, the processor is responsible to
+    restore the set attribute when _transform is called. For instance, we have implemented recording feature names and
+    restoring them in the wrapper methods ``fit_transform`` and ``transform``.
     """
 
     def __init__(self):

@@ -450,6 +450,7 @@ class CategoricalOrdinalEncoder(AbstractTransformer):
 
     def __init__(self):
         super(CategoricalOrdinalEncoder, self).__init__()
+        self.record_feature_mapping = None
 
     def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
         oe = OrdinalEncoder()
@@ -459,9 +460,11 @@ class CategoricalOrdinalEncoder(AbstractTransformer):
         for feature, categories in zip(trainer.cat_feature_names, oe.categories_):
             trainer.cat_feature_mapping[feature] = categories
         self.transformer = oe
+        self.record_feature_mapping = cp(trainer.cat_feature_mapping)
         return data
 
     def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+        trainer.cat_feature_mapping = cp(self.record_feature_mapping)
         try:
             data.loc[:, trainer.cat_feature_names] = self.transformer.transform(
                 data.loc[:, trainer.cat_feature_names]
