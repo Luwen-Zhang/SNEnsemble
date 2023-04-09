@@ -791,6 +791,8 @@ class Trainer:
         derived_stacked_features = self.extract_derived_stacked_feature_names(
             all_feature_names
         )
+        if len(cont_feature_names) == 0:
+            raise Exception(f"At least one continuous feature should be provided.")
         self.set_data(
             self.df,
             cont_feature_names,
