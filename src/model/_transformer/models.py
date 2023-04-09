@@ -98,10 +98,10 @@ class TransformerLSTMNN(AbstractNN):
             run="Number of Layers" in self.derived_feature_names,
         )
 
-        if self.lstm.run:
+        if self.lstm.run or n_outputs != 1:
             self.w = get_sequential(
                 layers,
-                1 + int(self.lstm.run),
+                1 * n_outputs + int(self.lstm.run),
                 n_outputs,
                 nn.ReLU,
             )
@@ -171,10 +171,10 @@ class TransformerSeqNN(AbstractNN):
             and "Number of Layers" in self.derived_feature_names,
         )
 
-        if self.seq_transformer.run:
+        if self.seq_transformer.run or n_outputs != 1:
             self.w = get_sequential(
                 layers,
-                1 + int(self.seq_transformer.run),
+                (1 + int(self.seq_transformer.run)) * n_outputs,
                 n_outputs,
                 nn.ReLU,
             )
@@ -263,7 +263,7 @@ class CatEmbedLSTMNN(AbstractNN):
         self.embed_encoder = get_sequential(
             layers,
             n_inputs=embedding_dim,
-            n_outputs=n_outputs,
+            n_outputs=1,
             act_func=nn.ReLU,
             dropout=embed_dropout,
             norm_type="layer",
@@ -404,10 +404,10 @@ class FastFormerSeqNN(AbstractNN):
             and "Number of Layers" in self.derived_feature_names,
         )
 
-        if self.seq_transformer.run:
+        if self.seq_transformer.run or n_outputs != 1:
             self.w = get_sequential(
                 layers,
-                1 + int(self.seq_transformer.run),
+                (1 + int(self.seq_transformer.run)) * n_outputs,
                 n_outputs,
                 nn.ReLU,
             )
