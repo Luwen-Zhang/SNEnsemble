@@ -2,10 +2,13 @@ import sys
 import torch
 from torch import nn
 import inspect
+import torch.nn.functional as F
 
 
 class SNMarker(nn.Module):
-    ...
+    def __init__(self):
+        super(SNMarker, self).__init__()
+        self.activ = F.relu
 
 
 class LinLog(SNMarker):
@@ -15,7 +18,7 @@ class LinLog(SNMarker):
 
     def forward(self, s: torch.Tensor, coeff: torch.Tensor):
         a, b = coeff.chunk(self.n_coeff, 1)
-        a, b = -torch.abs(a), torch.abs(b)
+        a, b = -self.activ(a), self.activ(b)
         return a * torch.abs(s) + b
 
 
@@ -26,7 +29,7 @@ class LogLog(SNMarker):
 
     def forward(self, s: torch.Tensor, coeff: torch.Tensor):
         a, b = coeff.chunk(self.n_coeff, 1)
-        a, b = -torch.abs(a), torch.abs(b)
+        a, b = -self.activ(a), self.activ(b)
         return a * torch.log10(torch.clamp(torch.abs(s), min=1e-8)) + b
 
 
