@@ -2646,14 +2646,13 @@ class Trainer:
         load_dir: str = "tension",
         avg_feature: List[str] = None,
         ax=None,
-        grid_size: int = 30,
-        n_bootstrap: int = 1,
         CI: float = 0.95,
         method: str = "statistical",
         verbose: bool = True,
         program: str = "ThisWork",
         model_name: str = "ThisWork",
         refit: bool = True,
+        **kwargs,
     ):
         """
         Calculate and plot the SN curve for the selected material using a selected model with bootstrap resampling.
@@ -2677,10 +2676,6 @@ class Trainer:
             A list of features to ignore when predicting SN curves by setting their values to their average.
         ax
             A matplotlib Axis instance. If not None, a new figure will be initialized.
-        grid_size
-            The grid for the predicted SN curve.
-        n_bootstrap
-            The number of bootstrap runs. See ``Trainer._bootstrap`` for details.
         CI
             The confidence interval for PSN curves and for predicted SN curves across multiple bootstrap runs and
             multiple samples. The latter usage is different from the CI argument in``Trainer.cal_partial_dependence``.
@@ -2694,6 +2689,8 @@ class Trainer:
             The selected model in the database.
         refit
             Whether to refit models on bootstrapped datasets. See Trainer._bootstrap.
+        **kwargs
+            Other arguments for ``Trainer._bootstrap``
         """
         # Check whether columns exist.
         if s_col not in self.df.columns:
@@ -2809,8 +2806,6 @@ class Trainer:
             df=processed_df.loc[chosen_indices, :],
             derived_data=self.get_derived_data_slice(self.derived_data, chosen_indices),
             focus_feature=s_col,
-            n_bootstrap=n_bootstrap,
-            grid_size=grid_size,
             x_min=s_min,
             x_max=s_max,
             CI=CI,
@@ -2818,6 +2813,7 @@ class Trainer:
             verbose=verbose,
             model_name=model_name,
             refit=refit if len(m_train_indices) != 0 else False,
+            **kwargs,
         )
 
         # Defining a series of utilities.
@@ -3137,8 +3133,8 @@ class Trainer:
         df: pd.DataFrame,
         derived_data: Dict[str, np.ndarray],
         focus_feature: str,
-        n_bootstrap: int,
-        grid_size: int,
+        n_bootstrap: int = 1,
+        grid_size: int = 30,
         verbose: bool = True,
         rederive: bool = True,
         refit: bool = True,
