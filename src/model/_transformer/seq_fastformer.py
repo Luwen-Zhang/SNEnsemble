@@ -34,15 +34,15 @@ class SeqFastFormer(FastFormer):
 
     def forward(self, x, derived_tensors):
         if self.run:
-            seq = derived_tensors["Lay-up Sequence"]
-            lens = derived_tensors["Number of Layers"]
+            seq = derived_tensors["Lay-up Sequence"].long()
+            lens = derived_tensors["Number of Layers"].long()
             max_len = seq.size(1)
             device = "cpu" if seq.get_device() == -1 else seq.get_device()
             # for the definition of padding_mask, see nn.MultiheadAttention.forward
             padding_mask = (
                 torch.arange(max_len, device=device).expand(len(lens), max_len) >= lens
             )
-            x = self.embedding(seq.long() + 90)
+            x = self.embedding(seq + 90)
             x_pos = self.pos_encoding(x)
             x_trans = self.transformer(x_pos, src_key_padding_mask=padding_mask)
             x_trans = self.transformer_head(x_trans)

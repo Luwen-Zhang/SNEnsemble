@@ -38,8 +38,8 @@ class SeqFTTransformer(FTTransformer):
 
     def forward(self, x, derived_tensors):
         if self.run:
-            seq = derived_tensors["Lay-up Sequence"]
-            lens = derived_tensors["Number of Layers"]
+            seq = derived_tensors["Lay-up Sequence"].long()
+            lens = derived_tensors["Number of Layers"].long()
             max_len = seq.size(1)
             device = "cpu" if seq.get_device() == -1 else seq.get_device()
             # for the definition of padding_mask, see nn.MultiheadAttention.forward

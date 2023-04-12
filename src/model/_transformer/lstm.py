@@ -27,8 +27,8 @@ class LSTM(nn.Module):
 
     def forward(self, x, derived_tensors):
         if self.run:
-            seq = derived_tensors["Lay-up Sequence"]
-            lens = derived_tensors["Number of Layers"]
+            seq = derived_tensors["Lay-up Sequence"].long()
+            lens = derived_tensors["Number of Layers"].long()
             device = "cpu" if seq.get_device() == -1 else seq.get_device()
             h_0 = torch.zeros(
                 self.lstm_layers, seq.size(0), self.n_hidden, device=device
@@ -37,7 +37,7 @@ class LSTM(nn.Module):
                 self.lstm_layers, seq.size(0), self.n_hidden, device=device
             )
 
-            seq_embed = self.embedding(seq.long() + 90)
+            seq_embed = self.embedding(seq + 90)
             seq_packed = nn.utils.rnn.pack_padded_sequence(
                 seq_embed,
                 torch.flatten(lens.cpu()),
