@@ -2603,21 +2603,22 @@ class Trainer:
 
     def plot_S_N(
         self,
-        s_col,
-        n_col,
-        r_col,
-        m_code,
-        r_value,
-        load_dir="tension",
+        s_col: str,
+        n_col: str,
+        r_col: str,
+        m_code: str,
+        r_value: float,
+        load_dir: str = "tension",
+        avg_feature: List[str] = None,
         ax=None,
-        grid_size=30,
-        n_bootstrap=1,
-        CI=0.95,
-        method="statistical",
-        verbose=True,
-        program="ThisWork",
-        model_name="ThisWork",
-        refit=True,
+        grid_size: int = 30,
+        n_bootstrap: int = 1,
+        CI: float = 0.95,
+        method: str = "statistical",
+        verbose: bool = True,
+        program: str = "ThisWork",
+        model_name: str = "ThisWork",
+        refit: bool = True,
     ):
         """
         Calculate and plot the SN curve for the selected material using a selected model with bootstrap resampling.
@@ -2637,6 +2638,8 @@ class Trainer:
         load_dir
             "tension" or else. If "tension" is selected, samples with s_col>0 will be selected for evaluation.
             Otherwise, those with s_col<0 will be selected.
+        avg_feature
+            A list of features to ignore when predicting SN curves by setting their values to their average.
         ax
             A matplotlib Axis instance. If not None, a new figure will be initialized.
         grid_size
@@ -2710,6 +2713,15 @@ class Trainer:
                 print(message)
             else:
                 warnings.warn(message, UserWarning)
+        if avg_feature is not None:
+            warnings.warn(
+                f"Some features are set to their average value: {avg_feature}"
+            )
+            processed_df = self.df.copy()
+            for feature in avg_feature:
+                processed_df[feature] = np.mean(processed_df[feature])
+        else:
+            processed_df = self.df.copy()
 
         # If no training or validation points available, raise an exception.
         if (
@@ -2759,7 +2771,7 @@ class Trainer:
         )
         x_value, mean_pred, ci_left, ci_right = self._bootstrap(
             program=program,
-            df=self.df.loc[chosen_indices, :],
+            df=processed_df.loc[chosen_indices, :],
             derived_data=self.get_derived_data_slice(self.derived_data, chosen_indices),
             focus_feature=s_col,
             n_bootstrap=n_bootstrap,
@@ -2928,7 +2940,7 @@ class Trainer:
         ax.set_xlim([0, 10])
         ax.set_title(f"{m_code} R={r_value} CI={CI * 100:.1f}\%")
 
-        path = f"{self.project_root}SN_curves_{program}_{model_name}"
+        path = os.path.join(self.project_root, f"SN_curves_{program}_{model_name}")
         if not os.path.exists(path):
             os.mkdir(path=path)
         fig_name = m_code.replace("/", "_") + f"_r_{r_value}.pdf"
