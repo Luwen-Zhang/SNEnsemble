@@ -23,6 +23,8 @@ from importlib import import_module, reload
 from functools import partialmethod
 import itertools
 from copy import deepcopy as cp
+from torch.autograd.grad_mode import _DecoratorContextManager
+from typing import Any
 
 clr = sns.color_palette("deep")
 sns.reset_defaults()
@@ -680,3 +682,21 @@ def add_postfix(path):
         s = os.path.join(*root_split) + ext
         root, ext = os.path.splitext(s)
     return s
+
+
+class torch_with_grad(_DecoratorContextManager):
+    """
+    Context-manager that enabled gradient calculation. This is an inverse version of torch.no_grad
+    """
+
+    def __init__(self) -> None:
+        if not torch._jit_internal.is_scripting():
+            super().__init__()
+        self.prev = False
+
+    def __enter__(self) -> None:
+        self.prev = torch.is_grad_enabled()
+        torch.set_grad_enabled(True)
+
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+        torch.set_grad_enabled(self.prev)

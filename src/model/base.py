@@ -1010,7 +1010,7 @@ class TorchModel(AbstractModel):
         model.eval()
         pred = []
         truth = []
-        with torch.no_grad() if src.setting["test_with_no_grad"] else nullcontext():
+        with torch.no_grad() if src.setting["test_with_no_grad"] else torch_with_grad():
             # print(test_dataset)
             avg_loss = 0
             for idx, tensors in enumerate(test_loader):
@@ -1231,14 +1231,17 @@ class AbstractNN(nn.Module):
         result:
             The obtained tensor.
         """
-        x = tensors[0]
-        additional_tensors = tensors[1:]
-        if type(additional_tensors[0]) == dict:
-            return self._forward(x, additional_tensors[0])
-        derived_tensors = {}
-        for tensor, name in zip(additional_tensors, self.derived_feature_names):
-            derived_tensors[name] = tensor
-        return self._forward(x, derived_tensors)
+        with torch.no_grad() if src.setting[
+            "test_with_no_grad"
+        ] and not self.training else torch_with_grad():
+            x = tensors[0]
+            additional_tensors = tensors[1:]
+            if type(additional_tensors[0]) == dict:
+                return self._forward(x, additional_tensors[0])
+            derived_tensors = {}
+            for tensor, name in zip(additional_tensors, self.derived_feature_names):
+                derived_tensors[name] = tensor
+            return self._forward(x, derived_tensors)
 
     def _forward(
         self, x: torch.Tensor, derived_tensors: Dict[str, torch.Tensor]

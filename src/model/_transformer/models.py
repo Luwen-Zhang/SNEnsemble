@@ -115,7 +115,7 @@ class TransformerLSTMNN(AbstractNN):
         all_res = [x_trans]
 
         x_lstm = self.lstm(x, derived_tensors)
-        if x_lstm is not None:
+        if self.lstm.run:
             all_res += [x_lstm]
 
         output = torch.concat(all_res, dim=1)
@@ -188,7 +188,7 @@ class TransformerSeqNN(AbstractNN):
         all_res = [x_trans]
 
         x_seq = self.seq_transformer(x, derived_tensors)
-        if x_seq is not None:
+        if self.seq_transformer.run:
             all_res += [x_seq]
 
         output = torch.concat(all_res, dim=1)
@@ -300,7 +300,7 @@ class CatEmbedLSTMNN(AbstractNN):
         all_res = [x_embed_encode]
 
         x_lstm = self.lstm(x, derived_tensors)
-        if x_lstm is not None:
+        if self.lstm.run:
             all_res += [x_lstm]
 
         output = torch.concat(all_res, dim=1)
@@ -421,7 +421,7 @@ class FastFormerSeqNN(AbstractNN):
         all_res = [x_trans]
 
         x_seq = self.seq_transformer(x, derived_tensors)
-        if x_seq is not None:
+        if self.seq_transformer.run:
             all_res += [x_seq]
 
         output = torch.concat(all_res, dim=1)

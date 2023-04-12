@@ -26,10 +26,10 @@ class LSTM(nn.Module):
             self.run = False
 
     def forward(self, x, derived_tensors):
+        device = "cpu" if x.get_device() == -1 else x.get_device()
         if self.run:
             seq = derived_tensors["Lay-up Sequence"].long()
             lens = derived_tensors["Number of Layers"].long()
-            device = "cpu" if seq.get_device() == -1 else seq.get_device()
             h_0 = torch.zeros(
                 self.lstm_layers, seq.size(0), self.n_hidden, device=device
             )
@@ -49,7 +49,7 @@ class LSTM(nn.Module):
             _, (h_t, _) = self.seq_lstm(seq_packed, (h_0, c_0))
             return torch.mean(h_t, dim=[0, 2]).view(-1, 1)
         else:
-            return None
+            return torch.zeros(x.size(0), 1, device=device)
 
     def _check_activate(self):
         if self._manual_activate():

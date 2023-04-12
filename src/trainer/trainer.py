@@ -3,6 +3,7 @@ The basic class for the project. It includes configuration, data processing, plo
 and comparing baseline models.
 """
 import os.path
+import numpy as np
 import sklearn.pipeline
 import src
 from src.utils import *
@@ -1240,14 +1241,31 @@ class Trainer:
             torch.tensor(value.astype(np.float32))
             for value in self.derived_data.values()
         ]
-        if src.setting["input_requires_grad"]:
-            X.requires_grad = True
+        self._tensors_requires_grad(X, *D)
         dataset = Data.TensorDataset(X, *D, y)
 
         self.train_dataset = Subset(dataset, self.train_indices)
         self.val_dataset = Subset(dataset, self.val_indices)
         self.test_dataset = Subset(dataset, self.test_indices)
         self.tensors = (X, *D, y) if len(D) > 0 else (X, None, y)
+
+    def _tensors_requires_grad(self, X: torch.Tensor, *D: torch.Tensor):
+        """
+        Let tensors requires_grad if the global setting ``input_requires_grad`` is True.
+
+        Parameters
+        ----------
+        X
+            The tabular tensor.
+        *D
+            Derived tensors.
+        """
+        if src.setting["input_requires_grad"]:
+            if not X.requires_grad:
+                X.requires_grad = True
+            for t in D:
+                if not t.requires_grad:
+                    t.requires_grad = True
 
     def get_derived_data_slice(
         self, derived_data: Dict[str, np.ndarray], indices: Iterable
@@ -1816,6 +1834,7 @@ class Trainer:
                         self.test_indices, :
                     ].values.flatten()
                     y = self.tensors[-1][self.test_indices, :]
+                    self._tensors_requires_grad(X, *D)
                     loader = Data.DataLoader(
                         Data.TensorDataset(X, *D, y),
                         batch_size=len(y),
@@ -1843,7 +1862,7 @@ class Trainer:
                         )
                     )
                 ]
-                attr = np.abs(np.append(attr[0], attr[1:]))
+                attr = np.abs(np.concatenate(attr))
             elif method == "shap":
                 attr = self.cal_shap(program=program, model_name=model_name)
             else:
@@ -1930,7 +1949,8 @@ class Trainer:
             test_data = [X_test, *D_test]
             explainer = shap.DeepExplainer(modelbase.model[model_name], background_data)
 
-            shap_values = explainer.shap_values(test_data)
+            with HiddenPrints():
+                shap_values = explainer.shap_values(test_data)
         else:
             background_data = shap.kmeans(
                 self.df.loc[self.train_indices, self.all_feature_names], 10
@@ -1955,9 +1975,9 @@ class Trainer:
                 test_data
             )
         attr = (
-            np.append(
-                np.mean(np.abs(shap_values[0]), axis=0),
-                [np.mean(np.abs(x), axis=0) for x in shap_values[1:]],
+            np.concatenate(
+                [np.mean(np.abs(shap_values[0]), axis=0)]
+                + [np.mean(np.abs(x), axis=0) for x in shap_values[1:]],
             )
             if type(shap_values) == list and len(shap_values) > 1
             else np.mean(np.abs(shap_values[0] if is_torch else shap_values), axis=0)
@@ -2014,11 +2034,19 @@ class Trainer:
         for idx, feature_type in enumerate(self.args["feature_types"]):
             clr_map[feature_type] = clr[idx]
 
+        where_effective = np.abs(attr) > 1e-5
+        effective_names = np.array(names)[where_effective]
+        print(
+            f"Feature importance less than 1e-5: {list(np.setdiff1d(names, effective_names))}"
+        )
+        attr = attr[where_effective]
+        pal = [x for idx, x in enumerate(pal) if where_effective[idx]]
+
         plt.figure(figsize=fig_size)
         ax = plt.subplot(111)
         plot_importance(
             ax,
-            names,
+            effective_names,
             attr,
             pal=pal,
             clr_map=clr_map,
@@ -2045,8 +2073,10 @@ class Trainer:
             patch.set_facecolor(color)
 
         plt.savefig(
-            self.project_root
-            + f"feature_importance_{program}_{model_name}_{method}.png",
+            os.path.join(
+                self.project_root,
+                f"feature_importance_{program}_{model_name}_{method}.png",
+            ),
             dpi=600,
         )
         if is_notebook():
@@ -2574,8 +2604,10 @@ class Trainer:
         ax.set_ylabel(f"ID of Material")
         warnings.filterwarnings("ignore", message="Tight layout not applied.")
         plt.savefig(
-            self.project_root
-            + f"{self.datasplitter.__class__.__name__}_{percentile}.pdf",
+            os.path.join(
+                self.project_root,
+                f"{self.datasplitter.__class__.__name__}_{percentile}.pdf",
+            ),
             bbox_inches="tight",
             dpi=1000,
         )

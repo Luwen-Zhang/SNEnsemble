@@ -37,6 +37,7 @@ class SeqFTTransformer(FTTransformer):
             self.run = False
 
     def forward(self, x, derived_tensors):
+        device = "cpu" if x.get_device() == -1 else x.get_device()
         if self.run:
             seq = derived_tensors["Lay-up Sequence"].long()
             lens = derived_tensors["Number of Layers"].long()
@@ -53,7 +54,7 @@ class SeqFTTransformer(FTTransformer):
             x_trans = self.transformer_head(x_trans)
             return x_trans
         else:
-            return None
+            return torch.zeros(x.size(0), 1, device=device)
 
     def _check_activate(self):
         if self._manual_activate():
