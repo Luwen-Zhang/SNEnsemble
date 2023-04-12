@@ -23,6 +23,7 @@ from sklearn.utils import resample as skresample
 import argparse
 import platform, psutil, subprocess
 import shutil
+import pickle
 
 set_random_seed(0)
 sys.path.append("configs/")
@@ -1527,6 +1528,7 @@ class Trainer:
         verbose: bool,
         test_data_only: bool,
         type: str = "random",
+        load_from_previous: bool = False,
     ) -> Dict[str, Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray]]]]:
         """
         Repeat loading data, training modelbases, and evaluating all models for multiple times.
@@ -1543,6 +1545,12 @@ class Trainer:
             Whether to evaluate models only on testing datasets.
         type
             The type of data splitting. "random" is currently supported.
+        load_from_previous
+            Load the state of a previous run (mostly because of an unexpected interruption).
+
+        Notes
+        -------
+        The results of a continuously run and a continued run (``load_from_previous=True``) are consistent.
 
         Returns
         -------
@@ -1555,7 +1563,6 @@ class Trainer:
                     keys: ["Training", "Testing", "Validation"]
                     values: (Predicted values, true values)
         """
-        set_random_seed(0)
         if not os.path.exists(os.path.join(self.project_root, "cv")):
             os.mkdir(os.path.join(self.project_root, "cv"))
         programs_predictions = {}
@@ -1565,11 +1572,40 @@ class Trainer:
             set_data_handler = self.load_data
         else:
             raise Exception(f"{type} cross validation not implemented.")
-        for i in range(n_random):
+
+        if load_from_previous:
+            if not os.path.isfile(
+                os.path.join(self.project_root, "cv", "cv_state.pkl")
+            ):
+                raise Exception(f"No previous state to load from.")
+            with open(
+                os.path.join(self.project_root, "cv", "cv_state.pkl"), "rb"
+            ) as file:
+                current_state = pickle.load(file)
+            start_i = current_state["i_random"]
+            self.load_state(current_state["trainer"])
+            programs_predictions = current_state["programs_predictions"]
+            if start_i >= n_random:
+                raise Exception(
+                    f"The loaded state is incompatible with the current setting."
+                )
+            print(f"Previous cross validation state is loaded.")
+        else:
+            start_i = 0
+        for i in range(start_i, n_random):
             if verbose:
                 print(
                     f"----------------------------{i + 1}/{n_random} {type} cross validation----------------------------"
                 )
+            current_state = {
+                "trainer": cp(self),
+                "i_random": i,
+                "programs_predictions": programs_predictions,
+            }
+            with open(
+                os.path.join(self.project_root, "cv", "cv_state.pkl"), "wb"
+            ) as file:
+                pickle.dump(current_state, file)
             with HiddenPrints(disable_std=not verbose):
                 set_random_seed(i)
                 set_data_handler()
@@ -1621,6 +1657,7 @@ class Trainer:
         dump_trainer: bool = True,
         cross_validation: int = 0,
         verbose: bool = True,
+        load_from_previous: bool = False,
     ) -> pd.DataFrame:
         """
         Run all modelbases with/without cross validation for a leaderboard.
@@ -1635,6 +1672,8 @@ class Trainer:
             The number of cross validation. See Trainer.cross_validation. 0 to evaluate directly on current datasets.
         verbose
             Verbosity.
+        load_from_previous
+            Load the state of a previous run (mostly because of an unexpected interruption).
 
         Returns
         -------
@@ -1651,6 +1690,7 @@ class Trainer:
                 n_random=cross_validation,
                 verbose=verbose,
                 test_data_only=test_data_only,
+                load_from_previous=load_from_previous,
             )
         else:
             programs_predictions = {}
