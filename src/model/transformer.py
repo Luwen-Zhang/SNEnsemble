@@ -35,6 +35,7 @@ class Transformer(TorchModel):
             "ConsGradTransformerSeq",
             "BiasConsGradTransformerSeq",
             "SNTransformerSeq",
+            "SNTransformerAddGradSeq",
             "CatEmbedLSTM",
             "BiasCatEmbedLSTM",
         ]
@@ -86,6 +87,7 @@ class Transformer(TorchModel):
             "ConsGradTransformerSeq",
             "BiasConsGradTransformerSeq",
             "SNTransformerSeq",
+            "SNTransformerAddGradSeq",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -157,6 +159,7 @@ class Transformer(TorchModel):
             "ConsGradTransformerSeq",
             "BiasConsGradTransformerSeq",
             "SNTransformerSeq",
+            "SNTransformerAddGradSeq",
         ]:
             return [
                 # ``seq_embedding_dim`` should be able to divided by ``attn_heads``.
@@ -220,6 +223,7 @@ class Transformer(TorchModel):
             "ConsGradTransformerSeq",
             "BiasConsGradTransformerSeq",
             "SNTransformerSeq",
+            "SNTransformerAddGradSeq",
         ]:
             return {
                 "seq_embedding_dim": 16,
@@ -251,7 +255,7 @@ class Transformer(TorchModel):
         if "ConsGrad" in model_name and not src.check_grad_in_loss():
             return False
         if (
-            model_name in ["SNTransformerSeq"]
+            model_name in ["SNTransformerSeq", "SNTransformerAddGradSeq"]
             and "Relative Mean Stress" not in self.trainer.cont_feature_names
         ):
             return False

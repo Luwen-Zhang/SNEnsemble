@@ -9,6 +9,7 @@ from .sn import SN
 from ..base import get_sequential, AbstractNN
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from typing import *
 
 
@@ -470,19 +471,87 @@ class BiasConsGradFastFormerSeqNN(FastFormerSeqNN):
 
 class SNTransformerSeqNN(AbstractNN):
     def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
+        if n_outputs != 1:
+            raise Exception("n_outputs > 1 is not supported.")
         super(SNTransformerSeqNN, self).__init__(trainer)
         self.sn = SN()
         self.transformer = TransformerSeqNN(
             n_inputs=n_inputs,
-            n_outputs=sum(self.sn.n_coeff_ls) + len(self.sn.n_coeff_ls),
+            n_outputs=1,
             layers=layers,
             trainer=trainer,
             **kwargs,
+        )
+        self.coeff_head = get_sequential(
+            layers=layers,
+            n_inputs=1,
+            n_outputs=sum(self.sn.n_coeff_ls) + len(self.sn.n_coeff_ls),
+            act_func=nn.ReLU,
         )
         self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
         self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
 
     def _forward(self, x, derived_tensors):
+        s = x[:, self.s_idx] - self.s_zero_slip
         coeffs = self.transformer(x, derived_tensors)
-        x_out = self.sn(x[:, self.s_idx] - self.s_zero_slip, coeffs)
+        self._coeffs = coeffs
+        coeffs_proj = self.coeff_head(coeffs) + coeffs
+        x_out = self.sn(s, coeffs_proj)
         return x_out
+
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        if self.training:
+            loss = (loss + self.default_loss_fn(self._coeffs, y_true)) / 2
+        return loss
+
+
+class SNTransformerAddGradSeqNN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
+        if n_outputs != 1:
+            raise Exception("n_outputs > 1 is not supported.")
+        super(SNTransformerAddGradSeqNN, self).__init__(trainer)
+        self.sn = SN()
+        self.transformer = TransformerSeqNN(
+            n_inputs=n_inputs,
+            n_outputs=1,
+            layers=layers,
+            trainer=trainer,
+            **kwargs,
+        )
+        self.coeff_head = get_sequential(
+            layers=layers,
+            n_inputs=1,
+            n_outputs=sum(self.sn.n_coeff_ls) + len(self.sn.n_coeff_ls),
+            act_func=nn.ReLU,
+        )
+        self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
+        self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
+
+    def _forward(self, x, derived_tensors):
+        s = x[:, self.s_idx] - self.s_zero_slip
+        coeffs = self.transformer(x, derived_tensors)
+        self._coeffs = coeffs
+        grad = torch.autograd.grad(
+            outputs=coeffs,
+            inputs=x,
+            grad_outputs=torch.ones_like(coeffs),
+            retain_graph=True,
+            create_graph=False,  # True to compute higher order derivatives, and is more expensive.
+        )[0]
+        grad_s = grad[:, self.s_idx]
+        approx_b = torch.mul(F.relu(grad_s), s)
+        coeffs_proj = self.coeff_head(coeffs) + coeffs
+        coeffs_proj[:, 0] += grad_s
+        coeffs_proj[:, 2] += grad_s
+        coeffs_proj[:, 1] += approx_b
+        coeffs_proj[:, 3] += approx_b
+
+        x_out = self.sn(s, coeffs_proj)
+        return x_out
+
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        if self.training:
+            loss = (loss + self.default_loss_fn(self._coeffs, y_true)) / 2
+        return loss
