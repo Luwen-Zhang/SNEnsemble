@@ -3157,6 +3157,8 @@ class Trainer:
             The generated sequential values for the feature, averaged predictions on the sequential values across
             multiple bootstrap runs and all samples, left confidence interval, and right confidence interval.
         """
+        from .utils import NoBayesOpt
+
         modelbase = self.get_modelbase(program)
         derived_data = self.sort_derived_data(derived_data)
         if focus_feature in self.cont_feature_names:
@@ -3186,15 +3188,18 @@ class Trainer:
             df_bootstrap = df_bootstrap.reset_index(drop=True)
             bootstrap_model = modelbase.detach_model(model_name=model_name)
             if refit:
-                bootstrap_model.fit(
-                    df_bootstrap,
-                    model_subset=[model_name],
-                    cont_feature_names=self.dataprocessors[0][0].record_cont_features,
-                    cat_feature_names=self.dataprocessors[0][0].record_cat_features,
-                    label_name=self.label_name,
-                    verbose=False,
-                    warm_start=True,
-                )
+                with NoBayesOpt(self):
+                    bootstrap_model.fit(
+                        df_bootstrap,
+                        model_subset=[model_name],
+                        cont_feature_names=self.dataprocessors[0][
+                            0
+                        ].record_cont_features,
+                        cat_feature_names=self.dataprocessors[0][0].record_cat_features,
+                        label_name=self.label_name,
+                        verbose=False,
+                        warm_start=True,
+                    )
             bootstrap_model_predictions = []
             for value in x_value:
                 df_perm = df_bootstrap.copy()
