@@ -264,7 +264,7 @@ class AbstractModel:
         if hasattr(self, "root"):
             self.root = path
         if self.store_in_harddisk:
-            if hasattr(self, "model"):
+            if hasattr(self, "model") and self.model is not None:
                 self.model.root = path
                 for name in self.model.model_path.keys():
                     self.model.model_path[name] = os.path.join(self.root, name) + ".pkl"

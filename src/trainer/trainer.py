@@ -3296,6 +3296,10 @@ class Trainer:
         """
         # https://stackoverflow.com/questions/1216356/is-it-safe-to-replace-a-self-object-by-another-object-of-the-same-type-in-a-meth
         self.__dict__.update(trainer.__dict__)
+        # The update operation does not change the location of self. However, model bases contains another trainer
+        # that points to another location if the state is loaded from disk.
+        for model in self.modelbases:
+            model.trainer = self
 
     def get_best_model(self) -> Tuple[str, str]:
         """
