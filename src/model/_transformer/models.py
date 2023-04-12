@@ -530,28 +530,22 @@ class SNTransformerAddGradSeqNN(AbstractNN):
 
     def _forward(self, x, derived_tensors):
         s = x[:, self.s_idx] - self.s_zero_slip
-        coeffs = self.transformer(x, derived_tensors)
-        self._coeffs = coeffs
+        naive_pred = self.transformer(x, derived_tensors)
+        self._naive_pred = naive_pred
         grad = torch.autograd.grad(
-            outputs=coeffs,
+            outputs=naive_pred,
             inputs=x,
-            grad_outputs=torch.ones_like(coeffs),
+            grad_outputs=torch.ones_like(naive_pred),
             retain_graph=True,
             create_graph=False,  # True to compute higher order derivatives, and is more expensive.
         )[0]
-        grad_s = grad[:, self.s_idx]
-        approx_b = torch.mul(F.relu(grad_s), s)
-        coeffs_proj = self.coeff_head(coeffs) + coeffs
-        coeffs_proj[:, 0] += grad_s
-        coeffs_proj[:, 2] += grad_s
-        coeffs_proj[:, 1] += approx_b
-        coeffs_proj[:, 3] += approx_b
-
-        x_out = self.sn(s, coeffs_proj)
+        grad_s = grad[:, self.s_idx].view(-1, 1)
+        coeffs_proj = self.coeff_head(naive_pred) + naive_pred
+        x_out = self.sn(s, coeffs_proj, grad_s, naive_pred)
         return x_out
 
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         loss = self.default_loss_fn(y_pred, y_true)
         if self.training:
-            loss = (loss + self.default_loss_fn(self._coeffs, y_true)) / 2
+            loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
         return loss
