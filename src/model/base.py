@@ -1018,9 +1018,7 @@ class TorchModel(AbstractModel):
                 data = tensors[0]
                 additional_tensors = tensors[1 : len(tensors) - 1]
                 y = model(*([data] + additional_tensors))
-                loss = model.loss_fn(
-                    yhat, y, model, *([data] + additional_tensors), **kwargs
-                )
+                loss = model.default_loss_fn(y, yhat)
                 avg_loss += loss.item() * len(y)
                 pred += list(y.cpu().detach().numpy())
                 truth += list(yhat.cpu().detach().numpy())

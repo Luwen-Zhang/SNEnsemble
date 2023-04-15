@@ -5,21 +5,17 @@ from src.utils import torch_with_grad
 import torch.nn.functional as F
 
 
-def BiasLoss(training, base_loss: torch.Tensor, w: torch.Tensor):
-    if not training:
-        return base_loss
+def BiasLoss(base_loss: torch.Tensor, w: torch.Tensor):
     return (base_loss * w).mean()
 
 
-def ConsGradLoss(training, balance=1e3, *data, **kwargs):
+def ConsGradLoss(balance=1e3, *data, **kwargs):
     with torch_with_grad():
         base_loss: torch.Tensor = kwargs["base_loss"]
         y_pred: torch.Tensor = kwargs["y_pred"]
         n_cont: int = kwargs["n_cont"]
         cont_feature_names: List[str] = kwargs["cont_feature_names"]
         implemented_features = ["Relative Mean Stress"]
-        if not training:
-            return base_loss
         feature_idx_mapping = {
             x: cont_feature_names.index(x)
             for x in implemented_features
