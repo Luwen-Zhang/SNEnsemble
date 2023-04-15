@@ -27,10 +27,10 @@ class LinLog(SNMarker):
         s = torch.abs(s)
         grad_s = F.relu(-grad_s)
         approx_b = F.relu(torch.mul(grad_s, s) + naive_pred)
-        # a, b = coeff.chunk(self.n_coeff, 1)
-        # a, b = -self.activ(a), self.activ(b)
-        a = -grad_s
-        b = approx_b
+        a, b = coeff.chunk(self.n_coeff, 1)
+        a, b = self.activ(a), self.activ(b)
+        a = -a / (torch.max(a) + 1e-8) * torch.max(grad_s) * 1e-1 - grad_s
+        b = b / (torch.max(b) + 1e-8) * torch.max(approx_b) * 1e-1 + approx_b
         return a * torch.abs(s) + b
 
 
@@ -51,10 +51,10 @@ class LogLog(SNMarker):
         log_s = torch.log10(s)
         grad_log_s = F.relu(torch.mul(torch.mul(grad_s, float(np.log(10))), s))
         approx_b = F.relu(torch.mul(grad_log_s, log_s) + naive_pred)
-        # a, b = coeff.chunk(self.n_coeff, 1)
-        # a, b = -self.activ(a), self.activ(b)
-        a = -grad_log_s
-        b = approx_b
+        a, b = coeff.chunk(self.n_coeff, 1)
+        a, b = self.activ(a), self.activ(b)
+        a = -a / (torch.max(a) + 1e-8) * torch.max(grad_log_s) * 1e-1 - grad_log_s
+        b = b / (torch.max(b) + 1e-8) * torch.max(approx_b) * 1e-1 + approx_b
         return a * log_s + b
 
 
