@@ -226,18 +226,18 @@ class Transformer(TorchModel):
             "SNTransformerAddGradSeq",
         ]:
             return {
-                "seq_embedding_dim": 16,
+                "seq_embedding_dim": 32,
                 "embedding_dim": 32,
-                "attn_layers": 4,
-                "attn_heads": 8,
-                "embed_dropout": 0.1,
-                "attn_dropout": 0.2,
+                "attn_layers": 2,
+                "attn_heads": 2,
+                "embed_dropout": 0.0,
+                "attn_dropout": 0.0,
                 "seq_attn_layers": 4,
                 "seq_attn_heads": 8,
-                "seq_attn_dropout": 0.2,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
+                "seq_attn_dropout": 0.17852454400693288,
+                "lr": 0.001822984873444137,
+                "weight_decay": 1e-05,
+                "batch_size": 128,
             }
         elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
             return {

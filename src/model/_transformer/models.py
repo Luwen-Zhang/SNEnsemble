@@ -524,19 +524,20 @@ class SNTransformerAddGradSeqNN(AbstractNN):
         self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
 
     def _forward(self, x, derived_tensors):
-        s = x[:, self.s_idx] - self.s_zero_slip
+        self.s_original = x[:, self.s_idx].clone()
+        x[:, self.s_idx] = self.s_original  # enable gradient wrt a single column
         naive_pred = self.transformer(x, derived_tensors)
         self._naive_pred = naive_pred
-        grad = torch.autograd.grad(
+        grad_s = torch.autograd.grad(
             outputs=naive_pred,
-            inputs=x,
+            inputs=self.s_original,
             grad_outputs=torch.ones_like(naive_pred),
             retain_graph=True,
             create_graph=False,  # True to compute higher order derivatives, and is more expensive.
-        )[0]
-        grad_s = grad[:, self.s_idx].view(-1, 1)
+        )[0].view(-1, 1)
         coeffs_proj = self.coeff_head(naive_pred) + naive_pred
-        x_out = self.sn(s, coeffs_proj, grad_s, naive_pred)
+        s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
+        x_out = self.sn(s_wo_bias, coeffs_proj, grad_s, naive_pred)
         return x_out
 
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
