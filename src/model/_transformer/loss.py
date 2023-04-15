@@ -2,6 +2,7 @@ import torch
 from typing import List
 from torch import nn
 from src.utils import torch_with_grad
+import torch.nn.functional as F
 
 
 def BiasLoss(training, base_loss: torch.Tensor, w: torch.Tensor):
@@ -10,7 +11,7 @@ def BiasLoss(training, base_loss: torch.Tensor, w: torch.Tensor):
     return (base_loss * w).mean()
 
 
-def ConsGrad(training, *data, **kwargs):
+def ConsGradLoss(training, balance=1e3, *data, **kwargs):
     with torch_with_grad():
         base_loss: torch.Tensor = kwargs["base_loss"]
         y_pred: torch.Tensor = kwargs["y_pred"]
@@ -35,11 +36,11 @@ def ConsGrad(training, *data, **kwargs):
         for feature, idx in feature_idx_mapping.items():
             grad_feature = grad[:, idx]
             if feature == "Relative Mean Stress":
-                feature_loss[idx] = torch.mean(nn.ReLU()(grad_feature) ** 2)
+                feature_loss[idx] = torch.mean(F.relu(grad_feature) ** 2)
             else:
                 raise Exception(
                     f"Operation on the gradient of feature {feature} is not implemented."
                 )
 
-    base_loss = base_loss + torch.mul(torch.sum(feature_loss), 1e3)
+    base_loss = base_loss + torch.mul(torch.sum(feature_loss), balance)
     return base_loss

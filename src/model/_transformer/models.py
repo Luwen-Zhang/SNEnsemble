@@ -2,7 +2,7 @@ from .cont_cat_embedding import Embedding
 from .fttransformer import FTTransformer
 from .fasttransformer import FastFormer
 from .lstm import LSTM
-from .loss import BiasLoss, ConsGrad
+from .loss import BiasLoss, ConsGradLoss
 from .seq_fastformer import SeqFastFormer
 from .seq_fttransformer import SeqFTTransformer
 from .sn import SN
@@ -208,7 +208,7 @@ class BiasTransformerSeqNN(TransformerSeqNN):
 class ConsGradTransformerSeqNN(TransformerSeqNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         loss = self.default_loss_fn(y_pred, y_true)
-        loss = ConsGrad(
+        loss = ConsGradLoss(
             self.training,
             base_loss=loss,
             y_pred=y_pred,
@@ -225,7 +225,7 @@ class BiasConsGradTransformerSeqNN(TransformerSeqNN):
         where_weight = self.derived_feature_names.index("Sample Weight")
         w = data[1 + where_weight]
         loss = BiasLoss(self.training, loss, w)
-        loss = ConsGrad(
+        loss = ConsGradLoss(
             self.training,
             base_loss=loss,
             y_pred=y_pred,
@@ -432,7 +432,7 @@ class FastFormerSeqNN(AbstractNN):
 class ConsGradFastFormerSeqNN(FastFormerSeqNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         loss = self.default_loss_fn(y_pred, y_true)
-        loss = ConsGrad(
+        loss = ConsGradLoss(
             self.training,
             base_loss=loss,
             y_pred=y_pred,
@@ -458,7 +458,7 @@ class BiasConsGradFastFormerSeqNN(FastFormerSeqNN):
         where_weight = self.derived_feature_names.index("Sample Weight")
         w = data[1 + where_weight]
         loss = BiasLoss(self.training, loss, w)
-        loss = ConsGrad(
+        loss = ConsGradLoss(
             self.training,
             base_loss=loss,
             y_pred=y_pred,
