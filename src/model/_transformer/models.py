@@ -2,7 +2,7 @@ from .cont_cat_embedding import Embedding
 from .fttransformer import FTTransformer
 from .fasttransformer import FastFormer
 from .lstm import LSTM
-from .loss import BiasLoss, ConsGradLoss
+from .loss import BiasLoss, ConsGradLoss, StressGradLoss
 from .seq_fastformer import SeqFastFormer
 from .seq_fttransformer import SeqFTTransformer
 from .sn import SN
@@ -543,4 +543,5 @@ class SNTransformerAddGradSeqNN(AbstractNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         loss = self.default_loss_fn(y_pred, y_true)
         loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
+        loss = StressGradLoss(y_pred, self.s_original, loss, *data)
         return loss
