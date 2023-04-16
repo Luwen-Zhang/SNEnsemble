@@ -39,7 +39,7 @@ class FTTransformerNN(AbstractNN):
             run_cat="categorical" in self.derived_feature_names,
         )
         self.embed_transformer = FTTransformer(
-            n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_cont,
+            n_inputs=int(self.embed.run_cat) * self.n_cat + n_inputs,
             attn_heads=attn_heads,
             attn_layers=attn_layers,
             embedding_dim=embedding_dim,
@@ -340,7 +340,7 @@ class FastFormerNN(AbstractNN):
             run_cat="categorical" in self.derived_feature_names,
         )
         self.embed_transformer = FastFormer(
-            n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_cont,
+            n_inputs=int(self.embed.run_cat) * self.n_cat + n_inputs,
             attn_heads=attn_heads,
             attn_layers=attn_layers,
             embedding_dim=embedding_dim,
