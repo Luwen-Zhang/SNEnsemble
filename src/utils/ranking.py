@@ -42,4 +42,23 @@ def avg_rank(dfs: List[pd.DataFrame]):
         axis=1
     )
     avg_df.sort_values(by="Avg Rank", ascending=True, inplace=True)
+    avg_df.reset_index(drop=True, inplace=True)
     return avg_df
+
+
+def merge_to_excel(
+    path: Union[os.PathLike, str],
+    dfs: List[pd.DataFrame],
+    avg_df: pd.DataFrame,
+    sheet_names: List[str] = None,
+    **kwargs,
+):
+    avg_sheet_name = "Average"
+    if sheet_names is None:
+        sheet_names = [f"Mode {x}" for x in range(len(dfs))]
+    elif len(sheet_names) == len(dfs) + 1:
+        avg_sheet_name = sheet_names.pop(-1)
+    with pd.ExcelWriter(path) as writer:
+        for df, name in zip(dfs, sheet_names):
+            df.to_excel(writer, sheet_name=name, **kwargs)
+        avg_df.to_excel(writer, sheet_name=avg_sheet_name, **kwargs)
