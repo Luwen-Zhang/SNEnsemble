@@ -23,11 +23,6 @@ class Transformer(TorchModel):
 
     def _get_model_names(self):
         return [
-            "FastFormer",
-            "FastFormerSeq",
-            "BiasFastFormerSeq",
-            "ConsGradFastFormerSeq",
-            "BiasConsGradFastFormerSeq",
             "FTTransformer",
             "TransformerLSTM",
             "TransformerSeq",
@@ -64,7 +59,6 @@ class Transformer(TorchModel):
             )
         elif model_name in [
             "FTTransformer",
-            "FastFormer",
             "SNTransformerAddGrad",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
@@ -85,10 +79,6 @@ class Transformer(TorchModel):
                 attn_dropout=kwargs["attn_dropout"],
             )
         elif model_name in [
-            "FastFormerSeq",
-            "BiasFastFormerSeq",
-            "ConsGradFastFormerSeq",
-            "BiasConsGradFastFormerSeq",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
@@ -149,7 +139,6 @@ class Transformer(TorchModel):
             ] + self.trainer.SPACE
         elif model_name in [
             "FTTransformer",
-            "FastFormer",
             "SNTransformerAddGrad",
         ]:
             return [
@@ -160,10 +149,6 @@ class Transformer(TorchModel):
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
             ] + self.trainer.SPACE
         elif model_name in [
-            "FastFormerSeq",
-            "BiasFastFormerSeq",
-            "ConsGradFastFormerSeq",
-            "BiasConsGradFastFormerSeq",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
@@ -211,7 +196,6 @@ class Transformer(TorchModel):
             }
         elif model_name in [
             "FTTransformer",
-            "FastFormer",
             "SNTransformerAddGrad",
         ]:
             return {
@@ -225,10 +209,6 @@ class Transformer(TorchModel):
                 "batch_size": 1024,
             }
         elif model_name in [
-            "FastFormerSeq",
-            "BiasFastFormerSeq",
-            "ConsGradFastFormerSeq",
-            "BiasConsGradFastFormerSeq",
             "TransformerSeq",
             "BiasTransformerSeq",
             "ConsGradTransformerSeq",
