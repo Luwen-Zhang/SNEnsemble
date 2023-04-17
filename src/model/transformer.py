@@ -35,6 +35,7 @@ class Transformer(TorchModel):
             "ConsGradTransformerSeq",
             "BiasConsGradTransformerSeq",
             "SNTransformerSeq",
+            "SNTransformerAddGrad",
             "SNTransformerAddGradSeq",
             "CatEmbedLSTM",
             "BiasCatEmbedLSTM",
@@ -45,7 +46,9 @@ class Transformer(TorchModel):
             return TransformerLSTMNN(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
-                self.trainer.args["layers"] if self.layers is None else self.layers,
+                layers=self.trainer.args["layers"]
+                if self.layers is None
+                else self.layers,
                 trainer=self.trainer,
                 cat_num_unique=[
                     len(x) for x in self.trainer.cat_feature_mapping.values()
@@ -62,11 +65,15 @@ class Transformer(TorchModel):
         elif model_name in [
             "FTTransformer",
             "FastFormer",
+            "SNTransformerAddGrad",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
+                layers=self.trainer.args["layers"]
+                if self.layers is None
+                else self.layers,
                 trainer=self.trainer,
                 cat_num_unique=[
                     len(x) for x in self.trainer.cat_feature_mapping.values()
@@ -93,7 +100,9 @@ class Transformer(TorchModel):
             return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
-                self.trainer.args["layers"] if self.layers is None else self.layers,
+                layers=self.trainer.args["layers"]
+                if self.layers is None
+                else self.layers,
                 trainer=self.trainer,
                 cat_num_unique=[
                     len(x) for x in self.trainer.cat_feature_mapping.values()
@@ -141,6 +150,7 @@ class Transformer(TorchModel):
         elif model_name in [
             "FTTransformer",
             "FastFormer",
+            "SNTransformerAddGrad",
         ]:
             return [
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
@@ -202,6 +212,7 @@ class Transformer(TorchModel):
         elif model_name in [
             "FTTransformer",
             "FastFormer",
+            "SNTransformerAddGrad",
         ]:
             return {
                 "embedding_dim": 32,
@@ -255,7 +266,8 @@ class Transformer(TorchModel):
         if "ConsGradLoss" in model_name and not src.check_grad_in_loss():
             return False
         if (
-            model_name in ["SNTransformerSeq", "SNTransformerAddGradSeq"]
+            model_name
+            in ["SNTransformerSeq", "SNTransformerAddGradSeq", "SNTransformerAddGrad"]
             and "Relative Mean Stress" not in self.trainer.cont_feature_names
         ):
             return False
