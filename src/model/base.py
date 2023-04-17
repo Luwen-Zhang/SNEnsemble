@@ -1334,12 +1334,12 @@ def get_sequential(
                 net.add_module(f"dropout_{idx}", nn.Dropout(dropout))
         net.add_module("output", nn.Linear(layers[-1], n_outputs))
     else:
-        net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
-        net.add_module("activate", act_func())
         if use_norm:
-            net.add_module("norm", norm(n_outputs))
+            net.add_module("norm", norm(n_inputs))
+        net.add_module("activate", act_func())
         if dropout != 0:
             net.add_module("dropout", nn.Dropout(dropout))
+        net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
 
     net.apply(init_weights)
     return net
