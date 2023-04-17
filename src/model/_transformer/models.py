@@ -590,5 +590,5 @@ class SNTransformerAddGradSeqNN(AbstractNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         loss = self.default_loss_fn(y_pred, y_true)
         loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
-        loss = StressGradLoss(y_pred, self.s_original, loss, *data)
+        # loss = StressGradLoss(y_pred, self.s_original, loss, *data)
         return loss
