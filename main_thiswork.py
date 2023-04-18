@@ -17,6 +17,9 @@ models = [
     Transformer(
         trainer,
         model_subset=[
+            "FTTransformer",
+            "TransformerSeq",
+            "SNTransformerAddGrad",
             "SNTransformerAddGradSeq",
         ],
     ),
