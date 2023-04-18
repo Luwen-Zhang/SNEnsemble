@@ -155,8 +155,8 @@ class FTTransformer(nn.Module):
             ff_layers,
             n_inputs * embedding_dim if self.flatten_transformer else embedding_dim,
             n_outputs,
-            nn.Identity if len(ff_layers) == 0 else nn.ReLU,
-            use_norm=False if len(ff_layers) == 0 else True,
+            nn.ReLU,
+            norm_type="layer",
             dropout=0,
         )
 
