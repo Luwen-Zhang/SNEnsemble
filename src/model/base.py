@@ -521,9 +521,10 @@ class AbstractModel:
                             **params,
                         )
 
-                    pred = self._pred_single_model(model, X_val, D_val, verbose=False)
                     try:
-                        res = metric_sklearn(pred, y_val, self.trainer.args["loss"])
+                        res = self._bayes_eval(
+                            model, X_train, D_train, y_train, X_val, D_val, y_val
+                        )
                     except Exception as e:
                         print(
                             f"An exception occurs when evaluating a bayes call: {e}. Returning a large value instead."
@@ -598,6 +599,39 @@ class AbstractModel:
 
         if dump_trainer:
             save_trainer(self.trainer)
+
+    def _bayes_eval(
+        self,
+        model,
+        X_train,
+        D_train,
+        y_train,
+        X_val,
+        D_val,
+        y_val,
+    ):
+        """
+        Evaluating the model for bayesian optimization iterations. If MaterialCycleSplitter or CycleSplitter
+        is used, the average error of training and evaluation is returned. Otherwise, the error of evaluation is
+        returned.
+
+        Returns
+        -------
+        result
+            The evaluation of bayesian hyperparameter optimization.
+        """
+        y_val_pred = self._pred_single_model(model, X_val, D_val, verbose=False)
+        res = metric_sklearn(y_val_pred, y_val, self.trainer.args["loss"])
+        if self.trainer.args["data_splitter"] in [
+            "MaterialCycleSplitter",
+            "CycleSplitter",
+        ]:
+            y_train_pred = self._pred_single_model(
+                model, X_train, D_train, verbose=False
+            )
+            res += metric_sklearn(y_train_pred, y_train, self.trainer.args["loss"])
+            res /= 2
+        return res
 
     def _check_train_status(self):
         """
@@ -906,7 +940,7 @@ class AbstractModel:
 
 class BayesCallback:
     """
-    Show a tqdm progress bar when performing bayes optimization.
+    Print information when performing bayes optimization.
     """
 
     def __init__(self, total):
@@ -1104,6 +1138,8 @@ class TorchModel(AbstractModel):
         from torch.utils.data.dataloader import default_collate
 
         collate_fn = lambda x: list(x_.to(self.device) for x_ in default_collate(x))
+        if not isinstance(model, AbstractNN):
+            raise Exception("_new_model must return an AbstractNN instance.")
         model.to(self.device)
         optimizer = model.get_optimizer(warm_start, **kwargs)
 
@@ -1143,7 +1179,7 @@ class TorchModel(AbstractModel):
                     f"val loss: {np.min(val_ls):.4f}, Epoch time: {t_end-t_start:.4f}s."
                 )
 
-            early_stopping(val_loss, model)
+            early_stopping(self._early_stopping_eval(train_loss, val_loss), model)
 
             if early_stopping.early_stop:
                 if verbose:
@@ -1187,6 +1223,31 @@ class TorchModel(AbstractModel):
             return sum(p.numel() for p in model.parameters() if p.requires_grad)
         else:
             return sum(p.numel() for p in model.parameters())
+
+    def _early_stopping_eval(self, train_loss: float, val_loss: float) -> float:
+        """
+        Calculate the loss value (criteria) for early stopping. By default, if MaterialCycleSplitter or CycleSplitter
+        is used, the average of ``train_loss`` and ``val_loss`` is returned. Otherwise, ``val_loss`` is returned.
+
+        Parameters
+        ----------
+        train_loss
+            Training loss at the epoch.
+        val_loss
+            Validation loss at the epoch.
+
+        Returns
+        -------
+        result
+            The early stopping evaluation.
+        """
+        if self.trainer.args["data_splitter"] in [
+            "MaterialCycleSplitter",
+            "CycleSplitter",
+        ]:
+            return 0.5 * (train_loss + val_loss)
+        else:
+            return val_loss
 
 
 class AbstractNN(nn.Module):
