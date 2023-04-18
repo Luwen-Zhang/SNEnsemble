@@ -1,6 +1,7 @@
 import sys
 import torch
 from torch import nn
+from torch.nn import Parameter
 import inspect
 import torch.nn.functional as F
 import numpy as np
@@ -10,6 +11,25 @@ class SNMarker(nn.Module):
     def __init__(self):
         super(SNMarker, self).__init__()
         self.activ = F.relu
+        self.register_buffer("running_a", torch.tensor([0.0]))
+        self.register_buffer("running_b", torch.tensor([0.0]))
+        self.momentum = 0.1
+
+    def _get_weight(self, ori_a, obj_a, ori_b, obj_b):
+        if self.training:
+            weight_a = torch.max(obj_a) / (torch.max(ori_a) + 1e-8) * 1e-1
+            weight_b = torch.max(obj_b) / (torch.max(ori_b) + 1e-8) * 1e-1
+            with torch.no_grad():
+                self.running_a = (
+                    self.momentum * weight_a + (1 - self.momentum) * self.running_a
+                )
+                self.running_b = (
+                    self.momentum * weight_b + (1 - self.momentum) * self.running_b
+                )
+        else:
+            weight_a = self.running_a
+            weight_b = self.running_b
+        return weight_a, weight_b
 
 
 class LinLog(SNMarker):
@@ -29,8 +49,9 @@ class LinLog(SNMarker):
         approx_b = F.relu(torch.mul(grad_s, s) + naive_pred)
         a, b = coeff.chunk(self.n_coeff, 1)
         a, b = self.activ(a), self.activ(b)
-        a = -a / (torch.max(a) + 1e-8) * torch.max(grad_s) * 1e-1 - grad_s
-        b = b / (torch.max(b) + 1e-8) * torch.max(approx_b) * 1e-1 + approx_b
+        weight_a, weight_b = self._get_weight(a, grad_s, b, approx_b)
+        a = -a * weight_a - grad_s
+        b = b * weight_b + approx_b
         return a * torch.abs(s) + b
 
 
@@ -53,8 +74,9 @@ class LogLog(SNMarker):
         approx_b = F.relu(torch.mul(grad_log_s, log_s) + naive_pred)
         a, b = coeff.chunk(self.n_coeff, 1)
         a, b = self.activ(a), self.activ(b)
-        a = -a / (torch.max(a) + 1e-8) * torch.max(grad_log_s) * 1e-1 - grad_log_s
-        b = b / (torch.max(b) + 1e-8) * torch.max(approx_b) * 1e-1 + approx_b
+        weight_a, weight_b = self._get_weight(a, grad_s, b, approx_b)
+        a = -a * weight_a - grad_log_s
+        b = b * weight_b + approx_b
         return a * log_s + b
 
 
