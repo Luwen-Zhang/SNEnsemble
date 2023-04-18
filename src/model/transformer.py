@@ -274,10 +274,7 @@ class Transformer(TorchModel):
         """
         y_val_pred = self._pred_single_model(model, X_val, D_val, verbose=False)
         res = metric_sklearn(y_val_pred, y_val, self.trainer.args["loss"])
-        if self.trainer.args["data_splitter"] in [
-            "MaterialCycleSplitter",
-            "CycleSplitter",
-        ]:
+        if self.trainer.args["data_splitter"] in ["CycleSplitter"]:
             y_train_pred = self._pred_single_model(
                 model, X_train, D_train, verbose=False
             )
@@ -302,10 +299,7 @@ class Transformer(TorchModel):
         result
             The early stopping evaluation.
         """
-        if self.trainer.args["data_splitter"] in [
-            "MaterialCycleSplitter",
-            "CycleSplitter",
-        ]:
+        if self.trainer.args["data_splitter"] in ["CycleSplitter"]:
             return 0.5 * (train_loss + val_loss)
         else:
             return val_loss
