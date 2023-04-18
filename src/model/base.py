@@ -611,9 +611,7 @@ class AbstractModel:
         y_val,
     ):
         """
-        Evaluating the model for bayesian optimization iterations. If MaterialCycleSplitter or CycleSplitter
-        is used, the average error of training and evaluation is returned. Otherwise, the error of evaluation is
-        returned.
+        Evaluating the model for bayesian optimization iterations. The validation error is returned directly.
 
         Returns
         -------
@@ -622,15 +620,6 @@ class AbstractModel:
         """
         y_val_pred = self._pred_single_model(model, X_val, D_val, verbose=False)
         res = metric_sklearn(y_val_pred, y_val, self.trainer.args["loss"])
-        if self.trainer.args["data_splitter"] in [
-            "MaterialCycleSplitter",
-            "CycleSplitter",
-        ]:
-            y_train_pred = self._pred_single_model(
-                model, X_train, D_train, verbose=False
-            )
-            res += metric_sklearn(y_train_pred, y_train, self.trainer.args["loss"])
-            res /= 2
         return res
 
     def _check_train_status(self):
@@ -1226,8 +1215,7 @@ class TorchModel(AbstractModel):
 
     def _early_stopping_eval(self, train_loss: float, val_loss: float) -> float:
         """
-        Calculate the loss value (criteria) for early stopping. By default, if MaterialCycleSplitter or CycleSplitter
-        is used, the average of ``train_loss`` and ``val_loss`` is returned. Otherwise, ``val_loss`` is returned.
+        Calculate the loss value (criteria) for early stopping. The validation loss is returned directly.
 
         Parameters
         ----------
@@ -1241,13 +1229,7 @@ class TorchModel(AbstractModel):
         result
             The early stopping evaluation.
         """
-        if self.trainer.args["data_splitter"] in [
-            "MaterialCycleSplitter",
-            "CycleSplitter",
-        ]:
-            return 0.5 * (train_loss + val_loss)
-        else:
-            return val_loss
+        return val_loss
 
 
 class AbstractNN(nn.Module):
