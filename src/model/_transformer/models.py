@@ -178,6 +178,7 @@ class TransformerSeqNN(AbstractNN):
                 (1 + int(self.seq_transformer.run)) * n_outputs,
                 n_outputs,
                 nn.ReLU,
+                norm_type="layer",
             )
         else:
             self.w = nn.Identity()
