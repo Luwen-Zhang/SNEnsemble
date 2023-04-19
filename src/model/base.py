@@ -996,9 +996,11 @@ class TorchModel(AbstractModel):
         avg_loss = 0
         for idx, tensors in enumerate(train_loader):
             optimizer.zero_grad()
-            yhat = tensors[-1]
-            data = tensors[0]
-            additional_tensors = tensors[1 : len(tensors) - 1]
+            yhat = tensors[-1].to(self.device)
+            data = tensors[0].to(self.device)
+            additional_tensors = [
+                x.to(self.device) for x in tensors[1 : len(tensors) - 1]
+            ]
             y = model(*([data] + additional_tensors))
             loss = model.loss_fn(
                 yhat, y, model, *([data] + additional_tensors), **kwargs
@@ -1037,9 +1039,11 @@ class TorchModel(AbstractModel):
             # print(test_dataset)
             avg_loss = 0
             for idx, tensors in enumerate(test_loader):
-                yhat = tensors[-1]
-                data = tensors[0]
-                additional_tensors = tensors[1 : len(tensors) - 1]
+                yhat = tensors[-1].to(self.device)
+                data = tensors[0].to(self.device)
+                additional_tensors = [
+                    x.to(self.device) for x in tensors[1 : len(tensors) - 1]
+                ]
                 y = model(*([data] + additional_tensors))
                 loss = model.default_loss_fn(y, yhat)
                 avg_loss += loss.item() * len(y)
@@ -1060,23 +1064,20 @@ class TorchModel(AbstractModel):
         D_test,
         y_test,
     ):
-        from torch.utils.data.dataloader import default_collate
-
-        collate_fn = lambda x: list(x_.to(self.device) for x_ in default_collate(x))
         train_loader = Data.DataLoader(
             self.trainer.train_dataset,
             batch_size=len(self.trainer.train_dataset),
-            collate_fn=collate_fn,
+            pin_memory=True,
         )
         val_loader = Data.DataLoader(
             self.trainer.val_dataset,
             batch_size=len(self.trainer.val_dataset),
-            collate_fn=collate_fn,
+            pin_memory=True,
         )
         test_loader = Data.DataLoader(
             self.trainer.test_dataset,
             batch_size=len(self.trainer.test_dataset),
-            collate_fn=collate_fn,
+            pin_memory=True,
         )
         return (
             train_loader,
@@ -1095,17 +1096,19 @@ class TorchModel(AbstractModel):
         X = torch.tensor(
             df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
-        ).to(self.device)
+        )
         if src.setting["input_requires_grad"]:
             X.requires_grad = True
         D = [
-            torch.tensor(value, dtype=torch.float32).to(self.device)
-            for value in derived_data.values()
+            torch.tensor(value, dtype=torch.float32) for value in derived_data.values()
         ]
-        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32).to(self.device)
+        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32)
 
         loader = Data.DataLoader(
-            Data.TensorDataset(X, *D, y), batch_size=len(df), shuffle=False
+            Data.TensorDataset(X, *D, y),
+            batch_size=len(df),
+            shuffle=False,
+            pin_memory=True,
         )
         return loader, derived_data
 
@@ -1124,9 +1127,6 @@ class TorchModel(AbstractModel):
         in_bayes_opt,
         **kwargs,
     ):
-        from torch.utils.data.dataloader import default_collate
-
-        collate_fn = lambda x: list(x_.to(self.device) for x_ in default_collate(x))
         if not isinstance(model, AbstractNN):
             raise Exception("_new_model must return an AbstractNN instance.")
         model.to(self.device)
@@ -1136,7 +1136,7 @@ class TorchModel(AbstractModel):
             X_train.dataset,
             batch_size=int(kwargs["batch_size"]),
             generator=torch.Generator().manual_seed(0),
-            collate_fn=collate_fn,
+            pin_memory=True,
         )
         val_loader = X_val
 
@@ -1278,10 +1278,11 @@ class AbstractNN(nn.Module):
             x = tensors[0]
             additional_tensors = tensors[1:]
             if type(additional_tensors[0]) == dict:
-                return self._forward(x, additional_tensors[0])
-            derived_tensors = {}
-            for tensor, name in zip(additional_tensors, self.derived_feature_names):
-                derived_tensors[name] = tensor
+                derived_tensors = additional_tensors[0]
+            else:
+                derived_tensors = {}
+                for tensor, name in zip(additional_tensors, self.derived_feature_names):
+                    derived_tensors[name] = tensor
             return self._forward(x, derived_tensors)
 
     def _forward(

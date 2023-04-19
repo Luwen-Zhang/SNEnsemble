@@ -1879,6 +1879,7 @@ class Trainer:
                         Data.TensorDataset(X, *D, y),
                         batch_size=len(y),
                         shuffle=False,
+                        pin_memory=True,
                     )
                     prediction, _, _ = modelbase._test_step(
                         modelbase.model[model_name], loader
