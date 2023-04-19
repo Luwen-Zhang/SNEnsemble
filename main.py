@@ -3,7 +3,9 @@ from src.trainer import Trainer
 from src.model import *
 from src.utils import Logging
 import os
+import faulthandler
 
+faulthandler.enable()
 log = Logging()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using {} device".format(device))
