@@ -45,6 +45,3 @@ New modelbases, individual models, tabular databases, feature derivation procedu
 
 Feel free to create issues if you implement new features, find mistakes, or have any question.
 
-## Acknowledgment
-
-We receive valuable supports from Mr. Sibrand Raijmaekers (LM Wind Power) for Upwind, OptiMat, and FACT databases. We also feel grateful for the open-sourced database SNL/MSU/DOE from Sandia National Laboratories.
