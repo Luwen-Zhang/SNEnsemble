@@ -237,7 +237,6 @@ class SNTransformerNN(AbstractNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         loss = self.default_loss_fn(y_pred, y_true)
         loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
-        # loss = StressGradLoss(y_pred, self.s_original, loss, *data)
         return loss
 
 
@@ -283,5 +282,58 @@ class SNTransformerSeqNN(AbstractNN):
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
         loss = self.default_loss_fn(y_pred, y_true)
         loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
-        # loss = StressGradLoss(y_pred, self.s_original, loss, *data)
+        return loss
+
+
+class SNTransformerAugNN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
+        if n_outputs != 1:
+            raise Exception("n_outputs > 1 is not supported.")
+        super(SNTransformerAugNN, self).__init__(trainer)
+        self.sn = SN()
+        self.transformer = FTTransformerNN(
+            n_inputs=n_inputs,
+            n_outputs=1,
+            trainer=trainer,
+            **kwargs,
+        )
+        self.coeff_head = get_sequential(
+            layers=layers,
+            n_inputs=1,
+            n_outputs=sum(self.sn.n_coeff_ls) + len(self.sn.n_coeff_ls),
+            act_func=nn.ReLU,
+        )
+        self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
+        self.s_one_slip = trainer.get_var_change("Relative Maximum Stress", value=1)
+        self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
+        self.stress_loss = StressGradLoss()
+
+    def _forward(self, x, derived_tensors):
+        self.s_original = x[:, self.s_idx].clone()
+        x[:, self.s_idx] = self.s_original  # enable gradient wrt a single column
+        naive_pred = self.transformer(x, derived_tensors)
+        self._naive_pred = naive_pred
+        grad_s = torch.autograd.grad(
+            outputs=naive_pred,
+            inputs=self.s_original,
+            grad_outputs=torch.ones_like(naive_pred),
+            retain_graph=True,
+            create_graph=False,  # True to compute higher order derivatives, and is more expensive.
+        )[0].view(-1, 1)
+        coeffs_proj = self.coeff_head(naive_pred) + naive_pred
+        s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
+        x_out = self.sn(s_wo_bias, coeffs_proj, grad_s, naive_pred)
+        return x_out
+
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
+        s_aug = torch.zeros_like(self.s_original).uniform_(
+            self.s_zero_slip, self.s_one_slip
+        )
+        s_aug.requires_grad_()
+        data_aug = [x.clone() for x in data]
+        data_aug[0][:, self.s_idx] = s_aug
+        y_pred_aug = model(*data_aug)
+        loss = self.stress_loss(y_pred=y_pred_aug, s=s_aug, base_loss=loss)
         return loss

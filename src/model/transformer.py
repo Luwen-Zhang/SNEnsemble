@@ -28,6 +28,7 @@ class Transformer(TorchModel):
             "TransformerSeq",
             "SNTransformer",
             "SNTransformerSeq",
+            "SNTransformerAug",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -54,6 +55,7 @@ class Transformer(TorchModel):
         elif model_name in [
             "FTTransformer",
             "SNTransformer",
+            "SNTransformerAug",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -113,6 +115,7 @@ class Transformer(TorchModel):
         elif model_name in [
             "FTTransformer",
             "SNTransformer",
+            "SNTransformerAug",
         ]:
             return [
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
@@ -158,6 +161,7 @@ class Transformer(TorchModel):
         elif model_name in [
             "FTTransformer",
             "SNTransformer",
+            "SNTransformerAug",
         ]:
             return {
                 "embedding_dim": 32,
@@ -192,7 +196,7 @@ class Transformer(TorchModel):
         if "ConsGradLoss" in model_name and not src.check_grad_in_loss():
             return False
         if (
-            model_name in ["SNTransformerSeq", "SNTransformer"]
+            model_name in ["SNTransformerSeq", "SNTransformer", "SNTransformerAug"]
             and "Relative Mean Stress" not in self.trainer.cont_feature_names
         ):
             return False
