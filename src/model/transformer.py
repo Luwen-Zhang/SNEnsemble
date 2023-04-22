@@ -26,14 +26,8 @@ class Transformer(TorchModel):
             "FTTransformer",
             "TransformerLSTM",
             "TransformerSeq",
-            "BiasTransformerSeq",
-            "ConsGradTransformerSeq",
-            "BiasConsGradTransformerSeq",
+            "SNTransformer",
             "SNTransformerSeq",
-            "SNTransformerAddGrad",
-            "SNTransformerAddGradSeq",
-            "CatEmbedLSTM",
-            "BiasCatEmbedLSTM",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -59,7 +53,7 @@ class Transformer(TorchModel):
             )
         elif model_name in [
             "FTTransformer",
-            "SNTransformerAddGrad",
+            "SNTransformer",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -80,11 +74,7 @@ class Transformer(TorchModel):
             )
         elif model_name in [
             "TransformerSeq",
-            "BiasTransformerSeq",
-            "ConsGradTransformerSeq",
-            "BiasConsGradTransformerSeq",
             "SNTransformerSeq",
-            "SNTransformerAddGradSeq",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -107,23 +97,6 @@ class Transformer(TorchModel):
                 seq_attn_heads=kwargs["seq_attn_heads"],
                 seq_attn_dropout=kwargs["seq_attn_dropout"],
             )
-        elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
-            return cls(
-                len(self.trainer.cont_feature_names),
-                len(self.trainer.label_name),
-                self.trainer.args["layers"] if self.layers is None else self.layers,
-                trainer=self.trainer,
-                embed_continuous=True,
-                cat_num_unique=[
-                    len(x) for x in self.trainer.cat_feature_mapping.values()
-                ],
-                lstm_embedding_dim=kwargs["lstm_embedding_dim"],
-                embedding_dim=kwargs["embedding_dim"],
-                n_hidden=kwargs["n_hidden"],
-                lstm_layers=kwargs["lstm_layers"],
-                embed_dropout=kwargs["embed_dropout"],
-            )
 
     def _space(self, model_name):
         if model_name == "TransformerLSTM":
@@ -139,7 +112,7 @@ class Transformer(TorchModel):
             ] + self.trainer.SPACE
         elif model_name in [
             "FTTransformer",
-            "SNTransformerAddGrad",
+            "SNTransformer",
         ]:
             return [
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
@@ -150,11 +123,7 @@ class Transformer(TorchModel):
             ] + self.trainer.SPACE
         elif model_name in [
             "TransformerSeq",
-            "BiasTransformerSeq",
-            "ConsGradTransformerSeq",
-            "BiasConsGradTransformerSeq",
             "SNTransformerSeq",
-            "SNTransformerAddGradSeq",
         ]:
             return [
                 # ``seq_embedding_dim`` should be able to divided by ``attn_heads``.
@@ -169,14 +138,6 @@ class Transformer(TorchModel):
                 ),
                 Categorical(categories=[2, 4, 8], name="seq_attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="seq_attn_dropout"),
-            ] + self.trainer.SPACE
-        elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
-            return [
-                Categorical(categories=[2, 4, 8, 16, 32], name="lstm_embedding_dim"),
-                Categorical(categories=[8, 16, 32], name="embedding_dim"),
-                Integer(low=1, high=30, prior="uniform", name="n_hidden", dtype=int),
-                Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
             ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
@@ -196,7 +157,7 @@ class Transformer(TorchModel):
             }
         elif model_name in [
             "FTTransformer",
-            "SNTransformerAddGrad",
+            "SNTransformer",
         ]:
             return {
                 "embedding_dim": 32,
@@ -210,11 +171,7 @@ class Transformer(TorchModel):
             }
         elif model_name in [
             "TransformerSeq",
-            "BiasTransformerSeq",
-            "ConsGradTransformerSeq",
-            "BiasConsGradTransformerSeq",
             "SNTransformerSeq",
-            "SNTransformerAddGradSeq",
         ]:
             return {
                 "seq_embedding_dim": 16,
@@ -230,24 +187,12 @@ class Transformer(TorchModel):
                 "weight_decay": 0.002,
                 "batch_size": 1024,
             }
-        elif model_name in ["CatEmbedLSTM", "BiasCatEmbedLSTM"]:
-            return {
-                "lstm_embedding_dim": 16,  # bayes-opt: 1000
-                "embedding_dim": 32,  # bayes-opt: 1
-                "n_hidden": 10,  # bayes-opt: 1
-                "lstm_layers": 1,  # bayes-opt: 1
-                "embed_dropout": 0.1,
-                "lr": 0.003,  # bayes-opt: 0.0218894
-                "weight_decay": 0.002,  # bayes-opt: 0.05
-                "batch_size": 1024,  # bayes-opt: 32
-            }
 
     def _conditional_validity(self, model_name: str) -> bool:
         if "ConsGradLoss" in model_name and not src.check_grad_in_loss():
             return False
         if (
-            model_name
-            in ["SNTransformerSeq", "SNTransformerAddGradSeq", "SNTransformerAddGrad"]
+            model_name in ["SNTransformerSeq", "SNTransformer"]
             and "Relative Mean Stress" not in self.trainer.cont_feature_names
         ):
             return False

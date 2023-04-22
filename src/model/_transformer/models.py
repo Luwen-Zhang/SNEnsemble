@@ -196,166 +196,11 @@ class TransformerSeqNN(AbstractNN):
         return output
 
 
-class BiasTransformerSeqNN(TransformerSeqNN):
-    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        loss = self.default_loss_fn(y_pred, y_true)
-        where_weight = self.derived_feature_names.index("Sample Weight")
-        w = data[1 + where_weight]
-        loss = BiasLoss(loss, w)
-        return loss
-
-
-class ConsGradTransformerSeqNN(TransformerSeqNN):
-    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        loss = self.default_loss_fn(y_pred, y_true)
-        loss = ConsGradLoss(
-            base_loss=loss,
-            y_pred=y_pred,
-            n_cont=self.n_cont,
-            cont_feature_names=self.cont_feature_names,
-            *data,
-        )
-        return loss
-
-
-class BiasConsGradTransformerSeqNN(TransformerSeqNN):
-    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        loss = self.default_loss_fn(y_pred, y_true)
-        where_weight = self.derived_feature_names.index("Sample Weight")
-        w = data[1 + where_weight]
-        loss = BiasLoss(loss, w)
-        loss = ConsGradLoss(
-            base_loss=loss,
-            y_pred=y_pred,
-            n_cont=self.n_cont,
-            cont_feature_names=self.cont_feature_names,
-            *data,
-        )
-        return loss
-
-
-class CatEmbedLSTMNN(AbstractNN):
-    def __init__(
-        self,
-        n_inputs,
-        n_outputs,
-        layers,
-        trainer,
-        embed_continuous=False,
-        cat_num_unique: List[int] = None,
-        embedding_dim=10,
-        lstm_embedding_dim=10,
-        n_hidden=3,
-        lstm_layers=1,
-        embed_dropout=0.1,
-    ):
-        super(CatEmbedLSTMNN, self).__init__(trainer)
-
-        self.embed = Embedding(
-            embedding_dim=embedding_dim,
-            n_inputs=n_inputs,
-            embed_dropout=embed_dropout,
-            cat_num_unique=cat_num_unique,
-            run_cat="categorical" in self.derived_feature_names,
-            embed_cont=embed_continuous,
-            cont_encoder_layers=layers,
-        )
-        self.embed_encoder = get_sequential(
-            layers,
-            n_inputs=embedding_dim,
-            n_outputs=1,
-            act_func=nn.ReLU,
-            dropout=embed_dropout,
-            norm_type="layer",
-        )
-        self.lstm = LSTM(
-            n_hidden,
-            lstm_embedding_dim,
-            lstm_layers,
-            run="Number of Layers" in self.derived_feature_names,
-        )
-
-        self.w = get_sequential(
-            layers,
-            n_inputs + int(self.embed.run_cat) * self.n_cat + int(self.lstm.run),
-            n_outputs,
-            nn.ReLU,
-        )
-
-    def _forward(self, x, derived_tensors):
-        x_embed = self.embed(x, derived_tensors)
-        if type(x_embed) == tuple:
-            # x_cont is encoded, x_cat is embedded.
-            x_cont, x_cat = x_embed
-            x_cat_encode = self.embed_encoder(x_cat).squeeze(2)
-            x_embed_encode = torch.cat([x_cont, x_cat_encode], dim=1)
-        elif x_embed.ndim == 3:
-            # x_cont and x_cat (if exists) are embedded.
-            x_embed_encode = self.embed_encoder(x_embed).squeeze(2)
-        else:
-            # x_cont is encoded, x_cat does not exists.
-            x_embed_encode = x_embed
-        all_res = [x_embed_encode]
-
-        x_lstm = self.lstm(x, derived_tensors)
-        if self.lstm.run:
-            all_res += [x_lstm]
-
-        output = torch.concat(all_res, dim=1)
-        output = self.w(output)
-        return output
-
-
-class BiasCatEmbedLSTMNN(CatEmbedLSTMNN):
-    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        loss = self.default_loss_fn(y_pred, y_true)
-        where_weight = self.derived_feature_names.index("Sample Weight")
-        w = data[1 + where_weight]
-        loss = BiasLoss(loss, w)
-        return loss
-
-
-class SNTransformerSeqNN(AbstractNN):
+class SNTransformerNN(AbstractNN):
     def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
         if n_outputs != 1:
             raise Exception("n_outputs > 1 is not supported.")
-        super(SNTransformerSeqNN, self).__init__(trainer)
-        self.sn = SN()
-        self.transformer = TransformerSeqNN(
-            n_inputs=n_inputs,
-            n_outputs=1,
-            layers=layers,
-            trainer=trainer,
-            **kwargs,
-        )
-        self.coeff_head = get_sequential(
-            layers=layers,
-            n_inputs=1,
-            n_outputs=sum(self.sn.n_coeff_ls) + len(self.sn.n_coeff_ls),
-            act_func=nn.ReLU,
-        )
-        self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
-        self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
-
-    def _forward(self, x, derived_tensors):
-        s = x[:, self.s_idx] - self.s_zero_slip
-        coeffs = self.transformer(x, derived_tensors)
-        self._coeffs = coeffs
-        coeffs_proj = self.coeff_head(coeffs) + coeffs
-        x_out = self.sn(s, coeffs_proj)
-        return x_out
-
-    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        loss = self.default_loss_fn(y_pred, y_true)
-        loss = (loss + self.default_loss_fn(self._coeffs, y_true)) / 2
-        return loss
-
-
-class SNTransformerAddGradNN(AbstractNN):
-    def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
-        if n_outputs != 1:
-            raise Exception("n_outputs > 1 is not supported.")
-        super(SNTransformerAddGradNN, self).__init__(trainer)
+        super(SNTransformerNN, self).__init__(trainer)
         self.sn = SN()
         self.transformer = FTTransformerNN(
             n_inputs=n_inputs,
@@ -396,11 +241,11 @@ class SNTransformerAddGradNN(AbstractNN):
         return loss
 
 
-class SNTransformerAddGradSeqNN(AbstractNN):
+class SNTransformerSeqNN(AbstractNN):
     def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
         if n_outputs != 1:
             raise Exception("n_outputs > 1 is not supported.")
-        super(SNTransformerAddGradSeqNN, self).__init__(trainer)
+        super(SNTransformerSeqNN, self).__init__(trainer)
         self.sn = SN()
         self.transformer = TransformerSeqNN(
             n_inputs=n_inputs,
