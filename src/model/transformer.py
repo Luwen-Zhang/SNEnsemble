@@ -198,53 +198,53 @@ class Transformer(TorchModel):
             return False
         return True
 
-    def _bayes_eval(
-        self,
-        model,
-        X_train,
-        D_train,
-        y_train,
-        X_val,
-        D_val,
-        y_val,
-    ):
-        """
-        Evaluating the model for bayesian optimization iterations. If MaterialCycleSplitter or CycleSplitter
-        is used, the average training and evaluation error is returned. Otherwise, evaluation error is returned.
+    # def _bayes_eval(
+    #     self,
+    #     model,
+    #     X_train,
+    #     D_train,
+    #     y_train,
+    #     X_val,
+    #     D_val,
+    #     y_val,
+    # ):
+    #     """
+    #     Evaluating the model for bayesian optimization iterations. If MaterialCycleSplitter or CycleSplitter
+    #     is used, the average training and evaluation error is returned. Otherwise, evaluation error is returned.
 
-        Returns
-        -------
-        result
-            The evaluation of bayesian hyperparameter optimization.
-        """
-        y_val_pred = self._pred_single_model(model, X_val, D_val, verbose=False)
-        res = metric_sklearn(y_val_pred, y_val, self.trainer.args["loss"])
-        if self.trainer.args["data_splitter"] in ["CycleSplitter"]:
-            y_train_pred = self._pred_single_model(
-                model, X_train, D_train, verbose=False
-            )
-            res += metric_sklearn(y_train_pred, y_train, self.trainer.args["loss"])
-            res /= 2
-        return res
+    #     Returns
+    #     -------
+    #     result
+    #         The evaluation of bayesian hyperparameter optimization.
+    #     """
+    #     y_val_pred = self._pred_single_model(model, X_val, D_val, verbose=False)
+    #     res = metric_sklearn(y_val_pred, y_val, self.trainer.args["loss"])
+    #     if self.trainer.args["data_splitter"] in ["CycleSplitter"]:
+    #         y_train_pred = self._pred_single_model(
+    #             model, X_train, D_train, verbose=False
+    #         )
+    #         res += metric_sklearn(y_train_pred, y_train, self.trainer.args["loss"])
+    #         res /= 2
+    #     return res
 
-    def _early_stopping_eval(self, train_loss: float, val_loss: float) -> float:
-        """
-        Calculate the loss value (criteria) for early stopping. By default, if MaterialCycleSplitter or CycleSplitter
-        is used, the average of ``train_loss`` and ``val_loss`` is returned. Otherwise, ``val_loss`` is returned.
+    # def _early_stopping_eval(self, train_loss: float, val_loss: float) -> float:
+    #     """
+    #     Calculate the loss value (criteria) for early stopping. By default, if MaterialCycleSplitter or CycleSplitter
+    #     is used, the average of ``train_loss`` and ``val_loss`` is returned. Otherwise, ``val_loss`` is returned.
 
-        Parameters
-        ----------
-        train_loss
-            Training loss at the epoch.
-        val_loss
-            Validation loss at the epoch.
+    #     Parameters
+    #     ----------
+    #     train_loss
+    #         Training loss at the epoch.
+    #     val_loss
+    #         Validation loss at the epoch.
 
-        Returns
-        -------
-        result
-            The early stopping evaluation.
-        """
-        if self.trainer.args["data_splitter"] in ["CycleSplitter"]:
-            return 0.5 * (train_loss + val_loss)
-        else:
-            return val_loss
+    #     Returns
+    #     -------
+    #     result
+    #         The early stopping evaluation.
+    #     """
+    #     if self.trainer.args["data_splitter"] in ["CycleSplitter"]:
+    #         return 0.5 * (train_loss + val_loss)
+    #     else:
+    #         return val_loss
