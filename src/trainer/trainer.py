@@ -1291,14 +1291,33 @@ class Trainer:
             tmp_derived_data[key] = value[indices, :]
         return tmp_derived_data
 
-    def get_zero_slip(self, feature_name: str):
+    def get_zero_slip(self, feature_name: str) -> float:
         """
         See how data processors act on a feature if its value is zero.
+        It is a wrapper for ``Trainer.get_var_change``.
 
         Parameters
         ----------
         feature_name
             The investigated feature.
+
+        Returns
+        -------
+        value
+            The transformed value for the feature using data processors.
+        """
+        return self.get_var_change(feature_name=feature_name, value=0)
+
+    def get_var_change(self, feature_name: str, value: float) -> float:
+        """
+        See how data processors act on a feature if its value is ``value``.
+
+        Parameters
+        ----------
+        feature_name
+            The investigated feature.
+        value
+            The investigated value.
 
         Returns
         -------
@@ -1312,7 +1331,7 @@ class Trainer:
         if feature_name not in self.dataprocessors[-1][0].record_cont_features:
             raise Exception(f"Feature {feature_name} not available.")
 
-        x = 0
+        x = value
         for processor, _ in self.dataprocessors:
             if hasattr(processor, "transformer"):
                 x = processor.var_slip(feature_name, x)
