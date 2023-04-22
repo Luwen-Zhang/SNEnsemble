@@ -522,7 +522,7 @@ class AbstractTransformer(AbstractProcessor):
         super(AbstractTransformer, self).__init__()
         self.transformer = None
 
-    def zero_slip(self, feature_name, x) -> Union[int, float, Any]:
+    def var_slip(self, feature_name, x) -> Union[int, float, Any]:
         """
         See how the transformer perform on a value of a feature.
 

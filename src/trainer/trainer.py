@@ -1315,7 +1315,7 @@ class Trainer:
         x = 0
         for processor, _ in self.dataprocessors:
             if hasattr(processor, "transformer"):
-                x = processor.zero_slip(feature_name, x)
+                x = processor.var_slip(feature_name, x)
         return x
 
     def describe(self, transformed=False, save=True) -> pd.DataFrame:

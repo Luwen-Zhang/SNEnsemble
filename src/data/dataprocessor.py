@@ -414,8 +414,8 @@ class UnscaledDataRecorder(AbstractTransformer):
         trainer._unscaled_label_data = label_data
         return data
 
-    def zero_slip(self, feature_name, x):
-        return 0
+    def var_slip(self, feature_name, x):
+        return x
 
 
 class StandardScaler(AbstractTransformer):
@@ -482,8 +482,8 @@ class CategoricalOrdinalEncoder(AbstractTransformer):
                 )
         return data
 
-    def zero_slip(self, feature_name, x):
-        return 0
+    def var_slip(self, feature_name, x):
+        return x
 
 
 processor_mapping = {}
