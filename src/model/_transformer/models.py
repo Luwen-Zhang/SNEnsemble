@@ -337,3 +337,42 @@ class SNTransformerAugNN(AbstractNN):
         y_pred_aug = model(*data_aug)
         loss = self.stress_loss(y_pred=y_pred_aug, s=s_aug, base_loss=loss)
         return loss
+
+
+class SNTransformerLRNN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
+        if n_outputs != 1:
+            raise Exception("n_outputs > 1 is not supported.")
+        super(SNTransformerLRNN, self).__init__(trainer)
+        from .sn_lr import SN as lrSN
+
+        self.sn = lrSN()
+        self.transformer = FTTransformerNN(
+            n_inputs=n_inputs,
+            n_outputs=1,
+            trainer=trainer,
+            **kwargs,
+        )
+        self.coeff_head = get_sequential(
+            layers=layers,
+            n_inputs=1,
+            n_outputs=sum(self.sn.n_coeff_ls) + len(self.sn.n_coeff_ls),
+            act_func=nn.ReLU,
+        )
+        self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
+        self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
+
+    def _forward(self, x, derived_tensors):
+        self.s_original = x[:, self.s_idx].clone()
+        x[:, self.s_idx] = self.s_original  # enable gradient wrt a single column
+        naive_pred = self.transformer(x, derived_tensors)
+        self._naive_pred = naive_pred
+        coeffs_proj = self.coeff_head(naive_pred) + naive_pred
+        s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
+        x_out = self.sn(s_wo_bias, coeffs_proj, naive_pred)
+        return x_out
+
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
+        return loss
