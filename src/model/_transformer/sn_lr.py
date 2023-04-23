@@ -30,6 +30,21 @@ class SNMarker(nn.Module):
         else:
             return getattr(self, name)
 
+    def _linear(self, s, n, a, b):
+        X = torch.concat([s, torch.ones_like(s)], dim=1)
+        approx_a, approx_b = torch.linalg.lstsq(X.T @ X, X.T @ n).solution
+        running_approx_a = self._update(-approx_a, "running_approx_a")
+        running_approx_b = self._update(approx_b, "running_approx_b")
+        weight_a = self._update(
+            running_approx_a / (torch.mean(a) + 1e-8) * self.weight, "running_weight_a"
+        )
+        weight_b = self._update(
+            running_approx_b / (torch.mean(b) + 1e-8) * self.weight, "running_weight_b"
+        )
+        a = -a * weight_a - running_approx_a
+        b = b * weight_b + running_approx_b
+        return a * s + b
+
 
 class LinLog(SNMarker):
     def __init__(self):
@@ -43,51 +58,27 @@ class LinLog(SNMarker):
         naive_pred: torch.Tensor,
     ):
         s = torch.abs(s)
-        X = torch.concat([s, torch.ones_like(s)], dim=1)
-        approx_a, approx_b = torch.inverse(X.T @ X + 1e-8) @ X.T @ naive_pred
-        running_approx_a = self._update(approx_a, "running_approx_a")
-        running_approx_b = self._update(approx_b, "running_approx_b")
         a, b = coeff.chunk(self.n_coeff, 1)
         a, b = self.activ(a), self.activ(b)
-        weight_a = self._update(
-            running_approx_a / (torch.mean(a) + 1e-8) * self.weight, "running_weight_a"
-        )
-        weight_b = self._update(
-            running_approx_b / (torch.mean(b) + 1e-8) * self.weight, "running_weight_b"
-        )
-        a = -a * weight_a - running_approx_a
-        b = b * weight_b + running_approx_b
-        return a * torch.abs(s) + b
+        return self._linear(s, naive_pred, a, b)
 
 
-class LogLog(SNMarker):
-    def __init__(self):
-        super(LogLog, self).__init__()
-        self.n_coeff = 2
-
-    def forward(
-        self,
-        s: torch.Tensor,
-        coeff: torch.Tensor,
-        naive_pred: torch.Tensor,
-    ):
-        s = torch.clamp(torch.abs(s), min=1e-8)
-        log_s = torch.log10(s)
-        X = torch.concat([log_s, torch.ones_like(log_s)], dim=1)
-        approx_a, approx_b = torch.inverse(X.T @ X + 1e-8) @ X.T @ naive_pred
-        running_approx_a = self._update(approx_a, "running_approx_a")
-        running_approx_b = self._update(approx_b, "running_approx_b")
-        a, b = coeff.chunk(self.n_coeff, 1)
-        a, b = self.activ(a), self.activ(b)
-        weight_a = self._update(
-            running_approx_a / (torch.mean(a) + 1e-8) * self.weight, "running_weight_a"
-        )
-        weight_b = self._update(
-            running_approx_b / (torch.mean(b) + 1e-8) * self.weight, "running_weight_b"
-        )
-        a = -a * weight_a - running_approx_a
-        b = b * weight_b + running_approx_b
-        return a * log_s + b
+# class LogLog(SNMarker):
+#     def __init__(self):
+#         super(LogLog, self).__init__()
+#         self.n_coeff = 2
+#
+#     def forward(
+#         self,
+#         s: torch.Tensor,
+#         coeff: torch.Tensor,
+#         naive_pred: torch.Tensor,
+#     ):
+#         s = torch.clamp(torch.abs(s), min=1e-8)
+#         log_s = torch.log10(s)
+#         a, b = coeff.chunk(self.n_coeff, 1)
+#         a, b = self.activ(a), self.activ(b)
+#         return self._linear(log_s, naive_pred, a, b)
 
 
 class SN(nn.Module):
