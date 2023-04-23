@@ -63,22 +63,22 @@ class LinLog(SNMarker):
         return self._linear(s, naive_pred, a, b)
 
 
-# class LogLog(SNMarker):
-#     def __init__(self):
-#         super(LogLog, self).__init__()
-#         self.n_coeff = 2
-#
-#     def forward(
-#         self,
-#         s: torch.Tensor,
-#         coeff: torch.Tensor,
-#         naive_pred: torch.Tensor,
-#     ):
-#         s = torch.clamp(torch.abs(s), min=1e-8)
-#         log_s = torch.log10(s)
-#         a, b = coeff.chunk(self.n_coeff, 1)
-#         a, b = self.activ(a), self.activ(b)
-#         return self._linear(log_s, naive_pred, a, b)
+class LogLog(SNMarker):
+    def __init__(self):
+        super(LogLog, self).__init__()
+        self.n_coeff = 2
+
+    def forward(
+        self,
+        s: torch.Tensor,
+        coeff: torch.Tensor,
+        naive_pred: torch.Tensor,
+    ):
+        s = torch.clamp(torch.abs(s), min=1e-8)
+        log_s = torch.log10(s)
+        a, b = coeff.chunk(self.n_coeff, 1)
+        a, b = self.activ(a), self.activ(b)
+        return self._linear(log_s, naive_pred, a, b)
 
 
 class SN(nn.Module):
