@@ -74,7 +74,7 @@ class LogLog(SNMarker):
         approx_b = F.relu(torch.mul(grad_log_s, log_s) + naive_pred)
         a, b = coeff.chunk(self.n_coeff, 1)
         a, b = self.activ(a), self.activ(b)
-        weight_a, weight_b = self._get_weight(a, grad_s, b, approx_b)
+        weight_a, weight_b = self._get_weight(a, grad_log_s, b, approx_b)
         a = -a * weight_a - grad_log_s
         b = b * weight_b + approx_b
         return a * log_s + b
