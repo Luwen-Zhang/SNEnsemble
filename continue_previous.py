@@ -2,7 +2,9 @@ import argparse
 from src.trainer import load_trainer
 import os
 from src.utils import Logging
+import faulthandler
 
+faulthandler.enable()
 parser = argparse.ArgumentParser()
 parser.add_argument("path", type=str)
 parser.add_argument("--cross_validation", default=10, type=int)
