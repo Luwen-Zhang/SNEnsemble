@@ -197,8 +197,6 @@ class Transformer(TorchModel):
             }
 
     def _conditional_validity(self, model_name: str) -> bool:
-        if "ConsGradLoss" in model_name and not src.check_grad_in_loss():
-            return False
         if (
             model_name
             in [

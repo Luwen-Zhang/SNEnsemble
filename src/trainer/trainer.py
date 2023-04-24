@@ -1242,31 +1242,12 @@ class Trainer:
             torch.tensor(value.astype(np.float32))
             for value in self.derived_data.values()
         ]
-        self._tensors_requires_grad(X, *D)
         dataset = Data.TensorDataset(X, *D, y)
 
         self.train_dataset = Subset(dataset, self.train_indices)
         self.val_dataset = Subset(dataset, self.val_indices)
         self.test_dataset = Subset(dataset, self.test_indices)
         self.tensors = (X, *D, y) if len(D) > 0 else (X, None, y)
-
-    def _tensors_requires_grad(self, X: torch.Tensor, *D: torch.Tensor):
-        """
-        Let tensors requires_grad if the global setting ``input_requires_grad`` is True.
-
-        Parameters
-        ----------
-        X
-            The tabular tensor.
-        *D
-            Derived tensors.
-        """
-        if src.setting["input_requires_grad"]:
-            if not X.requires_grad:
-                X.requires_grad = True
-            for t in D:
-                if not t.requires_grad:
-                    t.requires_grad = True
 
     def get_derived_data_slice(
         self, derived_data: Dict[str, np.ndarray], indices: Iterable
@@ -1893,7 +1874,6 @@ class Trainer:
                         self.test_indices, :
                     ].values.flatten()
                     y = self.tensors[-1][self.test_indices, :]
-                    self._tensors_requires_grad(X, *D)
                     loader = Data.DataLoader(
                         Data.TensorDataset(X, *D, y),
                         batch_size=len(y),

@@ -219,6 +219,7 @@ class SNTransformerNN(AbstractNN):
 
     def _forward(self, x, derived_tensors):
         self.s_original = x[:, self.s_idx].clone()
+        self.s_original.requires_grad_()
         x[:, self.s_idx] = self.s_original  # enable gradient wrt a single column
         naive_pred = self.transformer(x, derived_tensors)
         self._naive_pred = naive_pred
@@ -264,6 +265,7 @@ class SNTransformerSeqNN(AbstractNN):
 
     def _forward(self, x, derived_tensors):
         self.s_original = x[:, self.s_idx].clone()
+        self.s_original.requires_grad_()
         x[:, self.s_idx] = self.s_original  # enable gradient wrt a single column
         naive_pred = self.transformer(x, derived_tensors)
         self._naive_pred = naive_pred
@@ -310,6 +312,7 @@ class SNTransformerAugNN(AbstractNN):
 
     def _forward(self, x, derived_tensors):
         self.s_original = x[:, self.s_idx].clone()
+        self.s_original.requires_grad_()
         x[:, self.s_idx] = self.s_original  # enable gradient wrt a single column
         naive_pred = self.transformer(x, derived_tensors)
         self._naive_pred = naive_pred
