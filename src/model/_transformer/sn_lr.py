@@ -90,23 +90,18 @@ class SN(nn.Module):
                 self.sns.append(cls())
         self.n_coeff_ls = [sn.n_coeff for sn in self.sns]
 
-    def forward(self, s, coeff, naive_pred):
-        coeffs, sn_component_weights = coeff.split(
-            [sum(self.n_coeff_ls), len(self.n_coeff_ls)], dim=1
-        )
-        coeffs = coeffs.split(self.n_coeff_ls, dim=1)
-
+    def forward(self, s, sn_coeffs, sn_weights, naive_pred):
         x_sn = torch.concat(
             [
                 sn(s.view(-1, 1), coeff, naive_pred)
-                for sn, coeff in zip(self.sns, coeffs)
+                for sn, coeff in zip(self.sns, sn_coeffs)
             ],
             dim=1,
         )
         x_sn = torch.mul(
             x_sn,
             nn.functional.normalize(
-                torch.abs(sn_component_weights),
+                torch.abs(sn_weights),
                 p=1,
                 dim=1,
             ),

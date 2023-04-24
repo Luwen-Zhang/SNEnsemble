@@ -353,10 +353,11 @@ class SNTransformerLRNN(AbstractNN):
             trainer=trainer,
             **kwargs,
         )
+        self.n_coeff_ls = self.sn.n_coeff_ls
         self.coeff_head = get_sequential(
             layers=layers,
             n_inputs=1,
-            n_outputs=sum(self.sn.n_coeff_ls) + len(self.sn.n_coeff_ls),
+            n_outputs=sum(self.n_coeff_ls) + len(self.n_coeff_ls),
             act_func=nn.ReLU,
         )
         self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
@@ -368,8 +369,12 @@ class SNTransformerLRNN(AbstractNN):
         naive_pred = self.transformer(x, derived_tensors)
         self._naive_pred = naive_pred
         coeffs_proj = self.coeff_head(naive_pred) + naive_pred
+        sn_coeffs, sn_weights = coeffs_proj.split(
+            [sum(self.n_coeff_ls), len(self.n_coeff_ls)], dim=1
+        )
+        sn_coeffs = sn_coeffs.split(self.n_coeff_ls, dim=1)
         s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
-        x_out = self.sn(s_wo_bias, coeffs_proj, naive_pred)
+        x_out = self.sn(s_wo_bias, sn_coeffs, sn_weights, naive_pred)
         return x_out
 
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
