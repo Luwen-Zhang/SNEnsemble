@@ -554,6 +554,7 @@ class AbstractModel:
                 for key, value in zip(tmp_params.keys(), result.x):
                     params[key] = value
                 self.model_params[model_name] = cp(params)
+                callback.close()
                 skopt.dump(
                     result,
                     add_postfix(os.path.join(self.root, f"{model_name}_skopt.pt")),
@@ -594,11 +595,10 @@ class AbstractModel:
             pred_set(X_val, D_val, y_val, "Validation")
             pred_set(X_test, D_test, y_test, "Testing")
             self.model[model_name] = model
+            torch.cuda.empty_cache()
 
         if dump_trainer:
             save_trainer(self.trainer)
-
-        torch.cuda.empty_cache()
 
     def _bayes_eval(
         self,
@@ -957,6 +957,9 @@ class BayesCallback:
             f"Bayes-opt {self.cnt}/{self.total}, tot {tot_time:.2f}s, avg {tot_time/self.cnt:.2f}it/s: {self.postfix}"
         )
 
+    def close(self):
+        torch.cuda.empty_cache()
+
 
 class TorchModel(AbstractModel):
     """
@@ -1179,6 +1182,7 @@ class TorchModel(AbstractModel):
         model.load_state_dict(
             torch.load(os.path.join(self.root, "early_stopping_ckpt.pt"))
         )
+        torch.cuda.empty_cache()
         if verbose:
             print(f"Minimum loss: {min_loss:.5f}")
 
@@ -1186,6 +1190,7 @@ class TorchModel(AbstractModel):
         model.to(self.device)
         y_test_pred, _, _ = self._test_step(model, X_test, **kwargs)
         model.to("cpu")
+        torch.cuda.empty_cache()
         return y_test_pred
 
     def _space(self, model_name):
@@ -1325,8 +1330,10 @@ class ModelDict:
         with open(self.model_path[key], "wb") as file:
             pickle.dump((key, value), file, pickle.HIGHEST_PROTOCOL)
         del value
+        torch.cuda.empty_cache()
 
     def __getitem__(self, item):
+        torch.cuda.empty_cache()
         with open(self.model_path[item], "rb") as file:
             key, model = pickle.load(file)
         return model
