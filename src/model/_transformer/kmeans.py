@@ -51,3 +51,18 @@ class KMeans(nn.Module):
         dist = torch.pow((x.unsqueeze(dim=1) - self.centers.unsqueeze(dim=0)), 2)
         dist = dist.sum(dim=-1)
         return dist
+
+    def k_nearest_neighbors(self, k: int):
+        if len(self.clusters) == 1:
+            return torch.zeros(self.n_clusters, 0)
+        if k >= self.n_clusters:
+            raise Exception(
+                f"The requested number of neighbors {k} is greater than the total number of "
+                f"neighbors {self.n_clusters-1}."
+            )
+        dist = self.euclidean_pairwise_dist(self.centers)
+        sort_dist = torch.argsort(dist, dim=-1)
+        if k + 1 == self.n_clusters:
+            return sort_dist[:, 1:]
+        else:
+            return sort_dist[:, 1 : k + 1]

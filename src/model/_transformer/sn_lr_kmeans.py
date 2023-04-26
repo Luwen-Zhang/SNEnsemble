@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import numpy as np
 from ..base import get_sequential
 from .kmeans import Cluster, KMeans
+from itertools import chain
 
 
 class SNMarker(nn.Module):
@@ -132,19 +133,37 @@ class _SNCluster(Cluster):
 class KMeansSN(nn.Module):
     def __init__(self, n_clusters: int, n_input: int, layers):
         super(KMeansSN, self).__init__()
-
+        self.n_clusters = n_clusters
         self.sns = [
             _SNCluster(n_input=n_input, layers=layers, momentum=0.1)
             for i in range(n_clusters)
         ]
         self.kmeans = KMeans(n_clusters=n_clusters, n_input=n_input, clusters=self.sns)
+        self.knn = True
+        self.k = int(np.sqrt(len(self.sns)))
 
     def forward(self, x, s, naive_pred):
         x_cluster = self.kmeans(x)
         out = naive_pred.clone()
-        for i_cluster, cluster in enumerate(self.kmeans.clusters):
-            idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
-            if len(idx_in_cluster) >= 2:
-                pred = cluster.sn(s[idx_in_cluster], naive_pred[idx_in_cluster, :])
-                out[idx_in_cluster] = pred
+        if not self.knn or self.n_clusters == 1:
+            for i_cluster, cluster in enumerate(self.kmeans.clusters):
+                idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
+                if len(idx_in_cluster) >= 2:
+                    pred = cluster.sn(s[idx_in_cluster], naive_pred[idx_in_cluster, :])
+                    out[idx_in_cluster] = pred
+        else:
+            knn = self.kmeans.k_nearest_neighbors(k=self.k)
+            for i_cluster, cluster in enumerate(self.kmeans.clusters):
+                idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
+                if len(idx_in_cluster) >= 2:
+                    preds = [
+                        self.kmeans.clusters[i_nn_cluster].sn(
+                            s[idx_in_cluster], naive_pred[idx_in_cluster, :]
+                        )
+                        for i_nn_cluster in chain([i_cluster], knn[i_cluster])
+                    ]
+                    out[idx_in_cluster] = torch.mean(
+                        torch.concat(preds, dim=1), dim=1, keepdim=True
+                    )
+
         return out

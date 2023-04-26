@@ -395,7 +395,7 @@ class SNTransformerLRKMeansNN(AbstractNN):
 
         self.material_related_features = trainer.get_feature_idx_by_type(typ="Material")
         self.sn = KMeansSN(
-            n_clusters=1, n_input=len(self.material_related_features), layers=layers
+            n_clusters=3, n_input=len(self.material_related_features), layers=layers
         )
         self.transformer = FTTransformerNN(
             n_inputs=n_inputs,
