@@ -582,6 +582,59 @@ class Trainer:
         """
         return self.extract_derived_stacked_feature_names(self.all_feature_names)
 
+    def get_feature_names_by_type(self, typ: str) -> List[str]:
+        """
+        Find features with the type given by ``feature_names_type`` and ``feature_types`` in the configuration.
+
+        Parameters
+        ----------
+        typ
+            One type of features in ``feature_types`` in the configuration.
+
+        Returns
+        -------
+        names
+            A list of found features.
+
+        See Also
+        -------
+        ``Trainer.get_feature_idx_by_type``
+        """
+        if typ not in self.args["feature_types"]:
+            raise Exception(
+                f"Feature type {typ} is invalid (among {self.args['feature_types']})"
+            )
+        return [
+            name
+            for name, type_idx in self.args["feature_names_type"].items()
+            if type_idx == self.args["feature_types"].index(typ)
+        ]
+
+    def get_feature_idx_by_type(self, typ: str) -> np.ndarray:
+        """
+        Find features (by their index) with the type given by ``feature_names_type`` and ``feature_types`` in the
+        configuration.
+
+        Parameters
+        ----------
+        typ
+            One type of features in ``feature_types`` in the configuration.
+
+        Returns
+        -------
+        indices
+            A list of indices of found features.
+
+        See Also
+        -------
+        ``Trainer.get_feature_names_by_type``
+        """
+        names = self.get_feature_names_by_type(typ=typ)
+        if typ == "Categorical":
+            return np.array([self.cat_feature_names.index(name) for name in names])
+        else:
+            return np.array([self.cont_feature_names.index(name) for name in names])
+
     def set_data(
         self,
         df: pd.DataFrame,
