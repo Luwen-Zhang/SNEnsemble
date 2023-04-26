@@ -384,3 +384,38 @@ class SNTransformerLRNN(AbstractNN):
         loss = self.default_loss_fn(y_pred, y_true)
         loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
         return loss
+
+
+class SNTransformerLRKMeansNN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
+        if n_outputs != 1:
+            raise Exception("n_outputs > 1 is not supported.")
+        super(SNTransformerLRKMeansNN, self).__init__(trainer)
+        from .sn_lr_kmeans import KMeansSN
+
+        self.material_related_features = trainer.get_feature_idx_by_type(typ="Material")
+        self.sn = KMeansSN(
+            n_clusters=1, n_input=len(self.material_related_features), layers=layers
+        )
+        self.transformer = FTTransformerNN(
+            n_inputs=n_inputs,
+            n_outputs=1,
+            trainer=trainer,
+            **kwargs,
+        )
+        self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
+        self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
+
+    def _forward(self, x, derived_tensors):
+        self.s_original = x[:, self.s_idx].clone()
+        x[:, self.s_idx] = self.s_original  # enable gradient wrt a single column
+        naive_pred = self.transformer(x, derived_tensors)
+        self._naive_pred = naive_pred
+        s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
+        x_out = self.sn(x[:, self.material_related_features], s_wo_bias, naive_pred)
+        return x_out
+
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
+        return loss

@@ -30,6 +30,7 @@ class Transformer(TorchModel):
             "SNTransformerSeq",
             "SNTransformerAug",
             "SNTransformerLR",
+            "SNTransformerLRKMeans",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -58,6 +59,7 @@ class Transformer(TorchModel):
             "SNTransformer",
             "SNTransformerAug",
             "SNTransformerLR",
+            "SNTransformerLRKMeans",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -119,6 +121,7 @@ class Transformer(TorchModel):
             "SNTransformer",
             "SNTransformerAug",
             "SNTransformerLR",
+            "SNTransformerLRKMeans",
         ]:
             return [
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
@@ -166,6 +169,7 @@ class Transformer(TorchModel):
             "SNTransformer",
             "SNTransformerAug",
             "SNTransformerLR",
+            "SNTransformerLRKMeans",
         ]:
             return {
                 "embedding_dim": 32,
@@ -204,6 +208,7 @@ class Transformer(TorchModel):
                 "SNTransformer",
                 "SNTransformerAug",
                 "SNTransformerLR",
+                "SNTransformerLRKMeans",
             ]
             and "Relative Mean Stress" not in self.trainer.cont_feature_names
         ):
