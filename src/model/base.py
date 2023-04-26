@@ -1155,7 +1155,7 @@ class TorchModel(AbstractModel):
             train_loss = self._train_step(model, train_loader, optimizer, **kwargs)
             train_ls.append(train_loss)
             _, _, val_loss = self._test_step(model, val_loader, **kwargs)
-            val_ls.append(val_loss)
+            val_ls.append(self._early_stopping_eval(train_loss, val_loss))
             t_end = time.time()
 
             if verbose and (
@@ -1163,10 +1163,10 @@ class TorchModel(AbstractModel):
             ):
                 print(
                     f"Epoch: {i_epoch + 1}/{epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min "
-                    f"val loss: {np.min(val_ls):.4f}, Epoch time: {t_end-t_start:.4f}s."
+                    f"ES eval loss: {np.min(val_ls):.4f}, Epoch time: {t_end-t_start:.4f}s."
                 )
 
-            early_stopping(self._early_stopping_eval(train_loss, val_loss), model)
+            early_stopping(val_ls[-1], model)
 
             if early_stopping.early_stop:
                 if verbose:
