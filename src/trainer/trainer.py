@@ -1018,8 +1018,13 @@ class Trainer:
         self.categories_inverse_transform(self.df).to_csv(
             os.path.join(path, "data.csv"), encoding="utf-8", index=False
         )
-        tabular_data, _, _, _ = self.get_tabular_dataset()
-        self.categories_inverse_transform(tabular_data).to_csv(
+        tabular_data, _, cat_feature_names, _ = self.get_tabular_dataset()
+        tabular_data_inv = (
+            self.categories_inverse_transform(tabular_data)
+            if len(cat_feature_names) > 0
+            else tabular_data
+        )
+        tabular_data_inv.to_csv(
             os.path.join(path, "tabular_data.csv"), encoding="utf-8", index=False
         )
 
