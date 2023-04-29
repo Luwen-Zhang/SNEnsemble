@@ -608,6 +608,7 @@ class Trainer:
             name
             for name, type_idx in self.args["feature_names_type"].items()
             if type_idx == self.args["feature_types"].index(typ)
+            and name in self.all_feature_names
         ]
 
     def get_feature_idx_by_type(self, typ: str) -> np.ndarray:
