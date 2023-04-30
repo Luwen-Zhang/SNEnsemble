@@ -1172,7 +1172,8 @@ class TorchModel(AbstractModel):
                 if verbose:
                     idx = val_ls.index(min(val_ls))
                     print(
-                        f"Early stopping at epoch {i_epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: {train_ls[idx]:.4f}, Val loss: {val_ls[idx]:.4f}"
+                        f"Early stopping at epoch {i_epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: "
+                        f"{train_ls[idx]:.4f}, ES eval loss: {val_ls[idx]:.4f}"
                     )
                 break
 
