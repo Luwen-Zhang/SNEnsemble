@@ -182,7 +182,7 @@ class CycleSplitter(AbstractSplitter):
                 m_train_indices = []
                 m_test_indices = []
                 m_val_indices = []
-                for fr in set(material_freq_r):
+                for fr in np.unique(material_freq_r):
                     where_fr = np.where(material_freq_r == fr)[0]
                     fr_cycle = material_cycle[where_fr]
                     fr_train_indices = where_fr[
