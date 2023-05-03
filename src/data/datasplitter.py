@@ -1,3 +1,4 @@
+import numpy as np
 from src.utils import *
 from src.data import AbstractSplitter
 import inspect
@@ -76,8 +77,8 @@ class MaterialCycleSplitter(AbstractSplitter):
     """
     Split the dataset by the material code and the number of cycles to simulate the scenario of designing new materials
     using limited data from accelerated fatigue tests. Training/validation/testing datasets will contain entirely
-    different materials, and validation/testing sets contain data that have larger number of cycles than the training
-    set (even much larger in the testing set).
+    different materials, and validation/testing sets contain data that generally have larger number of cycles than the
+    training set (even much larger in the testing set).
     """
 
     def __init__(self, train_val_test=None):
@@ -99,6 +100,8 @@ class MaterialCycleSplitter(AbstractSplitter):
         mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
         mat_lay_set = list(sorted(set(mat_lay)))
         cycle = df[label_name].values.flatten()
+        freq = df["Frequency"].values.flatten() if "Frequency" in df.columns else None
+        r_value = df["R-value"].values.flatten() if "R-value" in df.columns else None
 
         train_mat_lay, val_mat_lay, test_mat_lay = MaterialSplitter.split_method(
             mat_lay_set, [self.train_ratio, self.val_ratio, self.test_ratio]
@@ -112,6 +115,8 @@ class MaterialCycleSplitter(AbstractSplitter):
             mat_lay,
             cycle,
             [self.train_ratio, self.val_ratio, self.test_ratio],
+            freq=freq,
+            r_value=r_value,
         )
 
         val_indices = np.append(val_indices, mat_val_indices)
@@ -128,7 +133,9 @@ class CycleSplitter(AbstractSplitter):
     """
     Split the dataset by the material code and the number of cycles to simulate the scenario of prediction using
     limited data from accelerated fatigue tests. Validation/testing sets contain data that have larger number of cycles
-    than the training set (even much larger in the testing set).
+    than the training set (even much larger in the testing set). If given at least one of "Frequency" and "R-value",
+    the splitting is performed for each material and for each combination of frequency-R (instead of only for each
+    material).
     """
 
     def __init__(self, train_val_test=None):
@@ -139,9 +146,11 @@ class CycleSplitter(AbstractSplitter):
         mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
         mat_lay_set = list(sorted(set(mat_lay)))
         cycle = df[label_name].values.flatten()
+        freq = df["Frequency"].values.flatten() if "Frequency" in df.columns else None
+        r_value = df["R-value"].values.flatten() if "R-value" in df.columns else None
 
         train_indices, val_indices, test_indices = self.split_method(
-            mat_lay_set, mat_lay, cycle, self.train_val_test
+            mat_lay_set, mat_lay, cycle, self.train_val_test, freq=freq, r_value=r_value
         )
 
         np.random.shuffle(train_indices)
@@ -151,24 +160,56 @@ class CycleSplitter(AbstractSplitter):
         return np.array(train_indices), np.array(val_indices), np.array(test_indices)
 
     @classmethod
-    def split_method(cls, mat_lay_set, mat_lay, cycle, train_val_test):
+    def split_method(
+        cls, mat_lay_set, mat_lay, cycle, train_val_test, freq=None, r_value=None
+    ):
         train_indices = []
         val_indices = []
         test_indices = []
 
+        if freq is not None and r_value is not None:
+            freq_r = np.array([f"{f}_{r}" for f, r in zip(freq, r_value)])
+        elif freq is None and r_value is None:
+            freq_r = None
+        else:
+            freq_r = freq if freq is not None else r_value
+
         for material in mat_lay_set:
             where_material = np.where(mat_lay == material)[0]
             material_cycle = cycle[where_material]
-            m_train_indices = where_material[
-                material_cycle <= np.percentile(material_cycle, train_val_test[0] * 100)
-            ]
-            m_test_indices = where_material[
-                material_cycle
-                > np.percentile(material_cycle, np.sum(train_val_test[0:2]) * 100)
-            ]
-            m_val_indices = np.setdiff1d(
-                where_material, np.append(m_train_indices, m_test_indices)
-            )
+            if freq_r is not None:
+                material_freq_r = freq_r[where_material]
+                m_train_indices = []
+                m_test_indices = []
+                m_val_indices = []
+                for fr in set(material_freq_r):
+                    where_fr = np.where(material_freq_r == fr)[0]
+                    fr_cycle = material_cycle[where_fr]
+                    fr_train_indices = where_fr[
+                        fr_cycle <= np.percentile(fr_cycle, train_val_test[0] * 100)
+                    ]
+                    fr_test_indices = where_fr[
+                        fr_cycle
+                        > np.percentile(fr_cycle, np.sum(train_val_test[0:2]) * 100)
+                    ]
+                    fr_val_indices = np.setdiff1d(
+                        where_fr, np.append(fr_train_indices, fr_test_indices)
+                    )
+                    m_train_indices += list(where_material[fr_train_indices])
+                    m_test_indices += list(where_material[fr_test_indices])
+                    m_val_indices += list(where_material[fr_val_indices])
+            else:
+                m_train_indices = where_material[
+                    material_cycle
+                    <= np.percentile(material_cycle, train_val_test[0] * 100)
+                ]
+                m_test_indices = where_material[
+                    material_cycle
+                    > np.percentile(material_cycle, np.sum(train_val_test[0:2]) * 100)
+                ]
+                m_val_indices = np.setdiff1d(
+                    where_material, np.append(m_train_indices, m_test_indices)
+                )
 
             train_indices += list(m_train_indices)
             val_indices += list(m_val_indices)
