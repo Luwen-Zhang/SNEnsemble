@@ -73,7 +73,11 @@ class KMeans(nn.Module):
                         dim=0
                     )
                     # D2 is the distance to the closest centroid for each data.
-                    probs = D2 / torch.sum(D2)
+                    sum_D2 = torch.sum(D2)
+                    if sum_D2 == 0:
+                        probs = torch.ones_like(D2, device=x.device) / len(D2)
+                    else:
+                        probs = D2 / sum_D2
                     # probs is the weight vector for uniform-random sampling.
                     # The following is an implementation of weighted uniform-random sampling using pytorch.
                     cumprobs = torch.cumsum(probs, dim=0)
@@ -110,7 +114,7 @@ class KMeans(nn.Module):
                         dtype=x.dtype,
                     )
                     mask[x_cluster, np.arange(len(x_cluster))] = 1.0
-                    c_grad = mask @ x / counts.view(-1, 1).to(x.dtype)
+                    c_grad = mask @ x / mask.sum(-1).view(-1, 1)
                     c_grad[c_grad != c_grad] = 0  # remove NaNs
                     lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
                     self.accum_n_points_in_clusters[matched_clusters] += counts
