@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import *
+import numpy as np
 
 
 class FTTransformerNN(AbstractNN):
@@ -393,9 +394,14 @@ class SNTransformerLRKMeansNN(AbstractNN):
         super(SNTransformerLRKMeansNN, self).__init__(trainer)
         from .sn_lr_kmeans import KMeansSN
 
-        self.material_related_features = trainer.get_feature_idx_by_type(typ="Material")
+        self.cluster_features = np.concatenate(
+            (
+                trainer.get_feature_idx_by_type(typ="Material"),
+                [trainer.cont_feature_names.index(x) for x in ["Frequency", "R-value"]],
+            )
+        )
         self.sn = KMeansSN(
-            n_clusters=3, n_input=len(self.material_related_features), layers=layers
+            n_clusters=3, n_input=len(self.cluster_features), layers=layers
         )
         self.transformer = FTTransformerNN(
             n_inputs=n_inputs,
@@ -412,7 +418,7 @@ class SNTransformerLRKMeansNN(AbstractNN):
         naive_pred = self.transformer(x, derived_tensors)
         self._naive_pred = naive_pred
         s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
-        x_out = self.sn(x[:, self.material_related_features], s_wo_bias, naive_pred)
+        x_out = self.sn(x[:, self.cluster_features], s_wo_bias, naive_pred)
         return x_out
 
     def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
