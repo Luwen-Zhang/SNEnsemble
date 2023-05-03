@@ -3028,7 +3028,7 @@ class Trainer:
         scatter_plot_func(n_test, s_test, clr[2], "Testing")
 
         # Plot predictions and intervals.
-        if len(m_train_indices) != 0:
+        if len(m_train_indices) > 3:
             _, ci_left, ci_right, psn_pred = get_interval_psn(
                 s_train.values,
                 n_train.values,
