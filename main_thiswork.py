@@ -24,6 +24,8 @@ models = [
             "TransformerSeq",
             "SNTransformer",
             "SNTransformerSeq",
+            "SNTransformerLR",
+            "SNTransformerLRKMeans",
         ],
     ),
 ]
