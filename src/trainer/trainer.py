@@ -2744,6 +2744,8 @@ class Trainer:
         r_col: str,
         m_code: str,
         r_value: float,
+        f_col: str = None,
+        freq: float = None,
         load_dir: str = "tension",
         avg_feature: List[str] = None,
         ax=None,
@@ -2770,6 +2772,10 @@ class Trainer:
             The selected material code.
         r_value
             The selected R-value to plot.
+        f_col
+            The name of the frequency column.
+        freq
+            The selected frequency to plot.
         load_dir
             "tension" or else. If "tension" is selected, samples with s_col>0 will be selected for evaluation.
             Otherwise, those with s_col<0 will be selected.
@@ -2809,18 +2815,24 @@ class Trainer:
             raise Exception(f"Material_Code {m_code} not available.")
 
         sgn = 1 if load_dir == "tension" else -1
-        m_train_indices = m_train_indices[
-            (self.df.loc[m_train_indices, s_col] * sgn > 0)
-            & ((self.df.loc[m_train_indices, r_col] - r_value).__abs__() < 1e-3)
+
+        include_f = (
+            f_col is not None and freq is not None and f_col in self.cont_feature_names
+        )
+        get_indices_wo_f = lambda indices, r, f: indices[
+            (self.df.loc[indices, s_col] * sgn > 0)
+            & ((self.df.loc[indices, r_col] - r).__abs__() < 1e-3)
         ]
-        m_test_indices = m_test_indices[
-            (self.df.loc[m_test_indices, s_col] * sgn > 0)
-            & ((self.df.loc[m_test_indices, r_col] - r_value).__abs__() < 1e-3)
+        get_indices_w_f = lambda indices, r, f: indices[
+            (self.df.loc[indices, s_col] * sgn > 0)
+            & ((self.df.loc[indices, r_col] - r).__abs__() < 1e-3)
+            & ((self.df.loc[indices, f_col] - f).__abs__() < 1e-3)
         ]
-        m_val_indices = m_val_indices[
-            (self.df.loc[m_val_indices, s_col] * sgn > 0)
-            & ((self.df.loc[m_val_indices, r_col] - r_value).__abs__() < 1e-3)
-        ]
+        get_indices_handle = get_indices_w_f if include_f else get_indices_wo_f
+
+        m_train_indices = get_indices_handle(m_train_indices, r_value, freq)
+        m_test_indices = get_indices_handle(m_test_indices, r_value, freq)
+        m_val_indices = get_indices_handle(m_val_indices, r_value, freq)
 
         # If other parameters are not consistent, raise Warning.
         stress_unrelated_cols = [
@@ -2862,17 +2874,27 @@ class Trainer:
             and len(m_val_indices) == 0
             and len(m_test_indices) == 0
         ):
-            unique_r = np.unique(self.df.loc[original_indices, r_col])
-            available_r = []
-            for r in unique_r:
-                if (
-                    (self.df.loc[original_indices, s_col] * sgn > 0)
-                    & ((self.df.loc[original_indices, r_col] - r).__abs__() < 1e-3)
-                ).any():
-                    available_r.append(r)
-            raise Exception(
-                f"R-value {r_value} not available. Choose among {available_r}."
-            )
+            if include_f:
+                r = self.df.loc[original_indices, r_col].values.flatten()
+                f = self.df.loc[original_indices, f_col].values.flatten()
+                unique_fr = set(list(zip(r, f)))
+                available_fr = []
+                for r, f in unique_fr:
+                    if len(get_indices_handle(original_indices, r, f)) > 0:
+                        available_fr.append((r, f))
+                raise Exception(
+                    f"The combination of R-value {r_value} and frequency {freq} is not available. Choose among "
+                    f"{available_fr}."
+                )
+            else:
+                unique_r = np.unique(self.df.loc[original_indices, r_col])
+                available_r = []
+                for r in unique_r:
+                    if len(get_indices_handle(original_indices, r, freq)) > 0:
+                        available_r.append(r)
+                raise Exception(
+                    f"R-value {r_value} is not available. Choose among {available_r}."
+                )
 
         # Extract S and N.
         s_train = self.df.loc[m_train_indices, s_col]
@@ -3075,7 +3097,10 @@ class Trainer:
         path = os.path.join(self.project_root, f"SN_curves_{program}_{model_name}")
         if not os.path.exists(path):
             os.mkdir(path=path)
-        fig_name = m_code.replace("/", "_") + f"_r_{r_value}.pdf"
+        fig_name = (
+            m_code.replace("/", "_")
+            + f"_r_{r_value}{f'_f_{freq}' if include_f else ''}.pdf"
+        )
         plt.savefig(path + "/" + fig_name)
 
         if is_notebook() and new_ax:
