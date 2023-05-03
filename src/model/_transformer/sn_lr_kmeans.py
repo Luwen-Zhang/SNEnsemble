@@ -140,7 +140,7 @@ class KMeansSN(nn.Module):
         ]
         self.kmeans = KMeans(n_clusters=n_clusters, n_input=n_input, clusters=self.sns)
         self.knn = True
-        self.k = int(np.sqrt(len(self.sns)))
+        self.k = int(np.sqrt(n_clusters))
 
     def forward(self, x, s, naive_pred):
         x_cluster = self.kmeans(x)
