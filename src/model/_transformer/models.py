@@ -401,7 +401,7 @@ class SNTransformerLRKMeansNN(AbstractNN):
             )
         )
         self.sn = KMeansSN(
-            n_clusters=3, n_input=len(self.cluster_features), layers=layers
+            n_clusters=5, n_input=len(self.cluster_features), layers=layers
         )
         self.transformer = FTTransformerNN(
             n_inputs=n_inputs,
