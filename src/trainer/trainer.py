@@ -681,6 +681,7 @@ class Trainer:
         if len(label_name) > 1:
             raise Exception(f"Only one target is supported.")
 
+        self._force_features = False
         self.cont_feature_names = cont_feature_names
         self.cat_feature_names = cat_feature_names
         self.cat_feature_mapping = {}
@@ -930,6 +931,7 @@ class Trainer:
             )
         ]
         self._update_dataset_auto()
+        self._force_features = True
 
     def sort_derived_data(
         self, derived_data: Dict[str, np.ndarray], ignore_absence: bool = False
@@ -1265,9 +1267,9 @@ class Trainer:
             else:
                 data = processor.fit_transform(data, self, **kwargs)
         data = data[self.all_feature_names + self.label_name]
-        if warm_start:
-            # If set_feature is called, and if some derived features are removed, recorded features in processors will
-            # be restored when predicting new data.
+        if warm_start and getattr(self, "_force_features", False):
+            # If set_feature_names is called (i.e. _force_features is True) where some derived features are excluded,
+            # the excluded features are wrongly restored during processor.transform.
             self.cont_feature_names = cont_feature_names
             self.cat_feature_names = cat_feature_names
         return data
