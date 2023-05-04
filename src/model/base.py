@@ -946,10 +946,14 @@ class BayesCallback:
 
     def call(self, result):
         self.postfix["ls"] = result.func_vals[-1]
-        self.postfix["param"] = [round(x, 5) for x in result.x_iters[-1]]
+        self.postfix["param"] = [
+            round(x, 5) if hasattr(x, "__round__") else x for x in result.x_iters[-1]
+        ]
         if result.fun < self.postfix["min ls"]:
             self.postfix["min ls"] = result.fun
-            self.postfix["min param"] = [round(x, 5) for x in result.x]
+            self.postfix["min param"] = [
+                round(x, 5) if hasattr(x, "__round__") else x for x in result.x
+            ]
             self.postfix["min at"] = len(result.func_vals)
         self.cnt += 1
         tot_time = time.time() - self.init_time
