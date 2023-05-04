@@ -111,7 +111,7 @@ class Transformer(TorchModel):
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
                 Integer(low=1, high=30, prior="uniform", name="n_hidden", dtype=int),
                 Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
-                Integer(low=2, high=4, prior="uniform", name="attn_layers", dtype=int),
+                Integer(low=2, high=6, prior="uniform", name="attn_layers", dtype=int),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
@@ -125,7 +125,7 @@ class Transformer(TorchModel):
         ]:
             return [
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
-                Integer(low=2, high=4, prior="uniform", name="attn_layers", dtype=int),
+                Integer(low=2, high=6, prior="uniform", name="attn_layers", dtype=int),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
@@ -138,7 +138,7 @@ class Transformer(TorchModel):
                 # ``seq_embedding_dim`` should be able to divided by ``attn_heads``.
                 Categorical(categories=[8, 16, 32], name="seq_embedding_dim"),
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
-                Integer(low=2, high=4, prior="uniform", name="attn_layers", dtype=int),
+                Integer(low=2, high=6, prior="uniform", name="attn_layers", dtype=int),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
@@ -156,7 +156,7 @@ class Transformer(TorchModel):
                 "embedding_dim": 32,
                 "n_hidden": 10,
                 "lstm_layers": 1,
-                "attn_layers": 4,
+                "attn_layers": 6,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
                 "attn_dropout": 0.2,
@@ -173,7 +173,7 @@ class Transformer(TorchModel):
         ]:
             return {
                 "embedding_dim": 32,
-                "attn_layers": 4,
+                "attn_layers": 6,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
                 "attn_dropout": 0.2,
@@ -188,7 +188,7 @@ class Transformer(TorchModel):
             return {
                 "seq_embedding_dim": 16,
                 "embedding_dim": 32,
-                "attn_layers": 4,
+                "attn_layers": 6,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
                 "attn_dropout": 0.2,

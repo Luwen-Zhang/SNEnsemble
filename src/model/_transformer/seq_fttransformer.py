@@ -10,18 +10,13 @@ class SeqFTTransformer(FTTransformer):
         embedding_dim,
         dropout,
         run,
-        use_torch_transformer=None,
-        flatten_transformer=None,
         *args,
         **kwargs,
     ):
         if run and self._check_activate():
-            # flatten_transformer=False because the length of the padded sequence might be unknown.
             super(SeqFTTransformer, self).__init__(
                 embedding_dim=embedding_dim,
                 dropout=dropout,
-                use_torch_transformer=True,
-                flatten_transformer=False,
                 *args,
                 **kwargs,
             )

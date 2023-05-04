@@ -23,10 +23,7 @@ class FTTransformerNN(AbstractNN):
         embed_dropout=0.1,
         attn_layers=4,
         attn_heads=8,
-        attn_ff_dim=256,
         attn_dropout=0.1,
-        use_torch_transformer=False,
-        flatten_transformer=True,
         **kwargs,
     ):
         super(FTTransformerNN, self).__init__(trainer)
@@ -43,12 +40,10 @@ class FTTransformerNN(AbstractNN):
             attn_heads=attn_heads,
             attn_layers=attn_layers,
             embedding_dim=embedding_dim,
-            ff_dim=attn_ff_dim,
-            ff_layers=[],
+            ff_dim=embedding_dim * 4,
+            ff_layers=[128, 64, 32],
             dropout=attn_dropout,
             n_outputs=n_outputs,
-            use_torch_transformer=use_torch_transformer,
-            flatten_transformer=flatten_transformer,
         )
 
     def _forward(self, x, derived_tensors):
@@ -71,11 +66,9 @@ class TransformerLSTMNN(AbstractNN):
         lstm_layers=1,
         attn_layers=4,
         attn_heads=8,
-        flatten_transformer=True,
         embed_dropout=0.1,
         attn_ff_dim=256,
         attn_dropout=0.1,
-        use_torch_transformer=False,
     ):
         super(TransformerLSTMNN, self).__init__(trainer)
         self.transformer = FTTransformerNN(
@@ -89,8 +82,6 @@ class TransformerLSTMNN(AbstractNN):
             attn_heads=attn_heads,
             attn_ff_dim=attn_ff_dim,
             attn_dropout=attn_dropout,
-            use_torch_transformer=use_torch_transformer,
-            flatten_transformer=flatten_transformer,
         )
 
         self.lstm = LSTM(
@@ -141,8 +132,6 @@ class TransformerSeqNN(AbstractNN):
         seq_attn_layers=4,
         seq_attn_heads=8,
         seq_attn_dropout=0.1,
-        use_torch_transformer=False,
-        flatten_transformer=True,
     ):
         super(TransformerSeqNN, self).__init__(trainer)
         self.transformer = FTTransformerNN(
@@ -156,8 +145,6 @@ class TransformerSeqNN(AbstractNN):
             attn_heads=attn_heads,
             attn_ff_dim=attn_ff_dim,
             attn_dropout=attn_dropout,
-            use_torch_transformer=use_torch_transformer,
-            flatten_transformer=flatten_transformer,
         )
 
         self.seq_transformer = SeqFTTransformer(
