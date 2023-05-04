@@ -118,7 +118,7 @@ class AppendCLSToken(nn.Module):
         return torch.cat([x, self.weight.view(1, 1, -1).repeat(len(x), 1, 1)], dim=1)
 
 
-class LinearAttentionPyTabular(nn.Module):
+class LinearAttention(nn.Module):
     # Reference: pytorch_tabular https://github.com/manujosephv/pytorch_tabular
     # pytorch_tabular version of linear attention
 
@@ -181,7 +181,7 @@ class TransformerBlock(nn.Module):
             raise Exception(f"transformer_ff_dim should be an even number.")
         self.linear_attn = linear_attn
         if linear_attn:
-            self.attn = LinearAttentionPyTabular(
+            self.attn = LinearAttention(
                 input_dim=embed_dim,
                 num_heads=attn_heads,
                 head_dim=embed_dim,
