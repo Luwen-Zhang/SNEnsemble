@@ -295,6 +295,7 @@ class FTTransformer(nn.Module):
         # like FT-Transformer and WideDeep do.
         # Also, dropout in MultiheadAttention improves performance.
         self.cls_token = cls_token
+        # cls_token is used in pytorch_tabular but not in pytorch_widedeep.
         if cls_token:
             self.add_cls = AppendCLSToken(d_token=embedding_dim)
         if use_torch_transformer:
@@ -319,6 +320,7 @@ class FTTransformer(nn.Module):
                 ff_dim=ff_dim,
                 dropout=dropout,
             )
+        # The head in pytorch_tabular is nn.Linear, but in pytorch_widedeep it is MLP.
         self.transformer_head = get_sequential(
             ff_layers,
             n_inputs * embedding_dim if not self.cls_token else embedding_dim,
