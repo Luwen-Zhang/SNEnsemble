@@ -1,7 +1,8 @@
 from src.utils import *
 from src.model import AbstractModel
-from skopt.space import Integer, Real
+from skopt.space import Integer, Real, Categorical
 import shutil
+import numpy as np
 
 
 class PytorchTabular(AbstractModel):
@@ -63,12 +64,19 @@ class PytorchTabular(AbstractModel):
         special_configs = {
             "NODE": {"embed_categorical": True},
         }
+        legal_kwargs = cp(kwargs)
+        for key in legal_kwargs.keys():
+            if type(legal_kwargs[key]) in [np.str_, np.int_]:
+                try:
+                    legal_kwargs[key] = int(legal_kwargs[key])
+                except:
+                    pass
         with HiddenPrints():
             model_config = (
-                model_configs[model_name](task="regression", **kwargs)
+                model_configs[model_name](task="regression", **legal_kwargs)
                 if model_name not in special_configs.keys()
                 else model_configs[model_name](
-                    task="regression", **special_configs[model_name], **kwargs
+                    task="regression", **special_configs[model_name], **legal_kwargs
                 )
             )
             tabular_model = TabularModel(
@@ -216,16 +224,10 @@ class PytorchTabular(AbstractModel):
                 ),  # 0.001
             ],
             "TabTransformer": [
+                Categorical(categories=[8, 16, 32], name="input_embed_dim"),
                 Real(low=0, high=0.3, prior="uniform", name="embedding_dropout"),  # 0.1
                 Real(low=0, high=0.3, prior="uniform", name="ff_dropout"),  # 0.1
-                # Categorical([16, 32, 64, 128], name='input_embed_dim'),  # 32
-                Real(
-                    low=0,
-                    high=0.5,
-                    prior="uniform",
-                    name="shared_embedding_fraction",
-                ),  # 0.25
-                # Categorical([2, 4, 8, 16], name='num_heads'),  # 8
+                Categorical([2, 4, 8], name="num_heads"),  # 8
                 Integer(
                     low=4,
                     high=8,
@@ -253,7 +255,7 @@ class PytorchTabular(AbstractModel):
                 Real(low=0, high=0.3, prior="uniform", name="attn_dropouts"),  # 0.0
                 # Categorical([16, 32, 64, 128], name='attn_embed_dim'),  # 32
                 Real(low=0, high=0.3, prior="uniform", name="dropout"),  # 0.0
-                # Categorical([8, 16, 32, 64], name='embedding_dim'),  # 16
+                Categorical([4, 8, 16, 32], name="embedding_dim"),  # 16
                 Real(low=0, high=0.3, prior="uniform", name="embedding_dropout"),  # 0.0
                 Integer(
                     low=1,
@@ -262,16 +264,12 @@ class PytorchTabular(AbstractModel):
                     name="num_attn_blocks",
                     dtype=int,
                 ),  # 3
-                # Integer(low=1, high=4, prior='uniform', name='num_heads', dtype=int),  # 2
+                Categorical([1, 2, 4], name="num_heads"),
             ],
             "FTTransformer": [
+                Categorical(categories=[8, 16, 32], name="input_embed_dim"),
                 Real(low=0, high=0.3, prior="uniform", name="embedding_dropout"),  # 0.1
-                Real(
-                    low=0,
-                    high=0.5,
-                    prior="uniform",
-                    name="shared_embedding_fraction",
-                ),  # 0.25
+                Categorical([2, 4, 8], name="num_heads"),
                 Integer(
                     low=4,
                     high=8,
@@ -332,9 +330,10 @@ class PytorchTabular(AbstractModel):
                 "learning_rate": 0.001,
             },
             "TabTransformer": {
+                "input_embed_dim": 32,
                 "embedding_dropout": 0.1,
                 "ff_dropout": 0.1,
-                "shared_embedding_fraction": 0.25,
+                "num_heads": 8,
                 "num_attn_blocks": 6,
                 "attn_dropout": 0.1,
                 "add_norm_dropout": 0.1,
@@ -345,12 +344,15 @@ class PytorchTabular(AbstractModel):
                 "learning_rate": 0.001,
                 "attn_dropouts": 0.0,
                 "dropout": 0.0,
+                "embedding_dim": 16,
                 "embedding_dropout": 0.0,
                 "num_attn_blocks": 3,
+                "num_heads": 2,
             },
             "FTTransformer": {
+                "input_embed_dim": 32,
                 "embedding_dropout": 0.1,
-                "shared_embedding_fraction": 0.25,
+                "num_heads": 8,
                 "num_attn_blocks": 6,
                 "attn_dropout": 0.1,
                 "add_norm_dropout": 0.1,
