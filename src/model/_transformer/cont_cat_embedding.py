@@ -18,14 +18,19 @@ class Embedding(nn.Module):
         super(Embedding, self).__init__()
         # Module: Continuous embedding
         self.embed_cont = embed_cont
+        d_sqrt_inv = 1 / np.sqrt(embedding_dim)
         if embed_cont:
             self.embedding_dim = embedding_dim
             self.cont_norm = nn.BatchNorm1d(n_inputs)
-            self.cont_embed_weight = nn.init.kaiming_uniform_(
-                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
+            self.cont_embed_weight = nn.init.uniform_(
+                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)),
+                a=-d_sqrt_inv,
+                b=d_sqrt_inv,
             )
-            self.cont_embed_bias = nn.init.kaiming_uniform_(
-                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)), a=np.sqrt(5)
+            self.cont_embed_bias = nn.init.uniform_(
+                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)),
+                a=-d_sqrt_inv,
+                b=d_sqrt_inv,
             )
             self.cont_dropout = nn.Dropout(embed_dropout)
         else:
@@ -49,6 +54,12 @@ class Embedding(nn.Module):
                     for num_unique in cat_num_unique
                 ]
             )
+            for embed in self.cat_embeds:
+                nn.init.uniform_(
+                    embed.weight,
+                    a=-d_sqrt_inv,
+                    b=d_sqrt_inv,
+                )
             self.cat_dropout = nn.Dropout(embed_dropout)
             self.run_cat = True
         else:
