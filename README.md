@@ -22,6 +22,12 @@ Then install dependencies
 pip install -r requirement.txt
 ```
 
+Note that `requirement.txt`  includes all dependencies to run benchmarks. If only our model and the basic functionality are needed, install by
+
+```shell
+pip install -r requirement_lite.txt
+```
+
 ## Our environment
 
 We run our experiments on a personal computer with Ubuntu 18.04, Intel Core i9-11900K, Nvidia RTX 3090. Results might differ on different devices/environments. We have verified main conclusions on Siyuan-1 cluster supported by the Center for High Performance Computing at Shanghai Jiao Tong University (with Nvidia A100 GPU). The environment for each trial can be seen in `log.txt`.
