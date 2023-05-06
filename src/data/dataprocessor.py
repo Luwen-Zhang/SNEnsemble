@@ -11,7 +11,6 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import StandardScaler as skStandardScaler
 from sklearn.preprocessing import OrdinalEncoder
 from typing import Type
-import shap
 
 
 class LackDataMaterialRemover(AbstractProcessor):
@@ -308,6 +307,8 @@ class CorrFeatureSelector(AbstractFeatureSelector):
     def _get_feature_names_out(
         self, data, trainer, thres=0.8, n_estimators=100, **kwargs
     ):
+        import shap
+
         abs_corr = trainer.cal_corr(imputed=False, features_only=True).abs()
         where_corr = np.where(abs_corr > thres)
         where_corr = [[trainer.cont_feature_names[x] for x in y] for y in where_corr]
