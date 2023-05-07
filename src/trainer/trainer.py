@@ -1708,6 +1708,15 @@ class Trainer:
             df_once.to_csv(
                 os.path.join(self.project_root, "cv", f"leaderboard_cv_{i}.csv")
             )
+            current_state = {
+                "trainer": cp(self),
+                "i_random": i + 1,
+                "programs_predictions": programs_predictions,
+            }
+            with open(
+                os.path.join(self.project_root, "cv", "cv_state.pkl"), "wb"
+            ) as file:
+                pickle.dump(current_state, file)
             if verbose:
                 print(
                     f"--------------------------End {i + 1}/{n_random} {type} cross validation--------------------------"
