@@ -3153,7 +3153,13 @@ class Trainer:
         # psn_plot_func(lin_psn_pred, color=clr[0], name=f"Lin-log 5\% PoF")
         # psn_plot_func(log_psn_pred, color=clr[2], name=f"Log-log 5\% PoF")
 
-        ax.legend(loc="upper right", markerscale=1.5, handlelength=1, handleheight=0.9)
+        ax.legend(
+            loc="upper right",
+            markerscale=1.5,
+            handlelength=1,
+            handleheight=0.9,
+            fontsize=plt.rcParams["font.size"] * 0.8,
+        )
         ax.set_xlabel(n_col)
         ax.set_ylabel(s_col)
         ax.set_xlim([0, 10])
