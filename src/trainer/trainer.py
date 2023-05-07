@@ -3,6 +3,7 @@ The basic class for the project. It includes configuration, data processing, plo
 and comparing baseline models.
 """
 import os.path
+import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn.pipeline
@@ -3077,18 +3078,24 @@ class Trainer:
         def interval_plot_func(pred, interv_left, interv_right, color, name):
             # Plot predictions and intervals.
             ax.plot(pred, x_value, color=color, zorder=10)
-            ax.fill_betweenx(
-                x_value,
-                interv_left,
-                interv_right,
-                alpha=0.4,
-                color=color,
-                edgecolor=None,
-                label=name,
-                zorder=0,
-            )
-            print(name)
-            report(interv_left, interv_right)
+            if np.isfinite(interv_left).all() and np.isfinite(interv_right).all():
+                ax.fill_betweenx(
+                    x_value,
+                    interv_left,
+                    interv_right,
+                    alpha=0.4,
+                    color=color,
+                    edgecolor=None,
+                    label=name,
+                    zorder=0,
+                )
+                print(name)
+                report(interv_left, interv_right)
+            else:
+                warnings.warn(
+                    f"Invalid value encountered when calculating intervals. It is probably because only one"
+                    f"unique stress value exists in the training set."
+                )
 
         def psn_plot_func(pred, color, name):
             # Plot psn
