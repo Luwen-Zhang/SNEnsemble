@@ -10,6 +10,13 @@ Bash scripts (e.g. `run.sh` and `run_thiswork.sh`) gives several examples to use
 
 ## Requirements
 
+We recommend using a virtual environment with `python=3.8` and conda.
+
+```shell
+conda create -n myvenv python=3.8
+conda activate myvenv
+```
+
 First, install `torch==1.12.0` with CUDA 1.16 (if a Nvidia GPU is available). 
 
 ```shell
