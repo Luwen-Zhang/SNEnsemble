@@ -3170,7 +3170,7 @@ class Trainer:
             os.mkdir(path=path)
         fig_name = (
             m_code.replace("/", "_")
-            + f"_r_{r_value}{f'_f_{freq}' if include_f else ''}.pdf"
+            + f"_r_{r_value}{f'_f_{freq}' if include_f else ''}{f'_refit' if refit else ''}.pdf"
         )
         plt.savefig(path + "/" + fig_name)
 
