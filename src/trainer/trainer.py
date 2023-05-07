@@ -3,6 +3,7 @@ The basic class for the project. It includes configuration, data processing, plo
 and comparing baseline models.
 """
 import os.path
+import matplotlib.pyplot as plt
 import numpy as np
 import sklearn.pipeline
 import src
@@ -2635,6 +2636,7 @@ class Trainer:
         train_heat = np.zeros((length, bins))
         val_heat = np.zeros((length, bins))
         test_heat = np.zeros((length, bins))
+        partition_cycles = {"train": [], "val": [], "test": []}
         np.seterr(invalid="ignore")
         for idx, material in enumerate(all_m_code):
             cycle = all_cycle[
@@ -2650,6 +2652,7 @@ class Trainer:
                 cycles = all_cycle[
                     self._select_by_material_code(m_code=material, partition=partition)
                 ]
+                partition_cycles[partition].append(cycles)
                 return np.histogram(cycles, range=hist_range, bins=bins)[0] / all_hist
 
             train_heat[idx, :] = get_heat(partition="train")
@@ -2662,12 +2665,11 @@ class Trainer:
         fig = plt.figure(figsize=(8, 2.5))
         gs = GridSpec(100, 100, figure=fig)
 
-        def plot_im(heat, name, pos, hide_y_ticks=False):
+        def plot_im(heat, pos, hide_y_ticks=False):
             ax = fig.add_subplot(pos)
-            im = ax.imshow(heat, aspect=bins / length, cmap="Oranges")
+            im = ax.imshow(heat, aspect="auto", cmap="Oranges")
             if hide_y_ticks:
                 ax.set_yticks([])
-            ax.set_title(name)
             ax.set_xlim([-0.5, bins - 0.5])
             ax.set_xticks([0 - 0.5, (bins - 1) / 2, bins - 0.5])
             if percentile == "all":
@@ -2681,15 +2683,71 @@ class Trainer:
                 ax.set_xticklabels([0, 50, 100])
             return im
 
-        plot_im(train_heat, "Training set", gs[:, 0:30], hide_y_ticks=False)
-        plot_im(val_heat, "Validation set", gs[:, 33:63], hide_y_ticks=True)
-        im = plot_im(test_heat, "Testing set", gs[:, 66:96], hide_y_ticks=True)
+        def plot_kde(heat, pos, name, hide_y_ticks=False):
+            ax = fig.add_subplot(pos)
+            x = np.linspace(np.min(all_cycle), np.max(all_cycle), 100)
+            kde = st.gaussian_kde(np.hstack(heat))(x)
+            ax.plot(x, kde, c=plt.get_cmap("Oranges")(200), lw=1)
+            where_max_kde = np.argmax(kde)
+            ax.plot(
+                np.array([x[where_max_kde]] * 10),
+                np.linspace(0, 0.5, 10),
+                "--",
+                color="grey",
+                alpha=0.5,
+                lw=1,
+            )
+            ax.text(
+                x[where_max_kde] + 0.1,
+                0.37,
+                f"{x[where_max_kde]:.2f}",
+                fontsize=plt.rcParams["font.size"] * 0.8,
+            )
+            if hide_y_ticks:
+                ax.set_yticks([])
+            else:
+                ax.set_yticks([0, 0.5])
+            ax.set_xticks([])
+            ax.set_xlim([np.min(all_cycle), np.max(all_cycle)])
+            ax.set_ylim([0, 0.5])
+            ax.set_title(name)
+
+        plot_kde(
+            partition_cycles["train"],
+            gs[:18, 0:30],
+            name="Training set",
+            hide_y_ticks=False,
+        )
+        plot_kde(
+            partition_cycles["val"],
+            gs[:18, 33:63],
+            name="Validation set",
+            hide_y_ticks=True,
+        )
+        plot_kde(
+            partition_cycles["test"],
+            gs[:18, 66:96],
+            name="Testing set",
+            hide_y_ticks=True,
+        )
+        plot_im(train_heat, gs[25:, 0:30], hide_y_ticks=False)
+        plot_im(val_heat, gs[25:, 33:63], hide_y_ticks=True)
+        im = plot_im(test_heat, gs[25:, 66:96], hide_y_ticks=True)
         # plt.colorbar(mappable=im)
         cax = fig.add_subplot(gs[50:98, 98:])
         cbar = plt.colorbar(cax=cax, mappable=im)
         cax.set_ylabel("Density")
-
-        ax = fig.add_subplot(111, frameon=False)
+        ax = fig.add_subplot(gs[:20, :], frameon=False)
+        plt.tick_params(
+            labelcolor="none",
+            which="both",
+            top=False,
+            bottom=False,
+            left=False,
+            right=False,
+        )
+        ax.set_ylabel(f"KDE\n")
+        ax = fig.add_subplot(gs[25:, :], frameon=False)
         plt.tick_params(
             labelcolor="none",
             which="both",
