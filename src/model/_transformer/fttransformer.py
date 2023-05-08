@@ -283,7 +283,7 @@ class FTTransformer(nn.Module):
         dropout,
         n_outputs,
         use_torch_transformer=False,
-        cls_token=False,
+        cls_token=True,
         **kwargs,
     ):
         super(FTTransformer, self).__init__()
@@ -321,14 +321,22 @@ class FTTransformer(nn.Module):
                 dropout=dropout,
             )
         # The head in pytorch_tabular is nn.Linear, but in pytorch_widedeep it is MLP.
-        self.transformer_head = get_sequential(
-            ff_layers,
-            n_inputs * embedding_dim if not self.cls_token else embedding_dim,
-            n_outputs,
-            nn.ReLU,
-            norm_type="layer",
-            dropout=0,
-        )
+        if len(ff_layers) == 0:
+            self.transformer_head = nn.Linear(
+                in_features=n_inputs * embedding_dim
+                if not self.cls_token
+                else embedding_dim,
+                out_features=n_outputs,
+            )
+        else:
+            self.transformer_head = get_sequential(
+                ff_layers,
+                n_inputs * embedding_dim if not self.cls_token else embedding_dim,
+                n_outputs,
+                nn.ReLU,
+                norm_type="layer",
+                dropout=0,
+            )
 
     def forward(self, x, derived_tensors):
         if self.cls_token:
