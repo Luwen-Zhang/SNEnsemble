@@ -312,13 +312,11 @@ class PytorchTabular(AbstractModel):
             "Category Embedding": {
                 "dropout": 0.5,
                 "embedding_dropout": 0.5,
-                "learning_rate": 0.001,
             },
             "NODE": {
                 "depth": 6,
                 "embedding_dropout": 0.0,
                 "input_dropout": 0.0,
-                "learning_rate": 0.001,
                 "num_trees": 256,
             },
             "TabNet": {
@@ -328,7 +326,6 @@ class PytorchTabular(AbstractModel):
                 "gamma": 1.3,
                 "n_independent": 2,
                 "n_shared": 2,
-                "learning_rate": 0.001,
             },
             "TabTransformer": {
                 "input_embed_dim": 32,
@@ -339,10 +336,8 @@ class PytorchTabular(AbstractModel):
                 "attn_dropout": 0.1,
                 "add_norm_dropout": 0.1,
                 "ff_hidden_multiplier": 4,
-                "learning_rate": 0.001,
             },
             "AutoInt": {
-                "learning_rate": 0.001,
                 "attn_dropouts": 0.0,
                 "dropout": 0.0,
                 "embedding_dim": 16,
@@ -372,7 +367,6 @@ class PytorchTabular(AbstractModel):
                 "tree_dropout": 0.0,
                 "tree_wise_attention_dropout": 0.0,
                 "embedding_dropout": 0.1,
-                "learning_rate": 1e-3,
             },
         }
         for key in params_dict.keys():
