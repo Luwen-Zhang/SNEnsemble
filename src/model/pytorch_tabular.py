@@ -40,7 +40,7 @@ class PytorchTabular(AbstractModel):
         if not os.path.exists(os.path.join(self.root, "ckpts")):
             os.mkdir(os.path.join(self.root, "ckpts"))
         trainer_config = TrainerConfig(
-            batch_size=kwargs["batch_size"],
+            batch_size=int(kwargs["batch_size"]),
             progress_bar="none",
             early_stopping="valid_mean_squared_error",
             early_stopping_patience=self.trainer.static_params["patience"],
