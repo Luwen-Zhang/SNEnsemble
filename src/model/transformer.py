@@ -150,8 +150,9 @@ class Transformer(TorchModel):
             ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
+        res = {}
         if model_name == "TransformerLSTM":
-            return {
+            res = {
                 "seq_embedding_dim": 16,
                 "embedding_dim": 32,
                 "n_hidden": 10,
@@ -160,9 +161,6 @@ class Transformer(TorchModel):
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
                 "attn_dropout": 0.2,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             }
         elif model_name in [
             "FTTransformer",
@@ -171,21 +169,18 @@ class Transformer(TorchModel):
             "SNTransformerLR",
             "SNTransformerLRKMeans",
         ]:
-            return {
+            res = {
                 "embedding_dim": 32,
                 "attn_layers": 6,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
-                "attn_dropout": 0.2,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
+                "attn_dropout": 0.1,
             }
         elif model_name in [
             "TransformerSeq",
             "SNTransformerSeq",
         ]:
-            return {
+            res = {
                 "seq_embedding_dim": 16,
                 "embedding_dim": 32,
                 "attn_layers": 6,
@@ -195,10 +190,9 @@ class Transformer(TorchModel):
                 "seq_attn_layers": 4,
                 "seq_attn_heads": 8,
                 "seq_attn_dropout": 0.2,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             }
+        res.update(self.trainer.chosen_params)
+        return res
 
     def _conditional_validity(self, model_name: str) -> bool:
         if (

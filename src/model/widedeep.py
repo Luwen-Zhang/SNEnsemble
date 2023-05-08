@@ -122,17 +122,11 @@ class WideDeep(AbstractModel):
             "TabMlp": {
                 "cat_embed_dropout": 0.1,
                 "mlp_dropout": 0.1,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
             "TabResnet": {
                 "cat_embed_dropout": 0.1,
                 "mlp_dropout": 0.1,
                 "blocks_dropout": 0.1,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
             "TabTransformer": {
                 "cat_embed_dropout": 0.1,
@@ -142,9 +136,6 @@ class WideDeep(AbstractModel):
                 "n_blocks": 4,
                 "attn_dropout": 0.2,
                 "ff_dropout": 0.1,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
             "TabNet": {
                 "cat_embed_dropout": 0.1,
@@ -155,9 +146,6 @@ class WideDeep(AbstractModel):
                 "n_glu_step_dependent": 2,
                 "n_glu_shared": 2,
                 "gamma": 1.3,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
             "SAINT": {
                 "cat_embed_dropout": 0.1,
@@ -167,18 +155,12 @@ class WideDeep(AbstractModel):
                 "n_blocks": 2,
                 "attn_dropout": 0.2,
                 "ff_dropout": 0.1,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
             "ContextAttentionMLP": {
                 "cat_embed_dropout": 0.1,
                 "input_dim": 32,
                 "n_blocks": 3,
                 "attn_dropout": 0.2,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
             "SelfAttentionMLP": {
                 "cat_embed_dropout": 0.1,
@@ -186,9 +168,6 @@ class WideDeep(AbstractModel):
                 "n_heads": 8,
                 "n_blocks": 3,
                 "attn_dropout": 0.2,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
             "FTTransformer": {
                 "cat_embed_dropout": 0.1,
@@ -199,9 +178,6 @@ class WideDeep(AbstractModel):
                 "attn_dropout": 0.2,
                 "ff_dropout": 0.1,
                 "kv_compression_factor": 0.5,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
             "TabPerceiver": {
                 "cat_embed_dropout": 0.1,
@@ -215,9 +191,6 @@ class WideDeep(AbstractModel):
                 "n_perceiver_blocks": 4,
                 "attn_dropout": 0.2,
                 "ff_dropout": 0.1,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
             "TabFastFormer": {
                 "cat_embed_dropout": 0.1,
@@ -227,11 +200,10 @@ class WideDeep(AbstractModel):
                 "n_blocks": 4,
                 "attn_dropout": 0.2,
                 "ff_dropout": 0.1,
-                "lr": 0.003,
-                "weight_decay": 0.002,
-                "batch_size": 1024,
             },
         }
+        for key in _value_dict.keys():
+            _value_dict[key].update(self.trainer.chosen_params)
         return _value_dict[model_name]
 
     def _new_model(self, model_name, verbose, **kwargs):

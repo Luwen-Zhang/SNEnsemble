@@ -40,6 +40,7 @@ class PytorchTabular(AbstractModel):
         if not os.path.exists(os.path.join(self.root, "ckpts")):
             os.mkdir(os.path.join(self.root, "ckpts"))
         trainer_config = TrainerConfig(
+            batch_size=kwargs["batch_size"],
             progress_bar="none",
             early_stopping="valid_mean_squared_error",
             early_stopping_patience=self.trainer.static_params["patience"],
@@ -50,7 +51,12 @@ class PytorchTabular(AbstractModel):
             load_best=True,
             accelerator="cpu" if self.device == "cpu" else "auto",
         )
-        optimizer_config = OptimizerConfig()
+        optimizer_config = OptimizerConfig(
+            optimizer="Adam",
+            optimizer_params={
+                "weight_decay": kwargs["weight_decay"],
+            },
+        )
 
         model_configs = {
             "Category Embedding": CategoryEmbeddingModelConfig,
@@ -65,6 +71,10 @@ class PytorchTabular(AbstractModel):
             "NODE": {"embed_categorical": True},
         }
         legal_kwargs = cp(kwargs)
+        legal_kwargs["learning_rate"] = kwargs["lr"]
+        del legal_kwargs["lr"]
+        del legal_kwargs["weight_decay"]
+        del legal_kwargs["batch_size"]
         for key in legal_kwargs.keys():
             if type(legal_kwargs[key]) in [np.str_, np.int_]:
                 try:
@@ -191,21 +201,17 @@ class PytorchTabular(AbstractModel):
             "Category Embedding": [
                 Real(low=0, high=0.5, prior="uniform", name="dropout"),  # 0.5
                 Real(low=0, high=0.5, prior="uniform", name="embedding_dropout"),  # 0.5
-                Real(
-                    low=1e-5, high=0.1, prior="log-uniform", name="learning_rate"
-                ),  # 0.001
-            ],
+            ]
+            + self.trainer.SPACE,
             "NODE": [
                 Integer(low=2, high=6, prior="uniform", name="depth", dtype=int),  # 6
                 Real(low=0, high=0.3, prior="uniform", name="embedding_dropout"),  # 0.0
                 Real(low=0, high=0.3, prior="uniform", name="input_dropout"),  # 0.0
-                Real(
-                    low=1e-5, high=0.1, prior="log-uniform", name="learning_rate"
-                ),  # 0.001
                 Integer(
                     low=128, high=512, prior="uniform", name="num_trees", dtype=int
                 ),
-            ],
+            ]
+            + self.trainer.SPACE,
             "TabNet": [
                 Integer(low=4, high=64, prior="uniform", name="n_d", dtype=int),  # 8
                 Integer(low=4, high=64, prior="uniform", name="n_a", dtype=int),  # 8
@@ -219,10 +225,8 @@ class PytorchTabular(AbstractModel):
                 Integer(
                     low=1, high=5, prior="uniform", name="n_shared", dtype=int
                 ),  # 2
-                Real(
-                    low=1e-5, high=0.1, prior="log-uniform", name="learning_rate"
-                ),  # 0.001
-            ],
+            ]
+            + self.trainer.SPACE,
             "TabTransformer": [
                 Categorical(categories=[8, 16, 32], name="input_embed_dim"),
                 Real(low=0, high=0.3, prior="uniform", name="embedding_dropout"),  # 0.1
@@ -244,14 +248,9 @@ class PytorchTabular(AbstractModel):
                     name="ff_hidden_multiplier",
                     dtype=int,
                 ),  # 4
-                Real(
-                    low=1e-5, high=0.1, prior="log-uniform", name="learning_rate"
-                ),  # 0.001
-            ],
+            ]
+            + self.trainer.SPACE,
             "AutoInt": [
-                Real(
-                    low=1e-5, high=0.1, prior="log-uniform", name="learning_rate"
-                ),  # 0.001
                 Real(low=0, high=0.3, prior="uniform", name="attn_dropouts"),  # 0.0
                 # Categorical([16, 32, 64, 128], name='attn_embed_dim'),  # 32
                 Real(low=0, high=0.3, prior="uniform", name="dropout"),  # 0.0
@@ -265,7 +264,8 @@ class PytorchTabular(AbstractModel):
                     dtype=int,
                 ),  # 3
                 Categorical([1, 2, 4], name="num_heads"),
-            ],
+            ]
+            + self.trainer.SPACE,
             "FTTransformer": [
                 Categorical(categories=[8, 16, 32], name="input_embed_dim"),
                 Real(low=0, high=0.3, prior="uniform", name="embedding_dropout"),  # 0.1
@@ -287,7 +287,8 @@ class PytorchTabular(AbstractModel):
                     name="ff_hidden_multiplier",
                     dtype=int,
                 ),  # 4
-            ],
+            ]
+            + self.trainer.SPACE,
             "GATE": [
                 Integer(low=2, high=10, prior="uniform", name="gflu_stages", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="gflu_dropout"),
@@ -301,8 +302,8 @@ class PytorchTabular(AbstractModel):
                     name="tree_wise_attention_dropout",
                 ),
                 Real(low=0.0, high=0.3, prior="uniform", name="embedding_dropout"),
-                Real(low=1e-5, high=0.1, prior="log-uniform", name="learning_rate"),
-            ],
+            ]
+            + self.trainer.SPACE,
         }
         return space_dict[model_name]
 
@@ -374,4 +375,6 @@ class PytorchTabular(AbstractModel):
                 "learning_rate": 1e-3,
             },
         }
+        for key in params_dict.keys():
+            params_dict[key].update(self.trainer.chosen_params)
         return params_dict[model_name]
