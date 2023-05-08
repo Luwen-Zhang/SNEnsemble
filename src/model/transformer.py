@@ -160,7 +160,7 @@ class Transformer(TorchModel):
                 "attn_layers": 6,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
-                "attn_dropout": 0.2,
+                "attn_dropout": 0.1,
             }
         elif model_name in [
             "FTTransformer",
@@ -186,10 +186,10 @@ class Transformer(TorchModel):
                 "attn_layers": 6,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
-                "attn_dropout": 0.2,
+                "attn_dropout": 0.1,
                 "seq_attn_layers": 4,
                 "seq_attn_heads": 8,
-                "seq_attn_dropout": 0.2,
+                "seq_attn_dropout": 0.1,
             }
         res.update(self.trainer.chosen_params)
         return res
