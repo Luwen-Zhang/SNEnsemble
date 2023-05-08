@@ -41,7 +41,7 @@ class FTTransformerNN(AbstractNN):
             attn_layers=attn_layers,
             embedding_dim=embedding_dim,
             ff_dim=embedding_dim * 4,
-            ff_layers=[128, 64, 32],
+            ff_layers=[],
             dropout=attn_dropout,
             n_outputs=n_outputs,
         )
