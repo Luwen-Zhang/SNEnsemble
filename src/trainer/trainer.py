@@ -1648,6 +1648,12 @@ class Trainer:
             start_i = current_state["i_random"]
             self.load_state(current_state["trainer"])
             programs_predictions = current_state["programs_predictions"]
+            if "once_predictions" in current_state.keys():
+                reloaded_once_predictions = current_state["once_predictions"]
+            else:
+                # For compatibility
+                reloaded_once_predictions = None
+            skip_program = reloaded_once_predictions is not None
             if start_i >= n_random:
                 raise Exception(
                     f"The loaded state is incompatible with the current setting."
@@ -1655,6 +1661,15 @@ class Trainer:
             print(f"Previous cross validation state is loaded.")
         else:
             start_i = 0
+            skip_program = False
+            reloaded_once_predictions = None
+
+        def func_save_state(state):
+            with open(
+                os.path.join(self.project_root, "cv", "cv_state.pkl"), "wb"
+            ) as file:
+                pickle.dump(state, file)
+
         for i in range(start_i, n_random):
             if verbose:
                 print(
@@ -1664,16 +1679,20 @@ class Trainer:
                 "trainer": cp(self),
                 "i_random": i,
                 "programs_predictions": programs_predictions,
+                "once_predictions": None,
             }
-            with open(
-                os.path.join(self.project_root, "cv", "cv_state.pkl"), "wb"
-            ) as file:
-                pickle.dump(current_state, file)
+            func_save_state(current_state)
             with HiddenPrints(disable_std=not verbose):
                 set_random_seed(i)
                 set_data_handler()
-            once_predictions = {}
+            once_predictions = {} if not skip_program else reloaded_once_predictions
             for program in programs:
+                if skip_program:
+                    if program in once_predictions.keys():
+                        print(f"Skipping finished model base {program}")
+                        continue
+                    else:
+                        skip_program = False
                 modelbase = self.get_modelbase(program)
                 modelbase.train(dump_trainer=True, verbose=verbose)
                 predictions = modelbase._predict_all(
@@ -1702,6 +1721,13 @@ class Trainer:
                             append_once("Validation")
                     else:
                         programs_predictions[program][model_name] = value
+                current_state = {
+                    "trainer": cp(self),
+                    "i_random": i,
+                    "programs_predictions": programs_predictions,
+                    "once_predictions": once_predictions,
+                }
+                func_save_state(current_state)
             df_once = self._cal_leaderboard(
                 once_predictions, test_data_only=test_data_only, save=False
             )
@@ -1712,11 +1738,9 @@ class Trainer:
                 "trainer": cp(self),
                 "i_random": i + 1,
                 "programs_predictions": programs_predictions,
+                "once_predictions": None,
             }
-            with open(
-                os.path.join(self.project_root, "cv", "cv_state.pkl"), "wb"
-            ) as file:
-                pickle.dump(current_state, file)
+            func_save_state(current_state)
             if verbose:
                 print(
                     f"--------------------------End {i + 1}/{n_random} {type} cross validation--------------------------"
