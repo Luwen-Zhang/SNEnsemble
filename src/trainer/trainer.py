@@ -3501,11 +3501,15 @@ class Trainer:
             A deepcopied previous status of the trainer.
         """
         # https://stackoverflow.com/questions/1216356/is-it-safe-to-replace-a-self-object-by-another-object-of-the-same-type-in-a-meth
+        current_root = cp(self.project_root)
         self.__dict__.update(trainer.__dict__)
         # The update operation does not change the location of self. However, model bases contains another trainer
         # that points to another location if the state is loaded from disk.
         for model in self.modelbases:
             model.trainer = self
+        self.set_path(current_root, verbose=False)
+        for modelbase in self.modelbases:
+            modelbase.set_path(os.path.join(current_root, modelbase.program))
 
     def get_best_model(self) -> Tuple[str, str]:
         """
