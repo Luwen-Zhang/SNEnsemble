@@ -32,6 +32,7 @@ class Transformer(TorchModel):
             "SNTransformerLR",
             "SNTransformerLRKMeans",
             "CategoryEmbedding",
+            "SNCatEmbedLRKMeans",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -104,10 +105,14 @@ class Transformer(TorchModel):
                 seq_attn_heads=kwargs["seq_attn_heads"],
                 seq_attn_dropout=kwargs["seq_attn_dropout"],
             )
-        elif model_name == "CategoryEmbedding":
-            return CategoryEmbeddingNN(
+        elif model_name in ["CategoryEmbedding", "SNCatEmbedLRKMeans"]:
+            cls = getattr(sys.modules[__name__], f"{model_name}NN")
+            return cls(
                 len(self.trainer.cont_feature_names),
                 len(self.trainer.label_name),
+                layers=self.trainer.args["layers"]
+                if self.layers is None
+                else self.layers,
                 trainer=self.trainer,
                 cat_num_unique=[
                     len(x) for x in self.trainer.cat_feature_mapping.values()
@@ -161,7 +166,7 @@ class Transformer(TorchModel):
                 Categorical(categories=[2, 4, 8], name="seq_attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="seq_attn_dropout"),
             ] + self.trainer.SPACE
-        elif model_name in ["CategoryEmbedding"]:
+        elif model_name in ["CategoryEmbedding", "SNCatEmbedLRKMeans"]:
             return [
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
@@ -212,6 +217,7 @@ class Transformer(TorchModel):
             }
         elif model_name in [
             "CategoryEmbedding",
+            "SNCatEmbedLRKMeans",
         ]:
             res = {
                 "embedding_dim": 3,
