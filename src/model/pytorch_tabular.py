@@ -310,8 +310,8 @@ class PytorchTabular(AbstractModel):
     def _initial_values(self, model_name):
         params_dict = {
             "Category Embedding": {
-                "dropout": 0.5,
-                "embedding_dropout": 0.5,
+                "dropout": 0.0,
+                "embedding_dropout": 0.1,
             },
             "NODE": {
                 "depth": 6,
