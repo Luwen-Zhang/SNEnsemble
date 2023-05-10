@@ -31,6 +31,7 @@ class Transformer(TorchModel):
             "SNTransformerAug",
             "SNTransformerLR",
             "SNTransformerLRKMeans",
+            "CategoryEmbedding",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -103,6 +104,18 @@ class Transformer(TorchModel):
                 seq_attn_heads=kwargs["seq_attn_heads"],
                 seq_attn_dropout=kwargs["seq_attn_dropout"],
             )
+        elif model_name == "CategoryEmbedding":
+            return CategoryEmbeddingNN(
+                len(self.trainer.cont_feature_names),
+                len(self.trainer.label_name),
+                trainer=self.trainer,
+                cat_num_unique=[
+                    len(x) for x in self.trainer.cat_feature_mapping.values()
+                ],
+                embedding_dim=kwargs["embedding_dim"],
+                embed_dropout=kwargs["embed_dropout"],
+                mlp_dropout=kwargs["mlp_dropout"],
+            )
 
     def _space(self, model_name):
         if model_name == "TransformerLSTM":
@@ -148,6 +161,12 @@ class Transformer(TorchModel):
                 Categorical(categories=[2, 4, 8], name="seq_attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="seq_attn_dropout"),
             ] + self.trainer.SPACE
+        elif model_name in ["CategoryEmbedding"]:
+            return [
+                Categorical(categories=[8, 16, 32], name="embedding_dim"),
+                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+            ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
         res = {}
@@ -190,6 +209,14 @@ class Transformer(TorchModel):
                 "seq_attn_layers": 4,
                 "seq_attn_heads": 8,
                 "seq_attn_dropout": 0.1,
+            }
+        elif model_name in [
+            "CategoryEmbedding",
+        ]:
+            res = {
+                "embedding_dim": 3,
+                "embed_dropout": 0.1,
+                "mlp_dropout": 0.0,
             }
         res.update(self.trainer.chosen_params)
         return res

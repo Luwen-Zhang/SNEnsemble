@@ -1,4 +1,4 @@
-from .cont_cat_embedding import Embedding
+from .cont_cat_embedding import Embedding, Embedding1d
 from .fttransformer import FTTransformer
 from .lstm import LSTM
 from .loss import BiasLoss, ConsGradLoss, StressGradLoss
@@ -412,3 +412,41 @@ class SNTransformerLRKMeansNN(AbstractNN):
         loss = self.default_loss_fn(y_pred, y_true)
         loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
         return loss
+
+
+class CategoryEmbeddingNN(AbstractNN):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        trainer,
+        cat_num_unique: List[int] = None,
+        embedding_dim=32,
+        embed_dropout=0.1,
+        mlp_dropout=0.0,
+        **kwargs,
+    ):
+        super(CategoryEmbeddingNN, self).__init__(trainer)
+
+        self.embed = Embedding1d(
+            embedding_dim,
+            embed_dropout,
+            cat_num_unique,
+            run_cat="categorical" in self.derived_feature_names,
+        )
+        self.linear = get_sequential(
+            [128, 64, 32],
+            n_inputs=n_inputs
+            + len(cat_num_unique) * embedding_dim * self.embed.run_cat,
+            n_outputs=n_outputs,
+            act_func=nn.ReLU,
+            dropout=mlp_dropout,
+            use_norm=False,
+        )
+
+    def _forward(
+        self, x: torch.Tensor, derived_tensors: Dict[str, torch.Tensor]
+    ) -> torch.Tensor:
+        x_embed = self.embed(x, derived_tensors)
+        output = self.linear(x_embed)
+        return output
