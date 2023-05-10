@@ -87,3 +87,47 @@ class Embedding(nn.Module):
         else:
             x_res = x_cont
         return x_res
+
+
+class Embedding1d(nn.Module):
+    def __init__(
+        self,
+        embedding_dim,
+        embed_dropout,
+        cat_num_unique,
+        run_cat,
+    ):
+        super(Embedding1d, self).__init__()
+        d_sqrt_inv = 1 / np.sqrt(embedding_dim)
+        if run_cat:
+            # See pytorch_widedeep.models.tabular.embeddings_layers.SameSizeCatEmbeddings
+            self.cat_embeds = nn.ModuleList(
+                [
+                    nn.Embedding(
+                        num_embeddings=num_unique + 1,
+                        embedding_dim=embedding_dim,
+                        padding_idx=0,
+                    )
+                    for num_unique in cat_num_unique
+                ]
+            )
+            for embed in self.cat_embeds:
+                nn.init.uniform_(
+                    embed.weight,
+                    a=-d_sqrt_inv,
+                    b=d_sqrt_inv,
+                )
+            self.cat_dropout = nn.Dropout(embed_dropout)
+            self.run_cat = True
+        else:
+            self.run_cat = False
+
+    def forward(self, x, derived_tensors):
+        x_res = x
+        if self.run_cat:
+            cat = derived_tensors["categorical"].long()
+            x_cat_embeds = [self.cat_embeds[i](cat[:, i]) for i in range(cat.size(1))]
+            x_cat = torch.cat(x_cat_embeds, 1)
+            x_cat = self.cat_dropout(x_cat)
+            x_res = torch.cat([x_res, x_cat], dim=1)
+        return x_res
