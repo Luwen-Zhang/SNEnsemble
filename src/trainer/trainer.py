@@ -1675,13 +1675,14 @@ class Trainer:
                 print(
                     f"----------------------------{i + 1}/{n_random} {type} cross validation----------------------------"
                 )
-            current_state = {
-                "trainer": cp(self),
-                "i_random": i,
-                "programs_predictions": programs_predictions,
-                "once_predictions": None,
-            }
-            func_save_state(current_state)
+            if not skip_program:
+                current_state = {
+                    "trainer": cp(self),
+                    "i_random": i,
+                    "programs_predictions": programs_predictions,
+                    "once_predictions": None,
+                }
+                func_save_state(current_state)
             with HiddenPrints(disable_std=not verbose):
                 set_random_seed(i)
                 set_data_handler()
