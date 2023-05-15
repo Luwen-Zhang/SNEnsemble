@@ -375,7 +375,7 @@ class SNTransformerLRNN(AbstractNN):
 
 
 class SNTransformerLRKMeansNN(AbstractNN):
-    def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
+    def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
         if n_outputs != 1:
             raise Exception("n_outputs > 1 is not supported.")
         super(SNTransformerLRKMeansNN, self).__init__(trainer)
@@ -388,7 +388,7 @@ class SNTransformerLRKMeansNN(AbstractNN):
             )
         )
         self.sn = KMeansSN(
-            n_clusters=5, n_input=len(self.cluster_features), layers=layers
+            n_clusters=n_clusters, n_input=len(self.cluster_features), layers=layers
         )
         self.transformer = FTTransformerNN(
             n_inputs=n_inputs,
@@ -453,7 +453,7 @@ class CategoryEmbeddingNN(AbstractNN):
 
 
 class SNCatEmbedLRKMeansNN(AbstractNN):
-    def __init__(self, n_inputs, n_outputs, layers, trainer, **kwargs):
+    def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
         if n_outputs != 1:
             raise Exception("n_outputs > 1 is not supported.")
         super(SNCatEmbedLRKMeansNN, self).__init__(trainer)
@@ -466,7 +466,7 @@ class SNCatEmbedLRKMeansNN(AbstractNN):
             )
         )
         self.sn = KMeansSN(
-            n_clusters=5, n_input=len(self.cluster_features), layers=layers
+            n_clusters=n_clusters, n_input=len(self.cluster_features), layers=layers
         )
         self.catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,

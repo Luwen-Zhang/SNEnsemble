@@ -61,7 +61,6 @@ class Transformer(TorchModel):
             "SNTransformer",
             "SNTransformerAug",
             "SNTransformerLR",
-            "SNTransformerLRKMeans",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -105,7 +104,7 @@ class Transformer(TorchModel):
                 seq_attn_heads=kwargs["seq_attn_heads"],
                 seq_attn_dropout=kwargs["seq_attn_dropout"],
             )
-        elif model_name in ["CategoryEmbedding", "SNCatEmbedLRKMeans"]:
+        elif model_name in ["CategoryEmbedding"]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
                 len(self.trainer.cont_feature_names),
@@ -120,6 +119,44 @@ class Transformer(TorchModel):
                 embedding_dim=kwargs["embedding_dim"],
                 embed_dropout=kwargs["embed_dropout"],
                 mlp_dropout=kwargs["mlp_dropout"],
+            )
+        elif model_name in ["SNCatEmbedLRKMeans"]:
+            cls = getattr(sys.modules[__name__], f"{model_name}NN")
+            return cls(
+                len(self.trainer.cont_feature_names),
+                len(self.trainer.label_name),
+                layers=self.trainer.args["layers"]
+                if self.layers is None
+                else self.layers,
+                trainer=self.trainer,
+                n_clusters=kwargs["n_clusters"],
+                cat_num_unique=[
+                    len(x) for x in self.trainer.cat_feature_mapping.values()
+                ],
+                embedding_dim=kwargs["embedding_dim"],
+                embed_dropout=kwargs["embed_dropout"],
+                mlp_dropout=kwargs["mlp_dropout"],
+            )
+        elif model_name in [
+            "SNTransformerLRKMeans",
+        ]:
+            cls = getattr(sys.modules[__name__], f"{model_name}NN")
+            return cls(
+                len(self.trainer.cont_feature_names),
+                len(self.trainer.label_name),
+                layers=self.trainer.args["layers"]
+                if self.layers is None
+                else self.layers,
+                trainer=self.trainer,
+                n_clusters=kwargs["n_clusters"],
+                cat_num_unique=[
+                    len(x) for x in self.trainer.cat_feature_mapping.values()
+                ],
+                embedding_dim=kwargs["embedding_dim"],
+                embed_dropout=kwargs["embed_dropout"],
+                attn_layers=kwargs["attn_layers"],
+                attn_heads=kwargs["attn_heads"],
+                attn_dropout=kwargs["attn_dropout"],
             )
 
     def _space(self, model_name):
@@ -139,10 +176,20 @@ class Transformer(TorchModel):
             "SNTransformer",
             "SNTransformerAug",
             "SNTransformerLR",
+        ]:
+            return [
+                Categorical(categories=[8, 16, 32], name="embedding_dim"),
+                Integer(low=2, high=6, prior="uniform", name="attn_layers", dtype=int),
+                Categorical(categories=[2, 4, 8], name="attn_heads"),
+                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
+            ] + self.trainer.SPACE
+        elif model_name in [
             "SNTransformerLRKMeans",
         ]:
             return [
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
+                Integer(low=2, high=16, prior="uniform", name="n_clusters", dtype=int),
                 Integer(low=2, high=6, prior="uniform", name="attn_layers", dtype=int),
                 Categorical(categories=[2, 4, 8], name="attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
@@ -166,10 +213,21 @@ class Transformer(TorchModel):
                 Categorical(categories=[2, 4, 8], name="seq_attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="seq_attn_dropout"),
             ] + self.trainer.SPACE
-        elif model_name in ["CategoryEmbedding", "SNCatEmbedLRKMeans"]:
+        elif model_name in ["CategoryEmbedding"]:
             return [
-                Categorical(categories=[8, 16, 32], name="embedding_dim"),
+                Integer(
+                    low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
+                ),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
+                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+            ] + self.trainer.SPACE
+        elif model_name in ["SNCatEmbedLRKMeans"]:
+            return [
+                Integer(
+                    low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
+                ),
+                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
+                Integer(low=2, high=16, prior="uniform", name="n_clusters", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
             ] + self.trainer.SPACE
 
@@ -191,10 +249,20 @@ class Transformer(TorchModel):
             "SNTransformer",
             "SNTransformerAug",
             "SNTransformerLR",
+        ]:
+            res = {
+                "embedding_dim": 32,
+                "attn_layers": 6,
+                "attn_heads": 8,
+                "embed_dropout": 0.1,
+                "attn_dropout": 0.1,
+            }
+        elif model_name in [
             "SNTransformerLRKMeans",
         ]:
             res = {
                 "embedding_dim": 32,
+                "n_clusters": 5,
                 "attn_layers": 6,
                 "attn_heads": 8,
                 "embed_dropout": 0.1,
@@ -217,11 +285,19 @@ class Transformer(TorchModel):
             }
         elif model_name in [
             "CategoryEmbedding",
+        ]:
+            res = {
+                "embedding_dim": 3,
+                "embed_dropout": 0.1,
+                "mlp_dropout": 0.0,
+            }
+        elif model_name in [
             "SNCatEmbedLRKMeans",
         ]:
             res = {
                 "embedding_dim": 3,
                 "embed_dropout": 0.1,
+                "n_clusters": 5,
                 "mlp_dropout": 0.0,
             }
         res.update(self.trainer.chosen_params)
