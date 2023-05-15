@@ -85,7 +85,7 @@ class LogLog(SNMarker):
 
 
 class SN(nn.Module):
-    def __init__(self, layers, *args, **kwargs):
+    def __init__(self, n_cluster_features, layers, *args, **kwargs):
         super(SN, self).__init__()
         self.sns = nn.ModuleList()
         for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
@@ -94,13 +94,13 @@ class SN(nn.Module):
         self.n_coeff_ls = [sn.n_coeff for sn in self.sns]
         self.coeff_head = get_sequential(
             layers=layers,
-            n_inputs=1,
+            n_inputs=1 + n_cluster_features,
             n_outputs=sum(self.n_coeff_ls) + len(self.n_coeff_ls),
             act_func=nn.ReLU,
         )
 
-    def forward(self, s, naive_pred):
-        coeffs_proj = self.coeff_head(naive_pred) + naive_pred
+    def forward(self, x, s, naive_pred):
+        coeffs_proj = self.coeff_head(torch.cat([x, naive_pred], dim=1)) + naive_pred
         sn_coeffs, sn_weights = coeffs_proj.split(
             [sum(self.n_coeff_ls), len(self.n_coeff_ls)], dim=1
         )
@@ -127,7 +127,7 @@ class SN(nn.Module):
 class _SNCluster(Cluster):
     def __init__(self, n_input, layers, momentum):
         super(_SNCluster, self).__init__(n_input, momentum=momentum)
-        self.sn = SN(layers)
+        self.sn = SN(n_input, layers)
 
 
 class KMeansSN(nn.Module):
@@ -149,7 +149,11 @@ class KMeansSN(nn.Module):
             for i_cluster, cluster in enumerate(self.kmeans.clusters):
                 idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
                 if len(idx_in_cluster) >= 2:
-                    pred = cluster.sn(s[idx_in_cluster], naive_pred[idx_in_cluster, :])
+                    pred = cluster.sn(
+                        x[idx_in_cluster, :],
+                        s[idx_in_cluster],
+                        naive_pred[idx_in_cluster, :],
+                    )
                     out[idx_in_cluster] = pred
         else:
             knn = self.kmeans.k_nearest_neighbors(k=self.k)
@@ -158,7 +162,9 @@ class KMeansSN(nn.Module):
                 if len(idx_in_cluster) >= 2:
                     preds = [
                         self.kmeans.clusters[i_nn_cluster].sn(
-                            s[idx_in_cluster], naive_pred[idx_in_cluster, :]
+                            x[idx_in_cluster],
+                            s[idx_in_cluster],
+                            naive_pred[idx_in_cluster, :],
                         )
                         for i_nn_cluster in chain([i_cluster], knn[i_cluster])
                     ]
