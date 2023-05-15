@@ -32,12 +32,11 @@ class SeqFTTransformer(FTTransformer):
             self.run = False
 
     def forward(self, x, derived_tensors):
-        device = "cpu" if x.get_device() == -1 else x.get_device()
+        device = torch.device(x.get_device())
         if self.run:
             seq = derived_tensors["Lay-up Sequence"].long()
             lens = derived_tensors["Number of Layers"].long()
             max_len = seq.size(1)
-            device = "cpu" if seq.get_device() == -1 else seq.get_device()
             # for the definition of padding_mask, see nn.MultiheadAttention.forward
             padding_mask = (
                 torch.arange(max_len, device=device).expand(len(lens), max_len) >= lens
