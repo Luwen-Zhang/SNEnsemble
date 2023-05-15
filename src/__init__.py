@@ -15,7 +15,7 @@ setting = dict(
     verbose_per_epoch=20,
     # To save memory, turn test_with_no_grad to True. However, this operation will make
     # some models that need gradients within the loss function invalid.
-    test_with_no_grad=False,
+    test_with_no_grad=True,
     # Debug mode might change behaviors of models. By default, epoch will be set to 2, n_calls to minimum, and
     # bayes_epoch to 1.
     debug_mode=False,
