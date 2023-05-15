@@ -45,11 +45,34 @@ class Trainer:
         project:
             The name of the trainer.
         """
-        self.device = device
+        self.device = "cpu"
+        self.set_device(device)
         self.project = project
         self.modelbases = []
         self.modelbases_names = []
         self.training = True
+
+    def set_device(self, device: str):
+        """
+        Set the device for model bases.
+
+        Parameters
+        ----------
+        device
+            "cpu" or "cuda"
+
+        Notes
+        ----------
+        Multi-GPU training and training on a machine with multiple GPUs are not tested.
+        """
+        if device not in ["cpu", "cuda"]:
+            raise Exception(
+                f"Device {device} is an invalid selection. Choose among {['cpu', 'cuda']}."
+                f"Note: Multi-GPU training and training on a machine with multiple GPUs are not tested."
+            )
+        self.device = device
+        for modelbase in self.modelbases:
+            modelbase.device = device
 
     def add_modelbases(self, models: List):
         """

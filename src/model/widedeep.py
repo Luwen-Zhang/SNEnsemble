@@ -280,7 +280,7 @@ class WideDeep(AbstractModel):
             optimizers={"deeptabular": optimizer}
             if self.trainer.args["bayes_opt"]
             else None,
-            device=self.trainer.device,
+            device="cpu" if self.trainer.device is "cpu" else "cuda",
             num_workers=0,
         )
         return wd_trainer
