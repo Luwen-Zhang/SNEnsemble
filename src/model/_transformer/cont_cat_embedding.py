@@ -22,15 +22,15 @@ class Embedding(nn.Module):
         if embed_cont:
             self.embedding_dim = embedding_dim
             self.cont_norm = nn.BatchNorm1d(n_inputs)
-            self.cont_embed_weight = nn.init.uniform_(
-                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)),
-                a=-d_sqrt_inv,
-                b=d_sqrt_inv,
+            self.cont_embed_weight = nn.Parameter(torch.Tensor(n_inputs, embedding_dim))
+            nn.init.normal_(
+                self.cont_embed_weight,
+                std=d_sqrt_inv,
             )
-            self.cont_embed_bias = nn.init.uniform_(
-                nn.Parameter(torch.Tensor(n_inputs, embedding_dim)),
-                a=-d_sqrt_inv,
-                b=d_sqrt_inv,
+            self.cont_embed_bias = nn.Parameter(torch.Tensor(n_inputs, embedding_dim))
+            nn.init.normal_(
+                self.cont_embed_bias,
+                std=d_sqrt_inv,
             )
             self.cont_dropout = nn.Dropout(embed_dropout)
         else:
@@ -55,10 +55,9 @@ class Embedding(nn.Module):
                 ]
             )
             for embed in self.cat_embeds:
-                nn.init.uniform_(
+                nn.init.normal_(
                     embed.weight,
-                    a=-d_sqrt_inv,
-                    b=d_sqrt_inv,
+                    std=d_sqrt_inv,
                 )
             self.cat_dropout = nn.Dropout(embed_dropout)
             self.run_cat = True
@@ -112,10 +111,9 @@ class Embedding1d(nn.Module):
                 ]
             )
             for embed in self.cat_embeds:
-                nn.init.uniform_(
+                nn.init.normal_(
                     embed.weight,
-                    a=-d_sqrt_inv,
-                    b=d_sqrt_inv,
+                    std=d_sqrt_inv,
                 )
             self.cat_dropout = nn.Dropout(embed_dropout)
             self.run_cat = True
