@@ -96,14 +96,14 @@ class AutoGluon(AbstractModel):
         train_data[label_name[0]] = y_train
         val_data = X_val.copy()
         val_data[label_name[0]] = y_val
-        with HiddenPrints():
+        with HiddenPrints(disable_std=not verbose, disable_logging=not verbose):
             model[1].fit(
                 train_data,
                 tuning_data=val_data,
                 presets="best_quality" if not in_bayes_opt else "medium_quality",
                 hyperparameter_tune_kwargs=None,
                 use_bag_holdout=True,
-                verbosity=0,
+                verbosity=5 if verbose else 0,
                 feature_generator=feature_generator,
                 hyperparameters={self._name_mapping[model[0]]: kwargs},
                 num_gpus=0 if self.device is "cpu" else "auto",
