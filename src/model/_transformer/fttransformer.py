@@ -284,6 +284,7 @@ class FTTransformer(nn.Module):
         n_outputs,
         use_torch_transformer=False,
         cls_token=True,
+        force_mean=False,
         **kwargs,
     ):
         super(FTTransformer, self).__init__()
@@ -296,6 +297,7 @@ class FTTransformer(nn.Module):
         # Also, dropout in MultiheadAttention improves performance.
         self.cls_token = cls_token
         # cls_token is used in pytorch_tabular but not in pytorch_widedeep.
+        self.force_mean = force_mean
         if cls_token:
             self.add_cls = AppendCLSToken(d_token=embedding_dim)
         if use_torch_transformer:
@@ -331,7 +333,9 @@ class FTTransformer(nn.Module):
         else:
             self.transformer_head = get_sequential(
                 ff_layers,
-                n_inputs * embedding_dim if not self.cls_token else embedding_dim,
+                n_inputs * embedding_dim
+                if not self.cls_token and not force_mean
+                else embedding_dim,
                 n_outputs,
                 nn.ReLU,
                 norm_type="layer",
@@ -344,6 +348,8 @@ class FTTransformer(nn.Module):
         x_trans = self.transformer(x)
         if self.cls_token:
             x_trans = x_trans[:, -1, :]
+        elif self.force_mean:
+            x_trans = x_trans.mean(1)
         else:
             x_trans = x_trans.flatten(1)
         x_trans = self.transformer_head(x_trans)
