@@ -21,7 +21,7 @@ class SeqFTTransformer(FTTransformer):
                 **kwargs,
             )
             self.embedding = nn.Embedding(
-                num_embeddings=191, embedding_dim=embedding_dim
+                num_embeddings=191, embedding_dim=embedding_dim, padding_idx=190
             )
             self.pos_encoding = PositionalEncoding(
                 d_model=embedding_dim, dropout=dropout
