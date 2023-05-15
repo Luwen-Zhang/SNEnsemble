@@ -46,11 +46,11 @@ class Trainer:
             The name of the trainer.
         """
         self.device = "cpu"
-        self.set_device(device)
         self.project = project
         self.modelbases = []
         self.modelbases_names = []
         self.training = True
+        self.set_device(device)
 
     def set_device(self, device: str):
         """
