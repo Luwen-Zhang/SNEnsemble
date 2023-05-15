@@ -158,6 +158,9 @@ class TransformerSeqNN(AbstractNN):
             n_outputs=n_outputs,
             run="Lay-up Sequence" in self.derived_feature_names
             and "Number of Layers" in self.derived_feature_names,
+            use_torch_transformer=True,
+            cls_token=False,
+            force_mean=True,
         )
 
         if self.seq_transformer.run or n_outputs != 1:
@@ -452,6 +455,74 @@ class CategoryEmbeddingNN(AbstractNN):
         return output
 
 
+class CatEmbedSeqNN(AbstractNN):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        cat_num_unique: List[int] = None,
+        embedding_dim=32,
+        embed_dropout=0.1,
+        mlp_dropout=0.0,
+        seq_embedding_dim=16,
+        attn_ff_dim=256,
+        seq_attn_layers=4,
+        seq_attn_heads=8,
+        seq_attn_dropout=0.1,
+    ):
+        super(CatEmbedSeqNN, self).__init__(trainer)
+        self.catembed = CategoryEmbeddingNN(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            cat_num_unique=cat_num_unique,
+            embedding_dim=embedding_dim,
+            embed_dropout=embed_dropout,
+            mlp_dropout=mlp_dropout,
+        )
+
+        self.seq_transformer = SeqFTTransformer(
+            n_inputs=None,  # not needed
+            attn_heads=seq_attn_heads,
+            attn_layers=seq_attn_layers,
+            embedding_dim=seq_embedding_dim,
+            ff_dim=attn_ff_dim,
+            ff_layers=layers,
+            dropout=seq_attn_dropout,
+            n_outputs=n_outputs,
+            run="Lay-up Sequence" in self.derived_feature_names
+            and "Number of Layers" in self.derived_feature_names,
+            use_torch_transformer=True,
+            cls_token=False,
+            force_mean=True,
+        )
+
+        if self.seq_transformer.run or n_outputs != 1:
+            self.w = get_sequential(
+                layers,
+                (1 + int(self.seq_transformer.run)) * n_outputs,
+                n_outputs,
+                nn.ReLU,
+                norm_type="layer",
+            )
+        else:
+            self.w = nn.Identity()
+
+    def _forward(self, x, derived_tensors):
+        x_catembed = self.catembed(x, derived_tensors)
+        all_res = [x_catembed]
+
+        x_seq = self.seq_transformer(x, derived_tensors)
+        if self.seq_transformer.run:
+            all_res += [x_seq]
+
+        output = torch.concat(all_res, dim=1)
+        output = self.w(output)
+        return output
+
+
 class SNCatEmbedLRKMeansNN(AbstractNN):
     def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
         if n_outputs != 1:
@@ -471,6 +542,47 @@ class SNCatEmbedLRKMeansNN(AbstractNN):
         self.catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,
             n_outputs=1,
+            trainer=trainer,
+            **kwargs,
+        )
+        self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
+        self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
+
+    def _forward(self, x, derived_tensors):
+        self.s_original = x[:, self.s_idx].clone()
+        x[:, self.s_idx] = self.s_original  # enable gradient wrt a single column
+        naive_pred = self.catembed(x, derived_tensors)
+        self._naive_pred = naive_pred
+        s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
+        x_out = self.sn(x[:, self.cluster_features], s_wo_bias, naive_pred)
+        return x_out
+
+    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+        loss = self.default_loss_fn(y_pred, y_true)
+        loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
+        return loss
+
+
+class SNCatEmbedLRKMeansSeqNN(AbstractNN):
+    def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
+        if n_outputs != 1:
+            raise Exception("n_outputs > 1 is not supported.")
+        super(SNCatEmbedLRKMeansSeqNN, self).__init__(trainer)
+        from .sn_lr_kmeans import KMeansSN
+
+        self.cluster_features = np.concatenate(
+            (
+                trainer.get_feature_idx_by_type(typ="Material"),
+                [trainer.cont_feature_names.index(x) for x in ["Frequency", "R-value"]],
+            )
+        )
+        self.sn = KMeansSN(
+            n_clusters=n_clusters, n_input=len(self.cluster_features), layers=layers
+        )
+        self.catembed = CatEmbedSeqNN(
+            n_inputs=n_inputs,
+            n_outputs=1,
+            layers=layers,
             trainer=trainer,
             **kwargs,
         )
