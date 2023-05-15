@@ -108,9 +108,10 @@ class AutoGluon(AbstractModel):
                 hyperparameters={self._name_mapping[model[0]]: kwargs},
                 num_gpus=0 if self.device is "cpu" else "auto",
             )
-        model[1].persist_models()
-        if os.path.exists(os.path.join(self.root, model[0])):
-            shutil.rmtree(os.path.join(self.root, model[0]))
+        if not in_bayes_opt:
+            model[1].persist_models(max_memory=None)
+            if os.path.exists(os.path.join(self.root, model[0])):
+                shutil.rmtree(os.path.join(self.root, model[0]))
         tc.enable_tqdm()
         warnings.simplefilter(action="default")
 
