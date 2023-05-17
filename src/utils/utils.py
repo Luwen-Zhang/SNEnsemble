@@ -25,6 +25,7 @@ import itertools
 from copy import deepcopy as cp
 from torch.autograd.grad_mode import _DecoratorContextManager
 from typing import Any
+from .collate import fix_collate_fn
 
 clr = sns.color_palette("deep")
 sns.reset_defaults()
@@ -61,7 +62,7 @@ def r2_loss(output, target):
 
 
 def set_random_seed(seed=0):
-    set_torch_random(seed)
+    set_torch(seed)
     np.random.seed(seed)
     random.seed(seed)
 
@@ -72,7 +73,7 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 
-def set_torch_random(seed=0):
+def set_torch(seed=0):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -89,6 +90,8 @@ def set_torch_random(seed=0):
         # https://pytorch.org/docs/stable/notes/randomness.html
         # https://github.com/pytorch/pytorch/issues/43672
         dl.__init__ = partialmethod(dl.__init__, worker_init_fn=seed_worker)
+
+    torch.utils.data._utils.collate.default_collate = fix_collate_fn
 
 
 def metric_sklearn(y_true, y_pred, metric):
