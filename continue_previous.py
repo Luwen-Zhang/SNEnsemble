@@ -2,7 +2,6 @@ import argparse
 from src.trainer import load_trainer
 import os
 from src.utils import Logging
-import faulthandler
 
 parser = argparse.ArgumentParser()
 parser.add_argument("path", type=str)
@@ -20,7 +19,5 @@ if not os.path.isfile(path):
 trainer = load_trainer(path)
 log = Logging()
 log.enter(os.path.join(trainer.project_root, "log.txt"))
-faulthandler.enable(open(os.path.join(trainer.project_root, "fault_log.txt"), "a"))
 trainer.get_leaderboard(cross_validation=cross_validation, load_from_previous=True)
-faulthandler.disable()
 log.exit()
