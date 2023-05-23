@@ -296,9 +296,9 @@ class GMM(nn.Module):
             return sort_dist[:, 1 : k + 1]
 
     def check_size(self, x: torch.Tensor):
-        if len(x.shape) != 2 or x.shape[-1] != self.n_input:
+        if len(x.shape) != 2 or x.shape[-1] != self.n_features:
             raise Exception(
-                f"Invalid input. Required shape: (n,{self.n_input}), got {x.shape} instead."
+                f"Invalid input. Required shape: (n,{self.n_features}), got {x.shape} instead."
             )
 
     def fit(self, x: torch.Tensor, n_iter: int = 100):
