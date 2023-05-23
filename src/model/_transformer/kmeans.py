@@ -14,7 +14,7 @@ import warnings
 class Cluster(nn.Module):
     def __init__(self, n_input: int, momentum: float = 0.8):
         super(Cluster, self).__init__()
-        self.register_buffer("center", torch.randn(1, n_input))
+        self.register_buffer("center", torch.zeros(1, n_input))
         self.momentum = momentum
 
     def update(self, new_center, momentum=None):
@@ -63,6 +63,11 @@ class KMeans(nn.Module):
             # https://github.com/DeMoriarty/fast_pytorch_kmeans/blob/master/fast_pytorch_kmeans/init_methods.py
             # In summary, this method calculates the distance value to the closest centroid for each data point, and
             # data points with higher values are more likely to be selected as the next centroid.
+            x = x[
+                torch.randint(
+                    0, int(x.shape[0]), [min(100000, x.shape[0])], device=x.device
+                )
+            ]
             centers = torch.zeros((self.n_clusters, x.shape[1])).to(x.device)
             r = torch.distributions.uniform.Uniform(0, 1)
             for i in range(self.n_clusters):
