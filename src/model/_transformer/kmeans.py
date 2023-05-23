@@ -33,6 +33,8 @@ class KMeans(nn.Module):
         n_input: int,
         clusters: List[Cluster] = None,
         momentum: float = 0.8,
+        method: str = "fast_kmeans",
+        init_method: str = "kmeans++",
     ):
         super(KMeans, self).__init__()
         self.n_clusters = n_clusters
@@ -42,23 +44,23 @@ class KMeans(nn.Module):
             if clusters is None
             else clusters
         )
-        self.method = "fast_kmeans"
+        self.method = method
         self.initialized = False
-        self.initialize_method = "kmeans++"
+        self.init_method = init_method
         self.register_buffer(
             "accum_n_points_in_clusters",
             torch.ones(self.n_clusters, dtype=torch.float32),
         )
 
-    def initialize(self, x: torch.Tensor, method="kmeans++"):
+    def initialize(self, x: torch.Tensor):
         if x.shape[0] < self.n_clusters:
             warnings.warn(
                 f"The batch size {x.shape[0]} is smaller than the number of clusters {self.n_clusters}. Centers "
                 f"of clusters are initialized randomly using torch.randn."
             )
-        if method == "random":
+        if self.init_method == "random":
             centers = x[torch.randperm(x.shape[0])[: self.n_clusters]]
-        elif method == "kmeans++":
+        elif self.init_method == "kmeans++":
             # Reference:
             # https://github.com/DeMoriarty/fast_pytorch_kmeans/blob/master/fast_pytorch_kmeans/init_methods.py
             # In summary, this method calculates the distance value to the closest centroid for each data point, and
@@ -90,7 +92,9 @@ class KMeans(nn.Module):
                         torch.searchsorted(cumprobs, r.sample([1]).to(x.device))
                     ]
         else:
-            raise Exception(f"Initialization method {method} is not implemented.")
+            raise Exception(
+                f"Initialization method {self.init_method} is not implemented."
+            )
         for i_cluster, cluster in enumerate(self.clusters):
             cluster.set(centers[i_cluster, :].view(1, -1))
         self.initialized = True
@@ -98,7 +102,7 @@ class KMeans(nn.Module):
     def forward(self, x: torch.Tensor):
         x = x.float()
         if not self.initialized and self.training:
-            self.initialize(x, method=self.initialize_method)
+            self.initialize(x)
         dist = self.euclidean_pairwise_dist(x)
         x_cluster = torch.argmin(dist, dim=1)
         if self.training:
@@ -154,3 +158,21 @@ class KMeans(nn.Module):
             return sort_dist[:, 1:]
         else:
             return sort_dist[:, 1 : k + 1]
+
+    def check_size(self, x: torch.Tensor):
+        if len(x.shape) != 2 or x.shape[-1] != self.n_input:
+            raise Exception(
+                f"Invalid input. Required shape: (n,{self.n_input}), got {x.shape} instead."
+            )
+
+    def fit(self, x: torch.Tensor, n_iter: int = 100):
+        self.check_size(x)
+        self.train()
+        for i in range(n_iter):
+            self(x)
+        return self
+
+    def predict(self, x: torch.Tensor):
+        self.check_size(x)
+        self.eval()
+        return self(x)
