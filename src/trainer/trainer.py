@@ -366,7 +366,7 @@ class Trainer:
             else os.path.join(project_root_subfolder, self.project)
         )
         t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-        folder_name = t + "-0" + "_" + self.configfile
+        folder_name = t + "-0" + "_" + os.path.split(self.configfile)[-1]
         if not os.path.exists(os.path.join("output", subfolder)):
             os.mkdir(os.path.join("output", subfolder))
         self.set_path(
