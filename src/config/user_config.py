@@ -4,11 +4,12 @@ import os.path
 import importlib.machinery
 import types
 from src.utils import pretty
+from .default import cfg as default_cfg
 
 
 class UserConfig:
     def __init__(self, path: str = None):
-        self.cfg = self.from_file("default")
+        self.cfg = default_cfg
         self.defaults = self.cfg.copy()
         if path is not None:
             self.merge_config(self.from_file(path))
