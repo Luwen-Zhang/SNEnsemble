@@ -164,11 +164,13 @@ class GMM(nn.Module):
             # Estimate weights.
             labels = kmeans.predict(x)
             _, counts = labels.unique(return_counts=True)
+            counts = counts.float() + 1e-12
             pi[0, 0, :] = counts / x.shape[0]
-            # Estimate variance.
+            # Estimate variance and means.
             for k in range(self.n_components):
                 resp = torch.zeros((x.shape[0],), device=x.device)
                 resp[torch.where(labels == k)[0]] = 1
+                centers[k, :] = torch.matmul(resp, x) / counts[k]
                 diff = x - centers[k, :]
                 var[0, k, :, :] = torch.matmul(resp * diff.t(), diff) / counts[
                     k
@@ -220,7 +222,7 @@ class GMM(nn.Module):
         mu = self.mu
         var = self.var
         x = self.modify_size(x)
-        precision = torch.inverse(var)
+        precision = torch.inverse(var.to(torch.float64)).to(x.dtype)
         d = x.shape[-1]
 
         log_2pi = d * np.log(2.0 * pi)
