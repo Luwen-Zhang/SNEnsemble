@@ -9,6 +9,7 @@ from typing import List
 import warnings
 from math import pi
 from .kmeans import KMeans
+from .clustering import AbstractCluster, AbstractClustering
 
 
 def calculate_matmul_n_times(n_components, mat_a, mat_b):
@@ -41,13 +42,12 @@ def calculate_matmul(mat_a, mat_b):
     return torch.sum(mat_a.squeeze(-2) * mat_b.squeeze(-1), dim=2, keepdim=True)
 
 
-class Cluster(nn.Module):
+class Cluster(AbstractCluster):
     def __init__(self, n_input: int, momentum: float = 0.8):
-        super(Cluster, self).__init__()
+        super(Cluster, self).__init__(n_input=n_input, momentum=momentum)
         self.register_buffer("mu", torch.randn(1, n_input))
         self.register_buffer("var", torch.randn(1, n_input, n_input))
         self.register_buffer("pi", torch.zeros(1, 1))
-        self.momentum = momentum
 
     def update(self, mu=None, var=None, pi=None, momentum=None):
         momentum = self.momentum if momentum is None else momentum
@@ -67,29 +67,27 @@ class Cluster(nn.Module):
             self.pi = pi
 
 
-class GMM(nn.Module):
+class GMM(AbstractClustering):
     def __init__(
         self,
         n_clusters: int,
         n_input: int,
         clusters: List[Cluster] = None,
         momentum: float = 0.8,
-        init_method: str = "kmeans++",
+        init_method: str = "kmeans",
     ):
-        super(GMM, self).__init__()
-        self.n_components = n_clusters
-        self.n_features = n_input
-        self.clusters = nn.ModuleList(
-            [Cluster(n_input=n_input, momentum=momentum) for i in range(n_clusters)]
-            if clusters is None
-            else clusters
+        super(GMM, self).__init__(
+            n_clusters=n_clusters,
+            n_input=n_input,
+            cluster_class=Cluster,
+            clusters=clusters,
+            momentum=momentum,
         )
-        self.initialized = False
         self.init_method = init_method
         self.eps = 1e-6
         self.register_buffer(
             "accum_n_points_in_clusters",
-            torch.ones(self.n_components, dtype=torch.float32),
+            torch.ones(self.n_clusters, dtype=torch.float32),
         )
 
     def forward(self, x: torch.Tensor):
@@ -111,7 +109,7 @@ class GMM(nn.Module):
                 pi = torch.sum(resp, dim=0, keepdim=True) + self.eps
                 mu = torch.sum(resp * x, dim=0, keepdim=True) / pi
 
-                eps = torch.eye(self.n_features, device=x.device) * self.eps
+                eps = torch.eye(self.n_input, device=x.device) * self.eps
                 var = (
                     torch.sum(
                         (x - mu).unsqueeze(-1).matmul((x - mu).unsqueeze(-2))
@@ -137,24 +135,24 @@ class GMM(nn.Module):
         return x_cluster
 
     def initialize(self, x: torch.Tensor):
-        if x.shape[0] < self.n_components:
+        if x.shape[0] < self.n_clusters:
             warnings.warn(
-                f"The batch size {x.shape[0]} is smaller than the number of clusters {self.n_components}. Centers "
+                f"The batch size {x.shape[0]} is smaller than the number of clusters {self.n_clusters}. Centers "
                 f"of clusters are initialized randomly using torch.randn."
             )
         pi = (
-            torch.ones((1, 1, self.n_components), requires_grad=False, device=x.device)
-            / self.n_components
+            torch.ones((1, 1, self.n_clusters), requires_grad=False, device=x.device)
+            / self.n_clusters
         )
         var = (
-            torch.eye(self.n_features, requires_grad=False, device=x.device)
-            .reshape(1, 1, self.n_features, self.n_features)
-            .repeat(1, self.n_components, 1, 1)
+            torch.eye(self.n_input, requires_grad=False, device=x.device)
+            .reshape(1, 1, self.n_input, self.n_input)
+            .repeat(1, self.n_clusters, 1, 1)
         )
         if self.init_method == "random":
-            centers = x[torch.randperm(x.shape[0])[: self.n_components]]
+            centers = x[torch.randperm(x.shape[0])[: self.n_clusters]]
         elif self.init_method == "kmeans":
-            kmeans = KMeans(n_clusters=self.n_components, n_input=self.n_features).to(
+            kmeans = KMeans(n_clusters=self.n_clusters, n_input=self.n_input).to(
                 x.device
             )
             kmeans.fit(x, n_iter=10)
@@ -167,14 +165,14 @@ class GMM(nn.Module):
             counts = counts.float() + 1e-12
             pi[0, 0, :] = counts / x.shape[0]
             # Estimate variance and means.
-            for k in range(self.n_components):
+            for k in range(self.n_clusters):
                 resp = torch.zeros((x.shape[0],), device=x.device)
                 resp[torch.where(labels == k)[0]] = 1
                 centers[k, :] = torch.matmul(resp, x) / counts[k]
                 diff = x - centers[k, :]
                 var[0, k, :, :] = torch.matmul(resp * diff.t(), diff) / counts[
                     k
-                ] + self.eps * torch.eye(self.n_features, device=x.device)
+                ] + self.eps * torch.eye(self.n_input, device=x.device)
         else:
             raise Exception(
                 f"Initialization method {self.init_method} is not implemented."
@@ -232,9 +230,7 @@ class GMM(nn.Module):
         x_mu_T = (x - mu).unsqueeze(-2)
         x_mu = (x - mu).unsqueeze(-1)
 
-        x_mu_T_precision = calculate_matmul_n_times(
-            self.n_components, x_mu_T, precision
-        )
+        x_mu_T_precision = calculate_matmul_n_times(self.n_clusters, x_mu_T, precision)
         x_mu_T_precision_x_mu = calculate_matmul(x_mu_T_precision, x_mu)
 
         return -0.5 * (log_2pi - log_det + x_mu_T_precision_x_mu)
@@ -245,9 +241,9 @@ class GMM(nn.Module):
         args:
             var:            torch.Tensor (1, k, d, d)
         """
-        log_det = torch.empty(size=(self.n_components,)).to(var.device)
+        log_det = torch.empty(size=(self.n_clusters,)).to(var.device)
 
-        for k in range(self.n_components):
+        for k in range(self.n_clusters):
             log_det[k] = (
                 2 * torch.log(torch.diagonal(torch.linalg.cholesky(var[0, k]))).sum()
             )
@@ -274,41 +270,3 @@ class GMM(nn.Module):
             return per_sample_score.mean()
         else:
             return torch.squeeze(per_sample_score)
-
-    def euclidean_pairwise_dist(self, x: torch.Tensor):
-        dist = torch.pow((x.unsqueeze(dim=1) - self.centers.unsqueeze(dim=0)), 2)
-        dist = dist.sum(dim=-1)
-        return dist
-
-    def k_nearest_neighbors(self, k: int):
-        if len(self.clusters) == 1:
-            return torch.zeros(self.n_components, 0)
-        if k >= self.n_components:
-            raise Exception(
-                f"The requested number of neighbors {k} is greater than the total number of "
-                f"neighbors {self.n_components-1}."
-            )
-        dist = self.euclidean_pairwise_dist(self.centers)
-        sort_dist = torch.argsort(dist, dim=-1)
-        if k + 1 == self.n_components:
-            return sort_dist[:, 1:]
-        else:
-            return sort_dist[:, 1 : k + 1]
-
-    def check_size(self, x: torch.Tensor):
-        if len(x.shape) != 2 or x.shape[-1] != self.n_features:
-            raise Exception(
-                f"Invalid input. Required shape: (n,{self.n_features}), got {x.shape} instead."
-            )
-
-    def fit(self, x: torch.Tensor, n_iter: int = 100):
-        self.check_size(x)
-        self.train()
-        for i in range(n_iter):
-            self(x)
-        return self
-
-    def predict(self, x: torch.Tensor):
-        self.check_size(x)
-        self.eval()
-        return self(x)
