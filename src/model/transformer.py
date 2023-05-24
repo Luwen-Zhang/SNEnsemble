@@ -1,8 +1,10 @@
 import src
 from src.utils import *
 from skopt.space import Integer, Categorical, Real
-from src.model import TorchModel, AbstractNN
-from ._transformer.models import *
+from src.model import TorchModel
+from ._transformer.models_clustering import *
+from ._transformer.models_with_seq import *
+from ._transformer.models_basic import *
 
 
 class Transformer(TorchModel):
@@ -26,10 +28,6 @@ class Transformer(TorchModel):
             "FTTransformer",
             "TransformerLSTM",
             "TransformerSeq",
-            # "SNTransformer",
-            # "SNTransformerSeq",
-            # "SNTransformerAug",
-            # "SNTransformerLR",
             "SNTransformerLRKMeans",
             "CategoryEmbedding",
             "CatEmbedSeq",
@@ -61,9 +59,6 @@ class Transformer(TorchModel):
             )
         elif model_name in [
             "FTTransformer",
-            "SNTransformer",
-            "SNTransformerAug",
-            "SNTransformerLR",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -84,7 +79,6 @@ class Transformer(TorchModel):
             )
         elif model_name in [
             "TransformerSeq",
-            "SNTransformerSeq",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -217,9 +211,6 @@ class Transformer(TorchModel):
             ] + self.trainer.SPACE
         elif model_name in [
             "FTTransformer",
-            "SNTransformer",
-            "SNTransformerAug",
-            "SNTransformerLR",
         ]:
             return [
                 Categorical(categories=[8, 16, 32], name="embedding_dim"),
@@ -241,7 +232,6 @@ class Transformer(TorchModel):
             ] + self.trainer.SPACE
         elif model_name in [
             "TransformerSeq",
-            "SNTransformerSeq",
         ]:
             return [
                 # ``seq_embedding_dim`` should be able to divided by ``attn_heads``.
@@ -319,9 +309,6 @@ class Transformer(TorchModel):
             }
         elif model_name in [
             "FTTransformer",
-            "SNTransformer",
-            "SNTransformerAug",
-            "SNTransformerLR",
         ]:
             res = {
                 "embedding_dim": 32,
@@ -343,7 +330,6 @@ class Transformer(TorchModel):
             }
         elif model_name in [
             "TransformerSeq",
-            "SNTransformerSeq",
         ]:
             res = {
                 "seq_embedding_dim": 16,
@@ -401,14 +387,7 @@ class Transformer(TorchModel):
 
     def _conditional_validity(self, model_name: str) -> bool:
         if (
-            model_name
-            in [
-                "SNTransformerSeq",
-                "SNTransformer",
-                "SNTransformerAug",
-                "SNTransformerLR",
-                "SNTransformerLRKMeans",
-            ]
+            model_name in ["SNTransformerLRKMeans"]
             and "Relative Mean Stress" not in self.trainer.cont_feature_names
         ):
             return False
