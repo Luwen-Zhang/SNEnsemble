@@ -275,3 +275,76 @@ class GMM(AbstractClustering):
             return per_sample_score.mean()
         else:
             return torch.squeeze(per_sample_score)
+
+
+class TwolayerGMMCluster(Cluster):
+    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
+        super(TwolayerGMMCluster, self).__init__(n_input=n_input, momentum=momentum)
+        self.inner_layer = GMM(momentum=momentum, n_input=n_input, **kwargs)
+
+
+class TwolayerGMM(GMM):
+    def __init__(
+        self,
+        n_clusters: int,
+        n_input_1: int,
+        n_input_2: int,
+        input_1_idx: List[int],
+        input_2_idx: List[int],
+        clusters: List[Cluster] = None,
+        momentum: float = 0.8,
+        n_clusters_per_cluster: int = 5,
+        **kwargs,
+    ):
+        if (
+            clusters is not None
+            and len(clusters) != n_clusters * n_clusters_per_cluster
+        ):
+            raise Exception(
+                f"{n_clusters*n_clusters_per_cluster} clusters is required. Got {len(clusters)} instead."
+            )
+        second_layer_clusters = [
+            TwolayerGMMCluster(
+                n_input=n_input_2,
+                momentum=momentum,
+                n_clusters=n_clusters_per_cluster,
+                clusters=clusters[
+                    i * n_clusters_per_cluster : (i + 1) * n_clusters_per_cluster
+                ]
+                if clusters is not None
+                else None,
+                **kwargs,
+            )
+            for i in range(n_clusters)
+        ]
+        self.n_total_clusters = n_clusters * n_clusters_per_cluster
+        self.n_clusters_per_cluster = n_clusters_per_cluster
+        self.input_1_idx = input_1_idx
+        self.input_2_idx = input_2_idx
+        super(TwolayerGMM, self).__init__(
+            n_clusters=self.n_total_clusters,
+            n_input=len(np.union1d(input_1_idx, input_2_idx)),
+            momentum=momentum,
+            clusters=clusters,
+        )
+        self.first_clustering = GMM(
+            n_clusters=n_clusters,
+            n_input=n_input_1,
+            momentum=momentum,
+            clusters=second_layer_clusters,
+            **kwargs,
+        )
+
+    def forward(self, x: torch.Tensor):
+        outer_cluster = self.first_clustering(x[:, self.input_1_idx])
+        x_cluster = torch.zeros((x.shape[0],), device=x.device).long()
+        for i in range(self.first_clustering.n_clusters):
+            where_in_cluster = torch.where(outer_cluster == i)[0]
+            inner_cluster = (
+                self.first_clustering.clusters[i].inner_layer(
+                    x[where_in_cluster, :][:, self.input_2_idx]
+                )
+                + i * self.n_clusters_per_cluster
+            )
+            x_cluster[where_in_cluster] = inner_cluster
+        return x_cluster

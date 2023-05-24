@@ -132,48 +132,25 @@ class AbstractSNClustering(nn.Module):
         n_input: int,
         layers,
         algorithm_class: Type[AbstractClustering],
-        cluster_class: Type[AbstractCluster],
     ):
         super(AbstractSNClustering, self).__init__()
         self.n_clusters = n_clusters
-        self.sns = [
-            cluster_class(n_input=n_input, layers=layers, momentum=0.1)
-            for i in range(n_clusters)
-        ]
-        self.clustering = algorithm_class(
-            n_clusters=n_clusters, n_input=n_input, clusters=self.sns
+        self.clustering = algorithm_class(n_clusters=n_clusters, n_input=n_input)
+        self.sns = nn.ModuleList(
+            [SN(n_cluster_features=n_input, layers=layers) for i in range(n_clusters)]
         )
-        self.knn = False
-        self.k = int(np.sqrt(n_clusters))
 
     def forward(self, x, s, naive_pred):
         x_cluster = self.clustering(x)
         out = naive_pred.clone()
-        if not self.knn or self.n_clusters == 1:
-            for i_cluster, cluster in enumerate(self.clustering.clusters):
-                idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
-                if len(idx_in_cluster) >= 2:
-                    pred = cluster.sn(
-                        x[idx_in_cluster, :],
-                        s[idx_in_cluster],
-                        naive_pred[idx_in_cluster, :],
-                    )
-                    out[idx_in_cluster] = pred
-        else:
-            knn = self.clustering.k_nearest_neighbors(k=self.k)
-            for i_cluster, cluster in enumerate(self.clustering.clusters):
-                idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
-                if len(idx_in_cluster) >= 2:
-                    preds = [
-                        self.clustering.clusters[i_nn_cluster].sn(
-                            x[idx_in_cluster],
-                            s[idx_in_cluster],
-                            naive_pred[idx_in_cluster, :],
-                        )
-                        for i_nn_cluster in chain([i_cluster], knn[i_cluster])
-                    ]
-                    out[idx_in_cluster] = torch.mean(
-                        torch.concat(preds, dim=1), dim=1, keepdim=True
-                    )
+        for i_cluster in range(self.n_clusters):
+            idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
+            if len(idx_in_cluster) >= 2:
+                pred = self.sns[i_cluster](
+                    x[idx_in_cluster, :],
+                    s[idx_in_cluster],
+                    naive_pred[idx_in_cluster, :],
+                )
+                out[idx_in_cluster] = pred
 
         return out
