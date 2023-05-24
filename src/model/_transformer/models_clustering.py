@@ -2,8 +2,7 @@ from .models_basic import CategoryEmbeddingNN, FTTransformerNN
 from .models_with_seq import CatEmbedSeqNN
 from ..base import get_sequential, AbstractNN
 import numpy as np
-from .clustering.sn_kmeans import KMeansSN
-from .clustering.sn_gmm import GMMSN
+from .clustering.singlelayer import KMeansSN, GMMSN
 
 
 class AbstractClusteringModel(AbstractNN):
