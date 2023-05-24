@@ -12,8 +12,8 @@ from .base import AbstractClustering, AbstractCluster
 
 
 class Cluster(AbstractCluster):
-    def __init__(self, n_input: int, momentum: float = 0.8):
-        super(Cluster, self).__init__(n_input=n_input, momentum=momentum)
+    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
+        super(Cluster, self).__init__(n_input=n_input, momentum=momentum, **kwargs)
         self.register_buffer("center", torch.zeros(1, n_input))
 
     def update(self, new_center, momentum=None):

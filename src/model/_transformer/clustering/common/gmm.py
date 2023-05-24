@@ -43,8 +43,8 @@ def calculate_matmul(mat_a, mat_b):
 
 
 class Cluster(AbstractCluster):
-    def __init__(self, n_input: int, momentum: float = 0.8):
-        super(Cluster, self).__init__(n_input=n_input, momentum=momentum)
+    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
+        super(Cluster, self).__init__(n_input=n_input, momentum=momentum, **kwargs)
         self.register_buffer("mu", torch.randn(1, n_input))
         self.register_buffer("var", torch.randn(1, n_input, n_input))
         self.register_buffer("pi", torch.zeros(1, 1))

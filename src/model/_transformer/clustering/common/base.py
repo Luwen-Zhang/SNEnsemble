@@ -4,7 +4,7 @@ from typing import List, Type
 
 
 class AbstractCluster(nn.Module):
-    def __init__(self, n_input: int, momentum: float = 0.8):
+    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
         super(AbstractCluster, self).__init__()
         self.momentum = momentum
 

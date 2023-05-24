@@ -7,6 +7,8 @@ import torch.nn.functional as F
 import numpy as np
 from src.model.base import get_sequential
 from itertools import chain
+from .common.base import AbstractClustering, AbstractCluster
+from typing import Type
 
 
 class SNMarker(nn.Module):
@@ -123,11 +125,16 @@ class SN(nn.Module):
         return x_sn
 
 
-class AbstractSNCluster(nn.Module):
+class AbstractSNClustering(nn.Module):
     def __init__(
-        self, n_clusters: int, n_input: int, layers, algorithm_class, cluster_class
+        self,
+        n_clusters: int,
+        n_input: int,
+        layers,
+        algorithm_class: Type[AbstractClustering],
+        cluster_class: Type[AbstractCluster],
     ):
-        super(AbstractSNCluster, self).__init__()
+        super(AbstractSNClustering, self).__init__()
         self.n_clusters = n_clusters
         self.sns = [
             cluster_class(n_input=n_input, layers=layers, momentum=0.1)
