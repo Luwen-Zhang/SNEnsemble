@@ -1,8 +1,8 @@
-from ..base import get_sequential, AbstractNN
+from ..base import get_sequential
 from typing import List, Union
 from .models_basic import CategoryEmbeddingNN, FTTransformerNN
-from .lstm import LSTM
-from .seq_fttransformer import SeqFTTransformer
+from .common.lstm import LSTM
+from .common.seq_fttransformer import SeqFTTransformer
 import torch
 from torch import nn
 from ..base import AbstractNN

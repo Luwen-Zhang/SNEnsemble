@@ -1,7 +1,7 @@
 from .fttransformer import PositionalEncoding, FTTransformer
 import torch
 from torch import nn
-from . import manual_activate
+from src.model._transformer import manual_activate
 
 
 class SeqFTTransformer(FTTransformer):

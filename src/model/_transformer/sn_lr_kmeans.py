@@ -1,4 +1,4 @@
-from .kmeans import Cluster, KMeans
+from .clustering.kmeans import Cluster, KMeans
 from .sn_lr_cluster import SN, AbstractSNCluster
 
 

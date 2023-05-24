@@ -1,4 +1,4 @@
-from .gmm import Cluster, GMM
+from .clustering.gmm import Cluster, GMM
 from .sn_lr_cluster import SN, AbstractSNCluster
 
 

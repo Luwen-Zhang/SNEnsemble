@@ -1,7 +1,7 @@
 from typing import List, Dict
 from ..base import get_sequential, AbstractNN
-from .cont_cat_embedding import Embedding, Embedding1d
-from .fttransformer import FTTransformer
+from .common.cont_cat_embedding import Embedding, Embedding1d
+from .common.fttransformer import FTTransformer
 import torch
 from torch import nn
 
