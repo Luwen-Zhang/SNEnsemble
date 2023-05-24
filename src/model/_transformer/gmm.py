@@ -95,12 +95,16 @@ class GMM(AbstractClustering):
         if not self.initialized and self.training:
             self.initialize(x)
         x = self.modify_size(x)
+        # Calculate the probability that the ith sample belongs to the kth gaussian.
+        # Note that the denominator in the bayesian theorem `log_prob_norm` (a constant) is not included.
         weighted_log_prob = self._estimate_log_prob(x) + torch.log(self.pi)
         x_cluster = torch.argmax(weighted_log_prob, dim=1).squeeze(-1)
         if self.training:
             with torch.no_grad():
                 # E step
+                # Calculate the denominator in the bayesian theorem
                 log_prob_norm = torch.logsumexp(weighted_log_prob, dim=1, keepdim=True)
+                # The log value of the probability that the ith sample belongs to the kth gaussian.
                 log_resp = weighted_log_prob - log_prob_norm
 
                 # M step
@@ -233,6 +237,7 @@ class GMM(AbstractClustering):
         x_mu_T_precision = calculate_matmul_n_times(self.n_clusters, x_mu_T, precision)
         x_mu_T_precision_x_mu = calculate_matmul(x_mu_T_precision, x_mu)
 
+        # `log_det` is the determinant of the inverse of the covariance, so the sign `+` is changed to `-`
         return -0.5 * (log_2pi - log_det + x_mu_T_precision_x_mu)
 
     def _calculate_log_det(self, var):
