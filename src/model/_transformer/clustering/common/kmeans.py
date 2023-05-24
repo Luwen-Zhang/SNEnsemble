@@ -8,7 +8,7 @@ import torch
 import numpy as np
 from typing import List
 import warnings
-from .clustering import AbstractClustering, AbstractCluster
+from .base import AbstractClustering, AbstractCluster
 
 
 class Cluster(AbstractCluster):

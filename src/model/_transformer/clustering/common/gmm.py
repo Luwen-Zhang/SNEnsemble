@@ -9,7 +9,7 @@ from typing import List
 import warnings
 from math import pi
 from .kmeans import KMeans
-from .clustering import AbstractCluster, AbstractClustering
+from .base import AbstractCluster, AbstractClustering
 
 
 def calculate_matmul_n_times(n_components, mat_a, mat_b):

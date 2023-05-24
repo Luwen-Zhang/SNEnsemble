@@ -1,5 +1,5 @@
-from .clustering.gmm import Cluster, GMM
-from .sn_lr_cluster import SN, AbstractSNCluster
+from .common.kmeans import Cluster, KMeans
+from .base import SN, AbstractSNCluster
 
 
 class _SNCluster(Cluster):
@@ -8,12 +8,12 @@ class _SNCluster(Cluster):
         self.sn = SN(n_input, layers)
 
 
-class GMMSN(AbstractSNCluster):
+class KMeansSN(AbstractSNCluster):
     def __init__(self, n_clusters: int, n_input: int, layers):
-        super(GMMSN, self).__init__(
+        super(KMeansSN, self).__init__(
             n_clusters=n_clusters,
             n_input=n_input,
             layers=layers,
-            algorithm_class=GMM,
+            algorithm_class=KMeans,
             cluster_class=_SNCluster,
         )

@@ -5,7 +5,7 @@ from torch.nn import Parameter
 import inspect
 import torch.nn.functional as F
 import numpy as np
-from ..base import get_sequential
+from src.model.base import get_sequential
 from itertools import chain
 
 

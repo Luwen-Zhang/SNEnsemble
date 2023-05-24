@@ -2,7 +2,8 @@ from .models_basic import CategoryEmbeddingNN, FTTransformerNN
 from .models_with_seq import CatEmbedSeqNN
 from ..base import get_sequential, AbstractNN
 import numpy as np
-from .sn_lr_kmeans import KMeansSN
+from .clustering.sn_kmeans import KMeansSN
+from .clustering.sn_gmm import GMMSN
 
 
 class AbstractClusteringModel(AbstractNN):
@@ -121,8 +122,6 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
 
 class SNCatEmbedLRGMMNN(AbstractClusteringModel):
     def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
-        from .sn_lr_gmm import GMMSN
-
         clustering_features = np.concatenate(
             (
                 trainer.get_feature_idx_by_type(typ="Material"),
