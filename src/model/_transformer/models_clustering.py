@@ -4,6 +4,7 @@ from ..base import get_sequential, AbstractNN
 import numpy as np
 from .clustering.singlelayer import KMeansSN, GMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN
+import torch
 
 
 class AbstractClusteringModel(AbstractNN):
@@ -35,10 +36,10 @@ class AbstractClusteringModel(AbstractNN):
         )
         return x_out
 
-    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
-        loss = self.default_loss_fn(y_pred, y_true)
-        loss = (loss + self.default_loss_fn(self._naive_pred, y_true)) / 2
-        return loss
+    def loss_fn(self, y_true, y_pred, *data, **kwargs):
+        self.naive_pred_loss = self.default_loss_fn(self._naive_pred, y_true)
+        self.output_loss = self.default_loss_fn(y_pred, y_true)
+        return (self.output_loss + self.naive_pred_loss) / 2
 
 
 class SNTransformerLRKMeansNN(AbstractClusteringModel):

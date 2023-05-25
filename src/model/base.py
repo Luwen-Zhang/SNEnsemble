@@ -970,89 +970,6 @@ class TorchModel(AbstractModel):
     The specific class for PyTorch-like models. Some abstract methods in AbstractModel are implemented.
     """
 
-    def _train_step(
-        self,
-        model: "AbstractNN",
-        train_loader: Data.DataLoader,
-        **kwargs,
-    ) -> float:
-        """
-        Train a torch.nn.Module model in a single epoch.
-
-        Parameters
-        ----------
-        model:
-            The torch model initialized in :func:`_new_model`.
-        train_loader:
-            The DataLoader of the training dataset.
-        **kwargs:
-            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
-
-        Returns
-        -------
-        loss:
-            The loss of the model on the training dataset.
-        """
-        model.train()
-        avg_loss = 0
-        for idx, tensors in enumerate(train_loader):
-            model.cal_zero_grad()
-            yhat = tensors[-1].to(self.device)
-            data = tensors[0].to(self.device)
-            additional_tensors = [
-                x.to(self.device) for x in tensors[1 : len(tensors) - 1]
-            ]
-            y = model(*([data] + additional_tensors))
-            loss = model.loss_fn(
-                yhat, y, model, *([data] + additional_tensors), **kwargs
-            )
-            model.cal_backward(loss)
-            model.cal_step()
-            avg_loss += loss.item() * len(y)
-
-        avg_loss /= len(train_loader.dataset)
-        return avg_loss
-
-    def _test_step(
-        self, model: nn.Module, test_loader: Data.DataLoader, **kwargs
-    ) -> Tuple[np.ndarray, np.ndarray, float]:
-        """
-        Evaluate a torch.nn.Module model in a single epoch.
-
-        Parameters
-        ----------
-        model:
-            The torch model initialized in :func:`_new_model`.
-        test_loader:
-            The DataLoader of the testing dataset.
-        **kwargs:
-            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
-
-        Returns
-        -------
-        results:
-            The prediction, ground truth, and loss of the model on the testing dataset.
-        """
-        model.eval()
-        pred = []
-        truth = []
-        with torch.no_grad() if src.setting["test_with_no_grad"] else torch_with_grad():
-            # print(test_dataset)
-            avg_loss = 0
-            for idx, tensors in enumerate(test_loader):
-                yhat = tensors[-1].to(self.device)
-                data = tensors[0].to(self.device)
-                additional_tensors = [
-                    x.to(self.device) for x in tensors[1 : len(tensors) - 1]
-                ]
-                y = model(*([data] + additional_tensors))
-                loss = model.default_loss_fn(y, yhat)
-                avg_loss += loss.item() * len(y)
-                pred += list(y.cpu().detach().numpy())
-                truth += list(yhat.cpu().detach().numpy())
-            avg_loss /= len(test_loader.dataset)
-        return np.array(pred), np.array(truth), avg_loss
-
     def _train_data_preprocess(
         self,
         X_train,
@@ -1113,7 +1030,7 @@ class TorchModel(AbstractModel):
 
     def _train_single_model(
         self,
-        model,
+        model: "AbstractNN",
         epoch,
         X_train,
         D_train,
@@ -1153,9 +1070,9 @@ class TorchModel(AbstractModel):
             # Note that train_loss is calculated across batch-training, its result might differ from that by directly
             # calling _test_step on train_loader. Also, using BatchNorm that behaves differently during training and
             # evaluating will cause this difference, but LayerNorm won't.
-            train_loss = self._train_step(model, train_loader, **kwargs)
+            train_loss = model.train_step(train_loader, **kwargs)
             train_ls.append(train_loss)
-            _, _, val_loss = self._test_step(model, val_loader, **kwargs)
+            _, _, val_loss = model.test_step(val_loader, **kwargs)
             val_ls.append(self._early_stopping_eval(train_loss, val_loss))
             t_end = time.time()
 
@@ -1188,9 +1105,11 @@ class TorchModel(AbstractModel):
         if verbose:
             print(f"Minimum loss: {min_loss:.5f}")
 
-    def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+    def _pred_single_model(
+        self, model: "AbstractNN", X_test, D_test, verbose, **kwargs
+    ):
         model.to(self.device)
-        y_test_pred, _, _ = self._test_step(model, X_test, **kwargs)
+        y_test_pred, _, _ = model.test_step(X_test, **kwargs)
         model.to("cpu")
         torch.cuda.empty_cache()
         return y_test_pred
@@ -1256,6 +1175,11 @@ class AbstractNN(nn.Module):
             trainer.derived_data.keys(), trainer.get_derived_data_sizes()
         ):
             self.derived_feature_names_dims[name] = dim
+        self._device_var = nn.Parameter(torch.empty(0, requires_grad=False))
+
+    @property
+    def device(self):
+        return self._device_var.device
 
     def forward(self, *tensors: torch.Tensor) -> torch.Tensor:
         """
@@ -1291,7 +1215,82 @@ class AbstractNN(nn.Module):
     ) -> torch.Tensor:
         raise NotImplementedError
 
-    def loss_fn(self, y_true, y_pred, model, *data, **kwargs):
+    def train_step(
+        self,
+        train_loader: Data.DataLoader,
+        **kwargs,
+    ) -> float:
+        """
+        Train in a single epoch.
+
+        Parameters
+        ----------
+        train_loader:
+            The DataLoader of the training dataset.
+        **kwargs:
+            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
+
+        Returns
+        -------
+        loss:
+            The loss of the model on the training dataset.
+        """
+        self.train()
+        avg_loss = 0
+        for idx, tensors in enumerate(train_loader):
+            self.cal_zero_grad()
+            yhat = tensors[-1].to(self.device)
+            data = tensors[0].to(self.device)
+            additional_tensors = [
+                x.to(self.device) for x in tensors[1 : len(tensors) - 1]
+            ]
+            y = self(*([data] + additional_tensors))
+            loss = self.loss_fn(yhat, y, *([data] + additional_tensors), **kwargs)
+            self.cal_backward_step(loss)
+            avg_loss += loss.item() * len(y)
+
+        avg_loss /= len(train_loader.dataset)
+        return avg_loss
+
+    def test_step(
+        self, test_loader: Data.DataLoader, **kwargs
+    ) -> Tuple[np.ndarray, np.ndarray, float]:
+        """
+        Evaluate a torch.nn.Module model in a single epoch.
+
+        Parameters
+        ----------
+        test_loader:
+            The DataLoader of the testing dataset.
+        **kwargs:
+            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
+
+        Returns
+        -------
+        results:
+            The prediction, ground truth, and loss of the model on the testing dataset.
+        """
+        self.eval()
+        pred = []
+        truth = []
+        with torch.no_grad() if src.setting["test_with_no_grad"] else torch_with_grad():
+            # print(test_dataset)
+            avg_loss = 0
+            for idx, tensors in enumerate(test_loader):
+                yhat = tensors[-1].to(self.device)
+                data = tensors[0].to(self.device)
+                additional_tensors = [
+                    x.to(self.device) for x in tensors[1 : len(tensors) - 1]
+                ]
+                y = self(*([data] + additional_tensors))
+                loss = self.default_loss_fn(y, yhat)
+                avg_loss += loss.item() * len(y)
+                pred += list(y.cpu().detach().numpy())
+                truth += list(yhat.cpu().detach().numpy())
+            avg_loss /= len(test_loader.dataset)
+        return np.array(pred), np.array(truth), avg_loss
+
+    def loss_fn(self, y_true, y_pred, *data, **kwargs):
         """
         User defined loss function.
 
@@ -1301,8 +1300,6 @@ class AbstractNN(nn.Module):
             Ground truth value.
         y_pred:
             Predicted value by the model.
-        model:
-            The model predicting y_pred.
         *data:
             Tensors of continuous data and derived data.
         **kwargs:
@@ -1341,9 +1338,9 @@ class AbstractNN(nn.Module):
         else:
             raise Exception(f"Optimizer is not initiated (by `init_optimizer`).")
 
-    def cal_backward(self, loss):
+    def cal_backward_step(self, loss):
         """
-        Call loss.backward().
+        Call loss.backward() and optimizer.step().
 
         Parameters
         ----------
@@ -1351,11 +1348,6 @@ class AbstractNN(nn.Module):
             The loss returned by `loss_fn`.
         """
         loss.backward()
-
-    def cal_step(self):
-        """
-        Call optimizer.step()
-        """
         self.optimizer.step()
 
 
