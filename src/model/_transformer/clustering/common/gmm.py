@@ -5,7 +5,7 @@ We improve the initialization and stability.
 import torch
 from torch import nn
 import numpy as np
-from typing import List
+from typing import List, Union
 import warnings
 from math import pi
 from .kmeans import KMeans
@@ -72,7 +72,7 @@ class GMM(AbstractClustering):
         self,
         n_clusters: int,
         n_input: int,
-        clusters: List[Cluster] = None,
+        clusters: Union[List[Cluster], nn.ModuleList] = None,
         momentum: float = 0.8,
         init_method: str = "kmeans",
     ):
@@ -291,7 +291,7 @@ class TwolayerGMM(AbstractMultilayerClustering):
         n_input_2: int,
         input_1_idx: List[int],
         input_2_idx: List[int],
-        clusters: List[Cluster] = None,
+        clusters: Union[List[Cluster], nn.ModuleList] = None,
         momentum: float = 0.8,
         n_clusters_per_cluster: int = 5,
         **kwargs,

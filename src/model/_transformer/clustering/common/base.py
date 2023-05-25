@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-from typing import List, Type
+from typing import List, Type, Union
 import numpy as np
 
 
@@ -16,7 +16,7 @@ class AbstractClustering(nn.Module):
         n_clusters: int,
         n_input: int,
         cluster_class: Type[AbstractCluster] = None,
-        clusters: List[AbstractCluster] = None,
+        clusters: Union[List[AbstractCluster], nn.ModuleList] = None,
         momentum: float = 0.8,
     ):
         super(AbstractClustering, self).__init__()
@@ -131,11 +131,14 @@ class AbstractMultilayerClustering(AbstractClustering):
             **kwargs,
         )
         # This is a surrogate instance to gather clusters in second_layer_clusters.
+        inner_clusters = nn.ModuleList()
+        for i in second_layer_clusters:
+            inner_clusters += i.inner_layer.clusters
         self.second_clustering = algorithm_class(
             n_clusters=self.n_total_clusters,
             n_input=len(np.union1d(input_1_idx, input_2_idx)),
             momentum=momentum,
-            clusters=clusters,
+            clusters=inner_clusters,
         )
 
     def forward(self, x: torch.Tensor):

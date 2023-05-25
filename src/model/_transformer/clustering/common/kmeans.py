@@ -5,10 +5,11 @@
 
 
 import torch
+from torch import nn
 import numpy as np
-from typing import List
+from typing import List, Union
 import warnings
-from .base import AbstractClustering, AbstractCluster
+from .base import AbstractClustering, AbstractCluster, AbstractMultilayerClustering
 
 
 class Cluster(AbstractCluster):
@@ -30,7 +31,7 @@ class KMeans(AbstractClustering):
         self,
         n_clusters: int,
         n_input: int,
-        clusters: List[Cluster] = None,
+        clusters: Union[List[Cluster], nn.ModuleList] = None,
         momentum: float = 0.8,
         method: str = "fast_kmeans",
         init_method: str = "kmeans++",
@@ -135,3 +136,37 @@ class KMeans(AbstractClustering):
     @property
     def centers(self):
         return torch.concat([cluster.center for cluster in self.clusters], dim=0)
+
+
+class SecondKMeansCluster(Cluster):
+    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
+        super(SecondKMeansCluster, self).__init__(n_input=n_input, momentum=momentum)
+        self.inner_layer = KMeans(momentum=momentum, n_input=n_input, **kwargs)
+
+
+class TwolayerKMeans(AbstractMultilayerClustering):
+    def __init__(
+        self,
+        n_clusters: int,
+        n_input_1: int,
+        n_input_2: int,
+        input_1_idx: List[int],
+        input_2_idx: List[int],
+        clusters: Union[List[Cluster], nn.ModuleList] = None,
+        momentum: float = 0.8,
+        n_clusters_per_cluster: int = 5,
+        **kwargs,
+    ):
+        super(TwolayerKMeans, self).__init__(
+            n_clusters=n_clusters,
+            n_input_1=n_input_1,
+            n_input_2=n_input_2,
+            input_1_idx=input_1_idx,
+            input_2_idx=input_2_idx,
+            algorithm_class=KMeans,
+            second_layer_cluster_class=SecondKMeansCluster,
+            clusters=clusters,
+            momentum=momentum,
+            n_clusters_per_cluster=n_clusters_per_cluster,
+            **kwargs,
+        )
