@@ -972,9 +972,8 @@ class TorchModel(AbstractModel):
 
     def _train_step(
         self,
-        model: nn.Module,
+        model: "AbstractNN",
         train_loader: Data.DataLoader,
-        optimizer: torch.optim.Optimizer,
         **kwargs,
     ) -> float:
         """
@@ -986,8 +985,6 @@ class TorchModel(AbstractModel):
             The torch model initialized in :func:`_new_model`.
         train_loader:
             The DataLoader of the training dataset.
-        optimizer:
-            A torch optimizer.
         **kwargs:
             Parameters to train the model. It contains all arguments in :func:`_initial_values`.
 
@@ -999,7 +996,7 @@ class TorchModel(AbstractModel):
         model.train()
         avg_loss = 0
         for idx, tensors in enumerate(train_loader):
-            optimizer.zero_grad()
+            model.cal_zero_grad()
             yhat = tensors[-1].to(self.device)
             data = tensors[0].to(self.device)
             additional_tensors = [
@@ -1009,8 +1006,8 @@ class TorchModel(AbstractModel):
             loss = model.loss_fn(
                 yhat, y, model, *([data] + additional_tensors), **kwargs
             )
-            loss.backward()
-            optimizer.step()
+            model.cal_backward(loss)
+            model.cal_step()
             avg_loss += loss.item() * len(y)
 
         avg_loss /= len(train_loader.dataset)
@@ -1132,7 +1129,7 @@ class TorchModel(AbstractModel):
         if not isinstance(model, AbstractNN):
             raise Exception("_new_model must return an AbstractNN instance.")
         model.to(self.device)
-        optimizer = model.get_optimizer(warm_start, **kwargs)
+        model.init_optimizer(warm_start, **kwargs)
 
         train_loader = Data.DataLoader(
             X_train.dataset,
@@ -1156,7 +1153,7 @@ class TorchModel(AbstractModel):
             # Note that train_loss is calculated across batch-training, its result might differ from that by directly
             # calling _test_step on train_loader. Also, using BatchNorm that behaves differently during training and
             # evaluating will cause this difference, but LayerNorm won't.
-            train_loss = self._train_step(model, train_loader, optimizer, **kwargs)
+            train_loss = self._train_step(model, train_loader, **kwargs)
             train_ls.append(train_loss)
             _, _, val_loss = self._test_step(model, val_loader, **kwargs)
             val_ls.append(self._early_stopping_eval(train_loss, val_loss))
@@ -1254,6 +1251,7 @@ class AbstractNN(nn.Module):
         self.derived_feature_names = list(trainer.derived_data.keys())
         self.derived_feature_dims = trainer.get_derived_data_sizes()
         self.derived_feature_names_dims = {}
+        self.optimizer = None
         for name, dim in zip(
             trainer.derived_data.keys(), trainer.get_derived_data_sizes()
         ):
@@ -1317,12 +1315,48 @@ class AbstractNN(nn.Module):
         """
         return self.default_loss_fn(y_pred, y_true)
 
-    def get_optimizer(self, warm_start, **kwargs):
-        return torch.optim.Adam(
+    def init_optimizer(self, warm_start, **kwargs):
+        """
+        Initialize a torch.optim.Optimizer.
+
+        Parameters
+        ----------
+        warm_start
+            Whether the model should be fine-tuned. If True, the learning rate in kwargs is modified.
+        kwargs
+            Parameters to generate the optimizer. It contains all arguments in :func:`_initial_values`.
+        """
+        self.optimizer = torch.optim.Adam(
             self.parameters(),
             lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
             weight_decay=kwargs["weight_decay"],
         )
+
+    def cal_zero_grad(self):
+        """
+        Call optimizer.zero_grad() of the optimizer initialized in `init_optimizer`.
+        """
+        if self.optimizer is not None:
+            self.optimizer.zero_grad()
+        else:
+            raise Exception(f"Optimizer is not initiated (by `init_optimizer`).")
+
+    def cal_backward(self, loss):
+        """
+        Call loss.backward().
+
+        Parameters
+        ----------
+        loss
+            The loss returned by `loss_fn`.
+        """
+        loss.backward()
+
+    def cal_step(self):
+        """
+        Call optimizer.step()
+        """
+        self.optimizer.step()
 
 
 class ModelDict:
