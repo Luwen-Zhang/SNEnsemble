@@ -85,13 +85,18 @@ class AbstractMultilayerClustering(AbstractClustering):
         n_input_2: int,
         input_1_idx: List[int],
         input_2_idx: List[int],
-        algorithm_class: Type[AbstractClustering],
-        second_layer_cluster_class: Type[AbstractCluster],
+        algorithm_class: Type[AbstractClustering] = None,
+        second_layer_cluster_class: Type[AbstractCluster] = None,
         clusters: List[AbstractCluster] = None,
         momentum: float = 0.8,
         n_clusters_per_cluster: int = 5,
         **kwargs,
     ):
+        if algorithm_class is None or second_layer_cluster_class is None:
+            raise Exception(
+                f"Classes inherited from AbstractMultilayerClustering should provide `algorithm_class` and "
+                f"`second_layer_cluster_class`."
+            )
         if (
             clusters is not None
             and len(clusters) != n_clusters * n_clusters_per_cluster

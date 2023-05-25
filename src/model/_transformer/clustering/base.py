@@ -7,8 +7,12 @@ import torch.nn.functional as F
 import numpy as np
 from src.model.base import get_sequential
 from itertools import chain
-from .common.base import AbstractClustering, AbstractCluster
-from typing import Type
+from .common.base import (
+    AbstractClustering,
+    AbstractCluster,
+    AbstractMultilayerClustering,
+)
+from typing import Type, List
 
 
 class SNMarker(nn.Module):
@@ -138,6 +142,51 @@ class AbstractSNClustering(nn.Module):
         self.clustering = algorithm_class(n_clusters=n_clusters, n_input=n_input)
         self.sns = nn.ModuleList(
             [SN(n_cluster_features=n_input, layers=layers) for i in range(n_clusters)]
+        )
+
+    def forward(self, x, s, naive_pred):
+        x_cluster = self.clustering(x)
+        out = naive_pred.clone()
+        for i_cluster in range(self.n_clusters):
+            idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
+            if len(idx_in_cluster) >= 2:
+                pred = self.sns[i_cluster](
+                    x[idx_in_cluster, :],
+                    s[idx_in_cluster],
+                    naive_pred[idx_in_cluster, :],
+                )
+                out[idx_in_cluster] = pred
+
+        return out
+
+
+class AbstractMultilayerSNClustering(nn.Module):
+    def __init__(
+        self,
+        n_clusters: int,
+        n_input_1: int,
+        n_input_2: int,
+        input_1_idx: List[int],
+        input_2_idx: List[int],
+        layers,
+        algorithm_class: Type[AbstractMultilayerClustering],
+        n_clusters_per_cluster: int = 5,
+    ):
+        super(AbstractMultilayerSNClustering, self).__init__()
+        self.clustering = algorithm_class(
+            n_clusters=n_clusters,
+            n_input_1=n_input_1,
+            n_input_2=n_input_2,
+            input_1_idx=input_1_idx,
+            input_2_idx=input_2_idx,
+            n_clusters_per_cluster=n_clusters_per_cluster,
+        )
+        self.n_clusters = self.clustering.n_total_clusters
+        self.sns = nn.ModuleList(
+            [
+                SN(n_cluster_features=self.clustering.n_input, layers=layers)
+                for i in range(self.n_clusters)
+            ]
         )
 
     def forward(self, x, s, naive_pred):

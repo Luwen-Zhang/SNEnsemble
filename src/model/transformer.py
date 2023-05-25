@@ -32,8 +32,10 @@ class Transformer(TorchModel):
             "CategoryEmbedding",
             "CatEmbedSeq",
             "SNCatEmbedLRKMeans",
+            "SNCatEmbedLR2LKMeans",
             "SNCatEmbedLRKMeansSeq",
             "SNCatEmbedLRGMM",
+            "SNCatEmbedLR2LGMM",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -137,7 +139,12 @@ class Transformer(TorchModel):
                 seq_attn_heads=kwargs["seq_attn_heads"],
                 seq_attn_dropout=kwargs["seq_attn_dropout"],
             )
-        elif model_name in ["SNCatEmbedLRKMeans", "SNCatEmbedLRGMM"]:
+        elif model_name in [
+            "SNCatEmbedLRKMeans",
+            "SNCatEmbedLRGMM",
+            "SNCatEmbedLR2LKMeans",
+            "SNCatEmbedLR2LGMM",
+        ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
                 len(self.trainer.cont_feature_names),
@@ -269,7 +276,12 @@ class Transformer(TorchModel):
                 Categorical(categories=[2, 4, 8, 16], name="seq_attn_heads"),
                 Real(low=0.0, high=0.3, prior="uniform", name="seq_attn_dropout"),
             ] + self.trainer.SPACE
-        elif model_name in ["SNCatEmbedLRKMeans", "SNCatEmbedLRGMM"]:
+        elif model_name in [
+            "SNCatEmbedLRKMeans",
+            "SNCatEmbedLRGMM",
+            "SNCatEmbedLR2LKMeans",
+            "SNCatEmbedLR2LGMM",
+        ]:
             return [
                 Integer(
                     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
@@ -362,7 +374,12 @@ class Transformer(TorchModel):
                 "seq_attn_heads": 8,
                 "seq_attn_dropout": 0.1,
             }
-        elif model_name in ["SNCatEmbedLRKMeans", "SNCatEmbedLRGMM"]:
+        elif model_name in [
+            "SNCatEmbedLRKMeans",
+            "SNCatEmbedLRGMM",
+            "SNCatEmbedLR2LKMeans",
+            "SNCatEmbedLR2LGMM",
+        ]:
             res = {
                 "embedding_dim": 3,
                 "embed_dropout": 0.1,
