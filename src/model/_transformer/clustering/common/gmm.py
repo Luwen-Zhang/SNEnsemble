@@ -24,7 +24,7 @@ def calculate_matmul_n_times(n_components, mat_a, mat_b):
 
     for i in range(n_components):
         mat_a_i = mat_a[:, i, :, :].squeeze(-2)
-        mat_b_i = mat_b[0, i, :, :].squeeze()
+        mat_b_i = mat_b[0, i, :, :]
         res[:, i, :, :] = mat_a_i.mm(mat_b_i).unsqueeze(1)
 
     return res
@@ -165,8 +165,12 @@ class GMM(AbstractClustering):
             # Reference: sklearn.mixture.gaussian_mixture._estimate_gaussian_covariances_full
             # Estimate weights.
             labels = kmeans.predict(x)
-            _, counts = labels.unique(return_counts=True)
-            counts = counts.float() + 1e-12
+            cluster_found, found_counts = labels.unique(return_counts=True)
+            counts = torch.add(
+                torch.zeros((self.n_clusters,), device=x.device, dtype=torch.float32),
+                1e-12,
+            )
+            counts[cluster_found] = found_counts.float()
             pi[0, 0, :] = counts / x.shape[0]
             # Estimate variance and means.
             for k in range(self.n_clusters):
