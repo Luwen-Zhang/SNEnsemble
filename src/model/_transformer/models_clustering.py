@@ -46,7 +46,7 @@ class SNTransformerLRKMeansNN(AbstractClusteringModel):
         clustering_features = np.concatenate(
             (
                 trainer.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["Frequency", "R-value"]],
+                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
             )
         )
         sn = KMeansSN(
@@ -72,7 +72,7 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
         clustering_features = np.concatenate(
             (
                 trainer.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["Frequency", "R-value"]],
+                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
             )
         )
         sn = KMeansSN(
@@ -98,7 +98,7 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
         clustering_features = np.concatenate(
             (
                 trainer.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["Frequency", "R-value"]],
+                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
             )
         )
         sn = KMeansSN(
@@ -125,7 +125,7 @@ class SNCatEmbedLRGMMNN(AbstractClusteringModel):
         clustering_features = np.concatenate(
             (
                 trainer.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["Frequency", "R-value"]],
+                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
             )
         )
         sn = GMMSN(
