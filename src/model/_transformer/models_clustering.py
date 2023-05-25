@@ -26,8 +26,6 @@ class AbstractClusteringModel(AbstractNN):
         self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
 
     def _forward(self, x, derived_tensors):
-        self.s_original = x[:, self.s_idx].clone()
-        x[:, self.s_idx] = self.s_original  # enable gradient wrt a single column
         naive_pred = self.cont_cat_model(x, derived_tensors)
         self._naive_pred = naive_pred
         s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
@@ -40,6 +38,12 @@ class AbstractClusteringModel(AbstractNN):
         self.naive_pred_loss = self.default_loss_fn(self._naive_pred, y_true)
         self.output_loss = self.default_loss_fn(y_pred, y_true)
         return (self.output_loss + self.naive_pred_loss) / 2
+
+    def cal_backward_step(self, loss):
+        self.output_loss.backward(retain_graph=True)
+        self.cont_cat_model.zero_grad()
+        self.naive_pred_loss.backward()
+        self.optimizer.step()
 
 
 class SNTransformerLRKMeansNN(AbstractClusteringModel):
