@@ -1,6 +1,7 @@
 from torch import nn
 import torch
 from typing import List, Type
+import numpy as np
 
 
 class AbstractCluster(nn.Module):
@@ -74,3 +75,79 @@ class AbstractClustering(nn.Module):
     @property
     def centers(self):
         raise NotImplementedError
+
+
+class AbstractMultilayerClustering(AbstractClustering):
+    def __init__(
+        self,
+        n_clusters: int,
+        n_input_1: int,
+        n_input_2: int,
+        input_1_idx: List[int],
+        input_2_idx: List[int],
+        algorithm_class: Type[AbstractClustering],
+        second_layer_cluster_class: Type[AbstractCluster],
+        clusters: List[AbstractCluster] = None,
+        momentum: float = 0.8,
+        n_clusters_per_cluster: int = 5,
+        **kwargs,
+    ):
+        if (
+            clusters is not None
+            and len(clusters) != n_clusters * n_clusters_per_cluster
+        ):
+            raise Exception(
+                f"{n_clusters * n_clusters_per_cluster} clusters is required. Got {len(clusters)} instead."
+            )
+        second_layer_clusters = [
+            second_layer_cluster_class(
+                n_input=n_input_2,
+                momentum=momentum,
+                n_clusters=n_clusters_per_cluster,
+                clusters=clusters[
+                    i * n_clusters_per_cluster : (i + 1) * n_clusters_per_cluster
+                ]
+                if clusters is not None
+                else None,
+                **kwargs,
+            )
+            for i in range(n_clusters)
+        ]
+        self.n_total_clusters = n_clusters * n_clusters_per_cluster
+        self.n_clusters_per_cluster = n_clusters_per_cluster
+        self.input_1_idx = input_1_idx
+        self.input_2_idx = input_2_idx
+        super().__init__(
+            n_clusters=self.n_total_clusters,
+            n_input=len(np.union1d(input_1_idx, input_2_idx)),
+            momentum=momentum,
+            clusters=[],
+        )
+        self.first_clustering = algorithm_class(
+            n_clusters=n_clusters,
+            n_input=n_input_1,
+            momentum=momentum,
+            clusters=second_layer_clusters,
+            **kwargs,
+        )
+        # This is a surrogate instance to gather clusters in second_layer_clusters.
+        self.second_clustering = algorithm_class(
+            n_clusters=self.n_total_clusters,
+            n_input=len(np.union1d(input_1_idx, input_2_idx)),
+            momentum=momentum,
+            clusters=clusters,
+        )
+
+    def forward(self, x: torch.Tensor):
+        outer_cluster = self.first_clustering(x[:, self.input_1_idx])
+        x_cluster = torch.zeros((x.shape[0],), device=x.device).long()
+        for i in range(self.first_clustering.n_clusters):
+            where_in_cluster = torch.where(outer_cluster == i)[0]
+            inner_cluster = (
+                self.first_clustering.clusters[i].inner_layer(
+                    x[where_in_cluster, :][:, self.input_2_idx]
+                )
+                + i * self.n_clusters_per_cluster
+            )
+            x_cluster[where_in_cluster] = inner_cluster
+        return x_cluster
