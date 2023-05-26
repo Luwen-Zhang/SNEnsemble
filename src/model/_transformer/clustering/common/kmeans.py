@@ -52,10 +52,7 @@ class KMeans(AbstractClustering):
 
     def initialize(self, x: torch.Tensor):
         if x.shape[0] < self.n_clusters:
-            warnings.warn(
-                f"The batch size {x.shape[0]} is smaller than the number of clusters {self.n_clusters}. Centers "
-                f"of clusters are initialized randomly using torch.randn."
-            )
+            return None
         if self.init_method == "random":
             centers = x[torch.randperm(x.shape[0])[: self.n_clusters]]
         elif self.init_method == "kmeans++":
@@ -63,11 +60,7 @@ class KMeans(AbstractClustering):
             # https://github.com/DeMoriarty/fast_pytorch_kmeans/blob/master/fast_pytorch_kmeans/init_methods.py
             # In summary, this method calculates the distance value to the closest centroid for each data point, and
             # data points with higher values are more likely to be selected as the next centroid.
-            x = x[
-                torch.randint(
-                    0, int(x.shape[0]), [min(100000, x.shape[0])], device=x.device
-                )
-            ]
+            x = x[torch.randint(0, int(x.shape[0]), [min(100000, x.shape[0])])]
             centers = torch.zeros((self.n_clusters, x.shape[1])).to(x.device)
             r = torch.distributions.uniform.Uniform(0, 1)
             for i in range(self.n_clusters):

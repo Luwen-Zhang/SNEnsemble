@@ -47,7 +47,7 @@ class Cluster(AbstractCluster):
         super(Cluster, self).__init__(n_input=n_input, momentum=momentum, **kwargs)
         self.register_buffer("mu", torch.randn(1, n_input))
         self.register_buffer("var", torch.randn(1, n_input, n_input))
-        self.register_buffer("pi", torch.zeros(1, 1))
+        self.register_buffer("pi", torch.ones(1, 1))
 
     def update(self, mu=None, var=None, pi=None, momentum=None):
         momentum = self.momentum if momentum is None else momentum
@@ -140,16 +140,15 @@ class GMM(AbstractClustering):
 
     def initialize(self, x: torch.Tensor):
         if x.shape[0] < self.n_clusters:
-            warnings.warn(
-                f"The batch size {x.shape[0]} is smaller than the number of clusters {self.n_clusters}. Centers "
-                f"of clusters are initialized randomly using torch.randn."
-            )
+            return None
         pi = (
             torch.ones((1, 1, self.n_clusters), requires_grad=False, device=x.device)
             / self.n_clusters
         )
         var = (
-            torch.eye(self.n_input, requires_grad=False, device=x.device)
+            torch.randn(
+                (self.n_input, self.n_input), requires_grad=False, device=x.device
+            )
             .reshape(1, 1, self.n_input, self.n_input)
             .repeat(1, self.n_clusters, 1, 1)
         )
@@ -208,7 +207,8 @@ class GMM(AbstractClustering):
 
     @property
     def pi(self):
-        return torch.concat([cluster.pi for cluster in self.clusters], 0).unsqueeze(0)
+        pi = torch.concat([cluster.pi for cluster in self.clusters], 0).unsqueeze(0)
+        return pi / torch.sum(pi)
 
     def modify_size(self, x):
         if len(x.size()) == 2:
