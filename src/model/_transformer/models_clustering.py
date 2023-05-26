@@ -37,7 +37,7 @@ class AbstractClusteringModel(AbstractNN):
     def loss_fn(self, y_true, y_pred, *data, **kwargs):
         self.naive_pred_loss = self.default_loss_fn(self._naive_pred, y_true)
         self.output_loss = self.default_loss_fn(y_pred, y_true)
-        return (self.output_loss + self.naive_pred_loss) / 2
+        return self.output_loss
 
     def cal_backward_step(self, loss):
         self.output_loss.backward(retain_graph=True)
