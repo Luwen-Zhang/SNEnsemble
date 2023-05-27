@@ -17,13 +17,11 @@ models = [
     Transformer(
         trainer,
         model_subset=[
-            "FTTransformer",
-            "TransformerLSTM",
-            "TransformerSeq",
-            "SNTransformer",
-            "SNTransformerSeq",
-            "SNTransformerLR",
-            "SNTransformerLRKMeans",
+            "CategoryEmbedding",
+            "SNCatEmbedLRKMeans",
+            "SNCatEmbedLRGMM",
+            "SNCatEmbedLR2LKMeans",
+            "SNCatEmbedLR2LGMM",
         ],
     ),
 ]
