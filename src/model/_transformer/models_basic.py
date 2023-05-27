@@ -24,6 +24,7 @@ class CategoryEmbeddingNN(AbstractNN):
             embedding_dim,
             embed_dropout,
             cat_num_unique,
+            n_inputs,
             run_cat="categorical" in self.derived_feature_names,
         )
         self.linear = get_sequential(
