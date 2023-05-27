@@ -27,7 +27,7 @@ import platform, psutil, subprocess
 import shutil
 import pickle
 
-set_random_seed(0)
+set_random_seed(src.setting["random_seed"])
 sys.path.append("configs/")
 
 
@@ -1707,7 +1707,7 @@ class Trainer:
                 }
                 func_save_state(current_state)
             with HiddenPrints(disable_std=not verbose):
-                set_random_seed(i)
+                set_random_seed(src.setting["random_seed"] + i)
                 set_data_handler()
             once_predictions = {} if not skip_program else reloaded_once_predictions
             for program in programs:

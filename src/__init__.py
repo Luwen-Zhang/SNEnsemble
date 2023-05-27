@@ -9,6 +9,8 @@ __root__ = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 __all__ = ["data", "model", "trainer", "config", "utils"]
 
 setting = dict(
+    # The random seed for numpy and pytorch (including cuda).
+    random_seed=0,
     # If the memory of the system (gpu or cpu) is lower than 6 GiBs, set ``low_memory`` to True.
     # TODO: Enlarge bayes search space when low_memory is set to False.
     low_memory=True,

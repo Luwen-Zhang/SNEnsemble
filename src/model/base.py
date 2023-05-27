@@ -288,7 +288,7 @@ class AbstractModel:
             A new model (without any restriction to its type). It will be passed to :func:``_train_single_model`` and
             :func:``_pred_single_model``.
         """
-        set_random_seed(0)
+        set_random_seed(src.setting["random_seed"])
         return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
 
     def _base_train_data_preprocess(
