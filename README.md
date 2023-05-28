@@ -10,7 +10,7 @@ Bash scripts (e.g. `run.sh` and `run_thiswork.sh`) gives several examples to use
 
 ## Requirements
 
-We recommend using a virtual environment with `python=3.8` and conda.
+We recommend using a virtual environment with `python=3.8` and conda (we have verified both [miniconda](https://docs.conda.io/en/latest/miniconda.html) and [anaconda](https://www.anaconda.com/)).
 
 ```shell
 conda create -n myvenv python=3.8
@@ -43,18 +43,20 @@ We run our experiments on a personal computer with Ubuntu 18.04, Intel Core i9-1
 
 The respository merges following well-established modelbases as baselines:
 
-* [AutoGluon](https://github.com/autogluon/autogluon)
+* [`autogluon`](https://github.com/autogluon/autogluon)
 
-* [WideDeep](https://github.com/jrzaurin/pytorch-widedeep)
+* [`pytorch_widedeep`](https://github.com/jrzaurin/pytorch-widedeep)
 
-* [Pytorch-Tabular](https://github.com/manujosephv/pytorch_tabular)
+* [`pytorch_tabular`](https://github.com/manujosephv/pytorch_tabular)
 
 
 ## Implementing new features
 
 New modelbases, individual models, tabular databases, feature derivation procedures, data preprocessing procedures, etc., can be easily extended in the framework. New features follow certain structures given by parent classes, and several methods should be implemented for them. See `src.model` for details.
 
+**Remark (for model developers)**: If model bases share the same `Trainer` (i.e. the configuration file), they share the same data preprocessing procedure. Therefore, if someone focuses on the improvement of data preprocessing (e.g. physics-informed data augmentation), do not share the `Trainer` with other model bases. On the other hand, if someone focuses on the model, it is better to use a `Trainer` defined by others to make them comparable.
+
 ## Contribution
 
-Feel free to create issues if you implement new features, find mistakes, or have any question.
+Feel free to create issues if you implement new features, propose a new model, find mistakes, or have any question.
 
