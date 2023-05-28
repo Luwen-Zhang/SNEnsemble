@@ -1,5 +1,5 @@
 from typing import List, Dict
-from ..base import get_sequential, AbstractNN
+from ..base import get_sequential, get_linear, AbstractNN
 from .common.cont_cat_embedding import Embedding, Embedding1d
 from .common.fttransformer import FTTransformer
 import torch
@@ -18,23 +18,33 @@ class CategoryEmbeddingNN(AbstractNN):
         mlp_dropout=0.0,
         **kwargs,
     ):
-        super(CategoryEmbeddingNN, self).__init__(trainer)
+        super(CategoryEmbeddingNN, self).__init__(trainer, **kwargs)
+
+        run_cat = "categorical" in self.derived_feature_names
+
+        self.linear = get_sequential(
+            [128, 64],
+            n_inputs=n_inputs + len(cat_num_unique) * embedding_dim * run_cat,
+            n_outputs=32,
+            act_func=nn.ReLU,
+            dropout=mlp_dropout,
+            use_norm=False,
+            out_activate=True,
+            out_norm_dropout=True,
+        )
 
         self.embed = Embedding1d(
             embedding_dim,
             embed_dropout,
             cat_num_unique,
             n_inputs,
-            run_cat="categorical" in self.derived_feature_names,
+            run_cat=run_cat,
         )
-        self.linear = get_sequential(
-            [128, 64, 32],
-            n_inputs=n_inputs
-            + len(cat_num_unique) * embedding_dim * self.embed.run_cat,
+
+        self.head = get_linear(
+            n_inputs=32,
             n_outputs=n_outputs,
-            act_func=nn.ReLU,
-            dropout=mlp_dropout,
-            use_norm=False,
+            nonlinearity="relu",
         )
 
     def _forward(
@@ -42,6 +52,7 @@ class CategoryEmbeddingNN(AbstractNN):
     ) -> torch.Tensor:
         x_embed = self.embed(x, derived_tensors)
         output = self.linear(x_embed)
+        output = self.head(output)
         return output
 
 

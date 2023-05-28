@@ -1051,7 +1051,9 @@ class TorchModel(AbstractModel):
         train_loader = Data.DataLoader(
             X_train.dataset,
             batch_size=int(kwargs["batch_size"]),
-            generator=torch.Generator().manual_seed(0),
+            sampler=torch.utils.data.RandomSampler(
+                data_source=X_train.dataset, replacement=False
+            ),
             pin_memory=True,
         )
         val_loader = X_val

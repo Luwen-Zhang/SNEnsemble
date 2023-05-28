@@ -115,7 +115,7 @@ class Transformer(TorchModel):
                 cat_num_unique=[
                     len(x) for x in self.trainer.cat_feature_mapping.values()
                 ],
-                embedding_dim=kwargs["embedding_dim"],
+                embedding_dim=3,
                 embed_dropout=kwargs["embed_dropout"],
                 mlp_dropout=kwargs["mlp_dropout"],
             )
@@ -256,11 +256,11 @@ class Transformer(TorchModel):
             ] + self.trainer.SPACE
         elif model_name in ["CategoryEmbedding"]:
             return [
-                Integer(
-                    low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
-                ),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+                # Integer(
+                #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
+                # ),
+                Real(low=0.0, high=0.5, prior="uniform", name="mlp_dropout"),
+                Real(low=0.0, high=0.5, prior="uniform", name="embed_dropout"),
             ] + self.trainer.SPACE
         elif model_name in ["CatEmbedSeq"]:
             return [
@@ -358,9 +358,9 @@ class Transformer(TorchModel):
             "CategoryEmbedding",
         ]:
             res = {
-                "embedding_dim": 3,
-                "embed_dropout": 0.1,
+                # "embedding_dim": 3,
                 "mlp_dropout": 0.0,
+                "embed_dropout": 0.1,
             }
         elif model_name in [
             "CatEmbedSeq",
