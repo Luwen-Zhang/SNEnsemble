@@ -1056,6 +1056,7 @@ class TorchModel(AbstractModel):
         warnings.filterwarnings(
             "ignore", "The dataloader, train_dataloader, does not have many workers"
         )
+        warnings.filterwarnings("ignore", "Checkpoint directory")
 
         train_loader = Data.DataLoader(
             X_train.dataset,
