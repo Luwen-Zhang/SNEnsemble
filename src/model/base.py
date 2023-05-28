@@ -1376,13 +1376,21 @@ class ModelDict:
         return self.model_path.keys()
 
 
-def init_weights(m):
+def init_weights(m, nonlinearity="leaky_relu"):
     if isinstance(m, nn.Linear):
-        torch.nn.init.kaiming_normal_(m.weight)
+        torch.nn.init.kaiming_normal_(m.weight, nonlinearity=nonlinearity)
 
 
 def get_sequential(
-    layers, n_inputs, n_outputs, act_func, dropout=0, use_norm=True, norm_type="batch"
+    layers,
+    n_inputs,
+    n_outputs,
+    act_func,
+    dropout=0,
+    use_norm=True,
+    norm_type="batch",
+    out_activate=False,
+    out_norm_dropout=False,
 ):
     net = nn.Sequential()
     if norm_type == "batch":
@@ -1391,28 +1399,53 @@ def get_sequential(
         norm = nn.LayerNorm
     else:
         raise Exception(f"Normalization {norm_type} not implemented.")
+    if act_func == nn.ReLU:
+        nonlinearity = "relu"
+    elif act_func == nn.LeakyReLU:
+        nonlinearity = "leaky_relu"
+    else:
+        nonlinearity = "leaky_relu"
     if len(layers) > 0:
-        net.add_module("input", nn.Linear(n_inputs, layers[0]))
-        net.add_module("activate_0", act_func())
         if use_norm:
             net.add_module(f"norm_0", norm(layers[0]))
+        net.add_module(
+            "input", get_linear(n_inputs, layers[0], nonlinearity=nonlinearity)
+        )
+        net.add_module("activate_0", act_func())
         if dropout != 0:
             net.add_module(f"dropout_0", nn.Dropout(dropout))
         for idx in range(1, len(layers)):
-            net.add_module(str(idx), nn.Linear(layers[idx - 1], layers[idx]))
-            net.add_module(f"activate_{idx}", act_func())
             if use_norm:
                 net.add_module(f"norm_{idx}", norm(layers[idx]))
+            net.add_module(
+                str(idx),
+                get_linear(layers[idx - 1], layers[idx], nonlinearity=nonlinearity),
+            )
+            net.add_module(f"activate_{idx}", act_func())
             if dropout != 0:
                 net.add_module(f"dropout_{idx}", nn.Dropout(dropout))
-        net.add_module("output", nn.Linear(layers[-1], n_outputs))
+        if out_norm_dropout and use_norm:
+            net.add_module(f"norm_out", norm(layers[-1]))
+        net.add_module(
+            "output", get_linear(layers[-1], n_outputs, nonlinearity=nonlinearity)
+        )
+        if out_activate:
+            net.add_module("activate_out", act_func())
+        if out_norm_dropout and dropout != 0:
+            net.add_module(f"dropout_out", nn.Dropout(dropout))
     else:
         if use_norm:
             net.add_module("norm", norm(n_inputs))
+        net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
         net.add_module("activate", act_func())
         if dropout != 0:
             net.add_module("dropout", nn.Dropout(dropout))
-        net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
 
-    net.apply(init_weights)
+    net.apply(partial(init_weights, nonlinearity=nonlinearity))
     return net
+
+
+def get_linear(n_inputs, n_outputs, nonlinearity="leaky_relu"):
+    linear = nn.Linear(n_inputs, n_outputs)
+    init_weights(linear, nonlinearity=nonlinearity)
+    return linear
