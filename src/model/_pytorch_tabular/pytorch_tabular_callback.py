@@ -19,7 +19,9 @@ class PytorchTabularCallback(Callback):
         val_loss = logs["valid_mean_squared_error"].detach().cpu().numpy()
         self.val_ls.append(val_loss)
         epoch = trainer.current_epoch
-        if epoch % src.setting["verbose_per_epoch"] == 0 and self.verbose:
+        if (
+            (epoch + 1) % src.setting["verbose_per_epoch"] == 0 or epoch == 0
+        ) and self.verbose:
             print(
                 f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
                 f"Min val loss: {np.min(self.val_ls):.4f}"
