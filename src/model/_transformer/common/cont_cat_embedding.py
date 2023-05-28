@@ -110,21 +110,19 @@ class Embedding1d(nn.Module):
                 ]
             )
             # No special initialization in pytorch_tabular.
-            for embed in self.cat_embeds:
-                nn.init.normal_(
-                    embed.weight,
-                    std=d_sqrt_inv,
-                )
+            # for embed in self.cat_embeds:
+            #     nn.init.normal_(
+            #         embed.weight,
+            #         std=d_sqrt_inv,
+            #     )
             self.run_cat = True
         else:
             self.run_cat = False
         self.dropout = nn.Dropout(embed_dropout)
-        # self.bn = nn.BatchNorm1d(n_inputs)
+        self.bn = nn.BatchNorm1d(n_inputs)
 
     def forward(self, x, derived_tensors):
-        x_res = x
-        # Use bn in pytorch_tabular.
-        # x_res = self.bn(x)
+        x_res = self.bn(x)
         if self.run_cat:
             cat = derived_tensors["categorical"].long()
             x_cat_embeds = [self.cat_embeds[i](cat[:, i]) for i in range(cat.size(1))]
