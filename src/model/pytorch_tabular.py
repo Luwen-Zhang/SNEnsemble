@@ -3,6 +3,7 @@ from src.model import AbstractModel
 from skopt.space import Integer, Real, Categorical
 import shutil
 import numpy as np
+from .base import PytorchLightningLossCallback
 
 
 class PytorchTabular(AbstractModel):
@@ -137,8 +138,6 @@ class PytorchTabular(AbstractModel):
         in_bayes_opt,
         **kwargs,
     ):
-        from ._pytorch_tabular.pytorch_tabular_callback import PytorchTabularCallback
-
         tc = TqdmController()
         tc.disable_tqdm()
         warnings.simplefilter(action="ignore", category=UserWarning)
@@ -156,7 +155,9 @@ class PytorchTabular(AbstractModel):
                 validation=val_data,
                 loss=self.trainer.get_loss_fn(),
                 max_epochs=epoch,
-                callbacks=[PytorchTabularCallback(verbose=verbose, total_epoch=epoch)],
+                callbacks=[
+                    PytorchLightningLossCallback(verbose=verbose, total_epoch=epoch)
+                ],
             )
         if os.path.exists(os.path.join(self.root, "ckpts")):
             shutil.rmtree(os.path.join(self.root, "ckpts"))

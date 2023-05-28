@@ -13,7 +13,9 @@ from typing import *
 from skopt.space import Real, Integer, Categorical
 import time
 from contextlib import nullcontext
+import pytorch_lightning as pl
 from functools import partial
+from pytorch_lightning import Callback
 
 
 class AbstractModel:
@@ -1452,3 +1454,27 @@ def get_linear(n_inputs, n_outputs, nonlinearity="leaky_relu"):
     linear = nn.Linear(n_inputs, n_outputs)
     init_weights(linear, nonlinearity=nonlinearity)
     return linear
+
+
+class PytorchLightningLossCallback(Callback):
+    def __init__(self, verbose, total_epoch):
+        super(PytorchLightningLossCallback, self).__init__()
+        self.val_ls = []
+        self.verbose = verbose
+        self.total_epoch = total_epoch
+
+    def on_train_epoch_end(
+        self, trainer: pl.Trainer, pl_module: pl.LightningModule
+    ) -> None:
+        logs = trainer.callback_metrics
+        train_loss = logs["train_mean_squared_error"].detach().cpu().numpy()
+        val_loss = logs["valid_mean_squared_error"].detach().cpu().numpy()
+        self.val_ls.append(val_loss)
+        epoch = trainer.current_epoch
+        if (
+            (epoch + 1) % src.setting["verbose_per_epoch"] == 0 or epoch == 0
+        ) and self.verbose:
+            print(
+                f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
+                f"Min val loss: {np.min(self.val_ls):.4f}"
+            )
