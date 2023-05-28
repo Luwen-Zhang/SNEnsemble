@@ -16,6 +16,7 @@ from contextlib import nullcontext
 import pytorch_lightning as pl
 from functools import partial
 from pytorch_lightning import Callback
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 
 class AbstractModel:
@@ -1048,8 +1049,13 @@ class TorchModel(AbstractModel):
     ):
         if not isinstance(model, AbstractNN):
             raise Exception("_new_model must return an AbstractNN instance.")
-        model.to(self.device)
-        model.init_optimizer(warm_start, **kwargs)
+
+        warnings.filterwarnings(
+            "ignore", "The dataloader, val_dataloader 0, does not have many workers"
+        )
+        warnings.filterwarnings(
+            "ignore", "The dataloader, train_dataloader, does not have many workers"
+        )
 
         train_loader = Data.DataLoader(
             X_train.dataset,
@@ -1061,60 +1067,74 @@ class TorchModel(AbstractModel):
         )
         val_loader = X_val
 
-        train_ls = []
-        val_ls = []
-
-        early_stopping = EarlyStopping(
-            patience=self.trainer.static_params["patience"],
-            verbose=False,
-            path=os.path.join(self.root, "early_stopping_ckpt.pt"),
+        trainer = pl.Trainer(
+            max_epochs=epoch,
+            min_epochs=1,
+            callbacks=[
+                PytorchLightningLossCallback(verbose=True, total_epoch=epoch),
+                EarlyStopping(
+                    monitor="valid_mean_squared_error",
+                    min_delta=0.001,
+                    patience=self.trainer.static_params["patience"],
+                    mode="min",
+                ),
+                ModelCheckpoint(
+                    monitor="valid_mean_squared_error",
+                    dirpath=self.root,
+                    filename="early_stopping_ckpt",
+                    save_top_k=1,
+                    mode="min",
+                    every_n_epochs=1,
+                ),
+            ],
+            fast_dev_run=False,
+            max_time=None,
+            gpus=None,
+            accelerator="auto",
+            devices=None,
+            accumulate_grad_batches=1,
+            auto_lr_find=False,
+            auto_select_gpus=True,
+            check_val_every_n_epoch=1,
+            gradient_clip_val=0.0,
+            overfit_batches=0.0,
+            deterministic=False,
+            profiler=None,
+            logger=False,
+            track_grad_norm=-1,
+            precision=32,
+            enable_checkpointing=True,
+            enable_progress_bar=False,
         )
 
-        for i_epoch in range(epoch):
-            t_start = time.time()
-            # Note that train_loss is calculated across batch-training, its result might differ from that by directly
-            # calling _test_step on train_loader. Also, using BatchNorm that behaves differently during training and
-            # evaluating will cause this difference, but LayerNorm won't.
-            train_loss = model.train_step(train_loader, **kwargs)
-            train_ls.append(train_loss)
-            _, _, val_loss = model.test_step(val_loader, **kwargs)
-            val_ls.append(self._early_stopping_eval(train_loss, val_loss))
-            t_end = time.time()
+        with HiddenPrints(
+            disable_std=not verbose,
+            disable_logging=not verbose,
+        ):
+            trainer.fit(
+                model, train_dataloaders=train_loader, val_dataloaders=val_loader
+            )
 
-            if verbose and (
-                (i_epoch + 1) % src.setting["verbose_per_epoch"] == 0 or i_epoch == 0
-            ):
-                print(
-                    f"Epoch: {i_epoch + 1}/{epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, Min "
-                    f"ES eval loss: {np.min(val_ls):.4f}, Epoch time: {t_end-t_start:.4f}s."
-                )
-
-            early_stopping(val_ls[-1], model)
-
-            if early_stopping.early_stop:
-                if verbose:
-                    idx = val_ls.index(min(val_ls))
-                    print(
-                        f"Early stopping at epoch {i_epoch + 1}, Checkpoint at epoch {idx + 1}, Train loss: "
-                        f"{train_ls[idx]:.4f}, ES eval loss: {val_ls[idx]:.4f}"
-                    )
-                break
-
-        idx = val_ls.index(min(val_ls))
-        min_loss = val_ls[idx]
         model.to("cpu")
         model.load_state_dict(
-            torch.load(os.path.join(self.root, "early_stopping_ckpt.pt"))
+            torch.load(os.path.join(self.root, "early_stopping_ckpt.ckpt"))[
+                "state_dict"
+            ]
         )
+        trainer.strategy.remove_checkpoint(
+            os.path.join(self.root, "early_stopping_ckpt.ckpt")
+        )
+        # pl.Trainer is not pickle-able. When pickling, "ReferenceError: weakly-referenced object no longer exists."
+        # may be raised occasionally. Set the trainer to None.
+        # https://deepforest.readthedocs.io/en/latest/FAQ.html
+        model.trainer = None
         torch.cuda.empty_cache()
-        if verbose:
-            print(f"Minimum loss: {min_loss:.5f}")
 
     def _pred_single_model(
         self, model: "AbstractNN", X_test, D_test, verbose, **kwargs
     ):
         model.to(self.device)
-        y_test_pred, _, _ = model.test_step(X_test, **kwargs)
+        y_test_pred, _, _ = model.test_epoch(X_test, **kwargs)
         model.to("cpu")
         torch.cuda.empty_cache()
         return y_test_pred
@@ -1156,8 +1176,8 @@ class TorchModel(AbstractModel):
         return val_loss
 
 
-class AbstractNN(nn.Module):
-    def __init__(self, trainer: Trainer):
+class AbstractNN(pl.LightningModule):
+    def __init__(self, trainer: Trainer, **kwargs):
         """
         PyTorch model that contains derived data names and dimensions from the trainer.
 
@@ -1175,7 +1195,9 @@ class AbstractNN(nn.Module):
         self.derived_feature_names = list(trainer.derived_data.keys())
         self.derived_feature_dims = trainer.get_derived_data_sizes()
         self.derived_feature_names_dims = {}
-        self.optimizer = None
+        self.automatic_optimization = False
+        if len(kwargs) > 0:
+            self.save_hyperparameters(*list(kwargs.keys()), ignore=["trainer"])
         for name, dim in zip(
             trainer.derived_data.keys(), trainer.get_derived_data_sizes()
         ):
@@ -1220,44 +1242,36 @@ class AbstractNN(nn.Module):
     ) -> torch.Tensor:
         raise NotImplementedError
 
-    def train_step(
-        self,
-        train_loader: Data.DataLoader,
-        **kwargs,
-    ) -> float:
-        """
-        Train in a single epoch.
+    def training_step(self, batch, batch_idx):
+        self.cal_zero_grad()
+        yhat = batch[-1]
+        data = batch[0]
+        additional_tensors = [x for x in batch[1 : len(batch) - 1]]
+        y = self(*([data] + additional_tensors))
+        loss = self.loss_fn(yhat, y, *([data] + additional_tensors))
+        self.cal_backward_step(loss)
+        mse = self.default_loss_fn(yhat, y)
+        self.log("train_mean_squared_error", mse.item())
+        return loss
 
-        Parameters
-        ----------
-        train_loader:
-            The DataLoader of the training dataset.
-        **kwargs:
-            Parameters to train the model. It contains all arguments in :func:`_initial_values`.
-
-        Returns
-        -------
-        loss:
-            The loss of the model on the training dataset.
-        """
-        self.train()
-        avg_loss = 0
-        for idx, tensors in enumerate(train_loader):
-            self.cal_zero_grad()
-            yhat = tensors[-1].to(self.device)
-            data = tensors[0].to(self.device)
-            additional_tensors = [
-                x.to(self.device) for x in tensors[1 : len(tensors) - 1]
-            ]
+    def validation_step(self, batch, batch_idx):
+        with torch.no_grad():
+            yhat = batch[-1]
+            data = batch[0]
+            additional_tensors = [x for x in batch[1 : len(batch) - 1]]
             y = self(*([data] + additional_tensors))
-            loss = self.loss_fn(yhat, y, *([data] + additional_tensors), **kwargs)
-            self.cal_backward_step(loss)
-            avg_loss += loss.item() * len(y)
+            mse = self.default_loss_fn(yhat, y)
+            self.log("valid_mean_squared_error", mse.item())
+        return yhat, y
 
-        avg_loss /= len(train_loader.dataset)
-        return avg_loss
+    def configure_optimizers(self) -> Any:
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=self.hparams.lr,
+            weight_decay=self.hparams.weight_decay,
+        )
 
-    def test_step(
+    def test_epoch(
         self, test_loader: Data.DataLoader, **kwargs
     ) -> Tuple[np.ndarray, np.ndarray, float]:
         """
@@ -1317,31 +1331,12 @@ class AbstractNN(nn.Module):
         """
         return self.default_loss_fn(y_pred, y_true)
 
-    def init_optimizer(self, warm_start, **kwargs):
-        """
-        Initialize a torch.optim.Optimizer.
-
-        Parameters
-        ----------
-        warm_start
-            Whether the model should be fine-tuned. If True, the learning rate in kwargs is modified.
-        kwargs
-            Parameters to generate the optimizer. It contains all arguments in :func:`_initial_values`.
-        """
-        self.optimizer = torch.optim.Adam(
-            self.parameters(),
-            lr=kwargs["lr"] / 10 if warm_start else kwargs["lr"],
-            weight_decay=kwargs["weight_decay"],
-        )
-
     def cal_zero_grad(self):
         """
         Call optimizer.zero_grad() of the optimizer initialized in `init_optimizer`.
         """
-        if self.optimizer is not None:
-            self.optimizer.zero_grad()
-        else:
-            raise Exception(f"Optimizer is not initiated (by `init_optimizer`).")
+        opt = self.optimizers()
+        opt.zero_grad()
 
     def cal_backward_step(self, loss):
         """
@@ -1352,8 +1347,9 @@ class AbstractNN(nn.Module):
         loss
             The loss returned by `loss_fn`.
         """
-        loss.backward()
-        self.optimizer.step()
+        self.manual_backward(loss)
+        opt = self.optimizers()
+        opt.step()
 
 
 class ModelDict:

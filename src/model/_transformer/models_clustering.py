@@ -15,8 +15,9 @@ class AbstractClusteringModel(AbstractNN):
         clustering_features,
         clustering_sn_model,
         cont_cat_model,
+        **kwargs
     ):
-        super(AbstractClusteringModel, self).__init__(trainer)
+        super(AbstractClusteringModel, self).__init__(trainer, **kwargs)
         if n_outputs != 1:
             raise Exception("n_outputs > 1 is not supported.")
         self.clustering_features = clustering_features
@@ -40,10 +41,10 @@ class AbstractClusteringModel(AbstractNN):
         return self.output_loss
 
     def cal_backward_step(self, loss):
-        self.output_loss.backward(retain_graph=True)
+        self.manual_backward(self.output_loss, retain_graph=True)
         self.cont_cat_model.zero_grad()
-        self.naive_pred_loss.backward()
-        self.optimizer.step()
+        self.manual_backward(self.naive_pred_loss)
+        self.optimizers().step()
 
 
 class SNTransformerLRKMeansNN(AbstractClusteringModel):
@@ -69,6 +70,7 @@ class SNTransformerLRKMeansNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=transformer,
+            **kwargs,
         )
 
 
@@ -95,6 +97,7 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            **kwargs,
         )
 
 
@@ -122,6 +125,7 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            **kwargs,
         )
 
 
@@ -148,6 +152,7 @@ class SNCatEmbedLRGMMNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            **kwargs,
         )
 
 
@@ -184,6 +189,7 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            **kwargs,
         )
 
 
@@ -220,4 +226,5 @@ class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            **kwargs,
         )

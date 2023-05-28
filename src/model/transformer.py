@@ -39,105 +39,49 @@ class Transformer(TorchModel):
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
+        fix_kwargs = dict(
+            n_inputs=len(self.trainer.cont_feature_names),
+            n_outputs=len(self.trainer.label_name),
+            layers=self.trainer.args["layers"] if self.layers is None else self.layers,
+            cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
+            trainer=self.trainer,
+        )
         if model_name == "TransformerLSTM":
             return TransformerLSTMNN(
-                len(self.trainer.cont_feature_names),
-                len(self.trainer.label_name),
-                layers=self.trainer.args["layers"]
-                if self.layers is None
-                else self.layers,
-                trainer=self.trainer,
-                cat_num_unique=[
-                    len(x) for x in self.trainer.cat_feature_mapping.values()
-                ],
-                seq_embedding_dim=kwargs["seq_embedding_dim"],
-                embedding_dim=kwargs["embedding_dim"],
-                n_hidden=kwargs["n_hidden"],
-                lstm_layers=kwargs["lstm_layers"],
-                attn_layers=kwargs["attn_layers"],
-                attn_heads=kwargs["attn_heads"],
-                embed_dropout=kwargs["embed_dropout"],
-                attn_dropout=kwargs["attn_dropout"],
+                **fix_kwargs,
+                attn_ff_dim=256,
+                **kwargs,
             )
         elif model_name in [
             "FTTransformer",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
-                len(self.trainer.cont_feature_names),
-                len(self.trainer.label_name),
-                layers=self.trainer.args["layers"]
-                if self.layers is None
-                else self.layers,
-                trainer=self.trainer,
-                cat_num_unique=[
-                    len(x) for x in self.trainer.cat_feature_mapping.values()
-                ],
-                embedding_dim=kwargs["embedding_dim"],
-                embed_dropout=kwargs["embed_dropout"],
-                attn_layers=kwargs["attn_layers"],
-                attn_heads=kwargs["attn_heads"],
-                attn_dropout=kwargs["attn_dropout"],
+                **fix_kwargs,
+                **kwargs,
             )
         elif model_name in [
             "TransformerSeq",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
-                len(self.trainer.cont_feature_names),
-                len(self.trainer.label_name),
-                layers=self.trainer.args["layers"]
-                if self.layers is None
-                else self.layers,
-                trainer=self.trainer,
-                cat_num_unique=[
-                    len(x) for x in self.trainer.cat_feature_mapping.values()
-                ],
-                seq_embedding_dim=kwargs["seq_embedding_dim"],
-                embedding_dim=kwargs["embedding_dim"],
-                embed_dropout=kwargs["embed_dropout"],
-                attn_layers=kwargs["attn_layers"],
-                attn_heads=kwargs["attn_heads"],
-                attn_dropout=kwargs["attn_dropout"],
-                seq_attn_layers=kwargs["seq_attn_layers"],
-                seq_attn_heads=kwargs["seq_attn_heads"],
-                seq_attn_dropout=kwargs["seq_attn_dropout"],
+                **fix_kwargs,
+                attn_ff_dim=256,
+                **kwargs,
             )
         elif model_name in ["CategoryEmbedding"]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
-                len(self.trainer.cont_feature_names),
-                len(self.trainer.label_name),
-                layers=self.trainer.args["layers"]
-                if self.layers is None
-                else self.layers,
-                trainer=self.trainer,
-                cat_num_unique=[
-                    len(x) for x in self.trainer.cat_feature_mapping.values()
-                ],
+                **fix_kwargs,
                 embedding_dim=3,
-                embed_dropout=kwargs["embed_dropout"],
-                mlp_dropout=kwargs["mlp_dropout"],
+                **kwargs,
             )
         elif model_name in ["CatEmbedSeq"]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
-                len(self.trainer.cont_feature_names),
-                len(self.trainer.label_name),
-                layers=self.trainer.args["layers"]
-                if self.layers is None
-                else self.layers,
-                trainer=self.trainer,
-                cat_num_unique=[
-                    len(x) for x in self.trainer.cat_feature_mapping.values()
-                ],
-                embedding_dim=kwargs["embedding_dim"],
-                embed_dropout=kwargs["embed_dropout"],
-                mlp_dropout=kwargs["mlp_dropout"],
-                seq_embedding_dim=kwargs["seq_embedding_dim"],
-                seq_attn_layers=kwargs["seq_attn_layers"],
-                seq_attn_heads=kwargs["seq_attn_heads"],
-                seq_attn_dropout=kwargs["seq_attn_dropout"],
+                **fix_kwargs,
+                attn_ff_dim=256,
+                **kwargs,
             )
         elif model_name in [
             "SNCatEmbedLRKMeans",
@@ -147,61 +91,23 @@ class Transformer(TorchModel):
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
-                len(self.trainer.cont_feature_names),
-                len(self.trainer.label_name),
-                layers=self.trainer.args["layers"]
-                if self.layers is None
-                else self.layers,
-                trainer=self.trainer,
-                n_clusters=kwargs["n_clusters"],
-                cat_num_unique=[
-                    len(x) for x in self.trainer.cat_feature_mapping.values()
-                ],
-                embedding_dim=kwargs["embedding_dim"],
-                embed_dropout=kwargs["embed_dropout"],
-                mlp_dropout=kwargs["mlp_dropout"],
+                **fix_kwargs,
+                **kwargs,
             )
         elif model_name in ["SNCatEmbedLRKMeansSeq"]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
-                len(self.trainer.cont_feature_names),
-                len(self.trainer.label_name),
-                layers=self.trainer.args["layers"]
-                if self.layers is None
-                else self.layers,
-                trainer=self.trainer,
-                n_clusters=kwargs["n_clusters"],
-                cat_num_unique=[
-                    len(x) for x in self.trainer.cat_feature_mapping.values()
-                ],
-                embedding_dim=kwargs["embedding_dim"],
-                embed_dropout=kwargs["embed_dropout"],
-                mlp_dropout=kwargs["mlp_dropout"],
-                seq_embedding_dim=kwargs["seq_embedding_dim"],
-                seq_attn_layers=kwargs["seq_attn_layers"],
-                seq_attn_heads=kwargs["seq_attn_heads"],
-                seq_attn_dropout=kwargs["seq_attn_dropout"],
+                **fix_kwargs,
+                attn_ff_dim=256,
+                **kwargs,
             )
         elif model_name in [
             "SNTransformerLRKMeans",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
-                len(self.trainer.cont_feature_names),
-                len(self.trainer.label_name),
-                layers=self.trainer.args["layers"]
-                if self.layers is None
-                else self.layers,
-                trainer=self.trainer,
-                n_clusters=kwargs["n_clusters"],
-                cat_num_unique=[
-                    len(x) for x in self.trainer.cat_feature_mapping.values()
-                ],
-                embedding_dim=kwargs["embedding_dim"],
-                embed_dropout=kwargs["embed_dropout"],
-                attn_layers=kwargs["attn_layers"],
-                attn_heads=kwargs["attn_heads"],
-                attn_dropout=kwargs["attn_dropout"],
+                **fix_kwargs,
+                **kwargs,
             )
 
     def _space(self, model_name):

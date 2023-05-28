@@ -16,8 +16,9 @@ class AbstractSeqModel(AbstractNN):
         trainer,
         cont_cat_model: AbstractNN,
         seq_model: Union[AbstractNN, nn.Module],
+        **kwargs,
     ):
-        super(AbstractSeqModel, self).__init__(trainer)
+        super(AbstractSeqModel, self).__init__(trainer, **kwargs)
         self.cont_cat_model = cont_cat_model
         self.seq_model = seq_model
         if self.seq_model.run or n_outputs != 1:
@@ -52,34 +53,26 @@ class TransformerLSTMNN(AbstractSeqModel):
         layers,
         trainer,
         cat_num_unique: List[int] = None,
-        embedding_dim=32,
-        seq_embedding_dim=10,
-        n_hidden=3,
-        lstm_layers=1,
-        attn_layers=4,
-        attn_heads=8,
-        embed_dropout=0.1,
-        attn_ff_dim=256,
-        attn_dropout=0.1,
+        **kwargs,
     ):
-        AbstractNN.__init__(self, trainer)
+        AbstractNN.__init__(self, trainer, **kwargs)
         transformer = FTTransformerNN(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
             trainer=trainer,
             cat_num_unique=cat_num_unique,
-            embedding_dim=embedding_dim,
-            embed_dropout=embed_dropout,
-            attn_layers=attn_layers,
-            attn_heads=attn_heads,
-            attn_ff_dim=attn_ff_dim,
-            attn_dropout=attn_dropout,
+            embedding_dim=self.hparams.embedding_dim,
+            embed_dropout=self.hparams.embed_dropout,
+            attn_layers=self.hparams.attn_layers,
+            attn_heads=self.hparams.attn_heads,
+            attn_ff_dim=self.hparams.attn_ff_dim,
+            attn_dropout=self.hparams.attn_dropout,
         )
 
         lstm = LSTM(
-            n_hidden,
-            seq_embedding_dim,
-            lstm_layers,
+            self.hparams.n_hidden,
+            self.hparams.seq_embedding_dim,
+            self.hparams.lstm_layers,
             run="Number of Layers" in self.derived_feature_names,
         )
         super(TransformerLSTMNN, self).__init__(
@@ -99,39 +92,30 @@ class TransformerSeqNN(AbstractSeqModel):
         layers,
         trainer,
         cat_num_unique: List[int] = None,
-        embedding_dim=32,
-        seq_embedding_dim=16,
-        embed_dropout=0.1,
-        attn_layers=4,
-        attn_heads=8,
-        attn_ff_dim=256,
-        attn_dropout=0.1,
-        seq_attn_layers=4,
-        seq_attn_heads=8,
-        seq_attn_dropout=0.1,
+        **kwargs,
     ):
-        AbstractNN.__init__(self, trainer)
+        AbstractNN.__init__(self, trainer, **kwargs)
         transformer = FTTransformerNN(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
             trainer=trainer,
             cat_num_unique=cat_num_unique,
-            embedding_dim=embedding_dim,
-            embed_dropout=embed_dropout,
-            attn_layers=attn_layers,
-            attn_heads=attn_heads,
-            attn_ff_dim=attn_ff_dim,
-            attn_dropout=attn_dropout,
+            embedding_dim=self.hparams.embedding_dim,
+            embed_dropout=self.hparams.embed_dropout,
+            attn_layers=self.hparams.attn_layers,
+            attn_heads=self.hparams.attn_heads,
+            attn_ff_dim=self.hparams.attn_ff_dim,
+            attn_dropout=self.hparams.attn_dropout,
         )
 
         seq_transformer = SeqFTTransformer(
             n_inputs=None,
-            attn_heads=seq_attn_heads,
-            attn_layers=seq_attn_layers,
-            embedding_dim=seq_embedding_dim,
-            ff_dim=attn_ff_dim,
+            attn_heads=self.hparams.seq_attn_heads,
+            attn_layers=self.hparams.seq_attn_layers,
+            embedding_dim=self.hparams.seq_embedding_dim,
+            ff_dim=self.hparams.attn_ff_dim,
             ff_layers=layers,
-            dropout=seq_attn_dropout,
+            dropout=self.hparams.seq_attn_dropout,
             n_outputs=n_outputs,
             run="Lay-up Sequence" in self.derived_feature_names
             and "Number of Layers" in self.derived_feature_names,
@@ -157,33 +141,26 @@ class CatEmbedSeqNN(AbstractSeqModel):
         layers,
         trainer,
         cat_num_unique: List[int] = None,
-        embedding_dim=32,
-        embed_dropout=0.1,
-        mlp_dropout=0.0,
-        seq_embedding_dim=16,
-        attn_ff_dim=256,
-        seq_attn_layers=4,
-        seq_attn_heads=8,
-        seq_attn_dropout=0.1,
+        **kwargs,
     ):
-        AbstractNN.__init__(self, trainer)
+        AbstractNN.__init__(self, trainer, **kwargs)
         catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
             trainer=trainer,
             cat_num_unique=cat_num_unique,
-            embedding_dim=embedding_dim,
-            embed_dropout=embed_dropout,
-            mlp_dropout=mlp_dropout,
+            embedding_dim=self.hparams.embedding_dim,
+            embed_dropout=self.hparams.embed_dropout,
+            mlp_dropout=self.hparams.mlp_dropout,
         )
         seq_transformer = SeqFTTransformer(
             n_inputs=None,  # not needed
-            attn_heads=seq_attn_heads,
-            attn_layers=seq_attn_layers,
-            embedding_dim=seq_embedding_dim,
-            ff_dim=attn_ff_dim,
+            attn_heads=self.hparams.seq_attn_heads,
+            attn_layers=self.hparams.seq_attn_layers,
+            embedding_dim=self.hparams.seq_embedding_dim,
+            ff_dim=self.hparams.attn_ff_dim,
             ff_layers=layers,
-            dropout=seq_attn_dropout,
+            dropout=self.hparams.seq_attn_dropout,
             n_outputs=n_outputs,
             run="Lay-up Sequence" in self.derived_feature_names
             and "Number of Layers" in self.derived_feature_names,
