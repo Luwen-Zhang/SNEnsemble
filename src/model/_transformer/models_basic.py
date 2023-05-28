@@ -18,7 +18,7 @@ class CategoryEmbeddingNN(AbstractNN):
         mlp_dropout=0.0,
         **kwargs,
     ):
-        super(CategoryEmbeddingNN, self).__init__(trainer, **kwargs)
+        super(CategoryEmbeddingNN, self).__init__(trainer)
 
         run_cat = "categorical" in self.derived_feature_names
 

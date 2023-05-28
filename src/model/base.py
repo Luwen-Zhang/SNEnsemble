@@ -13,6 +13,7 @@ from typing import *
 from skopt.space import Real, Integer, Categorical
 import time
 from contextlib import nullcontext
+from functools import partial
 
 
 class AbstractModel:
