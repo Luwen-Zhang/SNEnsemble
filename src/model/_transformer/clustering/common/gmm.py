@@ -282,9 +282,11 @@ class GMM(AbstractClustering):
 
 
 class SecondGMMCluster(Cluster):
-    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
-        super(SecondGMMCluster, self).__init__(n_input=n_input, momentum=momentum)
-        self.inner_layer = GMM(momentum=momentum, n_input=n_input, **kwargs)
+    def __init__(
+        self, n_input_outer: int, n_input_inner: int, momentum: float = 0.8, **kwargs
+    ):
+        super(SecondGMMCluster, self).__init__(n_input=n_input_outer, momentum=momentum)
+        self.inner_layer = GMM(momentum=momentum, n_input=n_input_inner, **kwargs)
 
 
 class TwolayerGMM(AbstractMultilayerClustering):

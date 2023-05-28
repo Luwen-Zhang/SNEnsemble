@@ -106,7 +106,8 @@ class AbstractMultilayerClustering(AbstractClustering):
             )
         second_layer_clusters = [
             second_layer_cluster_class(
-                n_input=n_input_2,
+                n_input_outer=n_input_1,
+                n_input_inner=n_input_2,
                 momentum=momentum,
                 n_clusters=n_clusters_per_cluster,
                 clusters=clusters[

@@ -132,9 +132,13 @@ class KMeans(AbstractClustering):
 
 
 class SecondKMeansCluster(Cluster):
-    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
-        super(SecondKMeansCluster, self).__init__(n_input=n_input, momentum=momentum)
-        self.inner_layer = KMeans(momentum=momentum, n_input=n_input, **kwargs)
+    def __init__(
+        self, n_input_outer: int, n_input_inner: int, momentum: float = 0.8, **kwargs
+    ):
+        super(SecondKMeansCluster, self).__init__(
+            n_input=n_input_outer, momentum=momentum
+        )
+        self.inner_layer = KMeans(momentum=momentum, n_input=n_input_inner, **kwargs)
 
 
 class TwolayerKMeans(AbstractMultilayerClustering):
