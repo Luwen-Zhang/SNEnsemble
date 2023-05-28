@@ -1410,7 +1410,7 @@ def get_sequential(
         nonlinearity = "leaky_relu"
     if len(layers) > 0:
         if use_norm:
-            net.add_module(f"norm_0", norm(layers[0]))
+            net.add_module(f"norm_0", norm(n_inputs))
         net.add_module(
             "input", get_linear(n_inputs, layers[0], nonlinearity=nonlinearity)
         )
@@ -1419,7 +1419,7 @@ def get_sequential(
             net.add_module(f"dropout_0", nn.Dropout(dropout))
         for idx in range(1, len(layers)):
             if use_norm:
-                net.add_module(f"norm_{idx}", norm(layers[idx]))
+                net.add_module(f"norm_{idx}", norm(layers[idx - 1]))
             net.add_module(
                 str(idx),
                 get_linear(layers[idx - 1], layers[idx], nonlinearity=nonlinearity),
