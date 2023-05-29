@@ -104,23 +104,23 @@ class IncrementalPCA(nn.Module):
             # Whitening
             if self.n_samples_seen_ == 0:
                 # If it is the first step, simply whiten X
-                x = x - col_mean
+                X = x - col_mean
             else:
                 col_batch_mean = torch.mean(x, dim=0)
-                x = x - col_batch_mean
+                X = x - col_batch_mean
                 # Build matrix of combined previous basis and new data
                 mean_correction = torch.sqrt(
                     (self.n_samples_seen_ / n_total_samples) * n_samples
                 ) * (self.mean_ - col_batch_mean)
-                x = torch.vstack(
+                X = torch.vstack(
                     (
                         self.singular_values_.view((-1, 1)) * self.components_,
-                        x,
+                        X,
                         mean_correction,
                     )
                 )
 
-            U, S, Vt = torch.linalg.svd(x, full_matrices=False)
+            U, S, Vt = torch.linalg.svd(X, full_matrices=False)
             U, Vt = svd_flip(U, Vt, u_based_decision=False)
             explained_variance = S**2 / (n_total_samples - 1)
             explained_variance_ratio = S**2 / torch.sum(col_var * n_total_samples)
