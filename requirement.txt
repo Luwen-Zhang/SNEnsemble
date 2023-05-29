@@ -20,3 +20,4 @@ pytorch_tabular==1.0.1
 miceforest==5.6.3
 shap==0.41.0
 einops==0.6.0
+pytorch_lightning==1.8.6
