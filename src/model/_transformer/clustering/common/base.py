@@ -7,6 +7,7 @@ import numpy as np
 class AbstractCluster(nn.Module):
     def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
         super(AbstractCluster, self).__init__()
+        self.n_input = n_input
         self.momentum = momentum
 
 
@@ -24,6 +25,12 @@ class AbstractClustering(nn.Module):
         self.n_input = n_input
         if clusters is None and cluster_class is None:
             raise Exception(f"Neither `cluster_class` nor `clusters` is provided.")
+        if clusters is not None and len(clusters) > 0:
+            if clusters[0].n_input != n_input:
+                raise Exception(
+                    f"Given clusters have n_input={clusters[0].n_input}, but the n_input of {self.__class__.__name__} "
+                    f"is set to {n_input}"
+                )
         self.clusters = nn.ModuleList(
             [
                 cluster_class(n_input=n_input, momentum=momentum)
@@ -142,7 +149,7 @@ class AbstractMultilayerClustering(AbstractClustering):
             inner_clusters += i.inner_layer.clusters
         self.second_clustering = algorithm_class(
             n_clusters=self.n_total_clusters,
-            n_input=len(np.union1d(input_1_idx, input_2_idx)),
+            n_input=n_input_2,
             momentum=momentum,
             clusters=inner_clusters,
         )
