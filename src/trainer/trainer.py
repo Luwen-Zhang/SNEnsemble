@@ -1475,12 +1475,16 @@ class Trainer:
         for modelbase in modelbases_to_train:
             modelbase.train(verbose=verbose)
 
-    def pca(self, **kwargs) -> PCA:
+    def pca(
+        self, feature_names: List[str] = None, feature_idx: List[int] = None, **kwargs
+    ) -> PCA:
         """
         Perform sklearn.decomposition.PCA
 
         Parameters
         -------
+        feature_names
+            A list of names of continuous features.
         **kwargs
             Arguments of sklearn.decomposition.PCA.
 
@@ -1490,7 +1494,16 @@ class Trainer:
             A sklearn.decomposition.PCA instance.
         """
         pca = PCA(**kwargs)
-        pca.fit(self.feature_data.loc[self.train_indices, :])
+        if feature_names is not None:
+            pca.fit(self.feature_data.loc[self.train_indices, feature_names])
+        elif feature_idx is not None:
+            pca.fit(
+                self.feature_data.loc[
+                    self.train_indices, np.array(self.cont_feature_names)[feature_idx]
+                ]
+            )
+        else:
+            pca.fit(self.feature_data.loc[self.train_indices, :])
         return pca
 
     def get_derived_data_sizes(self) -> List[Tuple]:
