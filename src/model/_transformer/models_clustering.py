@@ -46,15 +46,19 @@ class AbstractClusteringModel(AbstractNN):
         self.manual_backward(self.naive_pred_loss)
         self.optimizers().step()
 
-
-class SNTransformerLRKMeansNN(AbstractClusteringModel):
-    def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
-        clustering_features = np.concatenate(
+    @staticmethod
+    def basic_clustering_features_idx(trainer) -> np.ndarray:
+        return np.concatenate(
             (
                 trainer.get_feature_idx_by_type(typ="Material"),
                 [trainer.cont_feature_names.index(x) for x in ["R-value"]],
             )
         )
+
+    @staticmethod
+    def top_clustering_features_idx(trainer):
+        return AbstractClusteringModel.basic_clustering_features_idx(trainer)[:-1]
+        clustering_features = self.basic_clustering_features_idx(trainer)
         transformer = FTTransformerNN(
             n_inputs=n_inputs,
             n_outputs=1,
@@ -76,12 +80,7 @@ class SNTransformerLRKMeansNN(AbstractClusteringModel):
 
 class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
     def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
-        clustering_features = np.concatenate(
-            (
-                trainer.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
-            )
-        )
+        clustering_features = self.basic_clustering_features_idx(trainer)
         catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,
             n_outputs=1,
@@ -103,12 +102,7 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
 
 class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
     def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
-        clustering_features = np.concatenate(
-            (
-                trainer.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
-            )
-        )
+        clustering_features = self.basic_clustering_features_idx(trainer)
         catembed = CatEmbedSeqNN(
             n_inputs=n_inputs,
             n_outputs=1,
@@ -131,12 +125,7 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
 
 class SNCatEmbedLRGMMNN(AbstractClusteringModel):
     def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
-        clustering_features = np.concatenate(
-            (
-                trainer.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
-            )
-        )
+        clustering_features = self.basic_clustering_features_idx(trainer)
         catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,
             n_outputs=1,
@@ -158,15 +147,13 @@ class SNCatEmbedLRGMMNN(AbstractClusteringModel):
 
 class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
     def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
-        clustering_features = np.concatenate(
-            (
-                trainer.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
-            )
-        )
-        input_1_idx = list(np.arange(0, len(clustering_features) - 1))
+        clustering_features = list(self.basic_clustering_features_idx(trainer))
+        top_level_clustering_features = self.top_clustering_features_idx(trainer)
+        input_1_idx = [
+            list(clustering_features).index(x) for x in top_level_clustering_features
+        ]
         input_2_idx = list(
-            np.arange(len(clustering_features) - 1, len(clustering_features))
+            np.setdiff1d(np.arange(len(clustering_features)), input_1_idx)
         )
         catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,
@@ -195,15 +182,13 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
 
 class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
     def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
-        clustering_features = np.concatenate(
-            (
-                trainer.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
-            )
-        )
-        input_1_idx = list(np.arange(0, len(clustering_features) - 1))
+        clustering_features = list(self.basic_clustering_features_idx(trainer))
+        top_level_clustering_features = self.top_clustering_features_idx(trainer)
+        input_1_idx = [
+            list(clustering_features).index(x) for x in top_level_clustering_features
+        ]
         input_2_idx = list(
-            np.arange(len(clustering_features) - 1, len(clustering_features))
+            np.setdiff1d(np.arange(len(clustering_features)), input_1_idx)
         )
         catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,
