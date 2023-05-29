@@ -10,6 +10,7 @@ import numpy as np
 from typing import List, Union
 import warnings
 from .base import AbstractClustering, AbstractCluster, AbstractMultilayerClustering
+from src.model._transformer.pca.incremental_pca import IncrementalPCA
 
 
 class Cluster(AbstractCluster):
@@ -35,6 +36,7 @@ class KMeans(AbstractClustering):
         momentum: float = 0.8,
         method: str = "fast_kmeans",
         init_method: str = "kmeans++",
+        **kwargs,
     ):
         super(KMeans, self).__init__(
             n_clusters=n_clusters,
@@ -42,6 +44,7 @@ class KMeans(AbstractClustering):
             cluster_class=Cluster,
             clusters=clusters,
             momentum=momentum,
+            **kwargs,
         )
         self.method = method
         self.init_method = init_method
@@ -131,6 +134,31 @@ class KMeans(AbstractClustering):
         return torch.concat([cluster.center for cluster in self.clusters], dim=0)
 
 
+class PCAKMeans(KMeans):
+    def __init__(self, n_input, n_pca_dim: int = None, **kwargs):
+        if n_pca_dim is not None:
+            if n_input <= n_pca_dim:
+                msg = f"Expecting n_pca_dim lower than n_input {n_input}, but got {n_pca_dim}."
+                if n_input < n_pca_dim:
+                    raise Exception(msg)
+                elif n_input == n_pca_dim:
+                    warnings.warn(msg)
+                super(PCAKMeans, self).__init__(n_input=n_input, **kwargs)
+            else:
+                self.n_clustering_features = np.min([n_input, n_pca_dim])
+                super(PCAKMeans, self).__init__(
+                    n_input=self.n_clustering_features, **kwargs
+                )
+                self.pca = IncrementalPCA(n_components=self.n_clustering_features)
+        else:
+            super(PCAKMeans, self).__init__(n_input=n_input, **kwargs)
+
+    def forward(self, x: torch.Tensor):
+        if hasattr(self, "pca"):
+            x = self.pca(x)
+        return super(PCAKMeans, self).forward(x)
+
+
 class SecondKMeansCluster(Cluster):
     def __init__(
         self, n_input_outer: int, n_input_inner: int, momentum: float = 0.8, **kwargs
@@ -152,6 +180,7 @@ class TwolayerKMeans(AbstractMultilayerClustering):
         clusters: Union[List[Cluster], nn.ModuleList] = None,
         momentum: float = 0.8,
         n_clusters_per_cluster: int = 5,
+        n_pca_dim: int = None,
         **kwargs,
     ):
         super(TwolayerKMeans, self).__init__(
@@ -160,10 +189,11 @@ class TwolayerKMeans(AbstractMultilayerClustering):
             n_input_2=n_input_2,
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
-            algorithm_class=KMeans,
+            algorithm_class=PCAKMeans,
             second_layer_cluster_class=SecondKMeansCluster,
             clusters=clusters,
             momentum=momentum,
             n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
             **kwargs,
         )

@@ -136,10 +136,13 @@ class AbstractSNClustering(nn.Module):
         n_input: int,
         layers,
         algorithm_class: Type[AbstractClustering],
+        n_pca_dim: int = None,
     ):
         super(AbstractSNClustering, self).__init__()
         self.n_clusters = n_clusters
-        self.clustering = algorithm_class(n_clusters=n_clusters, n_input=n_input)
+        self.clustering = algorithm_class(
+            n_clusters=n_clusters, n_input=n_input, n_pca_dim=n_pca_dim
+        )
         self.sns = nn.ModuleList(
             [SN(n_cluster_features=n_input, layers=layers) for i in range(n_clusters)]
         )
@@ -171,6 +174,7 @@ class AbstractMultilayerSNClustering(nn.Module):
         layers,
         algorithm_class: Type[AbstractMultilayerClustering],
         n_clusters_per_cluster: int = 5,
+        n_pca_dim: int = None,
     ):
         super(AbstractMultilayerSNClustering, self).__init__()
         self.clustering = algorithm_class(
@@ -180,6 +184,7 @@ class AbstractMultilayerSNClustering(nn.Module):
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
             n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
         )
         self.n_clusters = self.clustering.n_total_clusters
         self.sns = nn.ModuleList(

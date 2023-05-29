@@ -10,6 +10,7 @@ import warnings
 from math import pi
 from .kmeans import KMeans
 from .base import AbstractCluster, AbstractClustering, AbstractMultilayerClustering
+from src.model._transformer.pca.incremental_pca import IncrementalPCA
 
 
 def calculate_matmul_n_times(n_components, mat_a, mat_b):
@@ -75,6 +76,7 @@ class GMM(AbstractClustering):
         clusters: Union[List[Cluster], nn.ModuleList] = None,
         momentum: float = 0.8,
         init_method: str = "kmeans",
+        **kwargs,
     ):
         super(GMM, self).__init__(
             n_clusters=n_clusters,
@@ -82,6 +84,7 @@ class GMM(AbstractClustering):
             cluster_class=Cluster,
             clusters=clusters,
             momentum=momentum,
+            **kwargs,
         )
         self.init_method = init_method
         self.eps = 1e-6
@@ -281,6 +284,31 @@ class GMM(AbstractClustering):
             return torch.squeeze(per_sample_score)
 
 
+class PCAGMM(GMM):
+    def __init__(self, n_input, n_pca_dim: int = None, **kwargs):
+        if n_pca_dim is not None:
+            if n_input <= n_pca_dim:
+                msg = f"Expecting n_pca_dim lower than n_input {n_input}, but got {n_pca_dim}."
+                if n_input < n_pca_dim:
+                    raise Exception(msg)
+                elif n_input == n_pca_dim:
+                    warnings.warn(msg)
+                super(PCAGMM, self).__init__(n_input=n_input, **kwargs)
+            else:
+                self.n_clustering_features = np.min([n_input, n_pca_dim])
+                super(PCAGMM, self).__init__(
+                    n_input=self.n_clustering_features, **kwargs
+                )
+                self.pca = IncrementalPCA(n_components=self.n_clustering_features)
+        else:
+            super(PCAGMM, self).__init__(n_input=n_input, **kwargs)
+
+    def forward(self, x: torch.Tensor):
+        if hasattr(self, "pca"):
+            x = self.pca(x)
+        return super(PCAGMM, self).forward(x)
+
+
 class SecondGMMCluster(Cluster):
     def __init__(
         self, n_input_outer: int, n_input_inner: int, momentum: float = 0.8, **kwargs
@@ -300,6 +328,7 @@ class TwolayerGMM(AbstractMultilayerClustering):
         clusters: Union[List[Cluster], nn.ModuleList] = None,
         momentum: float = 0.8,
         n_clusters_per_cluster: int = 5,
+        n_pca_dim: int = None,
         **kwargs,
     ):
         super(TwolayerGMM, self).__init__(
@@ -308,10 +337,11 @@ class TwolayerGMM(AbstractMultilayerClustering):
             n_input_2=n_input_2,
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
-            algorithm_class=GMM,
+            algorithm_class=PCAGMM,
             second_layer_cluster_class=SecondGMMCluster,
             clusters=clusters,
             momentum=momentum,
             n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
             **kwargs,
         )

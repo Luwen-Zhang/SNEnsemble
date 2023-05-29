@@ -19,6 +19,7 @@ class AbstractClustering(nn.Module):
         cluster_class: Type[AbstractCluster] = None,
         clusters: Union[List[AbstractCluster], nn.ModuleList] = None,
         momentum: float = 0.8,
+        **kwargs,
     ):
         super(AbstractClustering, self).__init__()
         self.n_clusters = n_clusters
@@ -97,6 +98,7 @@ class AbstractMultilayerClustering(AbstractClustering):
         clusters: List[AbstractCluster] = None,
         momentum: float = 0.8,
         n_clusters_per_cluster: int = 5,
+        n_pca_dim: int = None,
         **kwargs,
     ):
         if algorithm_class is None or second_layer_cluster_class is None:
@@ -113,7 +115,7 @@ class AbstractMultilayerClustering(AbstractClustering):
             )
         second_layer_clusters = [
             second_layer_cluster_class(
-                n_input_outer=n_input_1,
+                n_input_outer=n_input_1 if n_pca_dim is None else n_pca_dim,
                 n_input_inner=n_input_2,
                 momentum=momentum,
                 n_clusters=n_clusters_per_cluster,
@@ -141,6 +143,7 @@ class AbstractMultilayerClustering(AbstractClustering):
             n_input=n_input_1,
             momentum=momentum,
             clusters=second_layer_clusters,
+            n_pca_dim=n_pca_dim,
             **kwargs,
         )
         # This is a surrogate instance to gather clusters in second_layer_clusters.

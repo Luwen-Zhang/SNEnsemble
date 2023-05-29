@@ -58,6 +58,19 @@ class AbstractClusteringModel(AbstractNN):
     @staticmethod
     def top_clustering_features_idx(trainer):
         return AbstractClusteringModel.basic_clustering_features_idx(trainer)[:-1]
+
+
+class SNTransformerLRKMeansNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_pca_dim: int = None,
+        **kwargs
+    ):
         clustering_features = self.basic_clustering_features_idx(trainer)
         transformer = FTTransformerNN(
             n_inputs=n_inputs,
@@ -66,7 +79,10 @@ class AbstractClusteringModel(AbstractNN):
             **kwargs,
         )
         sn = KMeansSN(
-            n_clusters=n_clusters, n_input=len(clustering_features), layers=layers
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            layers=layers,
+            n_pca_dim=n_pca_dim,
         )
         super(SNTransformerLRKMeansNN, self).__init__(
             n_outputs=n_outputs,
@@ -79,7 +95,16 @@ class AbstractClusteringModel(AbstractNN):
 
 
 class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
-    def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_pca_dim: int = None,
+        **kwargs
+    ):
         clustering_features = self.basic_clustering_features_idx(trainer)
         catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,
@@ -88,7 +113,10 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
             **kwargs,
         )
         sn = KMeansSN(
-            n_clusters=n_clusters, n_input=len(clustering_features), layers=layers
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            layers=layers,
+            n_pca_dim=n_pca_dim,
         )
         super(SNCatEmbedLRKMeansNN, self).__init__(
             n_outputs=n_outputs,
@@ -101,7 +129,16 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
 
 
 class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
-    def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_pca_dim: int = None,
+        **kwargs
+    ):
         clustering_features = self.basic_clustering_features_idx(trainer)
         catembed = CatEmbedSeqNN(
             n_inputs=n_inputs,
@@ -111,7 +148,10 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
             **kwargs,
         )
         sn = KMeansSN(
-            n_clusters=n_clusters, n_input=len(clustering_features), layers=layers
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            layers=layers,
+            n_pca_dim=n_pca_dim,
         )
         super(SNCatEmbedLRKMeansSeqNN, self).__init__(
             n_outputs=n_outputs,
@@ -124,7 +164,9 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
 
 
 class SNCatEmbedLRGMMNN(AbstractClusteringModel):
-    def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
+    def __init__(
+        self, n_inputs, n_outputs, layers, trainer, n_clusters, n_pca_dim=None, **kwargs
+    ):
         clustering_features = self.basic_clustering_features_idx(trainer)
         catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,
@@ -133,7 +175,10 @@ class SNCatEmbedLRGMMNN(AbstractClusteringModel):
             **kwargs,
         )
         sn = GMMSN(
-            n_clusters=n_clusters, n_input=len(clustering_features), layers=layers
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            layers=layers,
+            n_pca_dim=n_pca_dim,
         )
         super(SNCatEmbedLRGMMNN, self).__init__(
             n_outputs=n_outputs,
@@ -146,7 +191,16 @@ class SNCatEmbedLRGMMNN(AbstractClusteringModel):
 
 
 class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
-    def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_pca_dim: int = None,
+        **kwargs
+    ):
         clustering_features = list(self.basic_clustering_features_idx(trainer))
         top_level_clustering_features = self.top_clustering_features_idx(trainer)
         input_1_idx = [
@@ -169,6 +223,7 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
             input_2_idx=input_2_idx,
             layers=layers,
             n_clusters_per_cluster=5,
+            n_pca_dim=n_pca_dim,
         )
         super(SNCatEmbedLR2LGMMNN, self).__init__(
             n_outputs=n_outputs,
@@ -181,7 +236,16 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
 
 
 class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
-    def __init__(self, n_inputs, n_outputs, layers, trainer, n_clusters, **kwargs):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_pca_dim: int = None,
+        **kwargs
+    ):
         clustering_features = list(self.basic_clustering_features_idx(trainer))
         top_level_clustering_features = self.top_clustering_features_idx(trainer)
         input_1_idx = [
@@ -204,6 +268,7 @@ class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
             input_2_idx=input_2_idx,
             layers=layers,
             n_clusters_per_cluster=5,
+            n_pca_dim=n_pca_dim,
         )
         super(SNCatEmbedLR2LKMeansNN, self).__init__(
             n_outputs=n_outputs,

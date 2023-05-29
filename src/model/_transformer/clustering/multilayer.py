@@ -14,6 +14,7 @@ class TwolayerGMMSN(AbstractMultilayerSNClustering):
         input_2_idx: List[int],
         layers,
         n_clusters_per_cluster: int = 5,
+        n_pca_dim: int = None,
     ):
         super(TwolayerGMMSN, self).__init__(
             n_clusters=n_clusters,
@@ -24,6 +25,7 @@ class TwolayerGMMSN(AbstractMultilayerSNClustering):
             layers=layers,
             algorithm_class=TwolayerGMM,
             n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
         )
 
 
@@ -37,6 +39,7 @@ class TwolayerKMeansSN(AbstractMultilayerSNClustering):
         input_2_idx: List[int],
         layers,
         n_clusters_per_cluster: int = 5,
+        n_pca_dim: int = None,
     ):
         super(TwolayerKMeansSN, self).__init__(
             n_clusters=n_clusters,
@@ -47,4 +50,5 @@ class TwolayerKMeansSN(AbstractMultilayerSNClustering):
             layers=layers,
             algorithm_class=TwolayerKMeans,
             n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
         )
