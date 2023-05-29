@@ -1459,6 +1459,12 @@ class PytorchLightningLossCallback(Callback):
         self.val_ls = []
         self.verbose = verbose
         self.total_epoch = total_epoch
+        self.start_time = 0
+
+    def on_train_epoch_start(
+        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"
+    ) -> None:
+        self.start_time = time.time()
 
     def on_train_epoch_end(
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
@@ -1473,5 +1479,5 @@ class PytorchLightningLossCallback(Callback):
         ) and self.verbose:
             print(
                 f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
-                f"Min val loss: {np.min(self.val_ls):.4f}"
+                f"Min val loss: {np.min(self.val_ls):.4f}, Epoch time: {time.time()-self.start_time:.3f}s."
             )
