@@ -26,6 +26,7 @@ import argparse
 import platform, psutil, subprocess
 import shutil
 import pickle
+from sklearn.decomposition import PCA
 
 set_random_seed(src.setting["random_seed"])
 sys.path.append("configs/")
@@ -1473,6 +1474,24 @@ class Trainer:
 
         for modelbase in modelbases_to_train:
             modelbase.train(verbose=verbose)
+
+    def pca(self, **kwargs) -> PCA:
+        """
+        Perform sklearn.decomposition.PCA
+
+        Parameters
+        -------
+        **kwargs
+            Arguments of sklearn.decomposition.PCA.
+
+        Returns
+        -------
+        pca
+            A sklearn.decomposition.PCA instance.
+        """
+        pca = PCA(**kwargs)
+        pca.fit(self.feature_data.loc[self.train_indices, :])
+        return pca
 
     def get_derived_data_sizes(self) -> List[Tuple]:
         """
