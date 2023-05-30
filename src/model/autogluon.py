@@ -101,9 +101,9 @@ class AutoGluon(AbstractModel):
                 train_data,
                 tuning_data=val_data,
                 presets="best_quality" if not in_bayes_opt else "medium_quality",
-                hyperparameter_tune_kwargs=None,
+                hyperparameter_tune_kwargs=None if len(kwargs) > 0 else "auto",
                 use_bag_holdout=True,
-                verbosity=30 if verbose else 0,
+                verbosity=2 if verbose else 0,
                 feature_generator=feature_generator,
                 hyperparameters={self._name_mapping[model[0]]: kwargs},
                 num_gpus=0 if self.device is "cpu" else "auto",
@@ -155,13 +155,13 @@ class AutoGluon(AbstractModel):
         """
         space_dict = {
             "LightGBM": [
-                Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),
+                # Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),
             ],
             "CatBoost": [
-                Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),
+                # Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),
             ],
             "XGBoost": [
-                Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),
+                # Real(low=5e-3, high=0.2, prior="log-uniform", name="learning_rate"),
             ],
             "Random Forest": [],
             "Extremely Randomized Trees": [],
@@ -231,9 +231,16 @@ class AutoGluon(AbstractModel):
 
     def _initial_values(self, model_name):
         params_dict = {
-            "LightGBM": {"learning_rate": 0.03},
-            "CatBoost": {"learning_rate": 0.05},
-            "XGBoost": {"learning_rate": 0.1},
+            "LightGBM": {
+                # It is sometimes extremely slow to train GBM multiple times on HPC.
+                # "learning_rate": 0.03,
+            },
+            "CatBoost": {
+                # "learning_rate": 0.05,
+            },
+            "XGBoost": {
+                # "learning_rate": 0.1,
+            },
             "Random Forest": {},
             "Extremely Randomized Trees": {},
             "K-Nearest Neighbors": {},
