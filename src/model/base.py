@@ -271,51 +271,6 @@ class AbstractModel:
         set_random_seed(src.setting["random_seed"])
         return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
 
-    def _base_train_data_preprocess(
-        self,
-    ) -> Tuple[
-        pd.DataFrame,
-        Dict[str, np.ndarray],
-        np.ndarray,
-        pd.DataFrame,
-        Dict[str, np.ndarray],
-        np.ndarray,
-        pd.DataFrame,
-        Dict[str, np.ndarray],
-        np.ndarray,
-    ]:
-        """
-        Load tabular training/validation/testing datasets from the trainer.
-
-        Returns
-        -------
-        datasets:
-            The training datasets: X_train, D_train, y_train;
-            The validation datasets: X_val, D_val, y_val;
-            The testing datasets: X_test, D_test, y_test
-        """
-        label_name = self.trainer.label_name
-        df = self.trainer.df
-        train_indices = self.trainer.train_indices
-        val_indices = self.trainer.val_indices
-        test_indices = self.trainer.test_indices
-        X_train = df.loc[train_indices, :].copy()
-        X_val = df.loc[val_indices, :].copy()
-        X_test = df.loc[test_indices, :].copy()
-        y_train = df.loc[train_indices, label_name].values
-        y_val = df.loc[val_indices, label_name].values
-        y_test = df.loc[test_indices, label_name].values
-        D_train = self.trainer.datamodule.get_derived_data_slice(
-            derived_data=self.trainer.derived_data, indices=self.trainer.train_indices
-        )
-        D_val = self.trainer.datamodule.get_derived_data_slice(
-            derived_data=self.trainer.derived_data, indices=self.trainer.val_indices
-        )
-        D_test = self.trainer.datamodule.get_derived_data_slice(
-            derived_data=self.trainer.derived_data, indices=self.trainer.test_indices
-        )
-        return X_train, D_train, y_train, X_val, D_val, y_val, X_test, D_test, y_test
-
     def _predict_all(
         self, verbose: bool = True, test_data_only: bool = False
     ) -> Dict[str, Dict]:
@@ -338,17 +293,7 @@ class AbstractModel:
         self._check_train_status()
 
         model_names = self.get_model_names()
-        (
-            X_train,
-            D_train,
-            y_train,
-            X_val,
-            D_val,
-            y_val,
-            X_test,
-            D_test,
-            y_test,
-        ) = self._base_train_data_preprocess()
+        data = self.trainer.datamodule
 
         predictions = {}
         tc = TqdmController()
@@ -358,24 +303,26 @@ class AbstractModel:
                 print(model_name, f"{idx + 1}/{len(model_names)}")
             if not test_data_only:
                 y_train_pred = self._predict(
-                    X_train,
-                    derived_data=D_train,
+                    data.X_train,
+                    derived_data=data.D_train,
                     model_name=model_name,
                 )
                 y_val_pred = self._predict(
-                    X_val, derived_data=D_val, model_name=model_name
+                    data.X_val, derived_data=data.D_val, model_name=model_name
                 )
+                y_train = data.y_train
+                y_val = data.y_val
             else:
                 y_train_pred = y_train = None
                 y_val_pred = y_val = None
 
             y_test_pred = self._predict(
-                X_test, derived_data=D_test, model_name=model_name
+                data.X_test, derived_data=data.D_test, model_name=model_name
             )
 
             predictions[model_name] = {
                 "Training": (y_train_pred, y_train),
-                "Testing": (y_test_pred, y_test),
+                "Testing": (y_test_pred, data.y_test),
                 "Validation": (y_val_pred, y_val),
             }
 
@@ -391,11 +338,11 @@ class AbstractModel:
         Parameters
         ----------
         df:
-            A new tabular dataset.
+            A new tabular dataset that has the same structure as self.trainer.datamodule.X_test.
         model_name:
             A name of a selected model, which is already trained.
         derived_data:
-            Data derived from :func:``Trainer.derive_unstacked``. If not None, unstacked data will be re-derived.
+            Data derived from datamodule.derive that has the same structure as self.trainer.datamodule.D_test.
         **kwargs:
             Ignored.
 
@@ -404,13 +351,10 @@ class AbstractModel:
         pred:
             Prediction of the target.
         """
-        X_df, derived_data = self._data_preprocess(
-            df, derived_data, model_name=model_name
-        )
+        X_test = self._data_preprocess(df, derived_data, model_name=model_name)
         return self._pred_single_model(
             self.model[model_name],
-            X_test=X_df,
-            D_test=derived_data,
+            X_test=X_test,
             verbose=False,
         )
 
@@ -440,18 +384,7 @@ class AbstractModel:
         **kwargs:
             Ignored.
         """
-        data = self._base_train_data_preprocess()
-        (
-            X_train,
-            D_train,
-            y_train,
-            X_val,
-            D_val,
-            y_val,
-            X_test,
-            D_test,
-            y_test,
-        ) = self._train_data_preprocess(*data)
+        data = self._train_data_preprocess()
         self.total_epoch = (
             self.trainer.args["epoch"] if not src.setting["debug_mode"] else 2
         )
@@ -489,12 +422,10 @@ class AbstractModel:
                             epoch=self.trainer.args["bayes_epoch"]
                             if not src.setting["debug_mode"]
                             else 1,
-                            X_train=X_train,
-                            D_train=D_train,
-                            y_train=y_train,
-                            X_val=X_val,
-                            D_val=D_val,
-                            y_val=y_val,
+                            X_train=data["X_train"],
+                            y_train=data["y_train"],
+                            X_val=data["X_val"],
+                            y_val=data["y_val"],
                             verbose=False,
                             warm_start=False,
                             in_bayes_opt=True,
@@ -503,7 +434,11 @@ class AbstractModel:
 
                     try:
                         res = self._bayes_eval(
-                            model, X_train, D_train, y_train, X_val, D_val, y_val
+                            model,
+                            data["X_train"],
+                            data["y_train"],
+                            data["X_val"],
+                            data["y_val"],
                         )
                     except Exception as e:
                         print(
@@ -553,27 +488,25 @@ class AbstractModel:
             self._train_single_model(
                 model,
                 epoch=self.total_epoch,
-                X_train=X_train,
-                D_train=D_train,
-                y_train=y_train,
-                X_val=X_val,
-                D_val=D_val,
-                y_val=y_val,
+                X_train=data["X_train"],
+                y_train=data["y_train"],
+                X_val=data["X_val"],
+                y_val=data["y_val"],
                 verbose=verbose,
                 warm_start=warm_start,
                 in_bayes_opt=False,
                 **tmp_params,
             )
 
-            def pred_set(X, D, y, name):
-                pred = self._pred_single_model(model, X, D, verbose=False)
+            def pred_set(X, y, name):
+                pred = self._pred_single_model(model, X, verbose=False)
                 mse = metric_sklearn(pred, y, "mse")
                 if verbose:
                     print(f"{name} MSE loss: {mse:.5f}, RMSE loss: {np.sqrt(mse):.5f}")
 
-            pred_set(X_train, D_train, y_train, "Training")
-            pred_set(X_val, D_val, y_val, "Validation")
-            pred_set(X_test, D_test, y_test, "Testing")
+            pred_set(data["X_train"], data["y_train"], "Training")
+            pred_set(data["X_val"], data["y_val"], "Validation")
+            pred_set(data["X_test"], data["y_test"], "Testing")
             self.model[model_name] = model
             torch.cuda.empty_cache()
 
@@ -584,10 +517,8 @@ class AbstractModel:
         self,
         model,
         X_train,
-        D_train,
         y_train,
         X_val,
-        D_val,
         y_val,
     ):
         """
@@ -598,7 +529,7 @@ class AbstractModel:
         result
             The evaluation of bayesian hyperparameter optimization.
         """
-        y_val_pred = self._pred_single_model(model, X_val, D_val, verbose=False)
+        y_val_pred = self._pred_single_model(model, X_val, verbose=False)
         res = metric_sklearn(y_val_pred, y_val, self.trainer.args["loss"])
         return res
 
@@ -733,34 +664,17 @@ class AbstractModel:
         """
         raise NotImplementedError
 
-    def _train_data_preprocess(
-        self,
-        X_train: pd.DataFrame,
-        D_train: Dict[str, np.ndarray],
-        y_train: np.ndarray,
-        X_val: pd.DataFrame,
-        D_val: Dict[str, np.ndarray],
-        y_val: np.ndarray,
-        X_test: pd.DataFrame,
-        D_test: Dict[str, np.ndarray],
-        y_test: np.ndarray,
-    ):
+    def _train_data_preprocess(self) -> Union[DataModule, dict]:
         """
-        Processing the dataset returned by :func:`_base_train_data_preprocess`. Returned values will be passed to
-        :func:`_train_single_model` and :func:`_pred_single_model`. This function can be used to train e.g. imputers
-        and scalers.
-
-        Parameters
-        ----------
-        The training datasets: X_train, D_train, y_train;
-        The validation datasets: X_val, D_val, y_val;
-        The testing datasets: X_test, D_test, y_test
+        Processing the data from self.trainer.datamodule for training.
 
         Returns
         -------
-        The training datasets: X_train, D_train, y_train;
-        The validation datasets: X_val, D_val, y_val;
-        The testing datasets: X_test, D_test, y_test
+        data
+            The returned value should be a ``Dict`` that has the following keys:
+            X_train, y_train, X_val, y_val, X_test, y_test.
+            Those with postfixes ``_train`` or ``_val`` will be passed to `_train_single_model` and ``_bayes_eval`.
+            All of them will be passed to ``_pred_single_model``.
         """
         raise NotImplementedError
 
@@ -773,16 +687,16 @@ class AbstractModel:
         Parameters
         ----------
         df:
-            The new tabular dataset.
+            The new tabular dataset that has the same structure as self.trainer.datamodule.X_test
         derived_data:
-            Data derived from :func:`Trainer.derive_unstacked`.
+            Data derived from datamodule.derive that has the same structure as self.trainer.datamodule.D_test.
         model_name:
             The name of a selected model.
 
         Returns
         -------
         data:
-            The processed tabular dataset and derived data.
+            The processed data (X_test).
         """
         raise NotImplementedError
 
@@ -791,10 +705,8 @@ class AbstractModel:
         model: Any,
         epoch: Optional[int],
         X_train: Any,
-        D_train: Any,
         y_train: np.ndarray,
         X_val: Any,
-        D_val: Any,
         y_val: Any,
         verbose: bool,
         warm_start: bool,
@@ -812,14 +724,10 @@ class AbstractModel:
             Total epochs to train the model.
         X_train:
             The training data from :func:`_train_data_preprocess`.
-        D_train:
-            The training derived data from :func:`_train_data_preprocess`.
         y_train:
             The training target from :func:`_train_data_preprocess`.
         X_val:
             The validation data from :func:`_train_data_preprocess`.
-        D_val:
-            The validation derived data from :func:`_train_data_preprocess`.
         y_val:
             The validation target from :func:`_train_data_preprocess`.
         verbose:
@@ -834,7 +742,7 @@ class AbstractModel:
         raise NotImplementedError
 
     def _pred_single_model(
-        self, model: Any, X_test: Any, D_test: Any, verbose: bool, **kwargs
+        self, model: Any, X_test: Any, verbose: bool, **kwargs
     ) -> np.ndarray:
         """
         Predict with the model trained in :func:`_train_single_model`.
@@ -845,8 +753,6 @@ class AbstractModel:
             The model trained in :func:`_train_single_model`.
         X_test:
             The testing data from :func:`_train_data_preprocess`.
-        D_test:
-            The testing derived data from :func:`_train_data_preprocess`.
         verbose:
             Verbosity.
         **kwargs:
@@ -950,44 +856,31 @@ class TorchModel(AbstractModel):
     The specific class for PyTorch-like models. Some abstract methods in AbstractModel are implemented.
     """
 
-    def _train_data_preprocess(
-        self,
-        X_train,
-        D_train,
-        y_train,
-        X_val,
-        D_val,
-        y_val,
-        X_test,
-        D_test,
-        y_test,
-    ):
+    def _train_data_preprocess(self):
+        datamodule = self.trainer.datamodule
         train_loader = Data.DataLoader(
-            self.trainer.datamodule.train_dataset,
-            batch_size=len(self.trainer.datamodule.train_dataset),
+            datamodule.train_dataset,
+            batch_size=len(datamodule.train_dataset),
             pin_memory=True,
         )
         val_loader = Data.DataLoader(
-            self.trainer.datamodule.val_dataset,
-            batch_size=len(self.trainer.datamodule.val_dataset),
+            datamodule.val_dataset,
+            batch_size=len(datamodule.val_dataset),
             pin_memory=True,
         )
         test_loader = Data.DataLoader(
-            self.trainer.datamodule.test_dataset,
-            batch_size=len(self.trainer.datamodule.test_dataset),
+            datamodule.test_dataset,
+            batch_size=len(datamodule.test_dataset),
             pin_memory=True,
         )
-        return (
-            train_loader,
-            None,
-            y_train,
-            val_loader,
-            None,
-            y_val,
-            test_loader,
-            None,
-            y_test,
-        )
+        return {
+            "X_train": train_loader,
+            "y_train": datamodule.y_train,
+            "X_val": val_loader,
+            "y_val": datamodule.y_val,
+            "X_test": test_loader,
+            "y_test": datamodule.y_test,
+        }
 
     def _data_preprocess(self, df, derived_data, model_name):
         df = self.trainer.datamodule.data_transform(df)
@@ -1006,17 +899,15 @@ class TorchModel(AbstractModel):
             shuffle=False,
             pin_memory=True,
         )
-        return loader, derived_data
+        return loader
 
     def _train_single_model(
         self,
         model: "AbstractNN",
         epoch,
         X_train,
-        D_train,
         y_train,
         X_val,
-        D_val,
         y_val,
         verbose,
         warm_start,
@@ -1107,9 +998,7 @@ class TorchModel(AbstractModel):
         model.trainer = None
         torch.cuda.empty_cache()
 
-    def _pred_single_model(
-        self, model: "AbstractNN", X_test, D_test, verbose, **kwargs
-    ):
+    def _pred_single_model(self, model: "AbstractNN", X_test, verbose, **kwargs):
         model.to(self.device)
         y_test_pred, _, _ = model.test_epoch(X_test, **kwargs)
         model.to("cpu")

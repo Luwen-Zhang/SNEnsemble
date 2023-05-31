@@ -285,21 +285,11 @@ class WideDeep(AbstractModel):
         )
         return wd_trainer
 
-    def _train_data_preprocess(
-        self,
-        X_train,
-        D_train,
-        y_train,
-        X_val,
-        D_val,
-        y_val,
-        X_test,
-        D_test,
-        y_test,
-    ):
+    def _train_data_preprocess(self):
         from pytorch_widedeep.preprocessing import TabPreprocessor
         from pandas._config import option_context
 
+        data = self.trainer.datamodule
         cont_feature_names = self.trainer.cont_feature_names
         cat_feature_names = self.trainer.cat_feature_names
         tab_preprocessor = TabPreprocessor(
@@ -307,31 +297,26 @@ class WideDeep(AbstractModel):
             cat_embed_cols=cat_feature_names if len(cat_feature_names) != 0 else None,
         )
         with option_context("mode.chained_assignment", None):
-            X_tab_train = tab_preprocessor.fit_transform(X_train)
-            X_tab_val = tab_preprocessor.transform(X_val)
-            X_tab_test = tab_preprocessor.transform(X_test)
+            X_tab_train = tab_preprocessor.fit_transform(data.X_train)
+            X_tab_val = tab_preprocessor.transform(data.X_val)
+            X_tab_test = tab_preprocessor.transform(data.X_test)
         self.tab_preprocessor = tab_preprocessor
-        return (
-            X_tab_train,
-            D_train,
-            y_train,
-            X_tab_val,
-            D_val,
-            y_val,
-            X_tab_test,
-            D_test,
-            y_test,
-        )
+        return {
+            "X_train": X_tab_train,
+            "y_train": data.y_train,
+            "X_val": X_tab_val,
+            "y_val": data.y_val,
+            "X_test": X_tab_test,
+            "y_test": data.y_test,
+        }
 
     def _train_single_model(
         self,
         model,
         epoch,
         X_train,
-        D_train,
         y_train,
         X_val,
-        D_val,
         y_val,
         verbose,
         warm_start,
@@ -351,7 +336,7 @@ class WideDeep(AbstractModel):
             finetune=warm_start,
         )
 
-    def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+    def _pred_single_model(self, model, X_test, verbose, **kwargs):
         return model.predict(X_tab=X_test)
 
     def _data_preprocess(self, df, derived_data, model_name):
@@ -361,7 +346,7 @@ class WideDeep(AbstractModel):
 
         with option_context("mode.chained_assignment", None):
             X_df = self.tab_preprocessor.transform(df)
-        return X_df, derived_data
+        return X_df
 
     def _get_model_names(self):
         return [

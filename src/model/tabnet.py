@@ -42,44 +42,35 @@ class TabNet(AbstractModel):
         model.set_params(**params)
         return model
 
-    def _train_data_preprocess(
-        self,
-        X_train,
-        D_train,
-        y_train,
-        X_val,
-        D_val,
-        y_val,
-        X_test,
-        D_test,
-        y_test,
-    ):
+    def _train_data_preprocess(self):
+        data = self.trainer.datamodule
         cont_feature_names = self.trainer.cont_feature_names
+        X_train = data.X_train[cont_feature_names].values.astype(np.float32)
+        X_val = data.X_val[cont_feature_names].values.astype(np.float32)
+        X_test = data.X_test[cont_feature_names].values.astype(np.float32)
+        y_train = data.y_train.astype(np.float32)
+        y_val = data.y_val.astype(np.float32)
+        y_test = data.y_test.astype(np.float32)
 
-        X_train = X_train[cont_feature_names].values.astype(np.float32)
-        X_val = X_val[cont_feature_names].values.astype(np.float32)
-        X_test = X_test[cont_feature_names].values.astype(np.float32)
-        y_train = y_train.astype(np.float32)
-        y_val = y_val.astype(np.float32)
-        y_test = y_test.astype(np.float32)
-
-        return X_train, D_train, y_train, X_val, D_val, y_val, X_test, D_test, y_test
+        return {
+            "X_train": X_train,
+            "y_train": y_train,
+            "X_val": X_val,
+            "y_val": y_val,
+            "X_test": X_test,
+            "y_test": y_test,
+        }
 
     def _data_preprocess(self, df, derived_data, model_name):
-        return (
-            df[self.trainer.cont_feature_names].values.astype(np.float32),
-            derived_data,
-        )
+        return df[self.trainer.cont_feature_names].values.astype(np.float32)
 
     def _train_single_model(
         self,
         model,
         epoch,
         X_train,
-        D_train,
         y_train,
         X_val,
-        D_val,
         y_val,
         verbose,
         warm_start,
@@ -100,7 +91,7 @@ class TabNet(AbstractModel):
             warm_start=warm_start,
         )
 
-    def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+    def _pred_single_model(self, model, X_test, verbose, **kwargs):
         return model.predict(X_test).reshape(-1, 1)
 
     def _space(self, model_name):

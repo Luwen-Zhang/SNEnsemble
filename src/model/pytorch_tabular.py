@@ -100,46 +100,35 @@ class PytorchTabular(AbstractModel):
         ExperimentRunManager.__init__ = erm_original_init
         return tabular_model
 
-    def _train_data_preprocess(
-        self,
-        X_train,
-        D_train,
-        y_train,
-        X_val,
-        D_val,
-        y_val,
-        X_test,
-        D_test,
-        y_test,
-    ):
+    def _train_data_preprocess(self):
+        data = self.trainer.datamodule
         all_feature_names = self.trainer.all_feature_names
-        X_train = self.trainer.datamodule.categories_inverse_transform(
-            X_train[all_feature_names]
-        )
-        X_val = self.trainer.datamodule.categories_inverse_transform(
-            X_val[all_feature_names]
-        )
-        X_test = self.trainer.datamodule.categories_inverse_transform(
-            X_test[all_feature_names]
-        )
-        return X_train, D_train, y_train, X_val, D_val, y_val, X_test, D_test, y_test
+        X_train = data.categories_inverse_transform(data.X_train[all_feature_names])
+        X_val = data.categories_inverse_transform(data.X_val[all_feature_names])
+        X_test = data.categories_inverse_transform(data.X_test[all_feature_names])
+        return {
+            "X_train": X_train,
+            "y_train": data.y_train,
+            "X_val": X_val,
+            "y_val": data.y_val,
+            "X_test": X_test,
+            "y_test": data.y_test,
+        }
 
     def _data_preprocess(self, df, derived_data, model_name):
         all_feature_names = self.trainer.all_feature_names
         df = self.trainer.datamodule.categories_inverse_transform(
             df[all_feature_names].copy()
         )
-        return df, derived_data
+        return df
 
     def _train_single_model(
         self,
         model,
         epoch,
         X_train,
-        D_train,
         y_train,
         X_val,
-        D_val,
         y_val,
         verbose,
         warm_start,
@@ -172,7 +161,7 @@ class PytorchTabular(AbstractModel):
         warnings.simplefilter(action="default", category=UserWarning)
         tc.enable_tqdm()
 
-    def _pred_single_model(self, model, X_test, D_test, verbose, **kwargs):
+    def _pred_single_model(self, model, X_test, verbose, **kwargs):
         target = model.config.target[0]
         with HiddenPrints():
             # Two annoying warnings that cannot be suppressed:
