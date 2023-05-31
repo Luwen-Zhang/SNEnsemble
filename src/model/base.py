@@ -3,6 +3,7 @@ import torch.optim.optimizer
 import src
 from src.utils import *
 from src.trainer import Trainer, save_trainer
+from src.data import DataModule
 import skopt
 from skopt import gp_minimize
 import torch.utils.data as Data
@@ -169,7 +170,7 @@ class AbstractModel:
         model_name:
             A selected name of a model, which is already trained.
         derived_data:
-            Data derived from :func:``Trainer.derive_unstacked``. If not None, unstacked data will be re-derived.
+            Data derived from :func:``DataModule.derive_unstacked``. If not None, unstacked data will be re-derived.
         ignore_absence:
             Whether to ignore absent keys in derived_data. Use True only when the model does not use derived_data.
         **kwargs:
@@ -187,38 +188,13 @@ class AbstractModel:
             raise Exception(
                 f"Model {model_name} is not available. Select among {self.get_model_names()}"
             )
-        absent_features = [
-            x
-            for x in np.setdiff1d(
-                self.trainer.all_feature_names, self.trainer.derived_stacked_features
-            )
-            if x not in df.columns
-        ]
-        absent_derived_features = [
-            x for x in self.trainer.derived_stacked_features if x not in df.columns
-        ]
-        if len(absent_features) > 0:
-            raise Exception(f"Feature {absent_features} not in the input dataframe.")
-
-        if derived_data is None or len(absent_derived_features) > 0:
-            df, _, derived_data = self.trainer.datamodule.derive(df)
-        else:
-            absent_keys = [
-                key
-                for key in self.trainer.derived_data.keys()
-                if key not in derived_data.keys()
-            ]
-            if len(absent_keys) > 0 and not ignore_absence:
-                raise Exception(
-                    f"Additional feature {absent_keys} not in the input derived_data."
-                )
-        df = self.trainer.datamodule.dataimputer.transform(df.copy(), self.trainer)
+        df, derived_data = self.trainer.datamodule.prepare_new_data(
+            df, derived_data, ignore_absence
+        )
         return self._predict(
             df,
             model_name,
-            self.trainer.datamodule.sort_derived_data(
-                derived_data, ignore_absence=ignore_absence
-            ),
+            derived_data,
             **kwargs,
         )
 

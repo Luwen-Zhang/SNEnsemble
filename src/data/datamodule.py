@@ -331,6 +331,58 @@ class DataModule:
             else None
         )
 
+    def prepare_new_data(
+        self, df: pd.DataFrame, derived_data: dict = None, ignore_absence=False
+    ) -> Tuple[pd.DataFrame, dict]:
+        """
+        Prepare the new tabular dataset for predictions from AbstractModel._predict. Users usually do not need to call
+        this because AbstractModel.predict does it.
+
+        Parameters
+        ----------
+        df:
+            A new tabular dataset.
+        derived_data:
+            Data derived from :func:``DataModule.derive_unstacked``. If not None, unstacked data will be re-derived.
+        ignore_absence:
+            Whether to ignore absent keys in derived_data. Use True only when the model does not use derived_data.
+
+        Returns
+        -------
+        df
+            The dataset after derivation and imputation. It has the same structure as self.X_train
+        derived_data:
+            Data derived from :func:``DataModule.derive_unstacked``. It has the same structure as self.D_train
+        """
+        absent_features = [
+            x
+            for x in np.setdiff1d(self.all_feature_names, self.derived_stacked_features)
+            if x not in df.columns
+        ]
+        absent_derived_features = [
+            x for x in self.derived_stacked_features if x not in df.columns
+        ]
+        if len(absent_features) > 0:
+            raise Exception(f"Feature {absent_features} not in the input dataframe.")
+
+        if derived_data is None or len(absent_derived_features) > 0:
+            df, _, derived_data = self.derive(df)
+        else:
+            absent_keys = [
+                key
+                for key in self.derived_data.keys()
+                if key not in derived_data.keys()
+            ]
+            if len(absent_keys) > 0 and not ignore_absence:
+                raise Exception(
+                    f"Additional feature {absent_keys} not in the input derived_data."
+                )
+        df = self.dataimputer.transform(df.copy(), self)
+        derived_data = self.sort_derived_data(
+            derived_data, ignore_absence=ignore_absence
+        )
+        return df, derived_data
+
     @property
     def cont_imputed_mask(self) -> pd.DataFrame:
         """
