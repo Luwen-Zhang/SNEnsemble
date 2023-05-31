@@ -104,7 +104,7 @@ class AutoGluon(AbstractModel):
                 verbosity=2 if verbose else 0,
                 feature_generator=feature_generator,
                 hyperparameters={self._name_mapping[model[0]]: kwargs},
-                num_gpus=0 if self.device is "cpu" else "auto",
+                num_gpus=0 if self.device == "cpu" else "auto",
             )
         if not in_bayes_opt:
             model[1].persist_models(max_memory=None)
