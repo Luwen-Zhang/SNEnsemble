@@ -378,7 +378,6 @@ class DataModule:
                     f"Additional feature {absent_keys} not in the input derived_data."
                 )
         df = self.dataimputer.transform(df.copy(), self)
-        df = self.data_transform(df)
         derived_data = self.sort_derived_data(
             derived_data, ignore_absence=ignore_absence
         )
@@ -919,27 +918,27 @@ class DataModule:
 
     @property
     def X_train(self):
-        return self.scaled_df.loc[self.train_indices, :].copy()
+        return self.df.loc[self.train_indices, :].copy()
 
     @property
     def X_val(self):
-        return self.scaled_df.loc[self.val_indices, :].copy()
+        return self.df.loc[self.val_indices, :].copy()
 
     @property
     def X_test(self):
-        return self.scaled_df.loc[self.test_indices, :].copy()
+        return self.df.loc[self.test_indices, :].copy()
 
     @property
     def y_train(self):
-        return self.scaled_df.loc[self.train_indices, self.label_name].values
+        return self.df.loc[self.train_indices, self.label_name].values
 
     @property
     def y_val(self):
-        return self.scaled_df.loc[self.val_indices, self.label_name].values
+        return self.df.loc[self.val_indices, self.label_name].values
 
     @property
     def y_test(self):
-        return self.scaled_df.loc[self.test_indices, self.label_name].values
+        return self.df.loc[self.test_indices, self.label_name].values
 
     @property
     def D_train(self):

@@ -883,6 +883,7 @@ class TorchModel(AbstractModel):
         }
 
     def _data_preprocess(self, df, derived_data, model_name):
+        df = self.trainer.datamodule.data_transform(df)
         X = torch.tensor(
             df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
