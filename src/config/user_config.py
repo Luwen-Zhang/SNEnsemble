@@ -7,36 +7,21 @@ from src.utils import pretty
 from .default import cfg as default_cfg
 
 
-class UserConfig:
+class UserConfig(dict):
     def __init__(self, path: str = None):
-        self.cfg = default_cfg
-        self.defaults = self.cfg.copy()
+        super(UserConfig, self).__init__()
+        self.update(default_cfg)
+        self.defaults = default_cfg.copy()
         if path is not None:
-            self.merge_config(self.from_file(path))
-
-    def available_keys(self):
-        return list(self.cfg.keys())
+            self.update(self.from_file(path))
 
     def defaults(self):
         return self.defaults.copy()
 
-    def merge_config(self, config: Dict):
-        """
-        Merge the input configuration into the current one.
-
-        Parameters
-        ----------
-        config
-            A dict containing configurations.
-        """
-        for key, value in config.items():
-            if value is not None:
-                self.cfg[key] = value
-
     @staticmethod
     def from_dict(cfg: Dict):
         tmp_cfg = UserConfig()
-        tmp_cfg.merge_config(cfg)
+        tmp_cfg.update(cfg)
         return tmp_cfg
 
     @staticmethod
@@ -67,16 +52,16 @@ class UserConfig:
             mod = types.ModuleType(loader.name)
             loader.exec_module(mod)
             cfg = mod.cfg
-        return cfg
+        return UserConfig.from_dict(cfg)
 
     def to_file(self, path: str):
         if path.endswith(".json"):
             with open(os.path.join(path), "w") as f:
-                json.dump(self.cfg, f, indent=4)
+                json.dump(self, f, indent=4)
         else:
             if not path.endswith(".py"):
                 path += ".py"
-            s = "cfg = " + pretty(self.cfg, htchar=" " * 4, indent=0)
+            s = "cfg = " + pretty(self, htchar=" " * 4, indent=0)
             try:
                 import black
 

@@ -238,7 +238,7 @@ class Trainer:
         """
         input_config = config is not None
         if isinstance(config, str) or not input_config:
-            base_config = UserConfig().cfg
+            base_config = UserConfig()
             # The base config is loaded using the --base argument
             if is_notebook() and not input_config:
                 raise Exception(
@@ -269,15 +269,15 @@ class Trainer:
             # Then, several args can be modified using other arguments like --lr, --weight_decay
             # only when a config file is not given so that configs depend on input arguments.
             if not is_notebook() and not input_config:
-                config.merge_config(parse_res)
+                config.update(parse_res)
             if manual_config is not None:
-                config.merge_config(manual_config)
-            self.args = config.cfg
+                config.update(manual_config)
+            self.args = config
         else:
             self.configfile = "UserInputConfig"
             if manual_config is not None:
                 warnings.warn(f"manual_config is ignored when config is an UserConfig.")
-            self.args = config.cfg
+            self.args = config
 
         self.set_data_splitter(name=self.args["data_splitter"], verbose=verbose)
         self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
