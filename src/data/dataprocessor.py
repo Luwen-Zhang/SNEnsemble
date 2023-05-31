@@ -3,6 +3,7 @@ from src.data import (
     AbstractProcessor,
     AbstractFeatureSelector,
     AbstractTransformer,
+    AbstractScaler,
 )
 from src.data import DataModule
 import inspect
@@ -422,7 +423,7 @@ class UnscaledDataRecorder(AbstractTransformer):
         return x
 
 
-class StandardScaler(AbstractTransformer):
+class StandardScaler(AbstractTransformer, AbstractScaler):
     """
     The standard scaler implemented using StandardScaler from sklearn.
     """
@@ -446,7 +447,7 @@ class StandardScaler(AbstractTransformer):
         return data
 
 
-class Normalizer(AbstractTransformer):
+class Normalizer(AbstractTransformer, AbstractScaler):
     """
     The standard scaler implemented using StandardScaler from sklearn.
     """

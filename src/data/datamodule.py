@@ -86,17 +86,37 @@ class DataModule:
         The `UnscaledDataRecorder` should be set before any scaling processor. If not found in the input, it will be
         appended at the end.
         """
-        from src.data.dataprocessor import get_data_processor
+        from src.data.dataprocessor import (
+            get_data_processor,
+            UnscaledDataRecorder,
+            AbstractScaler,
+        )
 
-        if "UnscaledDataRecorder" not in [name for name, _ in config]:
-            if verbose:
-                print(
-                    "UnscaledDataRecorder not in the data_processors pipeline. Only scaled data will be recorded."
-                )
-            config.append(("UnscaledDataRecorder", {}))
         self.dataprocessors = [
             (get_data_processor(name)(), kwargs) for name, kwargs in config
         ]
+        is_recorder = np.array(
+            [
+                int(isinstance(x, UnscaledDataRecorder))
+                for x in [processor for processor, _ in self.dataprocessors]
+            ]
+        )
+        is_scaler = np.array(
+            [
+                int(isinstance(x, AbstractScaler))
+                for x in [processor for processor, _ in self.dataprocessors]
+            ]
+        )
+        if np.sum(is_scaler) > 1:
+            raise Exception(f"More than one AbstractScaler.")
+        if np.sum(is_recorder) > 1:
+            raise Exception(f"More than one UnscaledDataRecorder.")
+        if is_scaler[-1] != 1:
+            raise Exception(f"The last dataprocessor should be an AbstractScaler.")
+        if is_recorder[-2] != 1:
+            raise Exception(
+                f"An UnscaledDataRecorder should be placed before the scaler."
+            )
 
     def set_data_derivers(self, config: List[Tuple[str, Dict]], verbose=True):
         """

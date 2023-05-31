@@ -5,6 +5,7 @@ from .base import AbstractProcessor
 from .base import AbstractFeatureSelector
 from .base import AbstractTransformer
 from .base import AbstractSplitter
+from .base import AbstractScaler
 
 from .datamodule import DataModule
 
@@ -20,6 +21,7 @@ __all__ = [
     "AbstractProcessor",
     "AbstractFeatureSelector",
     "AbstractTransformer",
+    "AbstractScaler",
     "AbstractSplitter",
     "DataModule",
     "get_data_deriver",

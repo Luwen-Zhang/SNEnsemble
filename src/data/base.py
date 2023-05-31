@@ -618,6 +618,14 @@ class AbstractFeatureSelector(AbstractProcessor):
         raise NotImplementedError
 
 
+class AbstractScaler(AbstractProcessor):
+    """
+    This is a marker for scaling like standard scaler or normalizer.
+    """
+
+    pass
+
+
 class AbstractSplitter:
     """
     The base class for data-splitters that split the dataset and return training, validation and testing indices.
