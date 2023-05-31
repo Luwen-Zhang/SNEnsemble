@@ -513,6 +513,37 @@ class AbstractProcessor:
         raise NotImplementedError
 
 
+class AbstractAugmenter(AbstractProcessor):
+    def __init__(self):
+        super(AbstractAugmenter, self).__init__()
+
+    def _fit_transform(
+        self, data: pd.DataFrame, datamodule: DataModule, **kwargs
+    ) -> pd.DataFrame:
+        already_augmented = np.max(data.index) - len(datamodule.df) + 1
+        ###############################
+        # Here is the augmentation part
+        augmented = self._get_augmented(data, datamodule, **kwargs)
+        ###############################
+        augmented.reset_index(drop=True, inplace=True)
+        augmented.index = (
+            np.array(augmented.index) + len(datamodule.df) + already_augmented
+        )
+        data = pd.concat([data, augmented], axis=0)
+        return data
+
+    def _transform(
+        self, data: pd.DataFrame, datamodule: DataModule, **kwargs
+    ) -> pd.DataFrame:
+        # Do not do anything to the testing data.
+        return data
+
+    def _get_augmented(
+        self, data: pd.DataFrame, datamodule: DataModule, **kwargs
+    ) -> pd.DataFrame:
+        raise NotImplementedError
+
+
 class AbstractTransformer(AbstractProcessor):
     """
     The base class for data-processors that change the value of some features.

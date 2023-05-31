@@ -4,6 +4,7 @@ from .base import AbstractSklearnImputer
 from .base import AbstractProcessor
 from .base import AbstractFeatureSelector
 from .base import AbstractTransformer
+from .base import AbstractAugmenter
 from .base import AbstractSplitter
 from .base import AbstractScaler
 
@@ -21,6 +22,7 @@ __all__ = [
     "AbstractProcessor",
     "AbstractFeatureSelector",
     "AbstractTransformer",
+    "AbstractAugmenter",
     "AbstractScaler",
     "AbstractSplitter",
     "DataModule",

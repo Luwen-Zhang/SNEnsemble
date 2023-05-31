@@ -312,6 +312,13 @@ class DataModule:
         self.test_indices = update_indices(self.test_indices)
         self.val_indices = update_indices(self.val_indices)
 
+        if len(self.augmented_indices) > 0:
+            self.train_indices = np.array(
+                list(self.train_indices)
+                + list(self.augmented_indices - len(self.dropped_indices))
+            )
+            np.random.shuffle(self.train_indices)
+
         if (
             len(self.train_indices) == 0
             or len(self.val_indices) == 0
@@ -827,17 +834,32 @@ class DataModule:
             )
             testing_data = self.data_transform(tmp_data, scaler_only=True)
 
-        self.retained_indices = np.unique(
+        all_indices = np.unique(
             np.sort(np.array(list(training_data.index) + list(testing_data.index)))
         )
+        self.retained_indices = np.intersect1d(all_indices, np.arange(original_length))
         self.dropped_indices = np.setdiff1d(
             np.arange(original_length), self.retained_indices
         )
+        self.augmented_indices = np.setdiff1d(
+            training_data.index, np.arange(original_length)
+        )
+        if len(np.setdiff1d(testing_data.index, np.arange(original_length))) > 0:
+            raise Exception(f"Testing data should not be augmented.")
 
         def process_df(df, training, testing):
-            df.loc[training.index, training.columns] = training.values
+            inplace_training_index = np.intersect1d(
+                training.index, self.retained_indices
+            )
+            df.loc[inplace_training_index, training.columns] = training.loc[
+                inplace_training_index, :
+            ].values
             df.loc[testing.index, testing.columns] = testing.values
-            df = pd.DataFrame(df.loc[self.retained_indices, :]).reset_index(drop=True)
+            df = df.loc[self.retained_indices, :].copy().reset_index(drop=True)
+            if len(self.augmented_indices) > 0:
+                df = pd.concat(
+                    [df, training.loc[self.augmented_indices, :]], axis=0
+                ).reset_index(drop=True)
             df.loc[:, self.cat_feature_names] = df.loc[
                 :, self.cat_feature_names
             ].astype(np.int16)

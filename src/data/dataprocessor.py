@@ -4,6 +4,7 @@ from src.data import (
     AbstractFeatureSelector,
     AbstractTransformer,
     AbstractScaler,
+    AbstractAugmenter,
 )
 from src.data import DataModule
 import inspect
@@ -13,6 +14,18 @@ from sklearn.preprocessing import StandardScaler as skStandardScaler
 from sklearn.preprocessing import Normalizer as skNormalizer
 from sklearn.preprocessing import OrdinalEncoder
 from typing import Type
+
+
+class SampleDataAugmentor(AbstractAugmenter):
+    """
+    This is a sample of data augmentation, which is not reasonable at all and is only used to test data augmentation.
+    """
+
+    def _get_augmented(
+        self, data: pd.DataFrame, datamodule: DataModule, **kwargs
+    ) -> pd.DataFrame:
+        augmented = data.loc[data.index[-50:], :].copy()
+        return augmented
 
 
 class LackDataMaterialRemover(AbstractProcessor):
@@ -34,10 +47,21 @@ class LackDataMaterialRemover(AbstractProcessor):
         return data
 
     def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
-        for m_code in self.lack_data_mat:
-            m_codes = data.loc[:, "Material_Code"].copy()
-            where_material = m_codes.index[np.where(m_codes == m_code)[0]]
-            data = data.drop(where_material)
+        if datamodule.training:
+            for m_code in self.lack_data_mat:
+                m_codes = data.loc[:, "Material_Code"].copy()
+                where_material = m_codes.index[np.where(m_codes == m_code)[0]]
+                data = data.drop(where_material)
+        else:
+            exist_m_codes = [
+                m_code
+                for m_code in self.lack_data_mat
+                if m_code in data["Material_Code"]
+            ]
+            if len(exist_m_codes):
+                warnings.warn(
+                    f"{exist_m_codes} are removed by {self.__class__.__name__} but exist in the input dataset."
+                )
         return data
 
 
@@ -66,11 +90,17 @@ class MaterialSelector(AbstractProcessor):
         return data
 
     def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
-        m_codes = data.loc[:, "Material_Code"].copy()
-        if self.m_code not in list(m_codes):
-            raise Exception(f"m_code {self.m_code} not available.")
-        where_material = m_codes.index[np.where(m_codes == self.m_code)[0]]
-        data = data.loc[where_material, :]
+        if datamodule.training:
+            m_codes = data.loc[:, "Material_Code"].copy()
+            if self.m_code not in list(m_codes):
+                raise Exception(f"m_code {self.m_code} not available.")
+            where_material = m_codes.index[np.where(m_codes == self.m_code)[0]]
+            data = data.loc[where_material, :]
+        else:
+            if self.m_code not in data["Material_Code"]:
+                warnings.warn(
+                    f"{self.m_code} selected by {self.__class__.__name__} does not exist in the input dataset."
+                )
         return data
 
 
@@ -109,12 +139,19 @@ class FeatureValueSelector(AbstractProcessor):
         return data
 
     def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
-        if self.value not in list(data[self.feature]):
-            raise Exception(
-                f"Value {self.value} not available for feature {self.feature}. Select from {data[self.feature].unique()}"
-            )
-        where_value = data.index[np.where(data[self.feature] == self.value)[0]]
-        data = data.loc[where_value, :]
+        if datamodule.training:
+            if self.value not in list(data[self.feature]):
+                raise Exception(
+                    f"Value {self.value} not available for feature {self.feature}. Select from {data[self.feature].unique()}"
+                )
+            where_value = data.index[np.where(data[self.feature] == self.value)[0]]
+            data = data.loc[where_value, :]
+        else:
+            if self.value not in list(data[self.feature]):
+                warnings.warn(
+                    f"Value {self.value} not available for feature {self.feature} selected by "
+                    f"{self.__class__.__name__}."
+                )
         return data
 
 
