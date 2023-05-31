@@ -34,7 +34,6 @@ cfg = {
         ("CategoricalOrdinalEncoder", {}),
         ("NaNFeatureRemover", {}),
         ("VarianceFeatureSelector", {"thres": 1}),
-        ("UnscaledDataRecorder", {}),
         ("StandardScaler", {}),
     ],
     "data_derivers": [],

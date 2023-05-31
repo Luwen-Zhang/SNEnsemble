@@ -86,21 +86,11 @@ class DataModule:
         The `UnscaledDataRecorder` should be set before any scaling processor. If not found in the input, it will be
         appended at the end.
         """
-        from src.data.dataprocessor import (
-            get_data_processor,
-            UnscaledDataRecorder,
-            AbstractScaler,
-        )
+        from src.data.dataprocessor import get_data_processor, AbstractScaler
 
         self.dataprocessors = [
             (get_data_processor(name)(), kwargs) for name, kwargs in config
         ]
-        is_recorder = np.array(
-            [
-                int(isinstance(x, UnscaledDataRecorder))
-                for x in [processor for processor, _ in self.dataprocessors]
-            ]
-        )
         is_scaler = np.array(
             [
                 int(isinstance(x, AbstractScaler))
@@ -109,14 +99,8 @@ class DataModule:
         )
         if np.sum(is_scaler) > 1:
             raise Exception(f"More than one AbstractScaler.")
-        if np.sum(is_recorder) > 1:
-            raise Exception(f"More than one UnscaledDataRecorder.")
         if is_scaler[-1] != 1:
             raise Exception(f"The last dataprocessor should be an AbstractScaler.")
-        if is_recorder[-2] != 1:
-            raise Exception(
-                f"An UnscaledDataRecorder should be placed before the scaler."
-            )
 
     def set_data_derivers(self, config: List[Tuple[str, Dict]], verbose=True):
         """
@@ -373,6 +357,11 @@ class DataModule:
             The dataset after derivation, imputation, and processing. It has the same structure as self.X_train
         derived_data:
             Data derived from :func:``DataModule.derive_unstacked``. It has the same structure as self.D_train
+
+        Notes
+        -------
+        The returned df is not scaled for the sake of further treatments. To scale the df,
+        run ``df = datamodule.data_transform(df, scaler_only=True)``
         """
         absent_features = [
             x
@@ -398,6 +387,7 @@ class DataModule:
                     f"Additional feature {absent_keys} not in the input derived_data."
                 )
         df = self.dataimputer.transform(df.copy(), self)
+        df = self.data_transform(df, skip_scaler=True)
         derived_data = self.sort_derived_data(
             derived_data, ignore_absence=ignore_absence
         )
@@ -811,35 +801,31 @@ class DataModule:
         verbose
             Verbosity.
         """
-        self._unscaled_feature_data = pd.DataFrame()
-        self._unscaled_label_data = pd.DataFrame()
-        self._categorical_data = pd.DataFrame()
         self.df.reset_index(drop=True, inplace=True)
         self.scaled_df = self.df.copy()
         original_length = len(self.df)
 
         with HiddenPrints(disable_std=not verbose):
-            training_data = self._data_preprocess(
+            tmp_data = self._data_preprocess(
                 self.df.loc[list(self.train_indices) + list(self.val_indices), :],
                 warm_start=warm_start,
+                skip_scaler=True,
             )
             unscaled_training_data = pd.concat(
-                [
-                    self._unscaled_feature_data,
-                    self._categorical_data,
-                    self._unscaled_label_data,
-                ],
+                list(self.divide_from_tabular_dataset(tmp_data)),
                 axis=1,
             )
-            testing_data = self.data_transform(self.df.loc[self.test_indices, :])
+            training_data = self._data_preprocess(
+                tmp_data, warm_start=warm_start, scaler_only=True
+            )
+            tmp_data = self.data_transform(
+                self.df.loc[self.test_indices, :], skip_scaler=True
+            )
             unscaled_testing_data = pd.concat(
-                [
-                    self._unscaled_feature_data,
-                    self._categorical_data,
-                    self._unscaled_label_data,
-                ],
+                list(self.divide_from_tabular_dataset(tmp_data)),
                 axis=1,
             )
+            testing_data = self.data_transform(tmp_data, scaler_only=True)
 
         self.retained_indices = np.unique(
             np.sort(np.array(list(training_data.index) + list(testing_data.index)))
@@ -979,7 +965,11 @@ class DataModule:
         )
 
     def _data_preprocess(
-        self, input_data: pd.DataFrame, warm_start: bool = False
+        self,
+        input_data: pd.DataFrame,
+        warm_start: bool = False,
+        skip_scaler: bool = False,
+        scaler_only: bool = False,
     ) -> pd.DataFrame:
         """
         Call data processors to fit and/or transform the input tabular dataset.
@@ -989,17 +979,29 @@ class DataModule:
         input_data
             The tabular dataset.
         warm_start
-            True to fit and transform data processors, and False to transform.
+            False to fit and transform data processors, and True to transform only.
+        skip_scaler
+            True to skip scaling (the last processor).
+        scaler_only
+            True to only perform scaling (the last processor).
 
         Returns
         -------
         df
             The processed data.
         """
+        from .base import AbstractScaler
+
+        if skip_scaler and scaler_only:
+            raise Exception(f"Both skip_scaler and scaler_only are True.")
         data = input_data.copy()
         cont_feature_names = cp(self.cont_feature_names)
         cat_feature_names = cp(self.cat_feature_names)
         for processor, kwargs in self.dataprocessors:
+            if skip_scaler and isinstance(processor, AbstractScaler):
+                continue
+            if scaler_only and not isinstance(processor, AbstractScaler):
+                continue
             if warm_start:
                 data = processor.transform(data, self, **kwargs)
             else:
@@ -1012,7 +1014,12 @@ class DataModule:
             self.cat_feature_names = cat_feature_names
         return data
 
-    def data_transform(self, input_data: pd.DataFrame):
+    def data_transform(
+        self,
+        input_data: pd.DataFrame,
+        skip_scaler: bool = False,
+        scaler_only: bool = False,
+    ):
         """
         Transform the input tabular dataset using fitted data processors. Only AbstractTransformers take effects.
 
@@ -1020,13 +1027,22 @@ class DataModule:
         ----------
         input_data
             The tabular dataset.
+        skip_scaler
+            True to skip scaling (the last processor).
+        scaler_only
+            True to only perform scaling (the last processor).
 
         Returns
         -------
         df
             Transformed tabular dataset.
         """
-        return self._data_preprocess(input_data.copy(), warm_start=True)
+        return self._data_preprocess(
+            input_data.copy(),
+            warm_start=True,
+            skip_scaler=skip_scaler,
+            scaler_only=scaler_only,
+        )
 
     def _update_dataset_auto(self):
         """

@@ -387,42 +387,6 @@ class CorrFeatureSelector(AbstractFeatureSelector):
         return retain_features
 
 
-class UnscaledDataRecorder(AbstractTransformer):
-    """
-    Record unscaled data in the datamodule. This processor MUST be inserted before ANY AbstractTransformer (like a
-    StandardScaler). The recorded data will be used to generate DataModule.df.
-    """
-
-    def __init__(self):
-        super(UnscaledDataRecorder, self).__init__()
-
-    def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
-        (
-            feature_data,
-            categorical_data,
-            label_data,
-        ) = datamodule.divide_from_tabular_dataset(data)
-
-        datamodule._unscaled_feature_data = feature_data
-        datamodule._categorical_data = categorical_data
-        datamodule._unscaled_label_data = label_data
-        return data
-
-    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
-        (
-            feature_data,
-            categorical_data,
-            label_data,
-        ) = datamodule.divide_from_tabular_dataset(data)
-        datamodule._unscaled_feature_data = feature_data
-        datamodule._categorical_data = categorical_data
-        datamodule._unscaled_label_data = label_data
-        return data
-
-    def var_slip(self, feature_name, x):
-        return x
-
-
 class StandardScaler(AbstractTransformer, AbstractScaler):
     """
     The standard scaler implemented using StandardScaler from sklearn.

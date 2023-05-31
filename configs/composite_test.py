@@ -99,7 +99,6 @@ cfg = {
         ["CategoricalOrdinalEncoder", {}],
         ["NaNFeatureRemover", {}],
         ["VarianceFeatureSelector", {"thres": 1}],
-        ["UnscaledDataRecorder", {}],
         ["StandardScaler", {}],
     ],
     "feature_types": ["Fatigue loading", "Material", "Categorical", "Derived"],

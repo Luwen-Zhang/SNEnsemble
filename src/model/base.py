@@ -675,6 +675,11 @@ class AbstractModel:
             X_train, y_train, X_val, y_val, X_test, y_test.
             Those with postfixes ``_train`` or ``_val`` will be passed to `_train_single_model` and ``_bayes_eval`.
             All of them will be passed to ``_pred_single_model``.
+
+        Notes
+        -------
+        self.trainer.datamodule.X_train/val/test are not scaled for the sake of further treatments. To scale the df,
+        run ``df = datamodule.data_transform(df, scaler_only=True)``
         """
         raise NotImplementedError
 
@@ -697,6 +702,11 @@ class AbstractModel:
         -------
         data:
             The processed data (X_test).
+
+        Notes
+        -------
+        The input df is not scaled for the sake of further treatments. To scale the df,
+        run ``df = datamodule.data_transform(df, scaler_only=True)``
         """
         raise NotImplementedError
 
@@ -883,7 +893,7 @@ class TorchModel(AbstractModel):
         }
 
     def _data_preprocess(self, df, derived_data, model_name):
-        df = self.trainer.datamodule.data_transform(df)
+        df = self.trainer.datamodule.data_transform(df, scaler_only=True)
         X = torch.tensor(
             df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
