@@ -1,5 +1,4 @@
 from src.utils import *
-from src.trainer import Trainer
 from src.data import AbstractImputer, AbstractSklearnImputer
 import inspect
 import sklearn.exceptions
@@ -8,6 +7,7 @@ from sklearn.impute import IterativeImputer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from typing import Type
+from .datamodule import DataModule
 
 
 class NaNImputer(AbstractImputer):
@@ -18,13 +18,15 @@ class NaNImputer(AbstractImputer):
     def __init__(self):
         super(NaNImputer, self).__init__()
 
-    def _fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _fit_transform(
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
+    ):
         impute_features = self._get_impute_features(
-            trainer.cont_feature_names, input_data
+            datamodule.cont_feature_names, input_data
         )
         return input_data.dropna(axis=0, subset=impute_features)
 
-    def _transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _transform(self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs):
         return input_data.dropna(axis=0, subset=self.record_imputed_features)
 
 
@@ -36,11 +38,13 @@ class MiceLightgbmImputer(AbstractImputer):
     def __init__(self):
         super(MiceLightgbmImputer, self).__init__()
 
-    def _fit_transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _fit_transform(
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
+    ):
         import miceforest as mf
 
         impute_features = self._get_impute_features(
-            trainer.cont_feature_names, input_data
+            datamodule.cont_feature_names, input_data
         )
         imputer = mf.ImputationKernel(
             input_data.loc[:, impute_features], random_state=0
@@ -53,7 +57,7 @@ class MiceLightgbmImputer(AbstractImputer):
         self.transformer = imputer
         return input_data
 
-    def _transform(self, input_data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _transform(self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs):
         input_data.loc[:, self.record_imputed_features] = (
             self.transformer.impute_new_data(
                 new_data=input_data.loc[:, self.record_imputed_features]

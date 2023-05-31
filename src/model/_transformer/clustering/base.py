@@ -1,15 +1,11 @@
 import sys
 import torch
 from torch import nn
-from torch.nn import Parameter
 import inspect
 import torch.nn.functional as F
-import numpy as np
 from src.model.base import get_sequential
-from itertools import chain
 from .common.base import (
     AbstractClustering,
-    AbstractCluster,
     AbstractMultilayerClustering,
 )
 from typing import Type, List

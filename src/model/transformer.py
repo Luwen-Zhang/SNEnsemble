@@ -1,4 +1,3 @@
-import src
 from src.utils import *
 from skopt.space import Integer, Categorical, Real
 from src.model import TorchModel
@@ -110,9 +109,9 @@ class Transformer(TorchModel):
             else:
                 feature_idx = cls.top_clustering_features_idx(self.trainer)
             if "2L" not in model_name:
-                pca = self.trainer.pca(feature_idx=feature_idx)
+                pca = self.trainer.datamodule.pca(feature_idx=feature_idx)
             else:
-                pca = self.trainer.pca(feature_idx=feature_idx)
+                pca = self.trainer.datamodule.pca(feature_idx=feature_idx)
             n_pca_dim = (
                 np.where(pca.explained_variance_ratio_.cumsum() < 0.9)[0][-1] + 1
             )

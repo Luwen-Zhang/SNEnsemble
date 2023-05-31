@@ -101,7 +101,7 @@ class RFE(TorchModel):
         while len(rest_features) > self.min_features:
             if verbose:
                 print(f"Using features: {rest_features}")
-            trainer.set_feature_names(rest_features)
+            trainer.datamodule.set_feature_names(rest_features)
             if self.cross_validation == 0:
                 modelbase._train(
                     verbose=False, model_subset=[model_name], dump_trainer=False
@@ -136,7 +136,7 @@ class RFE(TorchModel):
 
         select_idx = metrics.index(np.min(metrics))
         selected_features = features_eliminated[select_idx:]
-        trainer.set_feature_names(selected_features)
+        trainer.datamodule.set_feature_names(selected_features)
         self.metrics[model_name] = metrics
         self.features_eliminated[model_name] = features_eliminated
         self.impor_dicts[model_name] = impor_dicts

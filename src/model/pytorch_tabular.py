@@ -113,14 +113,22 @@ class PytorchTabular(AbstractModel):
         y_test,
     ):
         all_feature_names = self.trainer.all_feature_names
-        X_train = self.trainer.categories_inverse_transform(X_train[all_feature_names])
-        X_val = self.trainer.categories_inverse_transform(X_val[all_feature_names])
-        X_test = self.trainer.categories_inverse_transform(X_test[all_feature_names])
+        X_train = self.trainer.datamodule.categories_inverse_transform(
+            X_train[all_feature_names]
+        )
+        X_val = self.trainer.datamodule.categories_inverse_transform(
+            X_val[all_feature_names]
+        )
+        X_test = self.trainer.datamodule.categories_inverse_transform(
+            X_test[all_feature_names]
+        )
         return X_train, D_train, y_train, X_val, D_val, y_val, X_test, D_test, y_test
 
     def _data_preprocess(self, df, derived_data, model_name):
         all_feature_names = self.trainer.all_feature_names
-        df = self.trainer.categories_inverse_transform(df[all_feature_names].copy())
+        df = self.trainer.datamodule.categories_inverse_transform(
+            df[all_feature_names].copy()
+        )
         return df, derived_data
 
     def _train_single_model(

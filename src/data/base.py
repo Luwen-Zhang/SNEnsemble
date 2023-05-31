@@ -1,7 +1,7 @@
 from src.utils import *
-from src.trainer import Trainer
 from copy import deepcopy as cp
 from typing import *
+from .datamodule import DataModule
 
 
 class AbstractDeriver:
@@ -16,7 +16,7 @@ class AbstractDeriver:
     def derive(
         self,
         df: pd.DataFrame,
-        trainer: Trainer,
+        datamodule: DataModule,
         derived_name: str,
         **kwargs,
     ) -> Tuple[np.ndarray, str, List]:
@@ -28,8 +28,8 @@ class AbstractDeriver:
         ----------
         df:
             The tabular dataset.
-        trainer:
-            A Trainer instance. Data-derivers might use information in the Trainer, but would not change its contents.
+        datamodule:
+            A DataModule instance. Data-derivers might use information in the DataModule, but would not change its contents.
         derived_name:
             The name of the derived feature.
         **kwargs:
@@ -50,7 +50,7 @@ class AbstractDeriver:
             self._check_exist(df, arg_name, **kwargs)
         for arg_name in self._required_params(**kwargs) + ["stacked", "intermediate"]:
             self._check_arg(arg_name, **kwargs)
-        values = self._derive(df, trainer, **kwargs)
+        values = self._derive(df, datamodule, **kwargs)
         self._check_values(values)
         names = (
             self._generate_col_names(derived_name, values.shape[-1], **kwargs)
@@ -81,7 +81,7 @@ class AbstractDeriver:
     def _derive(
         self,
         df: pd.DataFrame,
-        trainer: Trainer,
+        datamodule: DataModule,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -91,8 +91,8 @@ class AbstractDeriver:
         ----------
         df:
             The tabular dataset.
-        trainer:
-            A Trainer instance. Data-derivers might use information in the Trainer, but would not change its contents.
+        datamodule:
+            A DataModule instance. Data-derivers might use information in the DataModule, but would not change its contents.
         **kwargs:
             Arguments specified in configuration files and :func:``_defaults``.
 
@@ -254,10 +254,10 @@ class AbstractImputer:
         self.record_imputed_features = None
 
     def fit_transform(
-        self, input_data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         """
-        Record feature names in the trainer, fit the imputer, and transform the input dataframe. This should perform
+        Record feature names in the datamodule, fit the imputer, and transform the input dataframe. This should perform
         on the training set. Missing values in categorical features are filled by "UNK". Continuous features that are
         totally missing will not be imputed.
 
@@ -265,8 +265,8 @@ class AbstractImputer:
         ----------
         input_data:
             A tabular dataset.
-        trainer:
-            A trainer instance that contains necessary information required by imputers.
+        datamodule:
+            A DataModule instance that contains necessary information required by imputers.
         **kwargs:
             Arguments specified in the configuration file.
         Returns
@@ -275,26 +275,26 @@ class AbstractImputer:
             A transformed tabular dataset.
         """
         data = input_data.copy()
-        self.record_cont_features = cp(trainer.cont_feature_names)
-        self.record_cat_features = cp(trainer.cat_feature_names)
+        self.record_cont_features = cp(datamodule.cont_feature_names)
+        self.record_cat_features = cp(datamodule.cat_feature_names)
         data.loc[:, self.record_cat_features] = data[self.record_cat_features].fillna(
             "UNK"
         )
-        return self._fit_transform(data, trainer, **kwargs)
+        return self._fit_transform(data, datamodule, **kwargs)
 
     def transform(
-        self, input_data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         """
-        Restore feature names in trainer using recorded features, and transform the input tabular data using the fitted
+        Restore feature names in datamodule using recorded features, and transform the input tabular data using the fitted
         imputer. This should perform on the validation and testing dataset.
 
         Parameters
         ----------
         input_data:
             A tabular dataset.
-        trainer:
-            A trainer instance that contains necessary information required by imputers.
+        datamodule:
+            A DataModule instance that contains necessary information required by imputers.
         **kwargs:
             Arguments specified in the configuration file.
 
@@ -304,15 +304,15 @@ class AbstractImputer:
             A transformed tabular dataset.
         """
         data = input_data.copy()
-        trainer.cont_feature_names = cp(self.record_cont_features)
-        trainer.cat_feature_names = cp(self.record_cat_features)
+        datamodule.cont_feature_names = cp(self.record_cont_features)
+        datamodule.cat_feature_names = cp(self.record_cat_features)
         data.loc[:, self.record_cat_features] = data[self.record_cat_features].fillna(
             "UNK"
         )
-        return self._transform(data, trainer, **kwargs)
+        return self._transform(data, datamodule, **kwargs)
 
     def _fit_transform(
-        self, input_data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         """
         Fit the imputer and transform the input dataframe. This should perform on the training dataset.
@@ -321,8 +321,8 @@ class AbstractImputer:
         ----------
         input_data:
             A tabular dataset.
-        trainer:
-            A trainer instance that contains necessary information required by imputers.
+        datamodule:
+            A DataModule instance that contains necessary information required by imputers.
         **kwargs:
             Arguments specified in the configuration file.
         Returns
@@ -333,7 +333,7 @@ class AbstractImputer:
         raise NotImplementedError
 
     def _transform(
-        self, input_data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         """
         Transform the input tabular data using the fitted imputer. This should perform on the validation and testing
@@ -343,8 +343,8 @@ class AbstractImputer:
         ----------
         input_data:
             A tabular dataset.
-        trainer:
-            A trainer instance that contains necessary information required by imputers.
+        datamodule:
+            A DataModule instance that contains necessary information required by imputers.
         **kwargs:
             Arguments specified in the configuration file.
 
@@ -392,10 +392,10 @@ class AbstractSklearnImputer(AbstractImputer):
         super(AbstractSklearnImputer, self).__init__()
 
     def _fit_transform(
-        self, input_data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         impute_features = self._get_impute_features(
-            trainer.cont_feature_names, input_data
+            datamodule.cont_feature_names, input_data
         )
         imputer = self._new_imputer()
         # https://github.com/scikit-learn/scikit-learn/issues/16426
@@ -413,7 +413,7 @@ class AbstractSklearnImputer(AbstractImputer):
         return input_data
 
     def _transform(
-        self, input_data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         res = self.transformer.transform(
             input_data.loc[:, self.record_imputed_features]
@@ -441,7 +441,7 @@ class AbstractProcessor:
 
     Notes
     -------
-    If any attribute of the trainer is set by the processor in ``_fit_transform``, the processor is responsible to
+    If any attribute of the datamodule is set by the processor in ``_fit_transform``, the processor is responsible to
     restore the set attribute when _transform is called. For instance, we have implemented recording feature names and
     restoring them in the wrapper methods ``fit_transform`` and ``transform``.
     """
@@ -451,18 +451,18 @@ class AbstractProcessor:
         self.record_cat_features = None
 
     def fit_transform(
-        self, input_data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         """
-        Record feature names in the trainer, fit the processor and transform the input data. This should perform on the
+        Record feature names in the datamodule, fit the processor and transform the input data. This should perform on the
         training set.
 
         Parameters
         ----------
         input_data:
             A tabular dataset.
-        trainer:
-            A trainer instance that contains necessary information required by processors.
+        datamodule:
+            A datamodule instance that contains necessary information required by processors.
         **kwargs:
             Arguments specified in the configuration file.
         Returns
@@ -471,24 +471,24 @@ class AbstractProcessor:
             A transformed tabular dataset.
         """
         data = input_data.copy()
-        res = self._fit_transform(data, trainer, **kwargs)
-        self.record_cont_features = cp(trainer.cont_feature_names)
-        self.record_cat_features = cp(trainer.cat_feature_names)
+        res = self._fit_transform(data, datamodule, **kwargs)
+        self.record_cont_features = cp(datamodule.cont_feature_names)
+        self.record_cat_features = cp(datamodule.cat_feature_names)
         return res
 
     def transform(
-        self, input_data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         """
-        Restore feature names in trainer using recorded features and transform the input data. This should perform on
+        Restore feature names in datamodule using recorded features and transform the input data. This should perform on
         the validation and testing dataset.
 
         Parameters
         ----------
         input_data:
             A tabular dataset.
-        trainer:
-            A trainer instance that contains necessary information required by processors.
+        datamodule:
+            A datamodule instance that contains necessary information required by processors.
         **kwargs:
             Arguments specified in the configuration file.
 
@@ -497,18 +497,18 @@ class AbstractProcessor:
         df:
             A transformed tabular dataset.
         """
-        trainer.cont_feature_names = cp(self.record_cont_features)
-        trainer.cat_feature_names = cp(self.record_cat_features)
+        datamodule.cont_feature_names = cp(self.record_cont_features)
+        datamodule.cat_feature_names = cp(self.record_cat_features)
         data = input_data.copy()
-        return self._transform(data, trainer, **kwargs)
+        return self._transform(data, datamodule, **kwargs)
 
     def _fit_transform(
-        self, data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         raise NotImplementedError
 
     def _transform(
-        self, data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         raise NotImplementedError
 
@@ -563,36 +563,40 @@ class AbstractFeatureSelector(AbstractProcessor):
         super(AbstractFeatureSelector, self).__init__()
 
     def _fit_transform(
-        self, data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
-        retain_features = list(self._get_feature_names_out(data, trainer, **kwargs))
+        retain_features = list(self._get_feature_names_out(data, datamodule, **kwargs))
         removed_features = list(
-            np.setdiff1d(trainer.all_feature_names, retain_features)
+            np.setdiff1d(datamodule.all_feature_names, retain_features)
         )
         if len(removed_features) > 0:
-            trainer.cont_feature_names = [
-                x for x in trainer.cont_feature_names if x in retain_features
+            datamodule.cont_feature_names = [
+                x for x in datamodule.cont_feature_names if x in retain_features
             ]
-            trainer.cat_feature_names = [
-                x for x in trainer.cat_feature_names if x in retain_features
+            datamodule.cat_feature_names = [
+                x for x in datamodule.cat_feature_names if x in retain_features
             ]
             print(
                 f"{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features "
                 f"retained: {retain_features}."
             )
         return data[
-            trainer.cont_feature_names + trainer.cat_feature_names + trainer.label_name
+            datamodule.cont_feature_names
+            + datamodule.cat_feature_names
+            + datamodule.label_name
         ]
 
     def _transform(
-        self, data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
         return data[
-            trainer.cont_feature_names + trainer.cat_feature_names + trainer.label_name
+            datamodule.cont_feature_names
+            + datamodule.cat_feature_names
+            + datamodule.label_name
         ]
 
     def _get_feature_names_out(
-        self, input_data: pd.DataFrame, trainer: Trainer, **kwargs
+        self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> List[str]:
         """
         Get selected features.
@@ -601,8 +605,8 @@ class AbstractFeatureSelector(AbstractProcessor):
         ----------
         input_data:
             A tabular dataset.
-        trainer:
-            A trainer instance that contains necessary information required by processors.
+        datamodule:
+            A datamodule instance that contains necessary information required by processors.
         **kwargs:
             Arguments specified in the configuration file.
 

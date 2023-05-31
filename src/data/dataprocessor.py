@@ -1,10 +1,10 @@
 from src.utils import *
-from src.trainer import Trainer
 from src.data import (
     AbstractProcessor,
     AbstractFeatureSelector,
     AbstractTransformer,
 )
+from src.data import DataModule
 import inspect
 from sklearn.model_selection import KFold
 from sklearn.feature_selection import VarianceThreshold
@@ -22,7 +22,7 @@ class LackDataMaterialRemover(AbstractProcessor):
     def __init__(self):
         super(LackDataMaterialRemover, self).__init__()
 
-    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         m_codes = data.loc[:, "Material_Code"].copy()
         m_cnts_index = list(m_codes.value_counts(ascending=False).index)
         self.lack_data_mat = m_cnts_index[len(m_cnts_index) // 10 * 8 :]
@@ -32,7 +32,7 @@ class LackDataMaterialRemover(AbstractProcessor):
             data = data.drop(where_material)
         return data
 
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         for m_code in self.lack_data_mat:
             m_codes = data.loc[:, "Material_Code"].copy()
             where_material = m_codes.index[np.where(m_codes == m_code)[0]]
@@ -52,11 +52,11 @@ class MaterialSelector(AbstractProcessor):
         super(MaterialSelector, self).__init__()
 
     def _fit_transform(
-        self, data: pd.DataFrame, trainer: Trainer, m_code=None, **kwargs
+        self, data: pd.DataFrame, datamodule: DataModule, m_code=None, **kwargs
     ):
         if m_code is None:
             raise Exception('MaterialSelector requires the argument "m_code".')
-        m_codes = trainer.df.loc[np.array(data.index), "Material_Code"].copy()
+        m_codes = datamodule.df.loc[np.array(data.index), "Material_Code"].copy()
         if m_code not in list(m_codes):
             raise Exception(f"m_code {m_code} not available.")
         where_material = m_codes.index[np.where(m_codes == m_code)[0]]
@@ -64,7 +64,7 @@ class MaterialSelector(AbstractProcessor):
         self.m_code = m_code
         return data
 
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         m_codes = data.loc[:, "Material_Code"].copy()
         if self.m_code not in list(m_codes):
             raise Exception(f"m_code {self.m_code} not available.")
@@ -89,7 +89,7 @@ class FeatureValueSelector(AbstractProcessor):
     def _fit_transform(
         self,
         data: pd.DataFrame,
-        trainer: Trainer,
+        datamodule: DataModule,
         feature=None,
         value=None,
         **kwargs,
@@ -107,7 +107,7 @@ class FeatureValueSelector(AbstractProcessor):
         self.feature, self.value = feature, value
         return data
 
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         if self.value not in list(data[self.feature]):
             raise Exception(
                 f"Value {self.value} not available for feature {self.feature}. Select from {data[self.feature].unique()}"
@@ -126,9 +126,9 @@ class IQRRemover(AbstractProcessor):
     def __init__(self):
         super(IQRRemover, self).__init__()
 
-    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         print(f"Removing outliers by IQR. Original size: {len(data)}, ", end="")
-        for feature in list(trainer.args["feature_names_type"].keys()):
+        for feature in list(datamodule.args["feature_names_type"].keys()):
             if pd.isna(data[feature]).all():
                 raise Exception(f"All values of {feature} are NaN.")
             Q1 = np.percentile(data[feature].dropna(axis=0), 25, method="midpoint")
@@ -144,7 +144,7 @@ class IQRRemover(AbstractProcessor):
         print(f"Final size: {len(data)}.")
         return data
 
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         return data
 
 
@@ -156,9 +156,9 @@ class StdRemover(AbstractProcessor):
     def __init__(self):
         super(StdRemover, self).__init__()
 
-    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         print(f"Removing outliers by std. Original size: {len(data)}, ", end="")
-        for feature in list(trainer.args["feature_names_type"].keys()):
+        for feature in list(datamodule.args["feature_names_type"].keys()):
             if pd.isna(data[feature]).all():
                 raise Exception(f"All values of {feature} are NaN.")
             m = np.mean(data[feature].dropna(axis=0))
@@ -173,7 +173,7 @@ class StdRemover(AbstractProcessor):
         print(f"Final size: {len(data)}.")
         return data
 
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         return data
 
 
@@ -185,12 +185,12 @@ class NaNFeatureRemover(AbstractFeatureSelector):
     def __init__(self):
         super(NaNFeatureRemover, self).__init__()
 
-    def _get_feature_names_out(self, data, trainer, **kwargs):
+    def _get_feature_names_out(self, data, datamodule, **kwargs):
         retain_features = []
         all_missing_idx = np.where(
-            pd.isna(data[trainer.all_feature_names]).values.all(axis=0)
+            pd.isna(data[datamodule.all_feature_names]).values.all(axis=0)
         )[0]
-        for idx, feature in enumerate(trainer.all_feature_names):
+        for idx, feature in enumerate(datamodule.all_feature_names):
             if idx not in all_missing_idx:
                 retain_features.append(feature)
         return retain_features
@@ -218,7 +218,7 @@ class RFEFeatureSelector(AbstractFeatureSelector):
     def _get_feature_names_out(
         self,
         data,
-        trainer,
+        datamodule,
         n_estimators=100,
         step=1,
         verbose=0,
@@ -247,7 +247,7 @@ class RFEFeatureSelector(AbstractFeatureSelector):
             )
 
         rfecv = ExtendRFECV(
-            estimator=trainer.get_base_predictor(
+            estimator=datamodule.get_base_predictor(
                 categorical=False,
                 n_estimators=100,
                 n_jobs=-1,
@@ -262,8 +262,8 @@ class RFEFeatureSelector(AbstractFeatureSelector):
             importance_getter=importance_getter if method == "shap" else method,
         )
         rfecv.fit(
-            data[trainer.all_feature_names],
-            data[trainer.label_name].values.flatten(),
+            data[datamodule.all_feature_names],
+            data[datamodule.label_name].values.flatten(),
         )
         retain_features = list(rfecv.get_feature_names_out())
         return retain_features
@@ -280,11 +280,11 @@ class VarianceFeatureSelector(AbstractFeatureSelector):
     def __init__(self):
         super(VarianceFeatureSelector, self).__init__()
 
-    def _get_feature_names_out(self, data, trainer, thres=0.8, **kwargs):
+    def _get_feature_names_out(self, data, datamodule, thres=0.8, **kwargs):
         sel = VarianceThreshold(threshold=(thres * (1 - thres)))
         sel.fit(
-            data[trainer.all_feature_names],
-            data[trainer.label_name].values.flatten(),
+            data[datamodule.all_feature_names],
+            data[datamodule.label_name].values.flatten(),
         )
         retain_features = list(sel.get_feature_names_out())
         return retain_features
@@ -306,13 +306,13 @@ class CorrFeatureSelector(AbstractFeatureSelector):
         super(CorrFeatureSelector, self).__init__()
 
     def _get_feature_names_out(
-        self, data, trainer, thres=0.8, n_estimators=100, **kwargs
+        self, data, datamodule, thres=0.8, n_estimators=100, **kwargs
     ):
         import shap
 
-        abs_corr = trainer.cal_corr(imputed=False, features_only=True).abs()
+        abs_corr = datamodule.cal_corr(imputed=False, features_only=True).abs()
         where_corr = np.where(abs_corr > thres)
-        where_corr = [[trainer.cont_feature_names[x] for x in y] for y in where_corr]
+        where_corr = [[datamodule.cont_feature_names[x] for x in y] for y in where_corr]
         corr_chain = {}
 
         def add_edge(x, y):
@@ -326,7 +326,7 @@ class CorrFeatureSelector(AbstractFeatureSelector):
                 add_edge(x, y)
                 add_edge(y, x)
         corr_feature = list(corr_chain.keys())
-        for x in np.setdiff1d(trainer.cont_feature_names, corr_feature):
+        for x in np.setdiff1d(datamodule.cont_feature_names, corr_feature):
             corr_chain[x] = []
 
         def dfs(visited, graph, node, ls):
@@ -350,12 +350,12 @@ class CorrFeatureSelector(AbstractFeatureSelector):
 
         corr_sets = [[x for x in y] for y in corr_sets]
 
-        rf = trainer.get_base_predictor(
+        rf = datamodule.get_base_predictor(
             categorical=False, n_estimators=n_estimators, n_jobs=-1, random_state=0
         )
         rf.fit(
-            data[trainer.all_feature_names],
-            data[trainer.label_name].values.flatten(),
+            data[datamodule.all_feature_names],
+            data[datamodule.label_name].values.flatten(),
         )
 
         explainer = shap.Explainer(rf)
@@ -364,15 +364,17 @@ class CorrFeatureSelector(AbstractFeatureSelector):
                 np.random.choice(
                     np.array(data.index), size=min([100, len(data)]), replace=False
                 ),
-                trainer.all_feature_names,
+                datamodule.all_feature_names,
             ]
         )
 
-        retain_features = list(np.setdiff1d(trainer.cont_feature_names, corr_feature))
+        retain_features = list(
+            np.setdiff1d(datamodule.cont_feature_names, corr_feature)
+        )
         attr = np.mean(np.abs(shap_values.values), axis=0)
         print("Correlated features (Ranked by SHAP):")
         for corr_set in corr_sets:
-            set_shap = [attr[trainer.all_feature_names.index(x)] for x in corr_set]
+            set_shap = [attr[datamodule.all_feature_names.index(x)] for x in corr_set]
             max_shap_feature = corr_set[set_shap.index(np.max(set_shap))]
             retain_features += [max_shap_feature]
             order = np.array(set_shap).argsort()
@@ -380,40 +382,40 @@ class CorrFeatureSelector(AbstractFeatureSelector):
             for idx in order[::-1]:
                 corr_set_dict[corr_set[idx]] = set_shap[idx]
             print(pretty(corr_set_dict))
-        retain_features += trainer.cat_feature_names
+        retain_features += datamodule.cat_feature_names
         return retain_features
 
 
 class UnscaledDataRecorder(AbstractTransformer):
     """
-    Record unscaled data in the trainer. This processor MUST be inserted before ANY AbstractTransformer (like a
-    StandardScaler). The recorded data will be used to generate Trainer.df.
+    Record unscaled data in the datamodule. This processor MUST be inserted before ANY AbstractTransformer (like a
+    StandardScaler). The recorded data will be used to generate DataModule.df.
     """
 
     def __init__(self):
         super(UnscaledDataRecorder, self).__init__()
 
-    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         (
             feature_data,
             categorical_data,
             label_data,
-        ) = trainer.divide_from_tabular_dataset(data)
+        ) = datamodule.divide_from_tabular_dataset(data)
 
-        trainer._unscaled_feature_data = feature_data
-        trainer._categorical_data = categorical_data
-        trainer._unscaled_label_data = label_data
+        datamodule._unscaled_feature_data = feature_data
+        datamodule._categorical_data = categorical_data
+        datamodule._unscaled_label_data = label_data
         return data
 
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         (
             feature_data,
             categorical_data,
             label_data,
-        ) = trainer.divide_from_tabular_dataset(data)
-        trainer._unscaled_feature_data = feature_data
-        trainer._categorical_data = categorical_data
-        trainer._unscaled_label_data = label_data
+        ) = datamodule.divide_from_tabular_dataset(data)
+        datamodule._unscaled_feature_data = feature_data
+        datamodule._categorical_data = categorical_data
+        datamodule._unscaled_label_data = label_data
         return data
 
     def var_slip(self, feature_name, x):
@@ -428,18 +430,18 @@ class StandardScaler(AbstractTransformer):
     def __init__(self):
         super(StandardScaler, self).__init__()
 
-    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         scaler = skStandardScaler()
-        data.loc[:, trainer.cont_feature_names] = scaler.fit_transform(
-            data.loc[:, trainer.cont_feature_names]
+        data.loc[:, datamodule.cont_feature_names] = scaler.fit_transform(
+            data.loc[:, datamodule.cont_feature_names]
         ).astype(np.float32)
 
         self.transformer = scaler
         return data
 
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data.loc[:, trainer.cont_feature_names] = self.transformer.transform(
-            data.loc[:, trainer.cont_feature_names]
+    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
+        data.loc[:, datamodule.cont_feature_names] = self.transformer.transform(
+            data.loc[:, datamodule.cont_feature_names]
         ).astype(np.float32)
         return data
 
@@ -452,18 +454,18 @@ class Normalizer(AbstractTransformer):
     def __init__(self):
         super(Normalizer, self).__init__()
 
-    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         scaler = skNormalizer()
-        data.loc[:, trainer.cont_feature_names] = scaler.fit_transform(
-            data.loc[:, trainer.cont_feature_names]
+        data.loc[:, datamodule.cont_feature_names] = scaler.fit_transform(
+            data.loc[:, datamodule.cont_feature_names]
         ).astype(np.float32)
 
         self.transformer = scaler
         return data
 
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        data.loc[:, trainer.cont_feature_names] = self.transformer.transform(
-            data.loc[:, trainer.cont_feature_names]
+    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
+        data.loc[:, datamodule.cont_feature_names] = self.transformer.transform(
+            data.loc[:, datamodule.cont_feature_names]
         ).astype(np.float32)
         return data
 
@@ -478,28 +480,28 @@ class CategoricalOrdinalEncoder(AbstractTransformer):
         super(CategoricalOrdinalEncoder, self).__init__()
         self.record_feature_mapping = None
 
-    def _fit_transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
+    def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         oe = OrdinalEncoder()
-        data.loc[:, trainer.cat_feature_names] = oe.fit_transform(
-            data.loc[:, trainer.cat_feature_names]
+        data.loc[:, datamodule.cat_feature_names] = oe.fit_transform(
+            data.loc[:, datamodule.cat_feature_names]
         ).astype(int)
-        for feature, categories in zip(trainer.cat_feature_names, oe.categories_):
-            trainer.cat_feature_mapping[feature] = categories
+        for feature, categories in zip(datamodule.cat_feature_names, oe.categories_):
+            datamodule.cat_feature_mapping[feature] = categories
         self.transformer = oe
-        self.record_feature_mapping = cp(trainer.cat_feature_mapping)
+        self.record_feature_mapping = cp(datamodule.cat_feature_mapping)
         return data
 
-    def _transform(self, data: pd.DataFrame, trainer: Trainer, **kwargs):
-        trainer.cat_feature_mapping = cp(self.record_feature_mapping)
+    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
+        datamodule.cat_feature_mapping = cp(self.record_feature_mapping)
         try:
-            data.loc[:, trainer.cat_feature_names] = self.transformer.transform(
-                data.loc[:, trainer.cat_feature_names]
+            data.loc[:, datamodule.cat_feature_names] = self.transformer.transform(
+                data.loc[:, datamodule.cat_feature_names]
             ).astype(int)
         except:
             try:
                 # Categorical features are already transformed.
                 self.transformer.inverse_transform(
-                    data.loc[:, trainer.cat_feature_names]
+                    data.loc[:, datamodule.cat_feature_names]
                 )
                 return data
             except:

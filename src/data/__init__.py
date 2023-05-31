@@ -6,6 +6,8 @@ from .base import AbstractFeatureSelector
 from .base import AbstractTransformer
 from .base import AbstractSplitter
 
+from .datamodule import DataModule
+
 from .dataderiver import get_data_deriver
 from .dataimputer import get_data_imputer
 from .dataprocessor import get_data_processor
@@ -19,6 +21,7 @@ __all__ = [
     "AbstractFeatureSelector",
     "AbstractTransformer",
     "AbstractSplitter",
+    "DataModule",
     "get_data_deriver",
     "get_data_imputer",
     "get_data_processor",

@@ -1,4 +1,3 @@
-import os
 import pickle
 import torch.optim.optimizer
 import src
@@ -12,7 +11,6 @@ from copy import deepcopy as cp
 from typing import *
 from skopt.space import Real, Integer, Categorical
 import time
-from contextlib import nullcontext
 import pytorch_lightning as pl
 from functools import partial
 from pytorch_lightning import Callback
@@ -107,7 +105,7 @@ class AbstractModel:
         """
         trainer_state = cp(self.trainer)
         self.trainer.set_status(training=True)
-        self.trainer.set_data(
+        self.trainer.datamodule.set_data(
             df,
             cont_feature_names=cont_feature_names,
             cat_feature_names=cat_feature_names,
@@ -203,7 +201,7 @@ class AbstractModel:
             raise Exception(f"Feature {absent_features} not in the input dataframe.")
 
         if derived_data is None or len(absent_derived_features) > 0:
-            df, _, derived_data = self.trainer.derive(df)
+            df, _, derived_data = self.trainer.datamodule.derive(df)
         else:
             absent_keys = [
                 key
@@ -214,11 +212,13 @@ class AbstractModel:
                 raise Exception(
                     f"Additional feature {absent_keys} not in the input derived_data."
                 )
-        df = self.trainer.dataimputer.transform(df.copy(), self.trainer)
+        df = self.trainer.datamodule.dataimputer.transform(df.copy(), self.trainer)
         return self._predict(
             df,
             model_name,
-            self.trainer.sort_derived_data(derived_data, ignore_absence=ignore_absence),
+            self.trainer.datamodule.sort_derived_data(
+                derived_data, ignore_absence=ignore_absence
+            ),
             **kwargs,
         )
 
@@ -329,13 +329,13 @@ class AbstractModel:
         y_train = df.loc[train_indices, label_name].values
         y_val = df.loc[val_indices, label_name].values
         y_test = df.loc[test_indices, label_name].values
-        D_train = self.trainer.get_derived_data_slice(
+        D_train = self.trainer.datamodule.get_derived_data_slice(
             derived_data=self.trainer.derived_data, indices=self.trainer.train_indices
         )
-        D_val = self.trainer.get_derived_data_slice(
+        D_val = self.trainer.datamodule.get_derived_data_slice(
             derived_data=self.trainer.derived_data, indices=self.trainer.val_indices
         )
-        D_test = self.trainer.get_derived_data_slice(
+        D_test = self.trainer.datamodule.get_derived_data_slice(
             derived_data=self.trainer.derived_data, indices=self.trainer.test_indices
         )
         return X_train, D_train, y_train, X_val, D_val, y_val, X_test, D_test, y_test
@@ -987,18 +987,18 @@ class TorchModel(AbstractModel):
         y_test,
     ):
         train_loader = Data.DataLoader(
-            self.trainer.train_dataset,
-            batch_size=len(self.trainer.train_dataset),
+            self.trainer.datamodule.train_dataset,
+            batch_size=len(self.trainer.datamodule.train_dataset),
             pin_memory=True,
         )
         val_loader = Data.DataLoader(
-            self.trainer.val_dataset,
-            batch_size=len(self.trainer.val_dataset),
+            self.trainer.datamodule.val_dataset,
+            batch_size=len(self.trainer.datamodule.val_dataset),
             pin_memory=True,
         )
         test_loader = Data.DataLoader(
-            self.trainer.test_dataset,
-            batch_size=len(self.trainer.test_dataset),
+            self.trainer.datamodule.test_dataset,
+            batch_size=len(self.trainer.datamodule.test_dataset),
             pin_memory=True,
         )
         return (
@@ -1014,7 +1014,7 @@ class TorchModel(AbstractModel):
         )
 
     def _data_preprocess(self, df, derived_data, model_name):
-        df = self.trainer.data_transform(df)
+        df = self.trainer.datamodule.data_transform(df)
         X = torch.tensor(
             df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
@@ -1194,13 +1194,13 @@ class AbstractNN(pl.LightningModule):
         self.n_cont = len(self.cont_feature_names)
         self.n_cat = len(self.cat_feature_names)
         self.derived_feature_names = list(trainer.derived_data.keys())
-        self.derived_feature_dims = trainer.get_derived_data_sizes()
+        self.derived_feature_dims = trainer.datamodule.get_derived_data_sizes()
         self.derived_feature_names_dims = {}
         self.automatic_optimization = False
         if len(kwargs) > 0:
             self.save_hyperparameters(*list(kwargs.keys()), ignore=["trainer"])
         for name, dim in zip(
-            trainer.derived_data.keys(), trainer.get_derived_data_sizes()
+            trainer.derived_data.keys(), trainer.datamodule.get_derived_data_sizes()
         ):
             self.derived_feature_names_dims[name] = dim
         self._device_var = nn.Parameter(torch.empty(0, requires_grad=False))

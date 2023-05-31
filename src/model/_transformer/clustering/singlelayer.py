@@ -1,5 +1,5 @@
-from .common.gmm import GMM, PCAGMM
-from .common.kmeans import KMeans, PCAKMeans
+from .common.gmm import PCAGMM
+from .common.kmeans import PCAKMeans
 from .base import AbstractSNClustering
 
 

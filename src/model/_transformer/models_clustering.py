@@ -1,10 +1,9 @@
 from .models_basic import CategoryEmbeddingNN, FTTransformerNN
 from .models_with_seq import CatEmbedSeqNN
-from ..base import get_sequential, AbstractNN
+from ..base import AbstractNN
 import numpy as np
 from .clustering.singlelayer import KMeansSN, GMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN
-import torch
 
 
 class AbstractClusteringModel(AbstractNN):
@@ -23,7 +22,7 @@ class AbstractClusteringModel(AbstractNN):
         self.clustering_features = clustering_features
         self.clustering_sn_model = clustering_sn_model
         self.cont_cat_model = cont_cat_model
-        self.s_zero_slip = trainer.get_zero_slip("Relative Maximum Stress")
+        self.s_zero_slip = trainer.datamodule.get_zero_slip("Relative Maximum Stress")
         self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
 
     def _forward(self, x, derived_tensors):
@@ -50,7 +49,7 @@ class AbstractClusteringModel(AbstractNN):
     def basic_clustering_features_idx(trainer) -> np.ndarray:
         return np.concatenate(
             (
-                trainer.get_feature_idx_by_type(typ="Material"),
+                trainer.datamodule.get_feature_idx_by_type(typ="Material"),
                 [trainer.cont_feature_names.index(x) for x in ["R-value"]],
             )
         )
