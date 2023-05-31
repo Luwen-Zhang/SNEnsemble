@@ -96,7 +96,7 @@ class AbstractModel:
             The names of a subset of all available models (in :func:``get_model_names``). Only these models will be
             trained.
         derived_data:
-            Data derived from :func:``Trainer.derive_unstacked``. If not None, unstacked data will be re-derived.
+            Data derived from :func:``DataModule.derive_unstacked``. If not None, unstacked data will be re-derived.
         verbose:
             Verbosity.
         warm_start:
@@ -752,7 +752,7 @@ class AbstractModel:
         model:
             The model trained in :func:`_train_single_model`.
         X_test:
-            The testing data from :func:`_train_data_preprocess`.
+            The testing data from :func:`_data_preprocess`.
         verbose:
             Verbosity.
         **kwargs:
@@ -883,7 +883,6 @@ class TorchModel(AbstractModel):
         }
 
     def _data_preprocess(self, df, derived_data, model_name):
-        df = self.trainer.datamodule.data_transform(df)
         X = torch.tensor(
             df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,

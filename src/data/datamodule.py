@@ -334,8 +334,9 @@ class DataModule:
         self, df: pd.DataFrame, derived_data: dict = None, ignore_absence=False
     ) -> Tuple[pd.DataFrame, dict]:
         """
-        Prepare the new tabular dataset for predictions from AbstractModel._predict. Users usually do not need to call
-        this because AbstractModel.predict does it.
+        Prepare the new tabular dataset for predictions from AbstractModel._predict. Stacked and unstacked features
+        are derived; missing values are imputed; AbstractProcessor.transform are called. Users usually do not need to
+        call this because AbstractModel.predict does it.
 
         Parameters
         ----------
@@ -349,7 +350,7 @@ class DataModule:
         Returns
         -------
         df
-            The dataset after derivation and imputation. It has the same structure as self.X_train
+            The dataset after derivation, imputation, and processing. It has the same structure as self.X_train
         derived_data:
             Data derived from :func:``DataModule.derive_unstacked``. It has the same structure as self.D_train
         """
@@ -377,6 +378,7 @@ class DataModule:
                     f"Additional feature {absent_keys} not in the input derived_data."
                 )
         df = self.dataimputer.transform(df.copy(), self)
+        df = self.data_transform(df)
         derived_data = self.sort_derived_data(
             derived_data, ignore_absence=ignore_absence
         )
@@ -917,27 +919,27 @@ class DataModule:
 
     @property
     def X_train(self):
-        return self.df.loc[self.train_indices, :].copy()
+        return self.scaled_df.loc[self.train_indices, :].copy()
 
     @property
     def X_val(self):
-        return self.df.loc[self.val_indices, :].copy()
+        return self.scaled_df.loc[self.val_indices, :].copy()
 
     @property
     def X_test(self):
-        return self.df.loc[self.test_indices, :].copy()
+        return self.scaled_df.loc[self.test_indices, :].copy()
 
     @property
     def y_train(self):
-        return self.df.loc[self.train_indices, self.label_name].values
+        return self.scaled_df.loc[self.train_indices, self.label_name].values
 
     @property
     def y_val(self):
-        return self.df.loc[self.val_indices, self.label_name].values
+        return self.scaled_df.loc[self.val_indices, self.label_name].values
 
     @property
     def y_test(self):
-        return self.df.loc[self.test_indices, self.label_name].values
+        return self.scaled_df.loc[self.test_indices, self.label_name].values
 
     @property
     def D_train(self):

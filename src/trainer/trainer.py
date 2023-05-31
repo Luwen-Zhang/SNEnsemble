@@ -1021,7 +1021,7 @@ class Trainer:
         else:
             if method == "permutation":
                 attr = np.zeros((len(self.all_feature_names),))
-                test_data = self.datamodule.X_test
+                test_data = self.df.loc[self.test_indices, :].copy()
                 base_pred = modelbase.predict(
                     test_data,
                     derived_data=self.datamodule.D_test,
@@ -1273,7 +1273,7 @@ class Trainer:
             feature_subset=self.all_feature_names,
             program=program,
             model_name=model_name,
-            df=self.datamodule.X_train,
+            df=self.df.loc[self.train_indices, :],
             derived_data=self.datamodule.D_train,
             n_bootstrap=n_bootstrap,
             refit=refit,
@@ -1367,7 +1367,7 @@ class Trainer:
 
         ground_truth = self.label_data.loc[self.test_indices, :].values.flatten()
         prediction = modelbase.predict(
-            df=self.datamodule.X_test,
+            df=self.df.loc[self.test_indices, :],
             derived_data=self.datamodule.D_test,
             model_name=model_name,
         ).flatten()
