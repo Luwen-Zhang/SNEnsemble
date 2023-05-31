@@ -848,6 +848,64 @@ class DataModule:
         """
         return self.scaled_df[self.label_name].copy()
 
+    def dataset_dict(self):
+        return {
+            "X_train": self.X_train,
+            "X_val": self.X_val,
+            "X_test": self.X_test,
+            "D_train": self.D_train,
+            "D_val": self.D_val,
+            "D_test": self.D_test,
+            "y_train": self.y_train,
+            "y_val": self.y_val,
+            "y_test": self.y_test,
+        }
+
+    def __getitem__(self, item):
+        return self.dataset_dict()[item]
+
+    @property
+    def X_train(self):
+        return self.df.loc[self.train_indices, :].copy()
+
+    @property
+    def X_val(self):
+        return self.df.loc[self.val_indices, :].copy()
+
+    @property
+    def X_test(self):
+        return self.df.loc[self.test_indices, :].copy()
+
+    @property
+    def y_train(self):
+        return self.df.loc[self.train_indices, self.label_name].values
+
+    @property
+    def y_val(self):
+        return self.df.loc[self.val_indices, self.label_name].values
+
+    @property
+    def y_test(self):
+        return self.df.loc[self.test_indices, self.label_name].values
+
+    @property
+    def D_train(self):
+        return self.get_derived_data_slice(
+            derived_data=self.derived_data, indices=self.train_indices
+        )
+
+    @property
+    def D_val(self):
+        return self.get_derived_data_slice(
+            derived_data=self.derived_data, indices=self.val_indices
+        )
+
+    @property
+    def D_test(self):
+        return self.get_derived_data_slice(
+            derived_data=self.derived_data, indices=self.test_indices
+        )
+
     def _data_preprocess(
         self, input_data: pd.DataFrame, warm_start: bool = False
     ) -> pd.DataFrame:
@@ -884,7 +942,7 @@ class DataModule:
 
     def data_transform(self, input_data: pd.DataFrame):
         """
-        Transform the input tabular dataset using fitted data processors.
+        Transform the input tabular dataset using fitted data processors. Only AbstractTransformers take effects.
 
         Parameters
         ----------

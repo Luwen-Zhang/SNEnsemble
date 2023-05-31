@@ -1021,10 +1021,10 @@ class Trainer:
         else:
             if method == "permutation":
                 attr = np.zeros((len(self.all_feature_names),))
-                test_data = self.df.loc[self.test_indices, :].copy()
+                test_data = self.datamodule.X_test
                 base_pred = modelbase.predict(
                     test_data,
-                    derived_data=self.datamodule.derive_unstacked(test_data),
+                    derived_data=self.datamodule.D_test,
                     model_name=model_name,
                 )
                 base_metric = self._metric_sklearn(
@@ -1273,10 +1273,8 @@ class Trainer:
             feature_subset=self.all_feature_names,
             program=program,
             model_name=model_name,
-            df=self.df.loc[self.train_indices, :],
-            derived_data=self.datamodule.get_derived_data_slice(
-                self.derived_data, self.train_indices
-            ),
+            df=self.datamodule.X_train,
+            derived_data=self.datamodule.D_train,
             n_bootstrap=n_bootstrap,
             refit=refit,
             grid_size=grid_size,
@@ -1369,10 +1367,8 @@ class Trainer:
 
         ground_truth = self.label_data.loc[self.test_indices, :].values.flatten()
         prediction = modelbase.predict(
-            df=self.df.loc[self.test_indices, :],
-            derived_data=self.datamodule.derive_unstacked(
-                self.df.loc[self.test_indices, :]
-            ),
+            df=self.datamodule.X_test,
+            derived_data=self.datamodule.D_test,
             model_name=model_name,
         ).flatten()
         plot_partial_err(
