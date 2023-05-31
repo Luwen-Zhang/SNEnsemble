@@ -9,7 +9,6 @@ from torch.utils.data import Subset
 from sklearn.decomposition import PCA
 import sklearn.pipeline
 import sklearn.ensemble
-from .dataprocessor import AbstractTransformer
 
 
 class DataModule:
@@ -1084,6 +1083,8 @@ class DataModule:
         value
             The transformed value for the feature using data processors.
         """
+        from .dataprocessor import AbstractTransformer
+
         if not hasattr(self, "dataprocessors"):
             raise Exception(f"Run load_config first.")
         elif len(self.dataprocessors) == 0 and feature_name in self.cont_feature_names:
