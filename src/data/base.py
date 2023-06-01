@@ -304,11 +304,12 @@ class AbstractImputer:
             A transformed tabular dataset.
         """
         data = input_data.copy()
-        datamodule.cont_feature_names = cp(self.record_cont_features)
-        datamodule.cat_feature_names = cp(self.record_cat_features)
-        data.loc[:, self.record_cat_features] = data[self.record_cat_features].fillna(
-            "UNK"
-        )
+        if not getattr(datamodule, "_force_features", False):
+            datamodule.cont_feature_names = cp(self.record_cont_features)
+            datamodule.cat_feature_names = cp(self.record_cat_features)
+        data.loc[:, datamodule.cat_feature_names] = data[
+            datamodule.cat_feature_names
+        ].fillna("UNK")
         return self._transform(data, datamodule, **kwargs)
 
     def _fit_transform(
@@ -497,8 +498,9 @@ class AbstractProcessor:
         df:
             A transformed tabular dataset.
         """
-        datamodule.cont_feature_names = cp(self.record_cont_features)
-        datamodule.cat_feature_names = cp(self.record_cat_features)
+        if not getattr(datamodule, "_force_features", False):
+            datamodule.cont_feature_names = cp(self.record_cont_features)
+            datamodule.cat_feature_names = cp(self.record_cat_features)
         data = input_data.copy()
         return self._transform(data, datamodule, **kwargs)
 

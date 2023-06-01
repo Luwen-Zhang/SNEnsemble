@@ -1030,8 +1030,6 @@ class DataModule:
         if skip_scaler and scaler_only:
             raise Exception(f"Both skip_scaler and scaler_only are True.")
         data = input_data.copy()
-        cont_feature_names = cp(self.cont_feature_names)
-        cat_feature_names = cp(self.cat_feature_names)
         for processor, kwargs in self.dataprocessors:
             if skip_scaler and isinstance(processor, AbstractScaler):
                 continue
@@ -1041,11 +1039,6 @@ class DataModule:
                 data = processor.transform(data, self, **kwargs)
             else:
                 data = processor.fit_transform(data, self, **kwargs)
-        if warm_start and getattr(self, "_force_features", False):
-            # If set_feature_names is called (i.e. _force_features is True) where some derived features are excluded,
-            # the excluded features are wrongly restored during processor.transform.
-            self.cont_feature_names = cont_feature_names
-            self.cat_feature_names = cat_feature_names
         return data
 
     def data_transform(
