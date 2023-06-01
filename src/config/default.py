@@ -28,7 +28,7 @@ cfg = {
             "categories": [32, 64, 128, 256, 512, 1024, 2048],
         },
     },
-    "data_splitter": "MaterialCycleSplitter",
+    "data_splitter": "CycleSplitter",
     "data_imputer": "MissForestImputer",
     "data_processors": [
         ("CategoricalOrdinalEncoder", {}),
