@@ -1,3 +1,5 @@
+import pandas as pd
+
 from src.utils import *
 from src.data import AbstractDeriver
 import inspect
@@ -483,7 +485,9 @@ class SampleWeightDeriver(AbstractDeriver):
         train_idx = datamodule.train_indices
         cont_feature_names = datamodule.cont_feature_names
         cat_feature_names = datamodule.cat_feature_names
-        weight = np.ones((len(df), 1))
+        weight = pd.DataFrame(
+            index=df.index, columns=["weight"], data=np.ones((len(df), 1))
+        )
         for feature in cont_feature_names:
             # We can only calculate distributions based on known data, i.e. the training set.
             if datamodule.training:
@@ -506,7 +510,9 @@ class SampleWeightDeriver(AbstractDeriver):
                 continue
             p_outlier = len(idx) / len(df)
             feature_weight = -np.log10(p_outlier)
-            weight[idx] *= 1.0 + 0.1 * feature_weight
+            weight.loc[idx, "weight"] = weight.loc[idx, "weight"] * (
+                1.0 + 0.1 * feature_weight
+            )
 
         for feature in cat_feature_names:
             cnts = df[feature].value_counts()
@@ -517,9 +523,11 @@ class SampleWeightDeriver(AbstractDeriver):
             )
             for value, w in zip(unique_values, feature_weight):
                 where_value = df.index[np.where(df[feature] == value)[0]]
-                weight[where_value] *= 1.0 + 0.1 * w
+                weight.loc[where_value, "weight"] = weight.loc[
+                    where_value, "weight"
+                ] * (1.0 + 0.1 * w)
 
-        weight = weight / np.sum(weight) * len(df)
+        weight = weight.values / np.sum(weight.values) * len(df)
         return weight
 
 
