@@ -13,15 +13,22 @@ class UserConfig(dict):
         self.update(default_cfg)
         self.defaults = default_cfg.copy()
         if path is not None:
-            self.update(self.from_file(path))
+            self.merge(self.from_file(path))
 
     def defaults(self):
         return self.defaults.copy()
 
+    def merge(self, d: Dict):
+        d_cp = d.copy()
+        for key, val in d_cp.items():
+            if val is None:
+                d.__delitem__(key)
+        super(UserConfig, self).update(d)
+
     @staticmethod
     def from_dict(cfg: Dict):
         tmp_cfg = UserConfig()
-        tmp_cfg.update(cfg)
+        tmp_cfg.merge(cfg)
         return tmp_cfg
 
     @staticmethod

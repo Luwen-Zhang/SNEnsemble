@@ -262,9 +262,9 @@ class Trainer:
             # Then, several args can be modified using other arguments like --lr, --weight_decay
             # only when a config file is not given so that configs depend on input arguments.
             if not is_notebook() and not input_config:
-                config.update(parse_res)
+                config.merge(parse_res)
             if manual_config is not None:
-                config.update(manual_config)
+                config.merge(manual_config)
             self.args = config
         else:
             self.configfile = "UserInputConfig"
