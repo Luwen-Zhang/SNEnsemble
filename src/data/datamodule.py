@@ -22,7 +22,7 @@ class DataModule:
         self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
         self.set_data_processors(self.args["data_processors"], verbose=verbose)
         self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
-        self.training = True
+        self.training = False
 
     def set_status(self, training: bool):
         """
@@ -214,6 +214,7 @@ class DataModule:
         if len(label_name) > 1:
             raise Exception(f"Only one target is supported.")
 
+        self.set_status(training=True)
         self._force_features = False
         self.cont_feature_names = cont_feature_names
         self.cat_feature_names = cat_feature_names
@@ -340,6 +341,7 @@ class DataModule:
             if "Material_Code" in self.df.columns
             else None
         )
+        self.set_status(training=False)
 
     def prepare_new_data(
         self, df: pd.DataFrame, derived_data: dict = None, ignore_absence=False
@@ -370,6 +372,7 @@ class DataModule:
         The returned df is not scaled for the sake of further treatments. To scale the df,
         run ``df = datamodule.data_transform(df, scaler_only=True)``
         """
+        self.set_status(training=False)
         absent_features = [
             x
             for x in np.setdiff1d(self.all_feature_names, self.derived_stacked_features)
@@ -583,6 +586,7 @@ class DataModule:
         all_feature_names
             A subset of current features.
         """
+        self.set_status(training=True)
         cont_feature_names = self.extract_cont_feature_names(all_feature_names)
         cat_feature_names = self.extract_cat_feature_names(all_feature_names)
         derived_stacked_features = self.extract_derived_stacked_feature_names(
@@ -610,6 +614,7 @@ class DataModule:
         ]
         self._update_dataset_auto()
         self._force_features = True
+        self.set_status(training=False)
 
     def sort_derived_data(
         self, derived_data: Dict[str, np.ndarray], ignore_absence: bool = False

@@ -104,8 +104,8 @@ class AbstractModel:
         bayes_opt:
             Whether to perform Gaussian-process-based Bayesian Hyperparameter Optimization for each model.
         """
-        trainer_state = cp(self.trainer)
         self.trainer.set_status(training=True)
+        trainer_state = cp(self.trainer)
         self.trainer.datamodule.set_data(
             df,
             cont_feature_names=cont_feature_names,
@@ -129,6 +129,7 @@ class AbstractModel:
             warm_start=warm_start if self._trained else False,
         )
         self.trainer.load_state(trainer_state)
+        self.trainer.set_status(training=False)
 
     def train(self, *args, **kwargs):
         """
@@ -151,6 +152,7 @@ class AbstractModel:
             warnings.warn(f"No model has been trained for {self.__class__.__name__}.")
         if verbose:
             print(f"\n-------------{self.program} End-------------\n")
+        self.trainer.set_status(training=False)
 
     def predict(
         self,
@@ -290,6 +292,7 @@ class AbstractModel:
             A dict of results. Its keys are "Training", "Testing", and "Validation". Its values are tuples containing
             predicted values and ground truth values
         """
+        self.trainer.set_status(training=False)
         self._check_train_status()
 
         model_names = self.get_model_names()
@@ -351,6 +354,7 @@ class AbstractModel:
         pred:
             Prediction of the target.
         """
+        self.trainer.set_status(training=False)
         X_test = self._data_preprocess(df, derived_data, model_name=model_name)
         return self._pred_single_model(
             self.model[model_name],
@@ -384,6 +388,7 @@ class AbstractModel:
         **kwargs:
             Ignored.
         """
+        self.trainer.set_status(training=True)
         data = self._train_data_preprocess()
         self.total_epoch = (
             self.trainer.args["epoch"] if not src.setting["debug_mode"] else 2
@@ -510,6 +515,7 @@ class AbstractModel:
             self.model[model_name] = model
             torch.cuda.empty_cache()
 
+        self.trainer.set_status(training=False)
         if dump_trainer:
             save_trainer(self.trainer)
 
