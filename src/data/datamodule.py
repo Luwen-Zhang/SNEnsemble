@@ -795,6 +795,11 @@ class DataModule:
                     derived_data[name] = value
         if len(self.cat_feature_names) > 0:
             derived_data["categorical"] = df[self.cat_feature_names].values
+        if len(self.augmented_indices) > 0:
+            if self.training:
+                augmented = np.zeros((len(df), 1))
+                augmented[self.augmented_indices - len(self.dropped_indices), 0] = 1
+                derived_data["augmented"] = augmented
         return derived_data
 
     def _data_process(
@@ -1033,7 +1038,6 @@ class DataModule:
                 data = processor.transform(data, self, **kwargs)
             else:
                 data = processor.fit_transform(data, self, **kwargs)
-        data = data[self.all_feature_names + self.label_name]
         if warm_start and getattr(self, "_force_features", False):
             # If set_feature_names is called (i.e. _force_features is True) where some derived features are excluded,
             # the excluded features are wrongly restored during processor.transform.

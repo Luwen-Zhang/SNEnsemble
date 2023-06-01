@@ -611,20 +611,12 @@ class AbstractFeatureSelector(AbstractProcessor):
                 f"{len(removed_features)} features removed: {removed_features}. {len(retain_features)} features "
                 f"retained: {retain_features}."
             )
-        return data[
-            datamodule.cont_feature_names
-            + datamodule.cat_feature_names
-            + datamodule.label_name
-        ]
+        return data
 
     def _transform(
         self, data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
-        return data[
-            datamodule.cont_feature_names
-            + datamodule.cat_feature_names
-            + datamodule.label_name
-        ]
+        return data
 
     def _get_feature_names_out(
         self, input_data: pd.DataFrame, datamodule: DataModule, **kwargs
