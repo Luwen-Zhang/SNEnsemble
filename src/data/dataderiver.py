@@ -466,6 +466,9 @@ class SampleWeightDeriver(AbstractDeriver):
     def __init__(self):
         super(SampleWeightDeriver, self).__init__()
         self.percentile_dict = {}
+        self.unique_vals = {}
+        self.feature_weight = {}
+        self.denominator = None
 
     def _required_cols(self, **kwargs):
         return []
@@ -482,6 +485,11 @@ class SampleWeightDeriver(AbstractDeriver):
         datamodule,
         **kwargs,
     ):
+        if datamodule.training:
+            self.percentile_dict = {}
+            self.unique_vals = {}
+            self.feature_weight = {}
+            self.denominator = None
         train_idx = datamodule.train_indices
         cont_feature_names = datamodule.cont_feature_names
         cat_feature_names = datamodule.cat_feature_names
@@ -508,26 +516,38 @@ class SampleWeightDeriver(AbstractDeriver):
             idx = np.union1d(upper, lower)
             if len(idx) == 0:
                 continue
-            p_outlier = len(idx) / len(df)
-            feature_weight = -np.log10(p_outlier)
+            if datamodule.training:
+                p_outlier = len(idx) / len(df)
+                feature_weight = -np.log10(p_outlier)
+                self.feature_weight[feature] = feature_weight
+            else:
+                feature_weight = self.feature_weight[feature]
             weight.loc[idx, "weight"] = weight.loc[idx, "weight"] * (
                 1.0 + 0.1 * feature_weight
             )
 
         for feature in cat_feature_names:
-            cnts = df[feature].value_counts()
-            unique_values = np.array(cnts.index)
-            p_unique_values = cnts.values / len(df)
-            feature_weight = np.abs(
-                np.log10(p_unique_values) - np.log10(max(p_unique_values))
-            )
+            if datamodule.training:
+                cnts = df[feature].value_counts()
+                unique_values = np.array(cnts.index)
+                p_unique_values = cnts.values / len(df)
+                feature_weight = np.abs(
+                    np.log10(p_unique_values) - np.log10(max(p_unique_values))
+                )
+                self.unique_vals[feature] = unique_values
+                self.feature_weight[feature] = feature_weight
+            else:
+                unique_values = self.unique_vals[feature]
+                feature_weight = self.feature_weight[feature]
             for value, w in zip(unique_values, feature_weight):
                 where_value = df.index[np.where(df[feature] == value)[0]]
                 weight.loc[where_value, "weight"] = weight.loc[
                     where_value, "weight"
                 ] * (1.0 + 0.1 * w)
 
-        weight = weight.values / np.sum(weight.values) * len(df)
+        if datamodule.training:
+            self.denominator = 1 / np.sum(weight.values) * len(df)
+        weight = weight.values * self.denominator
         return weight
 
 

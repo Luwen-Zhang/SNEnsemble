@@ -15,7 +15,7 @@ import sklearn.ensemble
 class DataModule:
     def __init__(
         self,
-        config: UserConfig,
+        config: Union[UserConfig, Dict],
         verbose: bool = True,
     ):
         self.args = config
@@ -182,6 +182,7 @@ class DataModule:
         warm_start: bool = False,
         verbose: bool = True,
         all_training: bool = False,
+        force_features: bool = False,
         train_indices: np.ndarray = None,
         val_indices: np.ndarray = None,
         test_indices: np.ndarray = None,
@@ -207,6 +208,8 @@ class DataModule:
             Verbosity.
         all_training
             Whether all samples are used for training.
+        force_features
+            Ignore derived features and do not remove features.
         train_indices
             Manually specify the training set by indices.
         val_indices
@@ -218,7 +221,7 @@ class DataModule:
             raise Exception(f"Only one target is supported.")
 
         self.set_status(training=True)
-        self._force_features = False
+        self._force_features = force_features
         self.cont_feature_names = cont_feature_names
         self.cat_feature_names = cat_feature_names
         self.cat_feature_mapping = {}
@@ -269,8 +272,10 @@ class DataModule:
         make_imputation()
         (
             self.df,
-            self.cont_feature_names,
+            cont_feature_names,
         ) = self.derive_stacked(self.df)
+        if not self._force_features:
+            self.cont_feature_names = cont_feature_names
         # There may exist nan in stacked features.
         self._cont_imputed_mask = pd.concat(
             [
@@ -603,6 +608,7 @@ class DataModule:
             cat_feature_names,
             self.label_name,
             verbose=False,
+            force_features=True,
             train_indices=self.train_indices,
             val_indices=self.val_indices,
             test_indices=self.test_indices,
@@ -799,10 +805,10 @@ class DataModule:
         if len(self.cat_feature_names) > 0:
             derived_data["categorical"] = df[self.cat_feature_names].values
         if len(self.augmented_indices) > 0:
+            augmented = np.zeros((len(df), 1))
             if self.training:
-                augmented = np.zeros((len(df), 1))
                 augmented[self.augmented_indices - len(self.dropped_indices), 0] = 1
-                derived_data["augmented"] = augmented
+            derived_data["augmented"] = augmented
         return derived_data
 
     def _data_process(
@@ -826,26 +832,18 @@ class DataModule:
         original_length = len(self.df)
 
         with HiddenPrints(disable_std=not verbose):
-            tmp_data = self._data_preprocess(
+            unscaled_training_data = self._data_preprocess(
                 self.df.loc[list(self.train_indices) + list(self.val_indices), :],
                 warm_start=warm_start,
                 skip_scaler=True,
             )
-            unscaled_training_data = pd.concat(
-                list(self.divide_from_tabular_dataset(tmp_data)),
-                axis=1,
-            )
             training_data = self._data_preprocess(
-                tmp_data, warm_start=warm_start, scaler_only=True
+                unscaled_training_data, warm_start=warm_start, scaler_only=True
             )
-            tmp_data = self.data_transform(
+            unscaled_testing_data = self.data_transform(
                 self.df.loc[self.test_indices, :], skip_scaler=True
             )
-            unscaled_testing_data = pd.concat(
-                list(self.divide_from_tabular_dataset(tmp_data)),
-                axis=1,
-            )
-            testing_data = self.data_transform(tmp_data, scaler_only=True)
+            testing_data = self.data_transform(unscaled_testing_data, scaler_only=True)
 
         all_indices = np.unique(
             np.sort(np.array(list(training_data.index) + list(testing_data.index)))
