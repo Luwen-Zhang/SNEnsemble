@@ -314,11 +314,11 @@ class DataModule:
         self.val_indices = update_indices(self.val_indices)
 
         if len(self.augmented_indices) > 0:
+            augmented_indices = self.augmented_indices - len(self.dropped_indices)
+            np.random.shuffle(augmented_indices)
             self.train_indices = np.array(
-                list(self.train_indices)
-                + list(self.augmented_indices - len(self.dropped_indices))
+                list(self.train_indices) + list(augmented_indices)
             )
-            np.random.shuffle(self.train_indices)
 
         if (
             len(self.train_indices) == 0
