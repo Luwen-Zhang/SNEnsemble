@@ -1,6 +1,6 @@
 import unittest
-import src
 from import_utils import *
+import src
 from src.config import UserConfig
 from src.data import DataModule, AbstractSplitter
 import numpy as np
