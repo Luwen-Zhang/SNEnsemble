@@ -23,7 +23,6 @@ import shutil
 import pickle
 
 set_random_seed(src.setting["random_seed"])
-sys.path.append("configs/")
 
 
 class Trainer:
@@ -462,11 +461,12 @@ class Trainer:
         project_root_subfolder
             See ``load_config``.
         """
-        if not os.path.exists("output"):
-            os.mkdir("output")
+        default_path = src.setting["default_output_path"]
+        if not os.path.exists(default_path):
+            os.makedirs(default_path)
         if project_root_subfolder is not None:
-            if not os.path.exists(os.path.join("output", project_root_subfolder)):
-                os.makedirs(os.path.join("output", project_root_subfolder))
+            if not os.path.exists(os.path.join(default_path, project_root_subfolder)):
+                os.makedirs(os.path.join(default_path, project_root_subfolder))
         subfolder = (
             self.project
             if project_root_subfolder is None
@@ -474,10 +474,11 @@ class Trainer:
         )
         t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         folder_name = t + "-0" + "_" + os.path.split(self.configfile)[-1]
-        if not os.path.exists(os.path.join("output", subfolder)):
-            os.mkdir(os.path.join("output", subfolder))
+        if not os.path.exists(os.path.join(default_path, subfolder)):
+            os.mkdir(os.path.join(default_path, subfolder))
         self.set_path(
-            add_postfix(os.path.join("output", subfolder, folder_name)), verbose=verbose
+            add_postfix(os.path.join(default_path, subfolder, folder_name)),
+            verbose=verbose,
         )
 
     def summarize_setting(self):

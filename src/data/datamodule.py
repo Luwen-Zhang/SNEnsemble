@@ -1,4 +1,5 @@
 import os.path
+import src
 from src.utils import *
 from src.config import UserConfig
 from copy import deepcopy as cp
@@ -143,7 +144,9 @@ class DataModule:
             Arguments for pd.read_excel or pd.read_csv, depending on file_type.
         """
         if data_path is None:
-            data_path = f"data/{self.args['database']}.{file_type}"
+            data_path = os.path.join(
+                src.setting["default_data_path"], f"{self.args['database']}.{file_type}"
+            )
         if file_type == "xlsx":
             self.df = pd.read_excel(data_path, engine="openpyxl", **kwargs)
         else:

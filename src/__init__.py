@@ -21,6 +21,10 @@ setting = dict(
     # Debug mode might change behaviors of models. By default, epoch will be set to 2, n_calls to minimum, and
     # bayes_epoch to 1.
     debug_mode=False,
+    # Default paths to configure trainers, data modules, and models.
+    default_output_path="output",
+    default_config_path="configs",
+    default_data_path="data",
 )
 
 if setting["debug_mode"]:

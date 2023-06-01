@@ -3,6 +3,7 @@ import json
 import os.path
 import importlib.machinery
 import types
+import src
 from src.utils import pretty
 from .default import cfg as default_cfg
 
@@ -33,7 +34,11 @@ class UserConfig(dict):
 
     @staticmethod
     def from_file(path: str) -> Dict:
-        file_path = path if "/" in path or os.path.isfile(path) else f"configs/{path}"
+        file_path = (
+            path
+            if "/" in path or os.path.isfile(path)
+            else os.path.join(src.setting["default_config_path"], path)
+        )
         ty = UserConfig.file_type(file_path)
         if ty is None:
             json_path = file_path + ".json"
