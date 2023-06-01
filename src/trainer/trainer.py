@@ -64,8 +64,6 @@ class Trainer:
                 f"Note: Multi-GPU training and training on a machine with multiple GPUs are not tested."
             )
         self.device = device
-        for modelbase in self.modelbases:
-            modelbase.device = device
 
     def add_modelbases(self, models: List):
         """

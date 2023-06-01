@@ -3,7 +3,7 @@ src/logs/
 venv/
 pyvenv.cfg
 src/config.json
-test/
+debug/
 .~lock*
 .SynologyWorkingDirectory
 .vscode

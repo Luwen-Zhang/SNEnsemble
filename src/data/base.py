@@ -705,7 +705,8 @@ class AbstractSplitter:
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         raise NotImplementedError
 
-    def _check_split(self, train_indices, val_indices, test_indices):
+    @staticmethod
+    def _check_split(train_indices, val_indices, test_indices):
         """
         Check whether split indices coincide with each other.
 

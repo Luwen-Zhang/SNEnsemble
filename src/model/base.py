@@ -47,7 +47,6 @@ class AbstractModel:
         **kwargs:
             Ignored.
         """
-        self.device = trainer.device
         self.trainer = trainer
         if not hasattr(trainer, "args"):
             trainer.load_config(config="default")
@@ -66,6 +65,10 @@ class AbstractModel:
         self.model_params = {}
         self._check_space()
         self._mkdir()
+
+    @property
+    def device(self):
+        return self.trainer.device
 
     def fit(
         self,
