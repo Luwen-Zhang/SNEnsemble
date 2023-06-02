@@ -24,7 +24,7 @@ class RandomSplitter(AbstractSplitter):
         return train_indices, val_indices, test_indices
 
     @property
-    def _support_k_fold(self):
+    def support_k_fold(self):
         return True
 
     def _next_fold(
@@ -80,7 +80,7 @@ class MaterialSplitter(AbstractSplitter):
         return train_mat_lay, val_mat_lay, test_mat_lay
 
     @property
-    def _support_k_fold(self):
+    def support_k_fold(self):
         return True
 
     def _next_fold(

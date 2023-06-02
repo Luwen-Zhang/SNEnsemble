@@ -256,6 +256,33 @@ class TestGeneral(unittest.TestCase):
 
         shutil.rmtree(os.path.join(src.setting["default_output_path"]))
 
+    def test_continue_previous(self):
+        configfile = "composite_test"
+        src.setting["debug_mode"] = True
+        trainer = Trainer(device="cpu")
+        trainer.load_config(
+            configfile,
+            manual_config={
+                "data_splitter": "RandomSplitter",
+            },
+        )
+        trainer.load_data()
+
+        models = [
+            PytorchTabular(trainer, model_subset=["Category Embedding"]),
+        ]
+        trainer.add_modelbases(models)
+        l0 = trainer.get_leaderboard(cross_validation=1, split_type="random")
+        l1 = trainer.get_leaderboard(cross_validation=2, load_from_previous=True)
+
+        l2 = trainer.get_leaderboard(cross_validation=2, split_type="random")
+        cols = ["Training RMSE", "Testing RMSE", "Validation RMSE"]
+        assert np.allclose(
+            l1[cols].values.astype(float), l2[cols].values.astype(float)
+        ), f"load_from_previous does not get consistent results."
+
+        shutil.rmtree(os.path.join(src.setting["default_output_path"]))
+
 
 if __name__ == "__main__":
     unittest.main()

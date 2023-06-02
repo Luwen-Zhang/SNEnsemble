@@ -702,7 +702,7 @@ class AbstractSplitter:
             Indices of the training, validation, and testing dataset.
         """
         k_fold = self.k_fold if k_fold is None or k_fold <= 1 else k_fold
-        if k_fold > 1 and self._support_k_fold:
+        if k_fold > 1 and self.support_k_fold:
             train_indices, val_indices, test_indices = self._next_fold(
                 df, cont_feature_names, cat_feature_names, label_name, k_fold
             )
@@ -731,7 +731,7 @@ class AbstractSplitter:
         raise NotImplementedError
 
     @property
-    def _support_k_fold(self):
+    def support_k_fold(self):
         return False
 
     def _next_fold(
@@ -746,7 +746,7 @@ class AbstractSplitter:
 
     def _sklearn_k_fold(self, data, k_fold):
         if self.fold_generator is None or k_fold != self.k_fold:
-            if k_fold != self.k_fold:
+            if k_fold != self.k_fold and self.k_fold > 1:
                 warnings.warn(
                     f"The input {k_fold}-fold is not consistent with the previous setting {self.k_fold}-fold. "
                     f"Starting a new {k_fold}-fold generator."
