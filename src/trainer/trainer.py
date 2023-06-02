@@ -588,7 +588,7 @@ class Trainer:
         n_random: int,
         verbose: bool,
         test_data_only: bool,
-        split_type: str = "kfold",
+        split_type: str = "cv",
         load_from_previous: bool = False,
     ) -> Dict[str, Dict[str, Dict[str, Tuple[np.ndarray, np.ndarray]]]]:
         """
@@ -605,7 +605,7 @@ class Trainer:
         test_data_only
             Whether to evaluate models only on testing datasets.
         split_type
-            The type of data splitting. "random" and "kfold" are supported. Ignored when load_from_previous is True.
+            The type of data splitting. "random" and "cv" are supported. Ignored when load_from_previous is True.
         load_from_previous
             Load the state of a previous run (mostly because of an unexpected interruption).
 
@@ -654,25 +654,22 @@ class Trainer:
                 )
             print(f"Previous cross validation state is loaded.")
             split_type = (
-                "kfold"
-                if self.datamodule.datasplitter.fold_generator is not None
+                "cv"
+                if self.datamodule.datasplitter.cv_generator is not None
                 else "random"
             )
         else:
             start_i = 0
             skip_program = False
             reloaded_once_predictions = None
-            if (
-                split_type == "kfold"
-                and not self.datamodule.datasplitter.support_k_fold
-            ):
+            if split_type == "cv" and not self.datamodule.datasplitter.support_cv:
                 warnings.warn(
-                    f"{self.datamodule.datasplitter.__class__.__name__} does not support k-fold splitting. Use "
-                    f"its original regime instead."
+                    f"{self.datamodule.datasplitter.__class__.__name__} does not support cross validation splitting. "
+                    f"Use its original regime instead."
                 )
                 split_type = "random"
-            self.datamodule.datasplitter.reset_k_fold(
-                k_fold=n_random if split_type == "kfold" else -1
+            self.datamodule.datasplitter.reset_cv(
+                cv=n_random if split_type == "cv" else -1
             )
 
         def func_save_state(state):
@@ -684,7 +681,7 @@ class Trainer:
         for i in range(start_i, n_random):
             if verbose:
                 print(
-                    f"----------------------------{i + 1}/{n_random} {split_type} cross validation----------------------------"
+                    f"----------------------------{i + 1}/{n_random} {split_type}----------------------------"
                 )
             trainer_state = cp(self)
             if not skip_program:
@@ -734,8 +731,8 @@ class Trainer:
                             append_once("Validation")
                     else:
                         programs_predictions[program][model_name] = value
-                # It is expected that only modelbases in self is changed.
-                # datamodule is not updated because the k-fold status should remain before load_data() is called.
+                # It is expected that only modelbases in self is changed. datamodule is not updated because the cross
+                # validation status should remain before load_data() is called.
                 trainer_state.modelbases = self.modelbases
                 current_state = {
                     "trainer": trainer_state,
@@ -760,7 +757,7 @@ class Trainer:
             func_save_state(current_state)
             if verbose:
                 print(
-                    f"--------------------------End {i + 1}/{n_random} {split_type} cross validation--------------------------"
+                    f"--------------------------End {i + 1}/{n_random} {split_type}--------------------------"
                 )
         return programs_predictions
 
@@ -771,7 +768,7 @@ class Trainer:
         cross_validation: int = 0,
         verbose: bool = True,
         load_from_previous: bool = False,
-        split_type: str = "kfold",
+        split_type: str = "cv",
     ) -> pd.DataFrame:
         """
         Run all modelbases with/without cross validation for a leaderboard.
@@ -789,7 +786,7 @@ class Trainer:
         load_from_previous
             Load the state of a previous run (mostly because of an unexpected interruption).
         split_type
-            The type of data splitting. "random" and "kfold" are supported. Ignored when load_from_previous is True.
+            The type of data splitting. "random" and "cv" are supported. Ignored when load_from_previous is True.
 
         Returns
         -------

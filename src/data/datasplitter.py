@@ -24,18 +24,18 @@ class RandomSplitter(AbstractSplitter):
         return train_indices, val_indices, test_indices
 
     @property
-    def support_k_fold(self):
+    def support_cv(self):
         return True
 
-    def _next_fold(
+    def _next_cv(
         self,
         df: pd.DataFrame,
         cont_feature_names: List[str],
         cat_feature_names: List[str],
         label_name: List[str],
-        k_fold: int,
+        cv: int,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        return self._sklearn_k_fold(np.arange(len(df)), k_fold)
+        return self._sklearn_k_fold(np.arange(len(df)), cv)
 
 
 def mat_lay_index(chosen_mat_lay, mat_lay):
@@ -80,25 +80,23 @@ class MaterialSplitter(AbstractSplitter):
         return train_mat_lay, val_mat_lay, test_mat_lay
 
     @property
-    def support_k_fold(self):
+    def support_cv(self):
         return True
 
-    def _next_fold(
+    def _next_cv(
         self,
         df: pd.DataFrame,
         cont_feature_names: List[str],
         cat_feature_names: List[str],
         label_name: List[str],
-        k_fold: int,
+        cv: int,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         convert_to_str = lambda x: np.array([str(i) for i in x])
         self._check_exist(df, "Material_Code", "Material_Code")
         mat_lay = convert_to_str(df["Material_Code"].copy())
         mat_lay_set = list(sorted(set(mat_lay)))
 
-        train_mat_lay, val_mat_lay, test_mat_lay = self._sklearn_k_fold(
-            mat_lay_set, k_fold
-        )
+        train_mat_lay, val_mat_lay, test_mat_lay = self._sklearn_k_fold(mat_lay_set, cv)
 
         train_mat_lay = convert_to_str(train_mat_lay)
         val_mat_lay = convert_to_str(val_mat_lay)
