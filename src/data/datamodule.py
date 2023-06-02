@@ -24,6 +24,7 @@ class DataModule:
         self.set_data_processors(self.args["data_processors"], verbose=verbose)
         self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
         self.training = False
+        self.data_path = None
 
     def set_status(self, training: bool):
         """
@@ -125,7 +126,6 @@ class DataModule:
     def load_data(
         self,
         data_path: str = None,
-        file_type: str = "csv",
         save_path: str = None,
         **kwargs,
     ) -> None:
@@ -135,19 +135,32 @@ class DataModule:
         Parameters
         ----------
         data_path
-            Path to the tabular data. By default, the file ``data/{database}.{file_type}`` is loaded.
-        file_type
-            ``csv`` or ``xlsx``
+            Path to the tabular data. By default, the file ``data/{database}.csv/.xlsx`` is loaded.
         save_path
             Path to save the loaded data.
         **kwargs
-            Arguments for pd.read_excel or pd.read_csv, depending on file_type.
+            Arguments for pd.read_excel or pd.read_csv.
         """
-        if data_path is None:
+        if data_path is None and self.data_path is None:
             data_path = os.path.join(
-                src.setting["default_data_path"], f"{self.args['database']}.{file_type}"
+                src.setting["default_data_path"], f"{self.args['database']}"
             )
-        if file_type == "xlsx":
+        elif self.data_path is not None:
+            print(f"Using previously used data path {self.data_path}")
+            data_path = self.data_path
+        file_type = os.path.splitext(data_path)[-1]
+        if file_type == "":
+            is_csv = os.path.isfile(data_path + ".csv")
+            is_xlsx = os.path.isfile(data_path + ".xlsx")
+            if is_csv and is_xlsx:
+                raise Exception(
+                    f"Both {data_path}.csv and {data_path}.xlsx exist. Provide the postfix in data_path."
+                )
+            if not is_csv and not is_xlsx:
+                raise Exception(f"{data_path}.csv and .xlsx do not exist.")
+            file_type = ".csv" if is_csv else ".xlsx"
+            data_path = data_path + file_type
+        if file_type == ".xlsx":
             self.df = pd.read_excel(data_path, engine="openpyxl", **kwargs)
         else:
             self.df = pd.read_csv(data_path, **kwargs)
