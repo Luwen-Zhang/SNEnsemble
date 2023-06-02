@@ -619,6 +619,7 @@ class DataModule:
         )
         if len(cont_feature_names) == 0:
             raise Exception(f"At least one continuous feature should be provided.")
+        has_indices = hasattr(self, "train_indices")
         self.set_data(
             self.df,
             cont_feature_names,
@@ -626,9 +627,9 @@ class DataModule:
             self.label_name,
             verbose=False,
             force_features=True,
-            train_indices=self.train_indices,
-            val_indices=self.val_indices,
-            test_indices=self.test_indices,
+            train_indices=self.train_indices if has_indices else None,
+            val_indices=self.val_indices if has_indices else None,
+            test_indices=self.test_indices if has_indices else None,
         )
         # Some derived stacked features are not in the specified list.
         self.cont_feature_names = [
