@@ -658,7 +658,11 @@ class AbstractSplitter:
     The base class for data-splitters that split the dataset and return training, validation and testing indices.
     """
 
-    def __init__(self, train_val_test: Optional[Union[List, np.ndarray]] = None):
+    def __init__(
+        self,
+        train_val_test: Optional[Union[List, np.ndarray]] = None,
+        k_fold: int = -1,
+    ):
         self.train_val_test = (
             np.array([0.6, 0.2, 0.2])
             if train_val_test is None
@@ -666,7 +670,7 @@ class AbstractSplitter:
         )
         self.train_val_test /= np.sum(self.train_val_test)
         self.fold_generator = None
-        self.k_fold = -1
+        self.k_fold = k_fold
 
     def split(
         self,
@@ -697,12 +701,13 @@ class AbstractSplitter:
         train_indices, val_indices, test_indices:
             Indices of the training, validation, and testing dataset.
         """
-        if k_fold is not None and self._support_k_fold:
+        k_fold = self.k_fold if k_fold is None or k_fold <= 1 else k_fold
+        if k_fold > 1 and self._support_k_fold:
             train_indices, val_indices, test_indices = self._next_fold(
                 df, cont_feature_names, cat_feature_names, label_name, k_fold
             )
         else:
-            if k_fold is not None:
+            if k_fold > 1:
                 warnings.warn(
                     f"{self.__class__.__name__} does not support k-fold splitting."
                 )
@@ -711,6 +716,10 @@ class AbstractSplitter:
             )
         self._check_split(train_indices, val_indices, test_indices)
         return train_indices, val_indices, test_indices
+
+    def reset_k_fold(self, k_fold: int = -1):
+        self.fold_generator = None
+        self.k_fold = k_fold
 
     def _split(
         self,
@@ -737,12 +746,14 @@ class AbstractSplitter:
 
     def _sklearn_k_fold(self, data, k_fold):
         if self.fold_generator is None or k_fold != self.k_fold:
-            if self.k_fold != -1 and k_fold != self.k_fold:
+            if k_fold != self.k_fold:
                 warnings.warn(
                     f"The input {k_fold}-fold is not consistent with the previous setting {self.k_fold}-fold. "
                     f"Starting a new {k_fold}-fold generator."
                 )
-            self.fold_generator = KFold(n_splits=k_fold, shuffle=True).split(data)
+            self.fold_generator = PickleAbleGenerator(
+                KFold(n_splits=k_fold, shuffle=True).split(data)
+            )
             self.k_fold = k_fold
         try:
             train_indices, test_indices = self.fold_generator.__next__()
@@ -750,7 +761,9 @@ class AbstractSplitter:
             warnings.warn(
                 f"{k_fold}-fold exceeded. Starting a new {k_fold}-fold generator."
             )
-            self.fold_generator = KFold(n_splits=k_fold, shuffle=True).split(data)
+            self.fold_generator = PickleAbleGenerator(
+                KFold(n_splits=k_fold, shuffle=True).split(data)
+            )
             train_indices, test_indices = self.fold_generator.__next__()
         train_indices, val_indices = train_test_split(
             train_indices, test_size=len(data) // k_fold, shuffle=True

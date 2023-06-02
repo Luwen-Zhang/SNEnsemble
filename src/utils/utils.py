@@ -703,3 +703,35 @@ class torch_with_grad(_DecoratorContextManager):
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
         torch.set_grad_enabled(self.prev)
+
+
+class PickleAbleGenerator:
+    def __init__(self, generator, max_generate=10000, inf=False):
+        self.ls = []
+        self.state = 0
+        for i in range(max_generate):
+            try:
+                self.ls.append(generator.__next__())
+            except:
+                break
+        else:
+            if not inf:
+                raise Exception(
+                    f"The generator {generator} generates more than {max_generate} values. Set inf=True if you "
+                    f"accept that only {max_generate} can be pickled."
+                )
+
+    def __next__(self):
+        if self.state >= len(self.ls):
+            raise StopIteration
+        else:
+            val = self.ls[self.state]
+            self.state += 1
+            return val
+
+    def __getstate__(self):
+        return {"state": self.state, "ls": self.ls}
+
+    def __setstate__(self, state):
+        self.state = state["state"]
+        self.ls = state["ls"]

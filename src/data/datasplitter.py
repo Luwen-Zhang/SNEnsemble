@@ -10,9 +10,6 @@ class RandomSplitter(AbstractSplitter):
     Randomly split the dataset.
     """
 
-    def __int__(self, train_val_test=None):
-        super(RandomSplitter, self).__init__(train_val_test)
-
     def _split(self, df, cont_feature_names, cat_feature_names, label_name):
         length = len(df)
         train_indices, test_indices = train_test_split(
@@ -54,9 +51,6 @@ class MaterialSplitter(AbstractSplitter):
     Split the dataset by the material code to simulate the scenario of designing new materials.
     Training/validation/testing datasets will contain entirely different materials.
     """
-
-    def __init__(self, train_val_test=None):
-        super(MaterialSplitter, self).__init__(train_val_test)
 
     def _split(self, df, cont_feature_names, cat_feature_names, label_name):
         self._check_exist(df, "Material_Code", "Material_Code")
@@ -124,9 +118,6 @@ class MaterialCycleSplitter(AbstractSplitter):
     training set (even much larger in the testing set).
     """
 
-    def __init__(self, train_val_test=None):
-        super(MaterialCycleSplitter, self).__init__(train_val_test)
-
     def _split(self, df, cont_feature_names, cat_feature_names, label_name):
         self.train_ratio = np.sqrt(self.train_val_test[0])
         self.val_ratio = (
@@ -180,9 +171,6 @@ class CycleSplitter(AbstractSplitter):
     the splitting is performed for each material and for each combination of frequency-R (instead of only for each
     material).
     """
-
-    def __init__(self, train_val_test=None):
-        super(CycleSplitter, self).__init__(train_val_test)
 
     def _split(self, df, cont_feature_names, cat_feature_names, label_name):
         self._check_exist(df, "Material_Code", "Material_Code")
