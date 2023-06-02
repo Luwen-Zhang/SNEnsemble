@@ -19,7 +19,7 @@ class DataModule:
         verbose: bool = True,
     ):
         self.args = config
-        self.set_data_splitter(name=self.args["data_splitter"], verbose=verbose)
+        self.set_data_splitter(self.args["data_splitter"], verbose=verbose)
         self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
         self.set_data_processors(self.args["data_processors"], verbose=verbose)
         self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
@@ -38,21 +38,25 @@ class DataModule:
         """
         self.training = training
 
-    def set_data_splitter(self, name: str, verbose=True):
+    def set_data_splitter(self, config: Union[str, Tuple[str, Dict]], verbose=True):
         """
         Set the data splitter. The specified splitter should be implemented in ``data/datasplitter.py``. Also, data
         splitter can be set directly using ``datamodule.datasplitter = YourSplitter()``
 
         Parameters
         ----------
-        name
-            The name of a data splitter implemented in ``data/datasplitter.py``.
+        config
+            The name of a data splitter implemented in ``data/datasplitter.py`` or a tuple providing the name and kwargs
+            of the data splitter
         verbose
             Ignored.
         """
         from src.data.datasplitter import get_data_splitter
 
-        self.datasplitter = get_data_splitter(name)()
+        if type(config) in [tuple, list]:
+            self.datasplitter = get_data_splitter(config[0])(**dict(config[1]))
+        else:
+            self.datasplitter = get_data_splitter(config)()
 
     def set_data_imputer(self, name, verbose=True):
         """
