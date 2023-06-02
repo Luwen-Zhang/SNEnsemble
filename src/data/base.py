@@ -2,6 +2,8 @@ from src.utils import *
 from copy import deepcopy as cp
 from typing import *
 from .datamodule import DataModule
+from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split
 
 
 class AbstractDeriver:
@@ -663,6 +665,8 @@ class AbstractSplitter:
             else np.array(train_val_test)
         )
         self.train_val_test /= np.sum(self.train_val_test)
+        self.fold_generator = None
+        self.k_fold = -1
 
     def split(
         self,
@@ -670,6 +674,7 @@ class AbstractSplitter:
         cont_feature_names: List[str],
         cat_feature_names: List[str],
         label_name: List[str],
+        k_fold: int = None,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Split the dataset.
@@ -684,15 +689,26 @@ class AbstractSplitter:
             Names of categorical features.
         label_name:
             The name of the label.
+        k_fold:
+            Perform k-fold cross validation by calling _next_fold if _support_k_fold is True.
 
         Returns
         -------
         train_indices, val_indices, test_indices:
             Indices of the training, validation, and testing dataset.
         """
-        train_indices, val_indices, test_indices = self._split(
-            df, cont_feature_names, cat_feature_names, label_name
-        )
+        if k_fold is not None and self._support_k_fold:
+            train_indices, val_indices, test_indices = self._next_fold(
+                df, cont_feature_names, cat_feature_names, label_name, k_fold
+            )
+        else:
+            if k_fold is not None:
+                warnings.warn(
+                    f"{self.__class__.__name__} does not support k-fold splitting."
+                )
+            train_indices, val_indices, test_indices = self._split(
+                df, cont_feature_names, cat_feature_names, label_name
+            )
         self._check_split(train_indices, val_indices, test_indices)
         return train_indices, val_indices, test_indices
 
@@ -704,6 +720,42 @@ class AbstractSplitter:
         label_name: List[str],
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         raise NotImplementedError
+
+    @property
+    def _support_k_fold(self):
+        return False
+
+    def _next_fold(
+        self,
+        df: pd.DataFrame,
+        cont_feature_names: List[str],
+        cat_feature_names: List[str],
+        label_name: List[str],
+        k_fold: int,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        raise NotImplementedError
+
+    def _sklearn_k_fold(self, data, k_fold):
+        if self.fold_generator is None or k_fold != self.k_fold:
+            if self.k_fold != -1 and k_fold != self.k_fold:
+                warnings.warn(
+                    f"The input {k_fold}-fold is not consistent with the previous setting {self.k_fold}-fold. "
+                    f"Starting a new {k_fold}-fold generator."
+                )
+            self.fold_generator = KFold(n_splits=k_fold, shuffle=True).split(data)
+            self.k_fold = k_fold
+        try:
+            train_indices, test_indices = self.fold_generator.__next__()
+        except:
+            warnings.warn(
+                f"{k_fold}-fold exceeded. Starting a new {k_fold}-fold generator."
+            )
+            self.fold_generator = KFold(n_splits=k_fold, shuffle=True).split(data)
+            train_indices, test_indices = self.fold_generator.__next__()
+        train_indices, val_indices = train_test_split(
+            train_indices, test_size=len(data) // k_fold, shuffle=True
+        )
+        return train_indices, val_indices, test_indices
 
     @staticmethod
     def _check_split(train_indices, val_indices, test_indices):

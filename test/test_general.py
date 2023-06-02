@@ -120,6 +120,39 @@ class TestGeneral(unittest.TestCase):
         print(f"\n-- Get not imputed dataframe --\n")
         datamodule.get_not_imputed_df()
 
+    def test_data_splitter(self):
+        import numpy as np
+        import pandas as pd
+        from src.data.datasplitter import RandomSplitter, MaterialSplitter
+
+        df = pd.DataFrame({"Material_Code": np.random.randint(0, 20, (100,))})
+        print("\n-- k-fold RandomSplitter --\n")
+        spl = RandomSplitter()
+        res_random = [spl.split(df, [], [], [], k_fold=5) for i in range(5)]
+        assert np.allclose(
+            np.sort(np.hstack([i[2] for i in res_random])), np.arange(100)
+        ), "RandomSplitter is not getting correct k-fold results."
+
+        print("\n-- k-fold RandomSplitter in a new iteration --\n")
+        res_random = [spl.split(df, [], [], [], k_fold=5) for i in range(5)]
+        assert np.allclose(
+            np.sort(np.hstack([i[2] for i in res_random])), np.arange(100)
+        ), "RandomSplitter is not getting correct k-fold results in a new iteration."
+
+        print("\n-- k-fold RandomSplitter change k --\n")
+        spl.split(df, [], [], [], k_fold=5)
+        res_random = [spl.split(df, [], [], [], k_fold=3) for i in range(3)]
+        assert np.allclose(
+            np.sort(np.hstack([i[2] for i in res_random])), np.arange(100)
+        ), "RandomSplitter is not getting correct k-fold results after changing the number of k-fold."
+
+        print("\n-- k-fold RandomSplitter --\n")
+        spl = MaterialSplitter()
+        res_mat = [spl.split(df, [], [], [], k_fold=5) for i in range(5)]
+        assert np.allclose(
+            np.sort(np.hstack([i[2] for i in res_mat])), np.arange(100)
+        ), "MaterialSplitter is not getting correct k-fold results after ."
+
     def test_trainer(self):
         print(f"\n-- Loading trainer --\n")
         configfile = "composite_test"
