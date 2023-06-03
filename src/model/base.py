@@ -1,3 +1,4 @@
+import os
 import pickle
 import torch.optim.optimizer
 import src
@@ -954,25 +955,27 @@ class TorchModel(AbstractModel):
         )
         val_loader = X_val
 
+        es_callback = EarlyStopping(
+            monitor="valid_mean_squared_error",
+            min_delta=0.001,
+            patience=self.trainer.static_params["patience"],
+            mode="min",
+        )
+        ckpt_callback = ModelCheckpoint(
+            monitor="valid_mean_squared_error",
+            dirpath=self.root,
+            filename="early_stopping_ckpt",
+            save_top_k=1,
+            mode="min",
+            every_n_epochs=1,
+        )
         trainer = pl.Trainer(
             max_epochs=epoch,
             min_epochs=1,
             callbacks=[
                 PytorchLightningLossCallback(verbose=True, total_epoch=epoch),
-                EarlyStopping(
-                    monitor="valid_mean_squared_error",
-                    min_delta=0.001,
-                    patience=self.trainer.static_params["patience"],
-                    mode="min",
-                ),
-                ModelCheckpoint(
-                    monitor="valid_mean_squared_error",
-                    dirpath=self.root,
-                    filename="early_stopping_ckpt",
-                    save_top_k=1,
-                    mode="min",
-                    every_n_epochs=1,
-                ),
+                es_callback,
+                ckpt_callback,
             ],
             fast_dev_run=False,
             max_time=None,
@@ -994,6 +997,10 @@ class TorchModel(AbstractModel):
             enable_progress_bar=False,
         )
 
+        ckpt_path = os.path.join(self.root, "early_stopping_ckpt.ckpt")
+        if os.path.isfile(ckpt_path):
+            os.remove(ckpt_path)
+
         with HiddenPrints(
             disable_std=not verbose,
             disable_logging=not verbose,
@@ -1003,11 +1010,7 @@ class TorchModel(AbstractModel):
             )
 
         model.to("cpu")
-        model.load_state_dict(
-            torch.load(os.path.join(self.root, "early_stopping_ckpt.ckpt"))[
-                "state_dict"
-            ]
-        )
+        model.load_state_dict(torch.load(ckpt_callback.best_model_path)["state_dict"])
         trainer.strategy.remove_checkpoint(
             os.path.join(self.root, "early_stopping_ckpt.ckpt")
         )
