@@ -36,6 +36,7 @@ class KMeans(AbstractClustering):
         momentum: float = 0.8,
         method: str = "fast_kmeans",
         init_method: str = "kmeans++",
+        n_init: int = 10,
         **kwargs,
     ):
         super(KMeans, self).__init__(
@@ -48,27 +49,53 @@ class KMeans(AbstractClustering):
         )
         self.method = method
         self.init_method = init_method
+        self.n_init = n_init
         self.register_buffer(
             "accum_n_points_in_clusters",
             torch.ones(self.n_clusters, dtype=torch.float32),
         )
 
     def initialize(self, x: torch.Tensor):
+        """
+        This is not what sklearn does. sklearn runs the entire clustering multiple times to find the best results.
+        But here only initialization is done instead of the entire fitting.
+        """
+        inertias = []
+        for i_init in range(self.n_init):
+            generator = torch.Generator(device="cpu")
+            generator.manual_seed(i_init)
+            self._initialize_once(x, generator=generator)
+            inertia = self._inertia(x)
+            inertias.append(inertia.unsqueeze(0))
+        best_i_init = torch.argmin(torch.concat(inertias)).squeeze().item()
+        generator = torch.Generator(device="cpu")
+        generator.manual_seed(best_i_init)
+        self._initialize_once(x, generator=generator)
+        self.initialized = True
+
+    def _initialize_once(self, x: torch.Tensor, generator):
         if x.shape[0] < self.n_clusters:
             return None
         if self.init_method == "random":
-            centers = x[torch.randperm(x.shape[0])[: self.n_clusters]]
+            centers = x[
+                torch.randperm(x.shape[0], generator=generator)[: self.n_clusters]
+            ]
         elif self.init_method == "kmeans++":
             # Reference:
             # https://github.com/DeMoriarty/fast_pytorch_kmeans/blob/master/fast_pytorch_kmeans/init_methods.py
             # In summary, this method calculates the distance value to the closest centroid for each data point, and
             # data points with higher values are more likely to be selected as the next centroid.
-            x = x[torch.randint(0, int(x.shape[0]), [min(100000, x.shape[0])])]
-            centers = torch.zeros((self.n_clusters, x.shape[1])).to(x.device)
-            r = torch.distributions.uniform.Uniform(0, 1)
+            x = x[
+                torch.randint(
+                    0, int(x.shape[0]), [min(100000, x.shape[0])], generator=generator
+                )
+            ]
+            centers = torch.zeros((self.n_clusters, x.shape[1]), device=x.device)
             for i in range(self.n_clusters):
                 if i == 0:
-                    centers[i, :] = x[torch.randint(x.shape[0], [1])]
+                    centers[i, :] = x[
+                        torch.randint(x.shape[0], [1], generator=generator)
+                    ]
                 else:
                     D2 = torch.cdist(centers[:i, :][None, :], x[None, :], p=2)[0].amin(
                         dim=0
@@ -83,7 +110,10 @@ class KMeans(AbstractClustering):
                     # The following is an implementation of weighted uniform-random sampling using pytorch.
                     cumprobs = torch.cumsum(probs, dim=0)
                     centers[i, :] = x[
-                        torch.searchsorted(cumprobs, r.sample([1]).to(x.device))
+                        torch.searchsorted(
+                            cumprobs,
+                            torch.rand([1], generator=generator).to(x.device),
+                        )
                     ]
         else:
             raise Exception(
@@ -91,14 +121,22 @@ class KMeans(AbstractClustering):
             )
         for i_cluster, cluster in enumerate(self.clusters):
             cluster.set(centers[i_cluster, :].view(1, -1))
-        self.initialized = True
+
+    def _predict(self, x):
+        dist = self.euclidean_pairwise_dist(x)
+        x_cluster = torch.argmin(dist, dim=1)
+        return x_cluster
+
+    def _inertia(self, x):
+        x_cluster = self._predict(x)
+        inertia = torch.sum(torch.pow(self.centers[x_cluster] - x, 2))
+        return inertia
 
     def forward(self, x: torch.Tensor):
         x = x.float()
         if not self.initialized and self.training:
             self.initialize(x)
-        dist = self.euclidean_pairwise_dist(x)
-        x_cluster = torch.argmin(dist, dim=1)
+        x_cluster = self._predict(x)
         if self.training:
             with torch.no_grad():
                 if self.method == "kmeans":
