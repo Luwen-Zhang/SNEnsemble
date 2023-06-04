@@ -65,6 +65,8 @@ class GMM(AbstractClustering):
         )
 
     def forward(self, x: torch.Tensor):
+        if x.shape[0] < 2:
+            return torch.zeros(x.shape[0], device=x.device).long()
         if not self.initialized and self.training:
             self.initialize(x)
         # Ref: sklearn.mixture.BaseMixture.fit_predict

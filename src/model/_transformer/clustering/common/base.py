@@ -165,11 +165,12 @@ class AbstractMultilayerClustering(AbstractClustering):
         x_cluster = torch.zeros((x.shape[0],), device=x.device).long()
         for i in range(self.first_clustering.n_clusters):
             where_in_cluster = torch.where(outer_cluster == i)[0]
-            inner_cluster = (
-                self.first_clustering.clusters[i].inner_layer(
-                    x[where_in_cluster, :][:, self.input_2_idx]
+            if len(where_in_cluster) > 0:
+                inner_cluster = (
+                    self.first_clustering.clusters[i].inner_layer(
+                        x[where_in_cluster, :][:, self.input_2_idx]
+                    )
+                    + i * self.n_clusters_per_cluster
                 )
-                + i * self.n_clusters_per_cluster
-            )
-            x_cluster[where_in_cluster] = inner_cluster
+                x_cluster[where_in_cluster] = inner_cluster
         return x_cluster
