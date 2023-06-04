@@ -29,7 +29,7 @@ from .collate import fix_collate_fn
 
 clr = sns.color_palette("deep")
 sns.reset_defaults()
-matplotlib.use("Agg")
+# matplotlib.use("Agg")
 if find_executable("latex"):
     matplotlib.rc("text", usetex=True)
 plt.rcParams["font.family"] = "serif"
