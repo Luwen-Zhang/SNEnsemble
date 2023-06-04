@@ -31,14 +31,18 @@ class Transformer(TorchModel):
             "CategoryEmbedding",
             "CatEmbedSeq",
             "SNCatEmbedLRKMeansSeq",
-            "SNCatEmbedLRKMeans",
-            "SNCatEmbedLR2LKMeans",
             "SNCatEmbedLRGMM",
-            "SNCatEmbedLR2LGMM",
-            "SNCatEmbedLRPCAKMeans",
-            "SNCatEmbedLR2LPCAKMeans",
             "SNCatEmbedLRPCAGMM",
+            "SNCatEmbedLR2LGMM",
             "SNCatEmbedLR2LPCAGMM",
+            "SNCatEmbedLRBMM",
+            "SNCatEmbedLRPCABMM",
+            "SNCatEmbedLR2LBMM",
+            "SNCatEmbedLR2LPCABMM",
+            "SNCatEmbedLRKMeans",
+            "SNCatEmbedLRPCAKMeans",
+            "SNCatEmbedLR2LKMeans",
+            "SNCatEmbedLR2LPCAKMeans",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -89,8 +93,10 @@ class Transformer(TorchModel):
         elif model_name in [
             "SNCatEmbedLRKMeans",
             "SNCatEmbedLRGMM",
+            "SNCatEmbedLRBMM",
             "SNCatEmbedLR2LKMeans",
             "SNCatEmbedLR2LGMM",
+            "SNCatEmbedLR2LBMM",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
@@ -100,8 +106,10 @@ class Transformer(TorchModel):
         elif model_name in [
             "SNCatEmbedLRPCAKMeans",
             "SNCatEmbedLRPCAGMM",
+            "SNCatEmbedLRPCABMM",
             "SNCatEmbedLR2LPCAKMeans",
             "SNCatEmbedLR2LPCAGMM",
+            "SNCatEmbedLR2LPCABMM",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name.replace('PCA', '')}NN")
             if "2L" not in model_name:
@@ -118,7 +126,6 @@ class Transformer(TorchModel):
             return cls(
                 **fix_kwargs,
                 n_pca_dim=n_pca_dim,
-                n_clusters=n_pca_dim,
                 **kwargs,
             )
         elif model_name in ["SNCatEmbedLRKMeansSeq"]:
@@ -212,8 +219,16 @@ class Transformer(TorchModel):
         elif model_name in [
             "SNCatEmbedLRKMeans",
             "SNCatEmbedLRGMM",
+            "SNCatEmbedLRBMM",
             "SNCatEmbedLR2LKMeans",
             "SNCatEmbedLR2LGMM",
+            "SNCatEmbedLR2LBMM",
+            "SNCatEmbedLRPCAKMeans",
+            "SNCatEmbedLRPCAGMM",
+            "SNCatEmbedLRPCABMM",
+            "SNCatEmbedLR2LPCAKMeans",
+            "SNCatEmbedLR2LPCAGMM",
+            "SNCatEmbedLR2LPCABMM",
         ]:
             return [
                 Integer(
@@ -221,19 +236,6 @@ class Transformer(TorchModel):
                 ),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Integer(low=2, high=16, prior="uniform", name="n_clusters", dtype=int),
-                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
-            ] + self.trainer.SPACE
-        elif model_name in [
-            "SNCatEmbedLRPCAKMeans",
-            "SNCatEmbedLRPCAGMM",
-            "SNCatEmbedLR2LPCAKMeans",
-            "SNCatEmbedLR2LPCAGMM",
-        ]:
-            return [
-                Integer(
-                    low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
-                ),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
             ] + self.trainer.SPACE
         elif model_name in ["SNCatEmbedLRKMeansSeq"]:
@@ -323,24 +325,21 @@ class Transformer(TorchModel):
         elif model_name in [
             "SNCatEmbedLRKMeans",
             "SNCatEmbedLRGMM",
+            "SNCatEmbedLRBMM",
             "SNCatEmbedLR2LKMeans",
             "SNCatEmbedLR2LGMM",
+            "SNCatEmbedLR2LBMM",
+            "SNCatEmbedLRPCAKMeans",
+            "SNCatEmbedLRPCAGMM",
+            "SNCatEmbedLRPCABMM",
+            "SNCatEmbedLR2LPCAKMeans",
+            "SNCatEmbedLR2LPCAGMM",
+            "SNCatEmbedLR2LPCABMM",
         ]:
             res = {
                 "embedding_dim": 3,
                 "embed_dropout": 0.1,
                 "n_clusters": 5,
-                "mlp_dropout": 0.0,
-            }
-        elif model_name in [
-            "SNCatEmbedLRPCAKMeans",
-            "SNCatEmbedLRPCAGMM",
-            "SNCatEmbedLR2LPCAKMeans",
-            "SNCatEmbedLR2LPCAGMM",
-        ]:
-            res = {
-                "embedding_dim": 3,
-                "embed_dropout": 0.1,
                 "mlp_dropout": 0.0,
             }
         elif model_name in [

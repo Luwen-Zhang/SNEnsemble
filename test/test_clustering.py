@@ -93,9 +93,11 @@ class TestClustering(unittest.TestCase):
             bmm.mean_precision_ = torch.tensor(
                 sk_bmm.mean_precision_, dtype=dt, device=device
             )
-            bmm.weight_concentration_ = tuple(
-                torch.tensor(x, dtype=dt, device=device)
-                for x in sk_bmm.weight_concentration_
+            bmm.weight_concentration_0 = torch.tensor(
+                sk_bmm.weight_concentration_[0], dtype=dt, device=device
+            )
+            bmm.weight_concentration_1 = torch.tensor(
+                sk_bmm.weight_concentration_[1], dtype=dt, device=device
             )
             bmm.degrees_of_freedom_ = torch.tensor(
                 sk_bmm.degrees_of_freedom_, dtype=dt, device=device

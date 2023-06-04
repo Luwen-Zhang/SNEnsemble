@@ -3,11 +3,31 @@ This is a modification of sklearn.mixture.BayesianMixture for pytorch.
 """
 from .gmm import GMM, Cluster
 import torch
+import warnings
+from src.model._transformer.pca.incremental_pca import IncrementalPCA
+from .base import AbstractMultilayerClustering
+import numpy as np
+from typing import List, Union
+from torch import nn
 
 
 class BMM(GMM):
     def __init__(self, *args, **kwargs):
         super(BMM, self).__init__(*args, **kwargs)
+        self.register_buffer("degrees_of_freedom_", torch.ones(self.n_clusters))
+        self.register_buffer(
+            "covariance_prior_", torch.ones(self.n_input, self.n_input)
+        )
+        self.register_buffer("mean_precision_", torch.ones(self.n_clusters))
+        self.register_buffer("mean_prior_", torch.ones(self.n_input))
+        self.register_buffer("weight_concentration_0", torch.ones(self.n_clusters))
+        self.register_buffer("weight_concentration_1", torch.ones(self.n_clusters))
+        # Ref: sklearn.mixture.BayesianGaussianMixture._check_weights_parameters
+        self.weight_concentration_prior_ = 1.0 / self.n_clusters
+        # Ref: sklearn.mixture.BayesianGaussianMixture._check_means_parameters
+        self.mean_precision_prior = 1.0
+        # Ref: sklearn.mixture.BayesianGaussianMixture._check_precision_parameters
+        self.degrees_of_freedom_prior_ = self.n_input
 
     def _estimate_log_prob(
         self, x: torch.Tensor, means: torch.Tensor, covariances: torch.Tensor
@@ -33,11 +53,11 @@ class BMM(GMM):
     def _estimate_log_weights(self):
         # Ref: sklearn.mixture.BayesianGaussianMixture._estimate_log_weights
         digamma_sum = torch.special.digamma(
-            self.weight_concentration_[0] + self.weight_concentration_[1]
+            self.weight_concentration_0 + self.weight_concentration_1
         )
-        digamma_a = torch.special.digamma(self.weight_concentration_[0])
-        digamma_b = torch.special.digamma(self.weight_concentration_[1])
-        device = self.weight_concentration_[0].device
+        digamma_a = torch.special.digamma(self.weight_concentration_0)
+        digamma_b = torch.special.digamma(self.weight_concentration_1)
+        device = self.weight_concentration_0.device
         return (
             digamma_a
             - digamma_sum
@@ -52,10 +72,8 @@ class BMM(GMM):
     def _estimate_parameters(self, x: torch.Tensor, resp: torch.Tensor):
         # Ref: sklearn.mixture.BayesianGaussianMixture._initialize
         nk, xk, sk = self._estimate_gaussian_parameters(x, resp)
-        # Ref: sklearn.mixture.BayesianGaussianMixture._check_weights_parameters
-        self.weight_concentration_prior_ = 1.0 / self.n_clusters
         # Ref: sklearn.mixture.BayesianGaussianMixture._estimate_weights
-        self.weight_concentration_ = (
+        self.weight_concentration_0, self.weight_concentration_1 = (
             1.0 + nk,
             self.weight_concentration_prior_
             + torch.hstack(
@@ -68,20 +86,16 @@ class BMM(GMM):
             ),
         )
         # Ref: sklearn.mixture.BayesianGaussianMixture._set_parameters
-        weight_dirichlet_sum = (
-            self.weight_concentration_[0] + self.weight_concentration_[1]
-        )
-        tmp = self.weight_concentration_[1] / weight_dirichlet_sum
+        weight_dirichlet_sum = self.weight_concentration_0 + self.weight_concentration_1
+        tmp = self.weight_concentration_1 / weight_dirichlet_sum
         weights = (
-            self.weight_concentration_[0]
+            self.weight_concentration_0
             / weight_dirichlet_sum
             * torch.hstack(
                 (torch.tensor([1], device=x.device), torch.cumprod(tmp[:-1], dim=0))
             )
         )
         weights /= torch.sum(weights)
-        # Ref: sklearn.mixture.BayesianGaussianMixture._check_means_parameters
-        self.mean_precision_prior = 1.0
         # Ref: sklearn.mixture.BayesianGaussianMixture._estimate_means
         self.mean_precision_ = self.mean_precision_prior + nk
         self.mean_prior_ = torch.mean(x, dim=0)
@@ -89,10 +103,11 @@ class BMM(GMM):
             self.mean_precision_prior * self.mean_prior_ + nk.unsqueeze(-1) * xk
         ) / self.mean_precision_.unsqueeze(-1)
         # Ref: sklearn.mixture.BayesianGaussianMixture._check_precision_parameters
-        self.degrees_of_freedom_prior_ = self.n_input
         self.degrees_of_freedom_ = self.degrees_of_freedom_prior_ + nk
         # Ref: sklearn.mixture.BayesianGaussianMixture._checkcovariance_prior_parameter
-        self.covariance_prior_ = torch.cov(x.T)
+        self.covariance_prior_ = torch.cov(x.T).reshape(
+            self.n_input, self.n_input
+        )  # To avoid empty cov.
         # Ref: sklearn.mixture.BayesianGaussianMixture._estimate_precisions (_estimate_wishart_full)
         covariances = torch.zeros(
             (self.n_clusters, self.n_input, self.n_input), device=x.device
@@ -109,3 +124,66 @@ class BMM(GMM):
             )
         covariances /= self.degrees_of_freedom_.unsqueeze(-1).unsqueeze(-1)
         return weights, means, covariances
+
+
+class PCABMM(BMM):
+    def __init__(self, n_input, n_pca_dim: int = None, **kwargs):
+        if n_pca_dim is not None:
+            if n_input <= n_pca_dim:
+                msg = f"Expecting n_pca_dim lower than n_input {n_input}, but got {n_pca_dim}."
+                if n_input < n_pca_dim:
+                    raise Exception(msg)
+                elif n_input == n_pca_dim:
+                    warnings.warn(msg)
+                super(PCABMM, self).__init__(n_input=n_input, **kwargs)
+            else:
+                self.n_clustering_features = np.min([n_input, n_pca_dim])
+                super(PCABMM, self).__init__(
+                    n_input=self.n_clustering_features, **kwargs
+                )
+                self.pca = IncrementalPCA(n_components=self.n_clustering_features)
+        else:
+            super(PCABMM, self).__init__(n_input=n_input, **kwargs)
+
+    def forward(self, x: torch.Tensor):
+        if hasattr(self, "pca"):
+            x = self.pca(x)
+        return super(PCABMM, self).forward(x)
+
+
+class SecondBMMCluster(Cluster):
+    def __init__(
+        self, n_input_outer: int, n_input_inner: int, momentum: float = 1.0, **kwargs
+    ):
+        super(SecondBMMCluster, self).__init__(n_input=n_input_outer, momentum=momentum)
+        self.inner_layer = BMM(momentum=momentum, n_input=n_input_inner, **kwargs)
+
+
+class TwolayerBMM(AbstractMultilayerClustering):
+    def __init__(
+        self,
+        n_clusters: int,
+        n_input_1: int,
+        n_input_2: int,
+        input_1_idx: List[int],
+        input_2_idx: List[int],
+        clusters: Union[List[Cluster], nn.ModuleList] = None,
+        momentum: float = 1.0,
+        n_clusters_per_cluster: int = 5,
+        n_pca_dim: int = None,
+        **kwargs,
+    ):
+        super(TwolayerBMM, self).__init__(
+            n_clusters=n_clusters,
+            n_input_1=n_input_1,
+            n_input_2=n_input_2,
+            input_1_idx=input_1_idx,
+            input_2_idx=input_2_idx,
+            algorithm_class=PCABMM,
+            second_layer_cluster_class=SecondBMMCluster,
+            clusters=clusters,
+            momentum=momentum,
+            n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
+            **kwargs,
+        )
