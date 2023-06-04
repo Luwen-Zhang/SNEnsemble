@@ -101,7 +101,7 @@ class TestClustering(unittest.TestCase):
                 sk_bmm.degrees_of_freedom_, dtype=dt, device=device
             )
             bmm.weight_concentration_prior = sk_bmm.weight_concentration_prior_
-            bmm.mean_precision_prior = sk_bmm.mean_precision_prior
+            bmm.mean_precision_prior = sk_bmm.mean_precision_prior_
             bmm.mean_prior = torch.tensor(sk_bmm.mean_prior_, dtype=dt, device=device)
             bmm.degrees_of_freedom_prior = sk_bmm.degrees_of_freedom_prior_
             bmm.covariance_prior = torch.tensor(
