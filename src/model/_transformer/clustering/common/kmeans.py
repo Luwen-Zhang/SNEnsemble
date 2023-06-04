@@ -14,7 +14,7 @@ from src.model._transformer.pca.incremental_pca import IncrementalPCA
 
 
 class Cluster(AbstractCluster):
-    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
+    def __init__(self, n_input: int, momentum: float = 1.0, **kwargs):
         super(Cluster, self).__init__(n_input=n_input, momentum=momentum, **kwargs)
         self.register_buffer("center", torch.zeros(1, n_input))
 
@@ -33,7 +33,7 @@ class KMeans(AbstractClustering):
         n_clusters: int,
         n_input: int,
         clusters: Union[List[Cluster], nn.ModuleList] = None,
-        momentum: float = 0.8,
+        momentum: float = 1.0,
         method: str = "fast_kmeans",
         init_method: str = "kmeans++",
         n_init: int = 10,
@@ -156,8 +156,13 @@ class KMeans(AbstractClustering):
                     mask[x_cluster, np.arange(len(x_cluster))] = 1.0
                     c_grad = mask @ x / mask.sum(-1).view(-1, 1)
                     c_grad[c_grad != c_grad] = 0  # remove NaNs
-                    lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
-                    self.accum_n_points_in_clusters[matched_clusters] += counts
+                    if self.adaptive_momentum:
+                        lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
+                        self.accum_n_points_in_clusters[matched_clusters] += counts
+                    else:
+                        lr = self.momentum * torch.ones(
+                            self.n_clusters, device=x.device
+                        )
                     for i_cluster, cluster in enumerate(self.clusters):
                         cluster.update(c_grad[i_cluster, :], momentum=lr[i_cluster])
                 else:
@@ -198,7 +203,7 @@ class PCAKMeans(KMeans):
 
 class SecondKMeansCluster(Cluster):
     def __init__(
-        self, n_input_outer: int, n_input_inner: int, momentum: float = 0.8, **kwargs
+        self, n_input_outer: int, n_input_inner: int, momentum: float = 1.0, **kwargs
     ):
         super(SecondKMeansCluster, self).__init__(
             n_input=n_input_outer, momentum=momentum
@@ -215,7 +220,7 @@ class TwolayerKMeans(AbstractMultilayerClustering):
         input_1_idx: List[int],
         input_2_idx: List[int],
         clusters: Union[List[Cluster], nn.ModuleList] = None,
-        momentum: float = 0.8,
+        momentum: float = 1.0,
         n_clusters_per_cluster: int = 5,
         n_pca_dim: int = None,
         **kwargs,

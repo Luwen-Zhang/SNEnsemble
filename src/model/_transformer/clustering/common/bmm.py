@@ -1,3 +1,6 @@
+"""
+This is a modification of sklearn.mixture.BayesianMixture for pytorch.
+"""
 from .gmm import GMM, Cluster
 import torch
 

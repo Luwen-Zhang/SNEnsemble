@@ -61,6 +61,7 @@ class TestClustering(unittest.TestCase):
                 n_clusters=n_clustering_clusters,
                 n_input=n_features,
                 init_method="kmeans",
+                adaptive_momentum=False,
             ).to(device)
             data = get_data(n_clusters, n_features, n_each_cluster, seed)
             t = torch.tensor(data, device=device, dtype=dt)
@@ -212,7 +213,10 @@ class TestClustering(unittest.TestCase):
             dt = torch.float64 if precision == "64" else torch.float32
             torch.set_default_dtype(dt)
             gmm = GMM(
-                n_clusters=n_clusters, n_input=n_features, init_method="kmeans"
+                n_clusters=n_clusters,
+                n_input=n_features,
+                init_method="kmeans",
+                adaptive_momentum=False,
             ).to(device)
             data = get_data(n_clusters, n_features, n_each_cluster, seed)
             t = torch.tensor(data, device=device, dtype=dt)

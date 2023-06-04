@@ -1,6 +1,5 @@
 """
-This is a modification of https://github.com/ldeecke/gmm-torch
-We improve the initialization and stability.
+This is a modification of sklearn.mixture.GaussianMixture for pytorch.
 """
 import torch
 from torch import nn
@@ -13,7 +12,7 @@ from src.model._transformer.pca.incremental_pca import IncrementalPCA
 
 
 class Cluster(AbstractCluster):
-    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
+    def __init__(self, n_input: int, momentum: float = 1.0, **kwargs):
         super(Cluster, self).__init__(n_input=n_input, momentum=momentum, **kwargs)
         self.register_buffer("mu", torch.randn(1, n_input))
         self.register_buffer("var", torch.randn(1, n_input, n_input))
@@ -46,7 +45,7 @@ class GMM(AbstractClustering):
         n_clusters: int,
         n_input: int,
         clusters: Union[List[Cluster], nn.ModuleList] = None,
-        momentum: float = 0.8,
+        momentum: float = 1.0,
         init_method: str = "kmeans",
         **kwargs,
     ):
@@ -139,17 +138,20 @@ class GMM(AbstractClustering):
         weights: torch.Tensor,
         means: torch.Tensor,
         covariances: torch.Tensor,
-        labels,
+        labels=None,
     ):
-        matched_clusters, counts = labels.unique(return_counts=True)
-        lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
-        self.accum_n_points_in_clusters[matched_clusters] += counts
+        if self.adaptive_momentum:
+            matched_clusters, counts = labels.unique(return_counts=True)
+            lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
+            self.accum_n_points_in_clusters[matched_clusters] += counts
+        else:
+            lr = self.momentum * torch.ones(self.n_clusters, device=weights.device)
         for i_cluster, cluster in enumerate(self.clusters):
             cluster.update(
                 mu=means[i_cluster, :].unsqueeze(0),
                 var=covariances[i_cluster, :, :].unsqueeze(0),
                 pi=weights[i_cluster],
-                momentum=1,
+                momentum=lr[i_cluster],
             )
 
     @property
@@ -267,7 +269,7 @@ class PCAGMM(GMM):
 
 class SecondGMMCluster(Cluster):
     def __init__(
-        self, n_input_outer: int, n_input_inner: int, momentum: float = 0.8, **kwargs
+        self, n_input_outer: int, n_input_inner: int, momentum: float = 1.0, **kwargs
     ):
         super(SecondGMMCluster, self).__init__(n_input=n_input_outer, momentum=momentum)
         self.inner_layer = GMM(momentum=momentum, n_input=n_input_inner, **kwargs)
@@ -282,7 +284,7 @@ class TwolayerGMM(AbstractMultilayerClustering):
         input_1_idx: List[int],
         input_2_idx: List[int],
         clusters: Union[List[Cluster], nn.ModuleList] = None,
-        momentum: float = 0.8,
+        momentum: float = 1.0,
         n_clusters_per_cluster: int = 5,
         n_pca_dim: int = None,
         **kwargs,

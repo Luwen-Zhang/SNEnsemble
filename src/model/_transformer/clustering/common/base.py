@@ -5,7 +5,7 @@ import numpy as np
 
 
 class AbstractCluster(nn.Module):
-    def __init__(self, n_input: int, momentum: float = 0.8, **kwargs):
+    def __init__(self, n_input: int, momentum: float = 1.0, **kwargs):
         super(AbstractCluster, self).__init__()
         self.n_input = n_input
         self.momentum = momentum
@@ -18,7 +18,8 @@ class AbstractClustering(nn.Module):
         n_input: int,
         cluster_class: Type[AbstractCluster] = None,
         clusters: Union[List[AbstractCluster], nn.ModuleList] = None,
-        momentum: float = 0.8,
+        momentum: float = 1.0,
+        adaptive_momentum: bool = True,
         **kwargs,
     ):
         super(AbstractClustering, self).__init__()
@@ -40,6 +41,8 @@ class AbstractClustering(nn.Module):
             if clusters is None
             else clusters
         )
+        self.adaptive_momentum = adaptive_momentum
+        self.momentum = momentum
         self.initialized = False
 
     def fit(self, x: torch.Tensor, n_iter: int = 100):
@@ -96,7 +99,7 @@ class AbstractMultilayerClustering(AbstractClustering):
         algorithm_class: Type[AbstractClustering] = None,
         second_layer_cluster_class: Type[AbstractCluster] = None,
         clusters: List[AbstractCluster] = None,
-        momentum: float = 0.8,
+        momentum: float = 1.0,
         n_clusters_per_cluster: int = 5,
         n_pca_dim: int = None,
         **kwargs,
