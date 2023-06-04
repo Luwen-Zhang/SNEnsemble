@@ -133,7 +133,6 @@ class KMeans(AbstractClustering):
         return inertia
 
     def forward(self, x: torch.Tensor):
-        x = x.float()
         if not self.initialized and self.training:
             self.initialize(x)
         x_cluster = self._predict(x)
