@@ -1,5 +1,5 @@
 """
-This is a modification of sklearn.mixture.BayesianMixture for pytorch.
+This is a modification of sklearn.mixture.BayesianGaussianMixture for pytorch.
 """
 from .gmm import GMM, Cluster
 import torch
