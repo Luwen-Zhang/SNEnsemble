@@ -172,15 +172,19 @@ class AbstractMultilayerClustering(AbstractClustering):
 
     def forward(self, x: torch.Tensor):
         outer_cluster = self.first_clustering(x[:, self.input_1_idx])
-        x_cluster = torch.zeros((x.shape[0],), device=x.device).long()
-        for i in range(self.first_clustering.n_clusters):
-            where_in_cluster = torch.where(outer_cluster == i)[0]
-            if len(where_in_cluster) > 0:
-                inner_cluster = (
-                    self.first_clustering.clusters[i].inner_layer(
-                        x[where_in_cluster, :][:, self.input_2_idx]
+        if not self.shared_second_layer_clusters:
+            x_cluster = torch.zeros((x.shape[0],), device=x.device).long()
+            for i in range(self.first_clustering.n_clusters):
+                where_in_cluster = torch.where(outer_cluster == i)[0]
+                if len(where_in_cluster) > 0:
+                    inner_cluster = (
+                        self.first_clustering.clusters[i].inner_layer(
+                            x[where_in_cluster, :][:, self.input_2_idx]
+                        )
+                        + i * self.n_clusters_per_cluster
                     )
-                    + i * self.n_clusters_per_cluster
-                )
-                x_cluster[where_in_cluster] = inner_cluster
+                    x_cluster[where_in_cluster] = inner_cluster
+        else:
+            inner_cluster = self.second_clustering(x[:, self.input_2_idx])
+            x_cluster = inner_cluster + outer_cluster * self.n_clusters_per_cluster
         return x_cluster
