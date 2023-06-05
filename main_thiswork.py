@@ -17,11 +17,17 @@ models = [
     Transformer(
         trainer,
         model_subset=[
-            "CategoryEmbedding",
-            "SNCatEmbedLRKMeans",
-            "SNCatEmbedLRGMM",
-            "SNCatEmbedLR2LKMeans",
-            "SNCatEmbedLR2LGMM",
+            # "CategoryEmbedding",
+            # "SNCatEmbedLRKMeans",
+            # "SNCatEmbedLRGMM",
+            # "SNCatEmbedLR2LKMeans",
+            # "SNCatEmbedLR2LGMM",
+            # "SNCatEmbedLRPCAKMeans",
+            "SNCatEmbedLRPCAGMM",
+            "SNCatEmbedLRPCABMM",
+            # "SNCatEmbedLR2LPCAKMeans",
+            "SNCatEmbedLR2LPCAGMM",
+            "SNCatEmbedLR2LPCABMM",
         ],
     ),
 ]
