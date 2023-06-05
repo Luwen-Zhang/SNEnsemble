@@ -19,7 +19,7 @@ class SNMarker(nn.Module):
         self.register_buffer("running_weight_b", torch.tensor([0.0]))
         self.register_buffer("running_approx_a", torch.tensor([1.0]))
         self.register_buffer("running_approx_b", torch.tensor([5.0]))
-        self.momentum = 0.1
+        self.exp_avg_factor = 0.1
         self.weight = 1e-1
 
     def _update(self, value, name):
@@ -28,7 +28,8 @@ class SNMarker(nn.Module):
                 setattr(
                     self,
                     name,
-                    self.momentum * value + (1 - self.momentum) * getattr(self, name),
+                    self.exp_avg_factor * value
+                    + (1 - self.exp_avg_factor) * getattr(self, name),
                 )
             return value
         else:

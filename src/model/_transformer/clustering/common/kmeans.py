@@ -14,13 +14,17 @@ from src.model._transformer.pca.incremental_pca import IncrementalPCA
 
 
 class Cluster(AbstractCluster):
-    def __init__(self, n_input: int, momentum: float = 1.0, **kwargs):
-        super(Cluster, self).__init__(n_input=n_input, momentum=momentum, **kwargs)
+    def __init__(self, n_input: int, exp_avg_factor: float = 1.0, **kwargs):
+        super(Cluster, self).__init__(
+            n_input=n_input, exp_avg_factor=exp_avg_factor, **kwargs
+        )
         self.register_buffer("center", torch.zeros(1, n_input))
 
-    def update(self, new_center, momentum=None):
-        momentum = self.momentum if momentum is None else momentum
-        self.center = momentum * new_center + (1 - momentum) * self.center
+    def update(self, new_center, exp_avg_factor=None):
+        exp_avg_factor = (
+            self.exp_avg_factor if exp_avg_factor is None else exp_avg_factor
+        )
+        self.center = exp_avg_factor * new_center + (1 - exp_avg_factor) * self.center
 
     def set(self, new_center):
         self.center = new_center
@@ -33,7 +37,7 @@ class KMeans(AbstractClustering):
         n_clusters: int,
         n_input: int,
         clusters: Union[List[Cluster], nn.ModuleList] = None,
-        momentum: float = 1.0,
+        exp_avg_factor: float = 1.0,
         method: str = "fast_kmeans",
         init_method: str = "kmeans++",
         n_init: int = 10,
@@ -44,7 +48,7 @@ class KMeans(AbstractClustering):
             n_input=n_input,
             cluster_class=Cluster,
             clusters=clusters,
-            momentum=momentum,
+            exp_avg_factor=exp_avg_factor,
             **kwargs,
         )
         self.method = method
@@ -160,11 +164,13 @@ class KMeans(AbstractClustering):
                         lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
                         self.accum_n_points_in_clusters[matched_clusters] += counts
                     else:
-                        lr = self.momentum * torch.ones(
+                        lr = self.exp_avg_factor * torch.ones(
                             self.n_clusters, device=x.device
                         )
                     for i_cluster, cluster in enumerate(self.clusters):
-                        cluster.update(c_grad[i_cluster, :], momentum=lr[i_cluster])
+                        cluster.update(
+                            c_grad[i_cluster, :], exp_avg_factor=lr[i_cluster]
+                        )
                 else:
                     raise Exception(
                         f"KMeans implementation {self.method} is not implemented."
@@ -203,12 +209,18 @@ class PCAKMeans(KMeans):
 
 class FirstKMeansCluster(Cluster):
     def __init__(
-        self, n_input_outer: int, n_input_inner: int, momentum: float = 1.0, **kwargs
+        self,
+        n_input_outer: int,
+        n_input_inner: int,
+        exp_avg_factor: float = 1.0,
+        **kwargs,
     ):
         super(FirstKMeansCluster, self).__init__(
-            n_input=n_input_outer, momentum=momentum
+            n_input=n_input_outer, exp_avg_factor=exp_avg_factor
         )
-        self.inner_layer = KMeans(momentum=momentum, n_input=n_input_inner, **kwargs)
+        self.inner_layer = KMeans(
+            exp_avg_factor=exp_avg_factor, n_input=n_input_inner, **kwargs
+        )
 
 
 class TwolayerKMeans(AbstractMultilayerClustering):

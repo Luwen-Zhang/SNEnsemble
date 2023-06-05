@@ -12,8 +12,10 @@ from src.model._transformer.pca.incremental_pca import IncrementalPCA
 
 
 class Cluster(AbstractCluster):
-    def __init__(self, n_input: int, momentum: float = 1.0, **kwargs):
-        super(Cluster, self).__init__(n_input=n_input, momentum=momentum, **kwargs)
+    def __init__(self, n_input: int, exp_avg_factor: float = 1.0, **kwargs):
+        super(Cluster, self).__init__(
+            n_input=n_input, exp_avg_factor=exp_avg_factor, **kwargs
+        )
         self.register_buffer("mu", torch.randn(1, n_input))
         self.register_buffer("var", torch.randn(1, n_input, n_input))
         self.register_buffer(
@@ -21,14 +23,16 @@ class Cluster(AbstractCluster):
             torch.ones(1),
         )
 
-    def update(self, mu=None, var=None, pi=None, momentum=None):
-        momentum = self.momentum if momentum is None else momentum
+    def update(self, mu=None, var=None, pi=None, exp_avg_factor=None):
+        exp_avg_factor = (
+            self.exp_avg_factor if exp_avg_factor is None else exp_avg_factor
+        )
         if mu is not None:
-            self.mu = momentum * mu + (1 - momentum) * self.mu
+            self.mu = exp_avg_factor * mu + (1 - exp_avg_factor) * self.mu
         if var is not None:
-            self.var = momentum * var + (1 - momentum) * self.var
+            self.var = exp_avg_factor * var + (1 - exp_avg_factor) * self.var
         if pi is not None:
-            self.pi = momentum * pi + (1 - momentum) * self.pi
+            self.pi = exp_avg_factor * pi + (1 - exp_avg_factor) * self.pi
 
     def set(self, mu=None, var=None, pi=None):
         if mu is not None:
@@ -45,7 +49,7 @@ class GMM(AbstractClustering):
         n_clusters: int,
         n_input: int,
         clusters: Union[List[Cluster], nn.ModuleList] = None,
-        momentum: float = 1.0,
+        exp_avg_factor: float = 1.0,
         init_method: str = "kmeans",
         **kwargs,
     ):
@@ -54,7 +58,7 @@ class GMM(AbstractClustering):
             n_input=n_input,
             cluster_class=Cluster,
             clusters=clusters,
-            momentum=momentum,
+            exp_avg_factor=exp_avg_factor,
             **kwargs,
         )
         self.init_method = init_method
@@ -147,13 +151,15 @@ class GMM(AbstractClustering):
             lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
             self.accum_n_points_in_clusters[matched_clusters] += counts
         else:
-            lr = self.momentum * torch.ones(self.n_clusters, device=weights.device)
+            lr = self.exp_avg_factor * torch.ones(
+                self.n_clusters, device=weights.device
+            )
         for i_cluster, cluster in enumerate(self.clusters):
             cluster.update(
                 mu=means[i_cluster, :].unsqueeze(0),
                 var=covariances[i_cluster, :, :].unsqueeze(0),
                 pi=weights[i_cluster],
-                momentum=lr[i_cluster],
+                exp_avg_factor=lr[i_cluster],
             )
 
     @property
@@ -271,10 +277,18 @@ class PCAGMM(GMM):
 
 class FirstGMMCluster(Cluster):
     def __init__(
-        self, n_input_outer: int, n_input_inner: int, momentum: float = 1.0, **kwargs
+        self,
+        n_input_outer: int,
+        n_input_inner: int,
+        exp_avg_factor: float = 1.0,
+        **kwargs,
     ):
-        super(FirstGMMCluster, self).__init__(n_input=n_input_outer, momentum=momentum)
-        self.inner_layer = GMM(momentum=momentum, n_input=n_input_inner, **kwargs)
+        super(FirstGMMCluster, self).__init__(
+            n_input=n_input_outer, exp_avg_factor=exp_avg_factor
+        )
+        self.inner_layer = GMM(
+            exp_avg_factor=exp_avg_factor, n_input=n_input_inner, **kwargs
+        )
 
 
 class TwolayerGMM(AbstractMultilayerClustering):

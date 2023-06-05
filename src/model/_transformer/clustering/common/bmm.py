@@ -153,10 +153,18 @@ class PCABMM(BMM):
 
 class FirstBMMCluster(Cluster):
     def __init__(
-        self, n_input_outer: int, n_input_inner: int, momentum: float = 1.0, **kwargs
+        self,
+        n_input_outer: int,
+        n_input_inner: int,
+        exp_avg_factor: float = 1.0,
+        **kwargs,
     ):
-        super(FirstBMMCluster, self).__init__(n_input=n_input_outer, momentum=momentum)
-        self.inner_layer = BMM(momentum=momentum, n_input=n_input_inner, **kwargs)
+        super(FirstBMMCluster, self).__init__(
+            n_input=n_input_outer, exp_avg_factor=exp_avg_factor
+        )
+        self.inner_layer = BMM(
+            exp_avg_factor=exp_avg_factor, n_input=n_input_inner, **kwargs
+        )
 
 
 class TwolayerBMM(AbstractMultilayerClustering):

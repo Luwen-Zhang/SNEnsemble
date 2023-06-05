@@ -6,10 +6,10 @@ from copy import deepcopy as cp
 
 
 class AbstractCluster(nn.Module):
-    def __init__(self, n_input: int, momentum: float = 1.0, **kwargs):
+    def __init__(self, n_input: int, exp_avg_factor: float = 1.0, **kwargs):
         super(AbstractCluster, self).__init__()
         self.n_input = n_input
-        self.momentum = momentum
+        self.exp_avg_factor = exp_avg_factor
 
 
 class AbstractClustering(nn.Module):
@@ -19,7 +19,7 @@ class AbstractClustering(nn.Module):
         n_input: int,
         cluster_class: Type[AbstractCluster] = None,
         clusters: Union[List[AbstractCluster], nn.ModuleList] = None,
-        momentum: float = 1.0,
+        exp_avg_factor: float = 1.0,
         adaptive_momentum: bool = True,
         **kwargs,
     ):
@@ -36,14 +36,14 @@ class AbstractClustering(nn.Module):
                 )
         self.clusters = nn.ModuleList(
             [
-                cluster_class(n_input=n_input, momentum=momentum)
+                cluster_class(n_input=n_input, exp_avg_factor=exp_avg_factor)
                 for i in range(n_clusters)
             ]
             if clusters is None
             else clusters
         )
         self.adaptive_momentum = adaptive_momentum
-        self.momentum = momentum
+        self.exp_avg_factor = exp_avg_factor
         self.initialized = False
 
     def fit(self, x: torch.Tensor, n_iter: int = 100):
@@ -99,7 +99,7 @@ class AbstractMultilayerClustering(AbstractClustering):
         input_2_idx: List[int],
         algorithm_class: Type[AbstractClustering] = None,
         first_layer_cluster_class: Type[AbstractCluster] = None,
-        momentum: float = 1.0,
+        exp_avg_factor: float = 1.0,
         n_clusters_per_cluster: int = 5,
         n_pca_dim: int = None,
         shared_second_layer_clusters: bool = False,
@@ -114,7 +114,7 @@ class AbstractMultilayerClustering(AbstractClustering):
         base_first_layer_cluster = first_layer_cluster_class(
             n_input_outer=n_input_1 if n_pca_dim is None else n_pca_dim,
             n_input_inner=n_input_2,
-            momentum=momentum,
+            exp_avg_factor=exp_avg_factor,
             n_clusters=n_clusters_per_cluster,
             **kwargs,
         )
@@ -138,13 +138,13 @@ class AbstractMultilayerClustering(AbstractClustering):
         super().__init__(
             n_clusters=self.n_total_clusters,
             n_input=len(np.union1d(input_1_idx, input_2_idx)),
-            momentum=momentum,
+            exp_avg_factor=exp_avg_factor,
             clusters=[],
         )
         self.first_clustering = algorithm_class(
             n_clusters=n_clusters,
             n_input=n_input_1,
-            momentum=momentum,
+            exp_avg_factor=exp_avg_factor,
             clusters=first_layer_clusters,
             n_pca_dim=n_pca_dim,
             **kwargs,
@@ -154,7 +154,7 @@ class AbstractMultilayerClustering(AbstractClustering):
             self.second_clustering = algorithm_class(
                 n_clusters=self.n_clusters_per_cluster,
                 n_input=n_input_2,
-                momentum=momentum,
+                exp_avg_factor=exp_avg_factor,
                 clusters=first_layer_clusters[0].inner_layer.clusters,
                 **kwargs,
             )
@@ -165,7 +165,7 @@ class AbstractMultilayerClustering(AbstractClustering):
             self.second_clustering = algorithm_class(
                 n_clusters=self.n_total_clusters,
                 n_input=n_input_2,
-                momentum=momentum,
+                exp_avg_factor=exp_avg_factor,
                 clusters=inner_clusters,
                 **kwargs,
             )

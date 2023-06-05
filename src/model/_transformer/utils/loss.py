@@ -8,7 +8,7 @@ class BalancedLoss(nn.Module):
     def __init__(self):
         super(BalancedLoss, self).__init__()
         self.register_buffer("weight", torch.tensor([1.0]))
-        self.momentum = 0.1
+        self.exp_avg_factor = 0.1
 
     def forward(self, **kwargs):
         base_loss = kwargs["base_loss"]
@@ -16,8 +16,8 @@ class BalancedLoss(nn.Module):
         if self.training:
             with torch.no_grad():
                 self.weight = (
-                    self.momentum * base_loss / (my_loss + 1e-8) * 0.1
-                    + (1 - self.momentum) * self.weight
+                    self.exp_avg_factor * base_loss / (my_loss + 1e-8) * 0.1
+                    + (1 - self.exp_avg_factor) * self.weight
                 )
         return self.weight * my_loss + base_loss
 
@@ -56,8 +56,8 @@ class StressGradLoss(BalancedLoss):
         if self.training:
             with torch.no_grad():
                 self.grad_2_weight = (
-                    self.momentum * grad_loss / (grad_2_loss + 1e-8)
-                    + (1 - self.momentum) * self.grad_2_weight
+                    self.exp_avg_factor * grad_loss / (grad_2_loss + 1e-8)
+                    + (1 - self.exp_avg_factor) * self.grad_2_weight
                 )
         return grad_loss + self.grad_2_weight * grad_2_loss
 
