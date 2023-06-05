@@ -2,6 +2,7 @@ from torch import nn
 import torch
 from typing import List, Type, Union
 import numpy as np
+from copy import deepcopy as cp
 
 
 class AbstractCluster(nn.Module):
@@ -97,39 +98,38 @@ class AbstractMultilayerClustering(AbstractClustering):
         input_1_idx: List[int],
         input_2_idx: List[int],
         algorithm_class: Type[AbstractClustering] = None,
-        second_layer_cluster_class: Type[AbstractCluster] = None,
-        clusters: List[AbstractCluster] = None,
+        first_layer_cluster_class: Type[AbstractCluster] = None,
         momentum: float = 1.0,
         n_clusters_per_cluster: int = 5,
         n_pca_dim: int = None,
+        shared_second_layer_clusters: bool = False,
         **kwargs,
     ):
-        if algorithm_class is None or second_layer_cluster_class is None:
+        if algorithm_class is None or first_layer_cluster_class is None:
             raise Exception(
                 f"Classes inherited from AbstractMultilayerClustering should provide `algorithm_class` and "
-                f"`second_layer_cluster_class`."
+                f"`first_layer_cluster_class`."
             )
-        if (
-            clusters is not None
-            and len(clusters) != n_clusters * n_clusters_per_cluster
-        ):
-            raise Exception(
-                f"{n_clusters * n_clusters_per_cluster} clusters is required. Got {len(clusters)} instead."
-            )
-        second_layer_clusters = [
-            second_layer_cluster_class(
-                n_input_outer=n_input_1 if n_pca_dim is None else n_pca_dim,
-                n_input_inner=n_input_2,
-                momentum=momentum,
-                n_clusters=n_clusters_per_cluster,
-                clusters=clusters[
-                    i * n_clusters_per_cluster : (i + 1) * n_clusters_per_cluster
-                ]
-                if clusters is not None
-                else None,
-                **kwargs,
-            )
-            for i in range(n_clusters)
+        self.shared_second_layer_clusters = shared_second_layer_clusters
+        base_first_layer_cluster = first_layer_cluster_class(
+            n_input_outer=n_input_1 if n_pca_dim is None else n_pca_dim,
+            n_input_inner=n_input_2,
+            momentum=momentum,
+            n_clusters=n_clusters_per_cluster,
+            **kwargs,
+        )
+        if shared_second_layer_clusters:
+
+            def _map_inner_clusters(cluster):
+                out = cp(cluster)
+                out.inner_layer = cluster.inner_layer
+                return out
+
+            duplicate_fn = _map_inner_clusters
+        else:
+            duplicate_fn = cp
+        first_layer_clusters = [
+            duplicate_fn(base_first_layer_cluster) for i in range(n_clusters)
         ]
         self.n_total_clusters = n_clusters * n_clusters_per_cluster
         self.n_clusters_per_cluster = n_clusters_per_cluster
@@ -145,20 +145,30 @@ class AbstractMultilayerClustering(AbstractClustering):
             n_clusters=n_clusters,
             n_input=n_input_1,
             momentum=momentum,
-            clusters=second_layer_clusters,
+            clusters=first_layer_clusters,
             n_pca_dim=n_pca_dim,
             **kwargs,
         )
         # This is a surrogate instance to gather clusters in second_layer_clusters.
-        inner_clusters = nn.ModuleList()
-        for i in second_layer_clusters:
-            inner_clusters += i.inner_layer.clusters
-        self.second_clustering = algorithm_class(
-            n_clusters=self.n_total_clusters,
-            n_input=n_input_2,
-            momentum=momentum,
-            clusters=inner_clusters,
-        )
+        if self.shared_second_layer_clusters:
+            self.second_clustering = algorithm_class(
+                n_clusters=self.n_clusters_per_cluster,
+                n_input=n_input_2,
+                momentum=momentum,
+                clusters=first_layer_clusters[0].inner_layer.clusters,
+                **kwargs,
+            )
+        else:
+            inner_clusters = nn.ModuleList()
+            for i in first_layer_clusters:
+                inner_clusters += i.inner_layer.clusters
+            self.second_clustering = algorithm_class(
+                n_clusters=self.n_total_clusters,
+                n_input=n_input_2,
+                momentum=momentum,
+                clusters=inner_clusters,
+                **kwargs,
+            )
 
     def forward(self, x: torch.Tensor):
         outer_cluster = self.first_clustering(x[:, self.input_1_idx])

@@ -201,11 +201,11 @@ class PCAKMeans(KMeans):
         return super(PCAKMeans, self).forward(x)
 
 
-class SecondKMeansCluster(Cluster):
+class FirstKMeansCluster(Cluster):
     def __init__(
         self, n_input_outer: int, n_input_inner: int, momentum: float = 1.0, **kwargs
     ):
-        super(SecondKMeansCluster, self).__init__(
+        super(FirstKMeansCluster, self).__init__(
             n_input=n_input_outer, momentum=momentum
         )
         self.inner_layer = KMeans(momentum=momentum, n_input=n_input_inner, **kwargs)
@@ -215,6 +215,6 @@ class TwolayerKMeans(AbstractMultilayerClustering):
     def __init__(self, **kwargs):
         super(TwolayerKMeans, self).__init__(
             algorithm_class=PCAKMeans,
-            second_layer_cluster_class=SecondKMeansCluster,
+            first_layer_cluster_class=FirstKMeansCluster,
             **kwargs,
         )

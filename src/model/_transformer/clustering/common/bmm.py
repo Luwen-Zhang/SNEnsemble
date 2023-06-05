@@ -151,11 +151,11 @@ class PCABMM(BMM):
         return super(PCABMM, self).forward(x)
 
 
-class SecondBMMCluster(Cluster):
+class FirstBMMCluster(Cluster):
     def __init__(
         self, n_input_outer: int, n_input_inner: int, momentum: float = 1.0, **kwargs
     ):
-        super(SecondBMMCluster, self).__init__(n_input=n_input_outer, momentum=momentum)
+        super(FirstBMMCluster, self).__init__(n_input=n_input_outer, momentum=momentum)
         self.inner_layer = BMM(momentum=momentum, n_input=n_input_inner, **kwargs)
 
 
@@ -163,6 +163,6 @@ class TwolayerBMM(AbstractMultilayerClustering):
     def __init__(self, **kwargs):
         super(TwolayerBMM, self).__init__(
             algorithm_class=PCABMM,
-            second_layer_cluster_class=SecondBMMCluster,
+            first_layer_cluster_class=FirstBMMCluster,
             **kwargs,
         )

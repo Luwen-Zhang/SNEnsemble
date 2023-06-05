@@ -269,11 +269,11 @@ class PCAGMM(GMM):
         return super(PCAGMM, self).forward(x)
 
 
-class SecondGMMCluster(Cluster):
+class FirstGMMCluster(Cluster):
     def __init__(
         self, n_input_outer: int, n_input_inner: int, momentum: float = 1.0, **kwargs
     ):
-        super(SecondGMMCluster, self).__init__(n_input=n_input_outer, momentum=momentum)
+        super(FirstGMMCluster, self).__init__(n_input=n_input_outer, momentum=momentum)
         self.inner_layer = GMM(momentum=momentum, n_input=n_input_inner, **kwargs)
 
 
@@ -281,6 +281,6 @@ class TwolayerGMM(AbstractMultilayerClustering):
     def __init__(self, **kwargs):
         super(TwolayerGMM, self).__init__(
             algorithm_class=PCAGMM,
-            second_layer_cluster_class=SecondGMMCluster,
+            first_layer_cluster_class=FirstGMMCluster,
             **kwargs,
         )
