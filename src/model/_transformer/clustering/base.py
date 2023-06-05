@@ -85,26 +85,39 @@ class LogLog(SNMarker):
         return self._linear(log_s, naive_pred, a, b)
 
 
+available_sn = []
+for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
+    if issubclass(cls, SNMarker) and cls != SNMarker:
+        available_sn.append(cls)
+
+
+def get_sns():
+    sns = nn.ModuleList([i() for i in available_sn])
+    return sns
+
+
+n_coeff_ls = [sn.n_coeff for sn in get_sns()]
+proj_dims = [sum(n_coeff_ls), len(n_coeff_ls)]
+proj_dim = sum(n_coeff_ls) + len(n_coeff_ls)
+
+
 class SN(nn.Module):
     def __init__(self, n_cluster_features, layers, *args, **kwargs):
         super(SN, self).__init__()
-        self.sns = nn.ModuleList()
-        for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
-            if issubclass(cls, SNMarker) and cls != SNMarker:
-                self.sns.append(cls())
-        self.n_coeff_ls = [sn.n_coeff for sn in self.sns]
+        self.sns = get_sns()
+        self.n_coeff_ls = n_coeff_ls
+        self.proj_dim = proj_dim
+        self.proj_dims = proj_dims
         self.coeff_head = get_sequential(
-            layers=layers,
-            n_inputs=1 + n_cluster_features,
-            n_outputs=sum(self.n_coeff_ls) + len(self.n_coeff_ls),
+            layers=[32],
+            n_inputs=self.proj_dim,
+            n_outputs=self.proj_dim,
             act_func=nn.ReLU,
         )
 
-    def forward(self, x, s, naive_pred):
-        coeffs_proj = self.coeff_head(torch.cat([x, naive_pred], dim=1)) + naive_pred
-        sn_coeffs, sn_weights = coeffs_proj.split(
-            [sum(self.n_coeff_ls), len(self.n_coeff_ls)], dim=1
-        )
+    def forward(self, x, s, naive_pred, coeffs_proj):
+        coeffs_proj = self.coeff_head(coeffs_proj) + coeffs_proj
+        sn_coeffs, sn_weights = coeffs_proj.split(self.proj_dims, dim=1)
         sn_coeffs = sn_coeffs.split(self.n_coeff_ls, dim=1)
         x_sn = torch.concat(
             [
@@ -142,8 +155,17 @@ class AbstractSNClustering(nn.Module):
         self.sns = nn.ModuleList(
             [SN(n_cluster_features=n_input, layers=layers) for i in range(n_clusters)]
         )
+        self.n_coeff_ls = n_coeff_ls
+        self.proj_dim = proj_dim
+        self.coeff_head = get_sequential(
+            layers=layers,
+            n_inputs=1 + n_input,
+            n_outputs=self.proj_dim,
+            act_func=nn.ReLU,
+        )
 
     def forward(self, x, s, naive_pred):
+        coeffs_proj = self.coeff_head(torch.cat([x, naive_pred], dim=1)) + naive_pred
         x_cluster = self.clustering(x)
         out = naive_pred.clone()
         for i_cluster in range(self.n_clusters):
@@ -153,6 +175,7 @@ class AbstractSNClustering(nn.Module):
                     x[idx_in_cluster, :],
                     s[idx_in_cluster],
                     naive_pred[idx_in_cluster, :],
+                    coeffs_proj[idx_in_cluster, :],
                 )
                 out[idx_in_cluster] = pred
 
@@ -190,8 +213,17 @@ class AbstractMultilayerSNClustering(nn.Module):
                 for i in range(self.n_clusters)
             ]
         )
+        self.n_coeff_ls = n_coeff_ls
+        self.proj_dim = proj_dim
+        self.coeff_head = get_sequential(
+            layers=layers,
+            n_inputs=1 + self.clustering.n_input,
+            n_outputs=proj_dim,
+            act_func=nn.ReLU,
+        )
 
     def forward(self, x, s, naive_pred):
+        coeffs_proj = self.coeff_head(torch.cat([x, naive_pred], dim=1)) + naive_pred
         x_cluster = self.clustering(x)
         out = naive_pred.clone()
         for i_cluster in range(self.n_clusters):
@@ -201,6 +233,7 @@ class AbstractMultilayerSNClustering(nn.Module):
                     x[idx_in_cluster, :],
                     s[idx_in_cluster],
                     naive_pred[idx_in_cluster, :],
+                    coeffs_proj[idx_in_cluster, :],
                 )
                 out[idx_in_cluster] = pred
 
