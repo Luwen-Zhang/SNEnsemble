@@ -41,7 +41,7 @@ class AbstractSeqModel(AbstractNN):
             all_res += [x_seq]
 
         output = torch.concat(all_res, dim=1)
-        output = self.w(output)
+        output = self.w(output) + x_contcat
         return output
 
 
