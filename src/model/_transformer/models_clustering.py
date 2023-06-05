@@ -50,13 +50,13 @@ class AbstractClusteringModel(AbstractNN):
         return np.concatenate(
             (
                 trainer.datamodule.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["R-value"]],
+                [trainer.cont_feature_names.index(x) for x in ["Frequency", "R-value"]],
             )
         )
 
     @staticmethod
     def top_clustering_features_idx(trainer):
-        return AbstractClusteringModel.basic_clustering_features_idx(trainer)[:-1]
+        return AbstractClusteringModel.basic_clustering_features_idx(trainer)[:-2]
 
 
 class SNTransformerLRKMeansNN(AbstractClusteringModel):
