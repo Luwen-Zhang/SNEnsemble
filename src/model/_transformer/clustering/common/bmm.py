@@ -160,30 +160,9 @@ class SecondBMMCluster(Cluster):
 
 
 class TwolayerBMM(AbstractMultilayerClustering):
-    def __init__(
-        self,
-        n_clusters: int,
-        n_input_1: int,
-        n_input_2: int,
-        input_1_idx: List[int],
-        input_2_idx: List[int],
-        clusters: Union[List[Cluster], nn.ModuleList] = None,
-        momentum: float = 1.0,
-        n_clusters_per_cluster: int = 5,
-        n_pca_dim: int = None,
-        **kwargs,
-    ):
+    def __init__(self, **kwargs):
         super(TwolayerBMM, self).__init__(
-            n_clusters=n_clusters,
-            n_input_1=n_input_1,
-            n_input_2=n_input_2,
-            input_1_idx=input_1_idx,
-            input_2_idx=input_2_idx,
             algorithm_class=PCABMM,
             second_layer_cluster_class=SecondBMMCluster,
-            clusters=clusters,
-            momentum=momentum,
-            n_clusters_per_cluster=n_clusters_per_cluster,
-            n_pca_dim=n_pca_dim,
             **kwargs,
         )
