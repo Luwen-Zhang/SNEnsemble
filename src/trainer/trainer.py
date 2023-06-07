@@ -711,6 +711,7 @@ class Trainer:
                 once_predictions[program] = predictions
                 for model_name, value in predictions.items():
                     if model_name in programs_predictions[program].keys():
+                        # current_predictions is a reference, so modifications are directly applied to it.
                         current_predictions = programs_predictions[program][model_name]
 
                         def append_once(key):
@@ -821,6 +822,138 @@ class Trainer:
             save_trainer(self)
         return df_leaderboard
 
+    def get_approx_cv_leaderboard(
+        self, leaderboard: pd.DataFrame, save: bool = True
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Calculate approximate average and standard errors based on cross_validation results in the folder
+        ``{self.project_root}/cv``.
+
+        Parameters
+        -------
+        leaderboard
+            A reference leaderboard to be filled by avg and std, and to sort the returned dataframe.
+        save
+            Save returned results locally with names "leaderboard_approx_mean.csv" and "leaderboard_approx_std.csv"
+
+        Returns
+        -------
+        leaderboard_mean
+            Averages in the same format as the input ``leaderboard``. There is an additional column "Rank".
+        leaderboard_std
+            Standard errors in the same format as the input ``leaderboard``. There is an additional column "Rank".
+
+        Notes
+        -------
+        The returned results are approximations of the precise leaderboard from ``get_leaderboard``. Some metrics like
+        RMSE may be different because element-wise and cross-validation-wise averaging are different.
+        """
+        leaderboard_mean = leaderboard.copy()
+        leaderboard_std = leaderboard.copy()
+        leaderboard_mean["Rank"] = np.nan
+        leaderboard_std["Rank"] = np.nan
+        if not os.path.exists(os.path.join(self.project_root, "cv")):
+            warnings.warn(
+                f"Cross validation folder {os.path.join(self.project_root, 'cv')} not found."
+            )
+            leaderboard_mean["Rank"] = leaderboard.index.values + 1
+            leaderboard_std.loc[
+                :, np.setdiff1d(leaderboard_std.columns, ["Program", "Model"])
+            ] = 0
+            return leaderboard_mean, leaderboard_std
+        df_cvs, programs, models, metrics = self._read_cv_leaderboards()
+        modelwise_cv = self.get_modelwise_cv_metrics()
+        for program in programs:
+            program_models = models[program]
+            for model in program_models:
+                res_cv = modelwise_cv[program][model]
+                # If numeric_only=True, only "Rank" is calculated somehow.
+                mean = res_cv[metrics].mean(0, numeric_only=False)
+                std = res_cv[metrics].std(0, numeric_only=False)
+                where_model = leaderboard_std.loc[
+                    (leaderboard_std["Program"] == program)
+                    & (leaderboard_std["Model"] == model)
+                ].index[0]
+                leaderboard_mean.loc[where_model, mean.index] = mean
+                leaderboard_std.loc[where_model, std.index] = std
+        if save:
+            leaderboard_mean.to_csv(
+                os.path.join(self.project_root, "leaderboard_approx_mean.csv"),
+                index=False,
+            )
+            leaderboard_std.to_csv(
+                os.path.join(self.project_root, "leaderboard_approx_std.csv"),
+                index=False,
+            )
+        return leaderboard_mean, leaderboard_std
+
+    def get_modelwise_cv_metrics(self) -> Dict[str, Dict[str, pd.DataFrame]]:
+        """
+        Assemble cross validation results in the folder ``{self.project_root}/cv`` for metrics of each model in each
+        model base.
+
+        Returns
+        -------
+        res_cvs
+            A dict of dicts where each of them contains metrics of cross validations of one model.
+        """
+        df_cvs, programs, models, metrics = self._read_cv_leaderboards()
+        res_cvs = {}
+        for program in programs:
+            res_cvs[program] = {}
+            program_models = models[program]
+            for model in program_models:
+                res_cvs[program][model] = pd.DataFrame(
+                    columns=df_cvs[0].columns, index=np.arange(len(df_cvs))
+                )
+                cv_metrics = np.zeros((len(df_cvs), len(metrics)))
+                for cv_idx, df_cv in enumerate(df_cvs):
+                    where_model = (df_cv["Program"] == program) & (
+                        df_cv["Model"] == model
+                    )
+                    model_metrics = df_cv.loc[where_model][metrics].values.flatten()
+                    cv_metrics[cv_idx, :] = model_metrics
+                res_cvs[program][model].loc[:, metrics] = cv_metrics
+                res_cvs[program][model]["Program"] = program
+                res_cvs[program][model]["Model"] = model
+        return res_cvs
+
+    def _read_cv_leaderboards(
+        self,
+    ) -> Tuple[List[pd.DataFrame], List[str], Dict[str, List[str]], List[str]]:
+        """
+        Read cross validation leaderboards in the folder ``{self.project_root}/cv``.
+
+        Returns
+        -------
+        A list of cross validation leaderboards, a list of model base names, a dict of model names in each model base,
+        and a list of metric names.
+        """
+        if not os.path.exists(os.path.join(self.project_root, "cv")):
+            raise Exception(
+                f"Cross validation folder {os.path.join(self.project_root, 'cv')} not found."
+            )
+        cvs = sorted(
+            [
+                i
+                for i in os.listdir(os.path.join(self.project_root, "cv"))
+                if "leaderboard_cv" in i
+            ]
+        )
+        df_cvs = [
+            pd.read_csv(os.path.join(self.project_root, "cv", cv), index_col=0)
+            for cv in cvs
+        ]
+        programs = list(np.unique(df_cvs[0]["Program"].values))
+        models = {
+            a: list(df_cvs[0].loc[np.where(df_cvs[0]["Program"] == a)[0], "Model"])
+            for a in programs
+        }
+        for df_cv in df_cvs:
+            df_cv["Rank"] = df_cv.index.values + 1
+        metrics = list(np.setdiff1d(df_cvs[0].columns, ["Program", "Model"]))
+        return df_cvs, programs, models, metrics
+
     def _cal_leaderboard(
         self,
         programs_predictions: Dict[
@@ -871,6 +1004,8 @@ class Trainer:
         if save:
             df_leaderboard.to_csv(os.path.join(self.project_root, "leaderboard.csv"))
             self.leaderboard = df_leaderboard
+            if os.path.exists(os.path.join(self.project_root, "cv")):
+                self.get_approx_cv_leaderboard(df_leaderboard, save=True)
         return df_leaderboard
 
     def plot_loss(self, train_ls: Any, val_ls: Any):
