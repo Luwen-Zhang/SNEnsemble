@@ -393,7 +393,6 @@ class AbstractModel:
             Ignored.
         """
         self.trainer.set_status(training=True)
-        data = self._train_data_preprocess()
         self.total_epoch = (
             self.trainer.args["epoch"] if not src.setting["debug_mode"] else 2
         )
@@ -408,6 +407,7 @@ class AbstractModel:
         ):
             if verbose:
                 print(f"Training {model_name}")
+            data = self._train_data_preprocess()
             tmp_params = self._get_params(model_name, verbose=verbose)
             space = self._space(model_name=model_name)
             if self.trainer.args["bayes_opt"] and not warm_start and len(space) > 0:

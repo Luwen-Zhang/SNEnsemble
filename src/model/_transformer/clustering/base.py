@@ -205,7 +205,7 @@ class AbstractMultilayerSNClustering(nn.Module):
             input_2_idx=input_2_idx,
             n_clusters_per_cluster=n_clusters_per_cluster,
             n_pca_dim=n_pca_dim,
-            shared_second_layer_clusters=True,
+            shared_second_layer_clusters=False,
         )
         self.n_clusters = self.clustering.n_total_clusters
         self.sns = nn.ModuleList(

@@ -160,13 +160,8 @@ class KMeans(AbstractClustering):
                     mask[x_cluster, np.arange(len(x_cluster))] = 1.0
                     c_grad = mask @ x / mask.sum(-1).view(-1, 1)
                     c_grad[c_grad != c_grad] = 0  # remove NaNs
-                    if self.adaptive_momentum:
-                        lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
-                        self.accum_n_points_in_clusters[matched_clusters] += counts
-                    else:
-                        lr = self.exp_avg_factor * torch.ones(
-                            self.n_clusters, device=x.device
-                        )
+                    lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
+                    self.accum_n_points_in_clusters[matched_clusters] += counts
                     for i_cluster, cluster in enumerate(self.clusters):
                         cluster.update(
                             c_grad[i_cluster, :], exp_avg_factor=lr[i_cluster]

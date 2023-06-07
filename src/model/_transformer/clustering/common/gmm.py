@@ -146,7 +146,7 @@ class GMM(AbstractClustering):
         covariances: torch.Tensor,
         labels=None,
     ):
-        if self.adaptive_momentum:
+        if self.adaptive_lr:
             matched_clusters, counts = labels.unique(return_counts=True)
             lr = 1 / self.accum_n_points_in_clusters[:, None] * 0.9 + 0.1
             self.accum_n_points_in_clusters[matched_clusters] += counts

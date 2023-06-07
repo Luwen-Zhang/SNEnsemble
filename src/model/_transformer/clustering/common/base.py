@@ -20,7 +20,7 @@ class AbstractClustering(nn.Module):
         cluster_class: Type[AbstractCluster] = None,
         clusters: Union[List[AbstractCluster], nn.ModuleList] = None,
         exp_avg_factor: float = 1.0,
-        adaptive_momentum: bool = True,
+        adaptive_lr: bool = False,
         **kwargs,
     ):
         super(AbstractClustering, self).__init__()
@@ -42,7 +42,7 @@ class AbstractClustering(nn.Module):
             if clusters is None
             else clusters
         )
-        self.adaptive_momentum = adaptive_momentum
+        self.adaptive_lr = adaptive_lr
         self.exp_avg_factor = exp_avg_factor
         self.initialized = False
 
