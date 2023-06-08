@@ -353,7 +353,7 @@ class Trainer:
         df
             The scaled label data.
         """
-        return self.datamodule.feature_data if hasattr(self, "datamodule") else None
+        return self.datamodule.label_data if hasattr(self, "datamodule") else None
 
     @property
     def derived_data(self):
