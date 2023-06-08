@@ -1224,7 +1224,11 @@ class AbstractNN(pl.LightningModule):
         Call optimizer.zero_grad() of the optimizer initialized in `init_optimizer`.
         """
         opt = self.optimizers()
-        opt.zero_grad()
+        if isinstance(opt, list):
+            for o in opt:
+                o.zero_grad()
+        else:
+            opt.zero_grad()
 
     def cal_backward_step(self, loss):
         """
