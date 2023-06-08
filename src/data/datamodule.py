@@ -850,8 +850,14 @@ class DataModule:
         original_length = len(self.df)
 
         with HiddenPrints(disable_std=not verbose):
+            if np.all(self.train_indices == self.val_indices):
+                df_training = self.df.loc[list(self.train_indices), :]
+            else:
+                df_training = self.df.loc[
+                    list(self.train_indices) + list(self.val_indices), :
+                ]
             unscaled_training_data = self._data_preprocess(
-                self.df.loc[list(self.train_indices) + list(self.val_indices), :],
+                df_training,
                 warm_start=warm_start,
                 skip_scaler=True,
             )
