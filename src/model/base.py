@@ -1243,6 +1243,27 @@ class AbstractNN(pl.LightningModule):
         opt = self.optimizers()
         opt.step()
 
+    def set_requires_grad(
+        self, model: nn.Module, requires_grad: bool = None, state=None
+    ):
+        if (requires_grad is None and state is None) or (
+            requires_grad is not None and state is not None
+        ):
+            raise Exception(
+                f"One of `requires_grad` and `state` should be specified to determine the action. If `requires_grad` is "
+                f"not None, requires_grad of all parameters in the model is set. If state is not None, state of "
+                f"requires_grad in the model is restored."
+            )
+        if state is not None:
+            for s, param in zip(state, model.parameters()):
+                param.requires_grad_(s)
+        else:
+            state = []
+            for param in model.parameters():
+                state.append(param.requires_grad)
+                param.requires_grad_(requires_grad)
+            return state
+
 
 class ModelDict:
     def __init__(self, path):
