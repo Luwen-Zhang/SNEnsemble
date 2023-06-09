@@ -103,7 +103,7 @@ class AbstractSNClustering(nn.Module):
         self.resp = resp
         self.nk = nk
 
-        # Calculate SN results in each cluster
+        # Calculate SN results in each cluster in parallel through vectorization.
         x_sn = torch.concat([sn(s, x_cluster).unsqueeze(-1) for sn in self.sns], dim=1)
         # Weighted sum of SN predictions
         self.ridge_input = x_sn

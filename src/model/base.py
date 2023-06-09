@@ -401,13 +401,12 @@ class AbstractModel:
                 self.model = ModelDict(path=self.root)
             else:
                 self.model = {}
-
+        data = self._train_data_preprocess()
         for model_name in (
             self.get_model_names() if model_subset is None else model_subset
         ):
             if verbose:
                 print(f"Training {model_name}")
-            data = self._train_data_preprocess()
             tmp_params = self._get_params(model_name, verbose=verbose)
             space = self._space(model_name=model_name)
             if self.trainer.args["bayes_opt"] and not warm_start and len(space) > 0:
