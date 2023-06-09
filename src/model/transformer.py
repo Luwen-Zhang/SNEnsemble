@@ -101,6 +101,7 @@ class Transformer(TorchModel):
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
                 **fix_kwargs,
+                embedding_dim=3,
                 **kwargs,
             )
         elif model_name in [
