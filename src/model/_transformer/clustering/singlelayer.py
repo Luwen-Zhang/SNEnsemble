@@ -5,15 +5,20 @@ from .base import AbstractSNClustering
 
 
 class GMMSN(AbstractSNClustering):
-    def __init__(self, **kwargs):
-        super(GMMSN, self).__init__(algorithm_class=PCAGMM, **kwargs)
+    def __init__(self, n_clusters: int, n_input: int, n_pca_dim: int = None, **kwargs):
+        clustering = PCAGMM(n_clusters=n_clusters, n_input=n_input, n_pca_dim=n_pca_dim)
+        super(GMMSN, self).__init__(clustering=clustering, **kwargs)
 
 
 class BMMSN(AbstractSNClustering):
-    def __init__(self, **kwargs):
-        super(BMMSN, self).__init__(algorithm_class=PCABMM, **kwargs)
+    def __init__(self, n_clusters: int, n_input: int, n_pca_dim: int = None, **kwargs):
+        clustering = PCABMM(n_clusters=n_clusters, n_input=n_input, n_pca_dim=n_pca_dim)
+        super(BMMSN, self).__init__(clustering=clustering, **kwargs)
 
 
 class KMeansSN(AbstractSNClustering):
-    def __init__(self, **kwargs):
-        super(KMeansSN, self).__init__(algorithm_class=PCAKMeans, **kwargs)
+    def __init__(self, n_clusters: int, n_input: int, n_pca_dim: int = None, **kwargs):
+        clustering = PCAKMeans(
+            n_clusters=n_clusters, n_input=n_input, n_pca_dim=n_pca_dim
+        )
+        super(KMeansSN, self).__init__(clustering=clustering, **kwargs)

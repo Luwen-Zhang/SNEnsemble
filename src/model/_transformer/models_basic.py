@@ -44,12 +44,15 @@ class CategoryEmbeddingNN(AbstractNN):
             n_outputs=n_outputs,
             nonlinearity="relu",
         )
+        self.hidden_rep_dim = 32
+        self.hidden_representation = None
 
     def _forward(
         self, x: torch.Tensor, derived_tensors: Dict[str, torch.Tensor]
     ) -> torch.Tensor:
         x_embed = self.embed(x, derived_tensors)
         output = self.linear(x_embed)
+        self.hidden_representation = output
         output = self.head(output)
         return output
 
@@ -82,8 +85,11 @@ class FTTransformerNN(AbstractNN):
             dropout=self.hparams.attn_dropout,
             n_outputs=n_outputs,
         )
+        self.hidden_rep_dim = self.embed_transformer.hidden_rep_dim
+        self.hidden_representation = None
 
     def _forward(self, x, derived_tensors):
         x_embed = self.embed(x, derived_tensors)
         x_trans = self.embed_transformer(x_embed, derived_tensors)
+        self.hidden_representation = self.embed_transformer.hidden_representation
         return x_trans

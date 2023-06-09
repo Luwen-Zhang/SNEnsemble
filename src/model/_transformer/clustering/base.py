@@ -2,25 +2,86 @@ import sys
 import torch
 from torch import nn
 import inspect
-import torch.nn.functional as F
-from src.model.base import get_sequential
-from .common.base import (
-    AbstractClustering,
-    AbstractMultilayerClustering,
-)
-from typing import Type, List
+from src.model.base import get_sequential, get_linear
+from .common.base import AbstractClustering
 
 
-class SNMarker(nn.Module):
-    def __init__(self):
-        super(SNMarker, self).__init__()
-        self.activ = F.softplus
-        self.register_buffer("running_weight_a", torch.tensor([0.0]))
-        self.register_buffer("running_weight_b", torch.tensor([0.0]))
-        self.register_buffer("running_approx_a", torch.tensor([1.0]))
-        self.register_buffer("running_approx_b", torch.tensor([5.0]))
-        self.exp_avg_factor = 0.1
-        self.weight = 1e-1
+class AbstractSN(nn.Module):
+    def __init__(self, **kwargs):
+        super(AbstractSN, self).__init__()
+        self.activ = torch.abs
+        self._register_params(**kwargs)
+        self.lstsq_input = None
+        self.lstsq_output = None
+
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.ones(n_clusters))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 5))
+
+    def _linear(self, s, x_cluster):
+        self.lstsq_input = s
+        self.lstsq_output = -torch.mul(self.activ(self.a[x_cluster]), s) + self.activ(
+            self.b[x_cluster]
+        )
+        return self.lstsq_output
+
+
+class LinLog(AbstractSN):
+    def forward(self, s: torch.Tensor, x_cluster: torch.Tensor):
+        s = torch.abs(s)
+        return self._linear(s, x_cluster)
+
+
+class LogLog(AbstractSN):
+    def forward(self, s: torch.Tensor, x_cluster: torch.Tensor):
+        s = torch.clamp(torch.abs(s), min=1e-8)
+        log_s = torch.log10(torch.add(s, 1))
+        return self._linear(log_s, x_cluster)
+
+
+available_sn = []
+for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
+    if issubclass(cls, AbstractSN) and cls != AbstractSN:
+        available_sn.append(cls)
+
+
+def get_sns(**kwargs):
+    sns = nn.ModuleList([i(**kwargs) for i in available_sn])
+    return sns
+
+
+class AbstractSNClustering(nn.Module):
+    def __init__(
+        self, layers, hidden_rep_dim: int, clustering: AbstractClustering, **kwargs
+    ):
+        super(AbstractSNClustering, self).__init__()
+        self.clustering = clustering
+        self.n_clusters = self.clustering.n_total_clusters
+        self.tune_head = get_linear(
+            n_inputs=hidden_rep_dim, n_outputs=1, nonlinearity="relu"
+        )
+        # self.tune_head = get_sequential(
+        #     [128, 64, 32],
+        #     n_inputs=hidden_rep_dim,
+        #     n_outputs=1,
+        #     use_norm=False,
+        #     act_func=nn.ReLU,
+        # )
+        self.sns = get_sns(n_clusters=self.n_clusters)
+
+        self.weight = 0.1
+        self.exp_avg_factor = 0.8
+        # Solved by exponential averaging
+        self.register_buffer(
+            "running_tune_weight", torch.mul(torch.ones(self.n_clusters), self.weight)
+        )
+        # Solved by logistic regression
+        self.running_sn_weight = nn.Parameter(
+            torch.mul(torch.ones((self.n_clusters, len(self.sns))), 1 / len(self.sns))
+        )
+        self.ridge_input = None
+        self.ridge_output = None
+        self.x_cluster = None
 
     def _update(self, value, name):
         if self.training:
@@ -35,207 +96,48 @@ class SNMarker(nn.Module):
         else:
             return getattr(self, name)
 
-    def _linear(self, s, n, a, b):
-        X = torch.concat([s, torch.ones_like(s)], dim=1)
-        approx_a, approx_b = torch.linalg.lstsq(X.T @ X, X.T @ n).solution
-        running_approx_a = self._update(-approx_a, "running_approx_a")
-        running_approx_b = self._update(approx_b, "running_approx_b")
-        weight_a = self._update(
-            running_approx_a / (torch.mean(a) + 1e-8) * self.weight, "running_weight_a"
-        )
-        weight_b = self._update(
-            running_approx_b / (torch.mean(b) + 1e-8) * self.weight, "running_weight_b"
-        )
-        a = -a * weight_a - running_approx_a * (1 - weight_a)
-        b = b * weight_b + running_approx_b * (1 - weight_b)
-        return a * s + b
+    def forward(self, x, s, hidden):
+        # Projection from hidden output to SN weights and tuning output
+        x_tune = self.tune_head(hidden)
 
+        # Clustering
+        x_cluster = self.clustering(x)
+        resp = torch.zeros((x.shape[0], self.n_clusters), device=x.device)
+        resp[torch.arange(x.shape[0]), x_cluster] = 1
+        nk = torch.add(torch.sum(resp, dim=0), 1e-12)
+        self.x_cluster = x_cluster
+        self.resp = resp
+        self.nk = nk
 
-class LinLog(SNMarker):
-    def __init__(self):
-        super(LinLog, self).__init__()
-        self.n_coeff = 2
-
-    def forward(
-        self,
-        s: torch.Tensor,
-        coeff: torch.Tensor,
-        naive_pred: torch.Tensor,
-    ):
-        s = torch.abs(s)
-        a, b = coeff.chunk(self.n_coeff, 1)
-        a, b = self.activ(a), self.activ(b)
-        return self._linear(s, naive_pred, a, b)
-
-
-class LogLog(SNMarker):
-    def __init__(self):
-        super(LogLog, self).__init__()
-        self.n_coeff = 2
-
-    def forward(
-        self,
-        s: torch.Tensor,
-        coeff: torch.Tensor,
-        naive_pred: torch.Tensor,
-    ):
-        s = torch.clamp(torch.abs(s), min=1e-8)
-        log_s = torch.log10(s)
-        a, b = coeff.chunk(self.n_coeff, 1)
-        a, b = self.activ(a), self.activ(b)
-        return self._linear(log_s, naive_pred, a, b)
-
-
-available_sn = []
-for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
-    if issubclass(cls, SNMarker) and cls != SNMarker:
-        available_sn.append(cls)
-
-
-def get_sns():
-    sns = nn.ModuleList([i() for i in available_sn])
-    return sns
-
-
-n_coeff_ls = [sn.n_coeff for sn in get_sns()]
-proj_dims = [sum(n_coeff_ls), len(n_coeff_ls)]
-proj_dim = sum(n_coeff_ls) + len(n_coeff_ls)
-
-
-class SN(nn.Module):
-    def __init__(self, n_cluster_features, layers, *args, **kwargs):
-        super(SN, self).__init__()
-        self.sns = get_sns()
-        self.n_coeff_ls = n_coeff_ls
-        self.proj_dim = proj_dim
-        self.proj_dims = proj_dims
-        self.coeff_head = get_sequential(
-            layers=[32],
-            n_inputs=self.proj_dim,
-            n_outputs=self.proj_dim,
-            act_func=nn.ReLU,
-        )
-
-    def forward(self, x, s, naive_pred, coeffs_proj):
-        coeffs_proj = self.coeff_head(coeffs_proj) + coeffs_proj
-        sn_coeffs, sn_weights = coeffs_proj.split(self.proj_dims, dim=1)
-        sn_coeffs = sn_coeffs.split(self.n_coeff_ls, dim=1)
-        x_sn = torch.concat(
-            [
-                sn(s.view(-1, 1), coeff, naive_pred)
-                for sn, coeff in zip(self.sns, sn_coeffs)
-            ],
-            dim=1,
-        )
-        x_sn = torch.mul(
-            x_sn,
-            nn.functional.normalize(
-                torch.abs(sn_weights),
-                p=1,
-                dim=1,
-            ),
-        )
+        # Calculate SN results in each cluster
+        x_sn = torch.concat([sn(s, x_cluster).unsqueeze(-1) for sn in self.sns], dim=1)
+        # Weighted sum of SN predictions
+        self.ridge_input = x_sn
+        x_sn = torch.mul(x_sn, self.running_sn_weight[x_cluster, :])
         x_sn = torch.sum(x_sn, dim=1).view(-1, 1)
-        return x_sn
+        self.ridge_output = x_sn.flatten()
 
-
-class AbstractSNClustering(nn.Module):
-    def __init__(
-        self,
-        n_clusters: int,
-        n_input: int,
-        layers,
-        algorithm_class: Type[AbstractClustering],
-        n_pca_dim: int = None,
-    ):
-        super(AbstractSNClustering, self).__init__()
-        self.n_clusters = n_clusters
-        self.clustering = algorithm_class(
-            n_clusters=n_clusters, n_input=n_input, n_pca_dim=n_pca_dim
-        )
-        self.sns = nn.ModuleList(
-            [SN(n_cluster_features=n_input, layers=layers) for i in range(n_clusters)]
-        )
-        self.n_coeff_ls = n_coeff_ls
-        self.proj_dim = proj_dim
-        self.coeff_head = get_sequential(
-            layers=layers,
-            n_inputs=1 + n_input,
-            n_outputs=self.proj_dim,
-            act_func=nn.ReLU,
-        )
-
-    def forward(self, x, s, naive_pred):
-        coeffs_proj = self.coeff_head(torch.cat([x, naive_pred], dim=1)) + naive_pred
-        x_cluster = self.clustering(x)
-        out = naive_pred.clone()
-        for i_cluster in range(self.n_clusters):
-            idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
-            if len(idx_in_cluster) >= 2:
-                pred = self.sns[i_cluster](
-                    x[idx_in_cluster, :],
-                    s[idx_in_cluster],
-                    naive_pred[idx_in_cluster, :],
-                    coeffs_proj[idx_in_cluster, :],
+        # Calculate mean prediction and tuning in each cluster
+        if self.training:
+            with torch.no_grad():
+                mean_pred_clusters = torch.flatten(
+                    torch.matmul(resp.T, x_sn) / nk.unsqueeze(-1)
                 )
-                out[idx_in_cluster] = pred
-
-        return out
-
-
-class AbstractMultilayerSNClustering(nn.Module):
-    def __init__(
-        self,
-        n_clusters: int,
-        n_input_1: int,
-        n_input_2: int,
-        input_1_idx: List[int],
-        input_2_idx: List[int],
-        layers,
-        algorithm_class: Type[AbstractMultilayerClustering],
-        n_clusters_per_cluster: int = 5,
-        n_pca_dim: int = None,
-    ):
-        super(AbstractMultilayerSNClustering, self).__init__()
-        self.clustering = algorithm_class(
-            n_clusters=n_clusters,
-            n_input_1=n_input_1,
-            n_input_2=n_input_2,
-            input_1_idx=input_1_idx,
-            input_2_idx=input_2_idx,
-            n_clusters_per_cluster=n_clusters_per_cluster,
-            n_pca_dim=n_pca_dim,
-            shared_second_layer_clusters=False,
+                estimate_weight = torch.mul(mean_pred_clusters, self.weight)
+                # Not updating if no data point in this cluster.
+                invalid_weight = nk < 1
+                estimate_weight[invalid_weight] = self.running_tune_weight[
+                    invalid_weight
+                ]
+                # Exponential averaging update
+                tune_weight = self._update(estimate_weight, "running_tune_weight")[
+                    x_cluster
+                ]
+        else:
+            tune_weight = self.running_tune_weight[x_cluster]
+        # Weighted sum of prediction and tuning
+        # out = x_sn + torch.mul(x_tune, tune_weight.view(-1, 1))
+        out = x_sn + torch.mul(
+            (torch.sigmoid(x_tune) - 0.5) * 2, tune_weight.view(-1, 1)
         )
-        self.n_clusters = self.clustering.n_total_clusters
-        self.sns = nn.ModuleList(
-            [
-                SN(n_cluster_features=self.clustering.n_input, layers=layers)
-                for i in range(self.n_clusters)
-            ]
-        )
-        self.n_coeff_ls = n_coeff_ls
-        self.proj_dim = proj_dim
-        self.coeff_head = get_sequential(
-            layers=layers,
-            n_inputs=1 + self.clustering.n_input,
-            n_outputs=proj_dim,
-            act_func=nn.ReLU,
-        )
-
-    def forward(self, x, s, naive_pred):
-        coeffs_proj = self.coeff_head(torch.cat([x, naive_pred], dim=1)) + naive_pred
-        x_cluster = self.clustering(x)
-        out = naive_pred.clone()
-        for i_cluster in range(self.n_clusters):
-            idx_in_cluster = torch.where(x_cluster == i_cluster)[0]
-            if len(idx_in_cluster) >= 2:
-                pred = self.sns[i_cluster](
-                    x[idx_in_cluster, :],
-                    s[idx_in_cluster],
-                    naive_pred[idx_in_cluster, :],
-                    coeffs_proj[idx_in_cluster, :],
-                )
-                out[idx_in_cluster] = pred
-
         return out

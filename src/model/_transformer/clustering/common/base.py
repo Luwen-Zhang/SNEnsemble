@@ -24,6 +24,7 @@ class AbstractClustering(nn.Module):
         **kwargs,
     ):
         super(AbstractClustering, self).__init__()
+        self.n_total_clusters = n_clusters
         self.n_clusters = n_clusters
         self.n_input = n_input
         if clusters is None and cluster_class is None:

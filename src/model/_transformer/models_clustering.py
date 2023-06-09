@@ -4,6 +4,7 @@ from ..base import AbstractNN
 import numpy as np
 from .clustering.singlelayer import KMeansSN, GMMSN, BMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN, TwolayerBMMSN
+import torch
 
 
 class AbstractClusteringModel(AbstractNN):
@@ -14,7 +15,8 @@ class AbstractClusteringModel(AbstractNN):
         clustering_features,
         clustering_sn_model,
         cont_cat_model,
-        **kwargs
+        ridge_penalty: float = 0.0,
+        **kwargs,
     ):
         super(AbstractClusteringModel, self).__init__(trainer, **kwargs)
         if n_outputs != 1:
@@ -22,28 +24,89 @@ class AbstractClusteringModel(AbstractNN):
         self.clustering_features = clustering_features
         self.clustering_sn_model = clustering_sn_model
         self.cont_cat_model = cont_cat_model
+        if not hasattr(self.cont_cat_model, "hidden_representation") or not hasattr(
+            self.cont_cat_model, "hidden_rep_dim"
+        ):
+            raise Exception(
+                f"The backbone should have an attribute called `hidden_representation` that records the "
+                f"final output of the hidden layer, and `hidden_rep_dim` that records the dim of "
+                f"`hidden_representation`."
+            )
         self.s_zero_slip = trainer.datamodule.get_zero_slip("Relative Maximum Stress")
         self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
+        self.ridge_penalty = ridge_penalty
 
     def _forward(self, x, derived_tensors):
         naive_pred = self.cont_cat_model(x, derived_tensors)
         self._naive_pred = naive_pred
+        hidden = self.cont_cat_model.hidden_representation
         s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
         x_out = self.clustering_sn_model(
-            x[:, self.clustering_features], s_wo_bias, naive_pred
+            x[:, self.clustering_features], s_wo_bias, hidden
         )
         return x_out
 
     def loss_fn(self, y_true, y_pred, *data, **kwargs):
         self.naive_pred_loss = self.default_loss_fn(self._naive_pred, y_true)
         self.output_loss = self.default_loss_fn(y_pred, y_true)
+        sum_weight = self.clustering_sn_model.nk[self.clustering_sn_model.x_cluster]
+        self.lstsq_loss = torch.sum(
+            torch.concat(
+                [
+                    torch.sum(
+                        0.5 * (y_true.flatten() - sn.lstsq_output) ** 2 / sum_weight
+                    ).unsqueeze(-1)
+                    for sn in self.clustering_sn_model.sns
+                ]
+            )
+        )
+        ridge_weight = self.clustering_sn_model.running_sn_weight
+        self.ridge_loss = torch.sum(
+            0.5
+            * (y_true.flatten() - self.clustering_sn_model.ridge_output) ** 2
+            / sum_weight
+        ) + torch.mul(
+            torch.sum(torch.mul(ridge_weight, ridge_weight)), self.ridge_penalty
+        )
         return self.output_loss
 
+    def configure_optimizers(self):
+        all_optimizer = torch.optim.Adam(
+            list(self.cont_cat_model.parameters())
+            + list(self.clustering_sn_model.tune_head.parameters()),
+            lr=self.hparams.lr,
+            weight_decay=self.hparams.weight_decay,
+        )
+        regression_optimizer = torch.optim.Adam(
+            list(self.clustering_sn_model.sns.parameters())
+            + [self.clustering_sn_model.running_sn_weight],
+            lr=0.8,
+            weight_decay=0,
+        )
+        return [all_optimizer, regression_optimizer]
+
     def cal_backward_step(self, loss):
+        optimizers = self.optimizers()
+        all_optimizer = optimizers[0]
+        regression_optimizer = optimizers[1]
         self.manual_backward(self.output_loss, retain_graph=True)
         self.cont_cat_model.zero_grad()
-        self.manual_backward(self.naive_pred_loss)
-        self.optimizers().step()
+        self.clustering_sn_model.sns.zero_grad()
+        if self.clustering_sn_model.running_sn_weight.grad is not None:
+            self.clustering_sn_model.running_sn_weight.grad.zero_()
+        self.manual_backward(self.naive_pred_loss, retain_graph=True)
+        all_optimizer.step()
+        self.manual_backward(
+            self.ridge_loss,
+            retain_graph=True,
+            inputs=self.clustering_sn_model.running_sn_weight,
+        )
+        self.clustering_sn_model.sns.zero_grad()
+        self.manual_backward(
+            self.lstsq_loss,
+            inputs=list(self.clustering_sn_model.sns.parameters()),
+        )
+        regression_optimizer.step()
 
     @staticmethod
     def basic_clustering_features_idx(trainer) -> np.ndarray:
@@ -56,7 +119,7 @@ class AbstractClusteringModel(AbstractNN):
 
     @staticmethod
     def top_clustering_features_idx(trainer):
-        return AbstractClusteringModel.basic_clustering_features_idx(trainer)[:-2]
+        return AbstractClusteringModel.basic_clustering_features_idx(trainer)[:-1]
 
 
 class SNTransformerLRKMeansNN(AbstractClusteringModel):
@@ -68,7 +131,7 @@ class SNTransformerLRKMeansNN(AbstractClusteringModel):
         trainer,
         n_clusters,
         n_pca_dim: int = None,
-        **kwargs
+        **kwargs,
     ):
         clustering_features = self.basic_clustering_features_idx(trainer)
         transformer = FTTransformerNN(
@@ -82,6 +145,7 @@ class SNTransformerLRKMeansNN(AbstractClusteringModel):
             n_input=len(clustering_features),
             layers=layers,
             n_pca_dim=n_pca_dim,
+            hidden_rep_dim=transformer.hidden_rep_dim,
         )
         super(SNTransformerLRKMeansNN, self).__init__(
             n_outputs=n_outputs,
@@ -102,7 +166,7 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
         trainer,
         n_clusters,
         n_pca_dim: int = None,
-        **kwargs
+        **kwargs,
     ):
         clustering_features = self.basic_clustering_features_idx(trainer)
         catembed = CategoryEmbeddingNN(
@@ -116,6 +180,7 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
             n_input=len(clustering_features),
             layers=layers,
             n_pca_dim=n_pca_dim,
+            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLRKMeansNN, self).__init__(
             n_outputs=n_outputs,
@@ -136,7 +201,7 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
         trainer,
         n_clusters,
         n_pca_dim: int = None,
-        **kwargs
+        **kwargs,
     ):
         clustering_features = self.basic_clustering_features_idx(trainer)
         catembed = CatEmbedSeqNN(
@@ -151,6 +216,7 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
             n_input=len(clustering_features),
             layers=layers,
             n_pca_dim=n_pca_dim,
+            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLRKMeansSeqNN, self).__init__(
             n_outputs=n_outputs,
@@ -178,6 +244,7 @@ class SNCatEmbedLRGMMNN(AbstractClusteringModel):
             n_input=len(clustering_features),
             layers=layers,
             n_pca_dim=n_pca_dim,
+            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLRGMMNN, self).__init__(
             n_outputs=n_outputs,
@@ -205,6 +272,7 @@ class SNCatEmbedLRBMMNN(AbstractClusteringModel):
             n_input=len(clustering_features),
             layers=layers,
             n_pca_dim=n_pca_dim,
+            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLRBMMNN, self).__init__(
             n_outputs=n_outputs,
@@ -225,7 +293,7 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
         trainer,
         n_clusters,
         n_pca_dim: int = None,
-        **kwargs
+        **kwargs,
     ):
         clustering_features = list(self.basic_clustering_features_idx(trainer))
         top_level_clustering_features = self.top_clustering_features_idx(trainer)
@@ -250,6 +318,7 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
             layers=layers,
             n_clusters_per_cluster=5,
             n_pca_dim=n_pca_dim,
+            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLR2LGMMNN, self).__init__(
             n_outputs=n_outputs,
@@ -270,7 +339,7 @@ class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
         trainer,
         n_clusters,
         n_pca_dim: int = None,
-        **kwargs
+        **kwargs,
     ):
         clustering_features = list(self.basic_clustering_features_idx(trainer))
         top_level_clustering_features = self.top_clustering_features_idx(trainer)
@@ -295,6 +364,7 @@ class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
             layers=layers,
             n_clusters_per_cluster=5,
             n_pca_dim=n_pca_dim,
+            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLR2LKMeansNN, self).__init__(
             n_outputs=n_outputs,
@@ -315,7 +385,7 @@ class SNCatEmbedLR2LBMMNN(AbstractClusteringModel):
         trainer,
         n_clusters,
         n_pca_dim: int = None,
-        **kwargs
+        **kwargs,
     ):
         clustering_features = list(self.basic_clustering_features_idx(trainer))
         top_level_clustering_features = self.top_clustering_features_idx(trainer)
@@ -338,8 +408,9 @@ class SNCatEmbedLR2LBMMNN(AbstractClusteringModel):
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
             layers=layers,
-            n_clusters_per_cluster=5,
+            n_clusters_per_cluster=10,
             n_pca_dim=n_pca_dim,
+            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLR2LBMMNN, self).__init__(
             n_outputs=n_outputs,
