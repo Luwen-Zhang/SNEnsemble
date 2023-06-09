@@ -89,23 +89,40 @@ class AbstractClusteringModel(AbstractNN):
         optimizers = self.optimizers()
         all_optimizer = optimizers[0]
         regression_optimizer = optimizers[1]
-        self.manual_backward(self.output_loss, retain_graph=True)
-        self.cont_cat_model.zero_grad()
-        self.clustering_sn_model.sns.zero_grad()
-        if self.clustering_sn_model.running_sn_weight.grad is not None:
-            self.clustering_sn_model.running_sn_weight.grad.zero_()
-        self.manual_backward(self.naive_pred_loss, retain_graph=True)
-        all_optimizer.step()
+        # The following commented zero_grad() operations are not necessary because `inputs`s are specified and no other
+        # gradient is calculated.
+        # 1st back-propagation: for deep learning weights.
+        self.manual_backward(
+            self.output_loss,
+            retain_graph=True,
+            inputs=list(self.clustering_sn_model.tune_head.parameters()),
+        )
+        # self.cont_cat_model.zero_grad()
+        # self.clustering_sn_model.sns.zero_grad()
+        # if self.clustering_sn_model.running_sn_weight.grad is not None:
+        #     self.clustering_sn_model.running_sn_weight.grad.zero_()
+
+        # 2nd back-propagation: for Ridge regression.
         self.manual_backward(
             self.ridge_loss,
             retain_graph=True,
             inputs=self.clustering_sn_model.running_sn_weight,
         )
-        self.clustering_sn_model.sns.zero_grad()
+        # self.cont_cat_model.zero_grad()
+        # self.clustering_sn_model.sns.zero_grad()
+
+        # 3rd back-propagation: for Least Square.
         self.manual_backward(
             self.lstsq_loss,
             inputs=list(self.clustering_sn_model.sns.parameters()),
+            retain_graph=True,
         )
+        # self.cont_cat_model.zero_grad()
+
+        # 4th back-propagation: for deep learning backbones.
+        self.manual_backward(self.naive_pred_loss)
+
+        all_optimizer.step()
         regression_optimizer.step()
 
     @staticmethod
