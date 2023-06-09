@@ -60,21 +60,15 @@ class AbstractSNClustering(nn.Module):
         self.tune_head = get_linear(
             n_inputs=hidden_rep_dim, n_outputs=1, nonlinearity="relu"
         )
-        # self.tune_head = get_sequential(
-        #     [128, 64, 32],
-        #     n_inputs=hidden_rep_dim,
-        #     n_outputs=1,
-        #     use_norm=False,
-        #     act_func=nn.ReLU,
-        # )
+        self.tune_head_normalize = nn.Sigmoid()
         self.sns = get_sns(n_clusters=self.n_clusters)
 
-        self.weight = 0.1
-        self.exp_avg_factor = 0.8
-        # Solved by exponential averaging
-        self.register_buffer(
-            "running_tune_weight", torch.mul(torch.ones(self.n_clusters), self.weight)
-        )
+        # self.weight = 0.8
+        # self.exp_avg_factor = 0.8
+        # # Solved by exponential averaging
+        # self.register_buffer(
+        #     "running_tune_weight", torch.mul(torch.ones(self.n_clusters), self.weight)
+        # )
         # Solved by logistic regression
         self.running_sn_weight = nn.Parameter(
             torch.mul(torch.ones((self.n_clusters, len(self.sns))), 1 / len(self.sns))
@@ -83,22 +77,22 @@ class AbstractSNClustering(nn.Module):
         self.ridge_output = None
         self.x_cluster = None
 
-    def _update(self, value, name):
-        if self.training:
-            with torch.no_grad():
-                setattr(
-                    self,
-                    name,
-                    self.exp_avg_factor * value
-                    + (1 - self.exp_avg_factor) * getattr(self, name),
-                )
-            return value
-        else:
-            return getattr(self, name)
+    # def _update(self, value, name):
+    #     if self.training:
+    #         with torch.no_grad():
+    #             setattr(
+    #                 self,
+    #                 name,
+    #                 self.exp_avg_factor * value
+    #                 + (1 - self.exp_avg_factor) * getattr(self, name),
+    #             )
+    #         return value
+    #     else:
+    #         return getattr(self, name)
 
-    def forward(self, x, s, hidden):
+    def forward(self, x, s, hidden, naive_pred):
         # Projection from hidden output to SN weights and tuning output
-        x_tune = self.tune_head(hidden)
+        x_tune = self.tune_head_normalize(self.tune_head(hidden))
 
         # Clustering
         x_cluster = self.clustering(x)
@@ -118,26 +112,23 @@ class AbstractSNClustering(nn.Module):
         self.ridge_output = x_sn.flatten()
 
         # Calculate mean prediction and tuning in each cluster
-        if self.training:
-            with torch.no_grad():
-                mean_pred_clusters = torch.flatten(
-                    torch.matmul(resp.T, x_sn) / nk.unsqueeze(-1)
-                )
-                estimate_weight = torch.mul(mean_pred_clusters, self.weight)
-                # Not updating if no data point in this cluster.
-                invalid_weight = nk < 1
-                estimate_weight[invalid_weight] = self.running_tune_weight[
-                    invalid_weight
-                ]
-                # Exponential averaging update
-                tune_weight = self._update(estimate_weight, "running_tune_weight")[
-                    x_cluster
-                ]
-        else:
-            tune_weight = self.running_tune_weight[x_cluster]
+        # if self.training:
+        #     with torch.no_grad():
+        #         mean_pred_clusters = torch.flatten(
+        #             torch.matmul(resp.T, x_sn) / nk.unsqueeze(-1)
+        #         )
+        #         estimate_weight = torch.mul(mean_pred_clusters, self.weight)
+        #         # Not updating if no data point in this cluster.
+        #         invalid_weight = nk < 1
+        #         estimate_weight[invalid_weight] = self.running_tune_weight[
+        #             invalid_weight
+        #         ]
+        #         # Exponential averaging update
+        #         tune_weight = self._update(estimate_weight, "running_tune_weight")[
+        #             x_cluster
+        #         ]
+        # else:
+        #     tune_weight = self.running_tune_weight[x_cluster]
         # Weighted sum of prediction and tuning
-        # out = x_sn + torch.mul(x_tune, tune_weight.view(-1, 1))
-        out = x_sn + torch.mul(
-            (torch.sigmoid(x_tune) - 0.5) * 2, tune_weight.view(-1, 1)
-        )
+        out = x_sn + torch.mul(x_tune, naive_pred - x_sn)
         return out

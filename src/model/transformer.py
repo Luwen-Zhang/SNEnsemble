@@ -125,6 +125,7 @@ class Transformer(TorchModel):
             )
             return cls(
                 **fix_kwargs,
+                embedding_dim=3,
                 n_pca_dim=n_pca_dim,
                 **kwargs,
             )
@@ -231,11 +232,11 @@ class Transformer(TorchModel):
             "SNCatEmbedLR2LPCABMM",
         ]:
             return [
-                Integer(
-                    low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
-                ),
+                # Integer(
+                #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
+                # ),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Integer(low=2, high=16, prior="uniform", name="n_clusters", dtype=int),
+                Integer(low=2, high=64, prior="uniform", name="n_clusters", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
             ] + self.trainer.SPACE
         elif model_name in ["SNCatEmbedLRKMeansSeq"]:
@@ -337,9 +338,9 @@ class Transformer(TorchModel):
             "SNCatEmbedLR2LPCABMM",
         ]:
             res = {
-                "embedding_dim": 3,
+                # "embedding_dim": 3,
                 "embed_dropout": 0.1,
-                "n_clusters": 5,
+                "n_clusters": 16,
                 "mlp_dropout": 0.0,
             }
         elif model_name in [

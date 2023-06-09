@@ -42,7 +42,7 @@ class AbstractClusteringModel(AbstractNN):
         hidden = self.cont_cat_model.hidden_representation
         s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
         x_out = self.clustering_sn_model(
-            x[:, self.clustering_features], s_wo_bias, hidden
+            x[:, self.clustering_features], s_wo_bias, hidden, naive_pred
         )
         return x_out
 

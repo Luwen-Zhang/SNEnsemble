@@ -25,7 +25,7 @@ class TwolayerGMMSN(AbstractSNClustering):
             input_2_idx=input_2_idx,
             n_clusters_per_cluster=n_clusters_per_cluster,
             n_pca_dim=n_pca_dim,
-            shared_second_layer_clusters=False,
+            shared_second_layer_clusters=True,
         )
         super(TwolayerGMMSN, self).__init__(clustering=clustering, **kwargs)
 
@@ -50,7 +50,7 @@ class TwolayerBMMSN(AbstractSNClustering):
             input_2_idx=input_2_idx,
             n_clusters_per_cluster=n_clusters_per_cluster,
             n_pca_dim=n_pca_dim,
-            shared_second_layer_clusters=False,
+            shared_second_layer_clusters=True,
         )
         super(TwolayerBMMSN, self).__init__(clustering=clustering, **kwargs)
 
@@ -75,6 +75,6 @@ class TwolayerKMeansSN(AbstractSNClustering):
             input_2_idx=input_2_idx,
             n_clusters_per_cluster=n_clusters_per_cluster,
             n_pca_dim=n_pca_dim,
-            shared_second_layer_clusters=False,
+            shared_second_layer_clusters=True,
         )
         super(TwolayerKMeansSN, self).__init__(clustering=clustering, **kwargs)
