@@ -62,6 +62,7 @@ class TestClustering(unittest.TestCase):
                 n_input=n_features,
                 init_method="kmeans",
                 adaptive_momentum=False,
+                on_cpu=device == "cpu",
             ).to(device)
             data = get_data(n_clusters, n_features, n_each_cluster, seed)
             t = torch.tensor(data, device=device, dtype=dt)
@@ -219,6 +220,7 @@ class TestClustering(unittest.TestCase):
                 n_input=n_features,
                 init_method="kmeans",
                 adaptive_momentum=False,
+                on_cpu=device == "cpu",
             ).to(device)
             data = get_data(n_clusters, n_features, n_each_cluster, seed)
             t = torch.tensor(data, device=device, dtype=dt)

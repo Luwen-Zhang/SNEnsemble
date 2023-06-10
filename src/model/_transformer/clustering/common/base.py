@@ -21,12 +21,14 @@ class AbstractClustering(nn.Module):
         clusters: Union[List[AbstractCluster], nn.ModuleList] = None,
         exp_avg_factor: float = 1.0,
         adaptive_lr: bool = False,
+        on_cpu: bool = True,
         **kwargs,
     ):
         super(AbstractClustering, self).__init__()
         self.n_total_clusters = n_clusters
         self.n_clusters = n_clusters
         self.n_input = n_input
+        self.on_cpu = on_cpu
         if clusters is None and cluster_class is None:
             raise Exception(f"Neither `cluster_class` nor `clusters` is provided.")
         if clusters is not None and len(clusters) > 0:
@@ -88,6 +90,19 @@ class AbstractClustering(nn.Module):
     @property
     def centers(self):
         raise NotImplementedError
+
+    def to_cpu(self, x):
+        if self.on_cpu:
+            self.to("cpu")
+            return x.device, x.to("cpu")
+        else:
+            return x.device, x
+
+    def to_device(self, x, device):
+        if self.on_cpu:
+            return x.to(device)
+        else:
+            return x
 
 
 class AbstractMultilayerClustering(AbstractClustering):

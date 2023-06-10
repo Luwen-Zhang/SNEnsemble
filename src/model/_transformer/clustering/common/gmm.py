@@ -17,7 +17,7 @@ class Cluster(AbstractCluster):
             n_input=n_input, exp_avg_factor=exp_avg_factor, **kwargs
         )
         self.register_buffer("mu", torch.randn(1, n_input))
-        self.register_buffer("var", torch.randn(1, n_input, n_input))
+        self.register_buffer("var", torch.eye(n_input).unsqueeze(0))
         self.register_buffer(
             "pi",
             torch.ones(1),
@@ -69,6 +69,7 @@ class GMM(AbstractClustering):
         )
 
     def forward(self, x: torch.Tensor):
+        device, x = self.to_cpu(x)
         if x.shape[0] < 2:
             return torch.zeros(x.shape[0], device=x.device).long()
         if not self.initialized and self.training:
@@ -100,6 +101,7 @@ class GMM(AbstractClustering):
                     covariances=covariances,
                     labels=x_cluster,
                 )
+        x_cluster = self.to_device(x_cluster, device)
         return x_cluster
 
     def initialize(self, x: torch.Tensor):
@@ -251,7 +253,7 @@ class GMM(AbstractClustering):
 
 
 class PCAGMM(GMM):
-    def __init__(self, n_input, n_pca_dim: int = None, **kwargs):
+    def __init__(self, n_input, n_pca_dim: int = None, on_cpu: bool = True, **kwargs):
         if n_pca_dim is not None:
             if n_input <= n_pca_dim:
                 msg = f"Expecting n_pca_dim lower than n_input {n_input}, but got {n_pca_dim}."
@@ -259,15 +261,17 @@ class PCAGMM(GMM):
                     raise Exception(msg)
                 elif n_input == n_pca_dim:
                     warnings.warn(msg)
-                super(PCAGMM, self).__init__(n_input=n_input, **kwargs)
+                super(PCAGMM, self).__init__(n_input=n_input, on_cpu=on_cpu, **kwargs)
             else:
                 self.n_clustering_features = np.min([n_input, n_pca_dim])
                 super(PCAGMM, self).__init__(
-                    n_input=self.n_clustering_features, **kwargs
+                    n_input=self.n_clustering_features, on_cpu=on_cpu, **kwargs
                 )
-                self.pca = IncrementalPCA(n_components=self.n_clustering_features)
+                self.pca = IncrementalPCA(
+                    n_components=self.n_clustering_features, on_cpu=on_cpu
+                )
         else:
-            super(PCAGMM, self).__init__(n_input=n_input, **kwargs)
+            super(PCAGMM, self).__init__(n_input=n_input, on_cpu=on_cpu, **kwargs)
 
     def forward(self, x: torch.Tensor):
         if hasattr(self, "pca"):

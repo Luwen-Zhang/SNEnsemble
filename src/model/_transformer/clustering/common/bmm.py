@@ -127,7 +127,7 @@ class BMM(GMM):
 
 
 class PCABMM(BMM):
-    def __init__(self, n_input, n_pca_dim: int = None, **kwargs):
+    def __init__(self, n_input, n_pca_dim: int = None, on_cpu: bool = True, **kwargs):
         if n_pca_dim is not None:
             if n_input <= n_pca_dim:
                 msg = f"Expecting n_pca_dim lower than n_input {n_input}, but got {n_pca_dim}."
@@ -135,15 +135,17 @@ class PCABMM(BMM):
                     raise Exception(msg)
                 elif n_input == n_pca_dim:
                     warnings.warn(msg)
-                super(PCABMM, self).__init__(n_input=n_input, **kwargs)
+                super(PCABMM, self).__init__(n_input=n_input, on_cpu=on_cpu, **kwargs)
             else:
                 self.n_clustering_features = np.min([n_input, n_pca_dim])
                 super(PCABMM, self).__init__(
-                    n_input=self.n_clustering_features, **kwargs
+                    n_input=self.n_clustering_features, on_cpu=on_cpu, **kwargs
                 )
-                self.pca = IncrementalPCA(n_components=self.n_clustering_features)
+                self.pca = IncrementalPCA(
+                    n_components=self.n_clustering_features, on_cpu=on_cpu
+                )
         else:
-            super(PCABMM, self).__init__(n_input=n_input, **kwargs)
+            super(PCABMM, self).__init__(n_input=n_input, on_cpu=on_cpu, **kwargs)
 
     def forward(self, x: torch.Tensor):
         if hasattr(self, "pca"):

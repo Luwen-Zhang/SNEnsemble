@@ -74,7 +74,7 @@ def _incremental_mean_and_var(X, last_mean, last_variance, last_sample_count):
 
 
 class IncrementalPCA(nn.Module):
-    def __init__(self, n_components: int = None):
+    def __init__(self, n_components: int = None, on_cpu: bool = True):
         super(IncrementalPCA, self).__init__()
         self.components_ = None
         self.n_components_ = n_components
@@ -86,9 +86,11 @@ class IncrementalPCA(nn.Module):
         self.explained_variance_ratio_ = None
         self.noise_variance_ = None
         self.initialized = False
+        self.on_cpu = on_cpu
 
     def forward(self, x):
         # i.e. partial_fit
+        device, x = self.to_cpu(x)
         if not self.initialized:
             self.initialize(x)
         if self.training:
@@ -140,6 +142,7 @@ class IncrementalPCA(nn.Module):
                 self.noise_variance_ = 0.0
         x = x - self.mean_
         output = torch.matmul(x, self.components_.T)
+        output = self.to_device(output, device)
         return output
 
     def initialize(self, x):
@@ -162,6 +165,19 @@ class IncrementalPCA(nn.Module):
             self.n_components_, x.shape[1], device=x.device, requires_grad=False
         )
         self.initialized = True
+
+    def to_cpu(self, x):
+        if self.on_cpu:
+            self.to("cpu")
+            return x.device, x.to("cpu")
+        else:
+            return x.device, x
+
+    def to_device(self, x, device):
+        if self.on_cpu:
+            return x.to(device)
+        else:
+            return x
 
 
 if __name__ == "__main__":

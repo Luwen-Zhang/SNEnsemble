@@ -137,6 +137,7 @@ class KMeans(AbstractClustering):
         return inertia
 
     def forward(self, x: torch.Tensor):
+        device, x = self.to_cpu(x)
         if not self.initialized and self.training:
             self.initialize(x)
         x_cluster = self._predict(x)
@@ -170,6 +171,7 @@ class KMeans(AbstractClustering):
                     raise Exception(
                         f"KMeans implementation {self.method} is not implemented."
                     )
+        x_cluster = self.to_device(x_cluster, device)
         return x_cluster
 
     @property
@@ -178,7 +180,7 @@ class KMeans(AbstractClustering):
 
 
 class PCAKMeans(KMeans):
-    def __init__(self, n_input, n_pca_dim: int = None, **kwargs):
+    def __init__(self, n_input, n_pca_dim: int = None, on_cpu: bool = True, **kwargs):
         if n_pca_dim is not None:
             if n_input <= n_pca_dim:
                 msg = f"Expecting n_pca_dim lower than n_input {n_input}, but got {n_pca_dim}."
@@ -186,15 +188,19 @@ class PCAKMeans(KMeans):
                     raise Exception(msg)
                 elif n_input == n_pca_dim:
                     warnings.warn(msg)
-                super(PCAKMeans, self).__init__(n_input=n_input, **kwargs)
+                super(PCAKMeans, self).__init__(
+                    n_input=n_input, on_cpu=on_cpu, **kwargs
+                )
             else:
                 self.n_clustering_features = np.min([n_input, n_pca_dim])
                 super(PCAKMeans, self).__init__(
-                    n_input=self.n_clustering_features, **kwargs
+                    n_input=self.n_clustering_features, on_cpu=on_cpu, **kwargs
                 )
-                self.pca = IncrementalPCA(n_components=self.n_clustering_features)
+                self.pca = IncrementalPCA(
+                    n_components=self.n_clustering_features, on_cpu=on_cpu
+                )
         else:
-            super(PCAKMeans, self).__init__(n_input=n_input, **kwargs)
+            super(PCAKMeans, self).__init__(n_input=n_input, on_cpu=on_cpu, **kwargs)
 
     def forward(self, x: torch.Tensor):
         if hasattr(self, "pca"):
