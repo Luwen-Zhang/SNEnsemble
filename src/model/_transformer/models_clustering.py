@@ -38,26 +38,46 @@ class AbstractClusteringModel(AbstractNN):
         self.s_zero_slip = trainer.datamodule.get_zero_slip("Relative Maximum Stress")
         self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
         self.ridge_penalty = ridge_penalty
-        self.tune_head = get_linear(
+        self.cls_head = get_linear(
             n_inputs=hidden_rep_dim, n_outputs=n_outputs, nonlinearity="relu"
         )
-        self.tune_head_normalize = nn.Sigmoid()
+        self.cls_head_normalize = nn.Sigmoid()
+        self.cls_head_loss = nn.CrossEntropyLoss()
 
     def _forward(self, x, derived_tensors):
-        naive_pred = self.cont_cat_model(x, derived_tensors)
-        self._naive_pred = naive_pred
-        hidden = self.cont_cat_model.hidden_representation
+        # Prediction of deep learning models.
+        dl_pred = self.cont_cat_model(x, derived_tensors)
+        # Prediction of physical models
         s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
-        x_sn = self.clustering_sn_model(x[:, self.clustering_features], s_wo_bias)
-        # Projection from hidden output to SN weights and tuning output
-        x_tune = self.tune_head_normalize(self.tune_head(hidden))
-        # Weighted sum of prediction and tuning
-        out = x_sn + torch.mul(x_tune, naive_pred - x_sn)
+        phy_pred = self.clustering_sn_model(x[:, self.clustering_features], s_wo_bias)
+        # Projection from hidden output to deep learning weights
+        hidden = self.cont_cat_model.hidden_representation
+        dl_weight = self.cls_head_normalize(self.cls_head(hidden))
+        # Weighted sum of prediction
+        out = phy_pred + torch.mul(dl_weight, dl_pred - phy_pred)
+        self.dl_pred = dl_pred
+        self.phy_pred = phy_pred
+        self.dl_weight = dl_weight
         return out
 
     def loss_fn(self, y_true, y_pred, *data, **kwargs):
-        self.naive_pred_loss = self.default_loss_fn(self._naive_pred, y_true)
+        # Train the regression head
+        self.dl_loss = self.default_loss_fn(self.dl_pred, y_true)
+        # Train the classification head
+        # If the error of dl predictions is lower, cls_label is 0
+        cls_label = (
+            torch.heaviside(
+                torch.abs(self.dl_pred - y_true) - torch.abs(self.phy_pred - y_true),
+                torch.tensor([0.0], device=y_true.device),
+            )
+            .flatten()
+            .long()
+        )
+        self.cls_loss = self.cls_head_loss(
+            torch.concat([self.dl_weight, 1 - self.dl_weight], dim=1), cls_label
+        )
         self.output_loss = self.default_loss_fn(y_pred, y_true)
+        # Train Least Square
         sum_weight = self.clustering_sn_model.nk[self.clustering_sn_model.x_cluster]
         self.lstsq_loss = torch.sum(
             torch.concat(
@@ -69,6 +89,7 @@ class AbstractClusteringModel(AbstractNN):
                 ]
             )
         )
+        # Train Ridge Regression
         ridge_weight = self.clustering_sn_model.running_sn_weight
         self.ridge_loss = torch.sum(
             0.5
@@ -81,7 +102,7 @@ class AbstractClusteringModel(AbstractNN):
 
     def configure_optimizers(self):
         all_optimizer = torch.optim.Adam(
-            list(self.cont_cat_model.parameters()) + list(self.tune_head.parameters()),
+            list(self.cont_cat_model.parameters()) + list(self.cls_head.parameters()),
             lr=self.hparams.lr,
             weight_decay=self.hparams.weight_decay,
         )
@@ -100,10 +121,11 @@ class AbstractClusteringModel(AbstractNN):
         # The following commented zero_grad() operations are not necessary because `inputs`s are specified and no other
         # gradient is calculated.
         # 1st back-propagation: for deep learning weights.
+        self.dl_weight.retain_grad()
         self.manual_backward(
-            self.output_loss,
+            self.cls_loss,
             retain_graph=True,
-            inputs=list(self.tune_head.parameters()),
+            inputs=list(self.cls_head.parameters()),
         )
         # self.cont_cat_model.zero_grad()
         # self.clustering_sn_model.sns.zero_grad()
@@ -128,7 +150,7 @@ class AbstractClusteringModel(AbstractNN):
         # self.cont_cat_model.zero_grad()
 
         # 4th back-propagation: for deep learning backbones.
-        self.manual_backward(self.naive_pred_loss)
+        self.manual_backward(self.dl_loss)
 
         all_optimizer.step()
         regression_optimizer.step()
