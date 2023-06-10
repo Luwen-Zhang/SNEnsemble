@@ -121,7 +121,7 @@ class BMM(GMM):
                 * self.mean_precision_prior
                 / self.mean_precision_[k]
                 * torch.outer(diff, diff)
-            )
+            ) + self.eps * torch.eye(self.n_input, device=x.device)
         covariances /= self.degrees_of_freedom_.unsqueeze(-1).unsqueeze(-1)
         return weights, means, covariances
 

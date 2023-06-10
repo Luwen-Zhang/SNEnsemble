@@ -189,7 +189,15 @@ class GMM(AbstractClustering):
         n_components, n_features = self.n_clusters, self.n_input
         precisions_chol = torch.zeros_like(covariances, device=covariances.device)
         for k in range(n_components):
-            cov_chol = torch.linalg.cholesky(covariances[k, :, :].to(torch.float64))
+            # Note that cholesky_ex seems to be experimental.
+            # https://pytorch.org/docs/stable/generated/torch.linalg.cholesky_ex.html#torch.linalg.cholesky_ex
+            # If using torch.linalg.cholesky, in some extreme cases, the covariances can be non-positive-definite
+            # because self.eps is not large enough.
+            # It seems to be possible to replace this by LDLT decomposition. But just leave it since it works fine.
+            # https://github.com/pytorch/pytorch/issues/71382
+            cov_chol = torch.linalg.cholesky_ex(
+                covariances[k, :, :].to(torch.float64)
+            ).L
             precisions_chol[k, :, :] = torch.linalg.solve_triangular(
                 cov_chol, torch.eye(n_features, device=cov_chol.device), upper=False
             ).T.to(dtype)
