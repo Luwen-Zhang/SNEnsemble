@@ -2,7 +2,6 @@ import sys
 import torch
 from torch import nn
 import inspect
-from src.model.base import get_sequential, get_linear
 from .common.base import AbstractClustering
 
 
@@ -51,16 +50,10 @@ def get_sns(**kwargs):
 
 
 class AbstractSNClustering(nn.Module):
-    def __init__(
-        self, layers, hidden_rep_dim: int, clustering: AbstractClustering, **kwargs
-    ):
+    def __init__(self, clustering: AbstractClustering, **kwargs):
         super(AbstractSNClustering, self).__init__()
         self.clustering = clustering
         self.n_clusters = self.clustering.n_total_clusters
-        self.tune_head = get_linear(
-            n_inputs=hidden_rep_dim, n_outputs=1, nonlinearity="relu"
-        )
-        self.tune_head_normalize = nn.Sigmoid()
         self.sns = get_sns(n_clusters=self.n_clusters)
 
         # self.weight = 0.8
@@ -90,10 +83,7 @@ class AbstractSNClustering(nn.Module):
     #     else:
     #         return getattr(self, name)
 
-    def forward(self, x, s, hidden, naive_pred):
-        # Projection from hidden output to SN weights and tuning output
-        x_tune = self.tune_head_normalize(self.tune_head(hidden))
-
+    def forward(self, x, s):
         # Clustering
         x_cluster = self.clustering(x)
         resp = torch.zeros((x.shape[0], self.n_clusters), device=x.device)
@@ -129,6 +119,4 @@ class AbstractSNClustering(nn.Module):
         #         ]
         # else:
         #     tune_weight = self.running_tune_weight[x_cluster]
-        # Weighted sum of prediction and tuning
-        out = x_sn + torch.mul(x_tune, naive_pred - x_sn)
-        return out
+        return x_sn

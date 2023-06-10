@@ -1,10 +1,11 @@
 from .models_basic import CategoryEmbeddingNN, FTTransformerNN
 from .models_with_seq import CatEmbedSeqNN
-from ..base import AbstractNN
+from ..base import AbstractNN, get_linear
 import numpy as np
 from .clustering.singlelayer import KMeansSN, GMMSN, BMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN, TwolayerBMMSN
 import torch
+from torch import nn
 
 
 class AbstractClusteringModel(AbstractNN):
@@ -15,6 +16,8 @@ class AbstractClusteringModel(AbstractNN):
         clustering_features,
         clustering_sn_model,
         cont_cat_model,
+        layers,
+        hidden_rep_dim: int,
         ridge_penalty: float = 0.0,
         **kwargs,
     ):
@@ -35,16 +38,22 @@ class AbstractClusteringModel(AbstractNN):
         self.s_zero_slip = trainer.datamodule.get_zero_slip("Relative Maximum Stress")
         self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
         self.ridge_penalty = ridge_penalty
+        self.tune_head = get_linear(
+            n_inputs=hidden_rep_dim, n_outputs=n_outputs, nonlinearity="relu"
+        )
+        self.tune_head_normalize = nn.Sigmoid()
 
     def _forward(self, x, derived_tensors):
         naive_pred = self.cont_cat_model(x, derived_tensors)
         self._naive_pred = naive_pred
         hidden = self.cont_cat_model.hidden_representation
         s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
-        x_out = self.clustering_sn_model(
-            x[:, self.clustering_features], s_wo_bias, hidden, naive_pred
-        )
-        return x_out
+        x_sn = self.clustering_sn_model(x[:, self.clustering_features], s_wo_bias)
+        # Projection from hidden output to SN weights and tuning output
+        x_tune = self.tune_head_normalize(self.tune_head(hidden))
+        # Weighted sum of prediction and tuning
+        out = x_sn + torch.mul(x_tune, naive_pred - x_sn)
+        return out
 
     def loss_fn(self, y_true, y_pred, *data, **kwargs):
         self.naive_pred_loss = self.default_loss_fn(self._naive_pred, y_true)
@@ -72,8 +81,7 @@ class AbstractClusteringModel(AbstractNN):
 
     def configure_optimizers(self):
         all_optimizer = torch.optim.Adam(
-            list(self.cont_cat_model.parameters())
-            + list(self.clustering_sn_model.tune_head.parameters()),
+            list(self.cont_cat_model.parameters()) + list(self.tune_head.parameters()),
             lr=self.hparams.lr,
             weight_decay=self.hparams.weight_decay,
         )
@@ -95,7 +103,7 @@ class AbstractClusteringModel(AbstractNN):
         self.manual_backward(
             self.output_loss,
             retain_graph=True,
-            inputs=list(self.clustering_sn_model.tune_head.parameters()),
+            inputs=list(self.tune_head.parameters()),
         )
         # self.cont_cat_model.zero_grad()
         # self.clustering_sn_model.sns.zero_grad()
@@ -160,9 +168,7 @@ class SNTransformerLRKMeansNN(AbstractClusteringModel):
         sn = KMeansSN(
             n_clusters=n_clusters,
             n_input=len(clustering_features),
-            layers=layers,
             n_pca_dim=n_pca_dim,
-            hidden_rep_dim=transformer.hidden_rep_dim,
         )
         super(SNTransformerLRKMeansNN, self).__init__(
             n_outputs=n_outputs,
@@ -170,6 +176,8 @@ class SNTransformerLRKMeansNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=transformer,
+            layers=layers,
+            hidden_rep_dim=transformer.hidden_rep_dim,
             **kwargs,
         )
 
@@ -195,9 +203,7 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
         sn = KMeansSN(
             n_clusters=n_clusters,
             n_input=len(clustering_features),
-            layers=layers,
             n_pca_dim=n_pca_dim,
-            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLRKMeansNN, self).__init__(
             n_outputs=n_outputs,
@@ -205,6 +211,8 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=catembed.hidden_rep_dim,
             **kwargs,
         )
 
@@ -231,9 +239,7 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
         sn = KMeansSN(
             n_clusters=n_clusters,
             n_input=len(clustering_features),
-            layers=layers,
             n_pca_dim=n_pca_dim,
-            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLRKMeansSeqNN, self).__init__(
             n_outputs=n_outputs,
@@ -241,6 +247,8 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=catembed.hidden_rep_dim,
             **kwargs,
         )
 
@@ -259,9 +267,7 @@ class SNCatEmbedLRGMMNN(AbstractClusteringModel):
         sn = GMMSN(
             n_clusters=n_clusters,
             n_input=len(clustering_features),
-            layers=layers,
             n_pca_dim=n_pca_dim,
-            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLRGMMNN, self).__init__(
             n_outputs=n_outputs,
@@ -269,6 +275,8 @@ class SNCatEmbedLRGMMNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=catembed.hidden_rep_dim,
             **kwargs,
         )
 
@@ -287,9 +295,7 @@ class SNCatEmbedLRBMMNN(AbstractClusteringModel):
         sn = BMMSN(
             n_clusters=n_clusters,
             n_input=len(clustering_features),
-            layers=layers,
             n_pca_dim=n_pca_dim,
-            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLRBMMNN, self).__init__(
             n_outputs=n_outputs,
@@ -297,6 +303,8 @@ class SNCatEmbedLRBMMNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=catembed.hidden_rep_dim,
             **kwargs,
         )
 
@@ -332,10 +340,8 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
             n_input_2=len(input_2_idx),
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
-            layers=layers,
             n_clusters_per_cluster=5,
             n_pca_dim=n_pca_dim,
-            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLR2LGMMNN, self).__init__(
             n_outputs=n_outputs,
@@ -343,6 +349,8 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=catembed.hidden_rep_dim,
             **kwargs,
         )
 
@@ -378,10 +386,8 @@ class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
             n_input_2=len(input_2_idx),
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
-            layers=layers,
             n_clusters_per_cluster=5,
             n_pca_dim=n_pca_dim,
-            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLR2LKMeansNN, self).__init__(
             n_outputs=n_outputs,
@@ -389,6 +395,8 @@ class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=catembed.hidden_rep_dim,
             **kwargs,
         )
 
@@ -424,10 +432,8 @@ class SNCatEmbedLR2LBMMNN(AbstractClusteringModel):
             n_input_2=len(input_2_idx),
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
-            layers=layers,
             n_clusters_per_cluster=10,
             n_pca_dim=n_pca_dim,
-            hidden_rep_dim=catembed.hidden_rep_dim,
         )
         super(SNCatEmbedLR2LBMMNN, self).__init__(
             n_outputs=n_outputs,
@@ -435,5 +441,7 @@ class SNCatEmbedLR2LBMMNN(AbstractClusteringModel):
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=catembed.hidden_rep_dim,
             **kwargs,
         )
