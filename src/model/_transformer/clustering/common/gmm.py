@@ -111,9 +111,9 @@ class GMM(AbstractClustering):
             resp = torch.rand(x.shape[0], self.n_clusters, device=x.device)
             resp /= resp.sum(dim=1).unsqueeze(-1)
         elif self.init_method == "kmeans":
-            kmeans = KMeans(n_clusters=self.n_clusters, n_input=self.n_input).to(
-                x.device
-            )
+            kmeans = KMeans(
+                n_clusters=self.n_clusters, n_input=self.n_input, on_cpu=self.on_cpu
+            ).to(x.device)
             kmeans.fit(x, n_iter=10)
             # Initial parameters are estimated using kmeans results.
             labels = kmeans.predict(x)
