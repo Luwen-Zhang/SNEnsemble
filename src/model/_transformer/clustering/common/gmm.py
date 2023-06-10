@@ -185,15 +185,14 @@ class GMM(AbstractClustering):
 
     def _compute_precision_cholesky(self, covariances: torch.Tensor):
         # Ref: sklearn.mixture._gaussian_mixture._compute_precision_cholesky
+        dtype = covariances.dtype
         n_components, n_features = self.n_clusters, self.n_input
         precisions_chol = torch.zeros_like(covariances, device=covariances.device)
         for k in range(n_components):
-            cov_chol = torch.linalg.cholesky(covariances[k, :, :].to(torch.float64)).to(
-                torch.float32
-            )
+            cov_chol = torch.linalg.cholesky(covariances[k, :, :].to(torch.float64))
             precisions_chol[k, :, :] = torch.linalg.solve_triangular(
                 cov_chol, torch.eye(n_features, device=cov_chol.device), upper=False
-            ).T
+            ).T.to(dtype)
         return precisions_chol
 
     def _estimate_parameters(self, x: torch.Tensor, resp: torch.Tensor):

@@ -122,8 +122,9 @@ class IncrementalPCA(nn.Module):
                     )
                 )
 
-            U, S, Vt = torch.linalg.svd(X, full_matrices=False)
+            U, S, Vt = torch.linalg.svd(X.to(torch.float64), full_matrices=False)
             U, Vt = svd_flip(U, Vt, u_based_decision=False)
+            U, S, Vt = U.to(x.dtype), S.to(x.dtype), Vt.to(x.dtype)
             explained_variance = S**2 / (n_total_samples - 1)
             explained_variance_ratio = S**2 / torch.sum(col_var * n_total_samples)
 
