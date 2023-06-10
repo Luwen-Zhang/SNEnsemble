@@ -420,27 +420,27 @@ class AbstractModel:
 
                 @skopt.utils.use_named_args(space)
                 def _bayes_objective(**params):
-                    with HiddenPrints():
-                        model = self.new_model(
-                            model_name=model_name, verbose=False, **params
-                        )
-
-                        self._train_single_model(
-                            model,
-                            epoch=self.trainer.args["bayes_epoch"]
-                            if not src.setting["debug_mode"]
-                            else 1,
-                            X_train=data["X_train"],
-                            y_train=data["y_train"],
-                            X_val=data["X_val"],
-                            y_val=data["y_val"],
-                            verbose=False,
-                            warm_start=False,
-                            in_bayes_opt=True,
-                            **params,
-                        )
-
                     try:
+                        with HiddenPrints():
+                            model = self.new_model(
+                                model_name=model_name, verbose=False, **params
+                            )
+
+                            self._train_single_model(
+                                model,
+                                epoch=self.trainer.args["bayes_epoch"]
+                                if not src.setting["debug_mode"]
+                                else 1,
+                                X_train=data["X_train"],
+                                y_train=data["y_train"],
+                                X_val=data["X_val"],
+                                y_val=data["y_val"],
+                                verbose=False,
+                                warm_start=False,
+                                in_bayes_opt=True,
+                                **params,
+                            )
+
                         res = self._bayes_eval(
                             model,
                             data["X_train"],
