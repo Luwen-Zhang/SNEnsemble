@@ -910,7 +910,9 @@ class TorchModel(AbstractModel):
         D = [
             torch.tensor(value, dtype=torch.float32) for value in derived_data.values()
         ]
-        y = torch.tensor(np.zeros((len(df), 1)), dtype=torch.float32)
+        y = torch.tensor(
+            np.zeros((len(df), len(self.trainer.label_name))), dtype=torch.float32
+        )
 
         loader = Data.DataLoader(
             Data.TensorDataset(X, *D, y),

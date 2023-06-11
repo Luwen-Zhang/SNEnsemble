@@ -13,13 +13,21 @@ class AutoGluon(AbstractModel):
 
     def _new_model(self, model_name, verbose, **kwargs):
         from autogluon.tabular import TabularPredictor
+        from ._autogluon.multilabel import MultilabelPredictor
 
         path = os.path.join(self.root, model_name)
-        predictor = TabularPredictor(
-            label=self.trainer.label_name[0],
-            path=os.path.join(self.root, model_name),
-            problem_type="regression",
-        )
+        if len(self.trainer.label_name) > 1:
+            predictor = MultilabelPredictor(
+                labels=self.trainer.label_name,
+                path=os.path.join(self.root, model_name),
+                problem_types=["regression"] * len(self.trainer.label_name),
+            )
+        else:
+            predictor = TabularPredictor(
+                label=self.trainer.label_name[0],
+                path=os.path.join(self.root, model_name),
+                problem_type="regression",
+            )
         if not os.path.exists(path):
             os.mkdir(path)
         return (model_name, predictor)
@@ -91,9 +99,9 @@ class AutoGluon(AbstractModel):
             ]
         )
         train_data = X_train.copy()
-        train_data[label_name[0]] = y_train
+        train_data[label_name] = y_train
         val_data = X_val.copy()
-        val_data[label_name[0]] = y_val
+        val_data[label_name] = y_val
         with HiddenPrints(disable_std=not verbose, disable_logging=not verbose):
             model[1].fit(
                 train_data,
@@ -114,7 +122,10 @@ class AutoGluon(AbstractModel):
         warnings.simplefilter(action="default")
 
     def _pred_single_model(self, model, X_test, verbose, **kwargs):
-        return model[1].predict(X_test).values.reshape(-1, 1)
+        if len(self.trainer.label_name) > 1:
+            return model[1].predict(X_test).values
+        else:
+            return model[1].predict(X_test).values.reshape(-1, 1)
 
     def _get_model_names(self):
         return [

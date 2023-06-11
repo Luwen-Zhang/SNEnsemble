@@ -235,7 +235,10 @@ class DataModule:
             Manually specify the testing set by indices.
         """
         if len(label_name) > 1:
-            raise Exception(f"Only one target is supported.")
+            warnings.warn(
+                f"Multi-target task is currently experimental. Some model base does not support multi-target"
+                f"well, pytorch-widedeep for example."
+            )
 
         self.set_status(training=True)
         self._force_features = force_features
@@ -850,7 +853,9 @@ class DataModule:
         original_length = len(self.df)
 
         with HiddenPrints(disable_std=not verbose):
-            if np.all(np.sort(self.train_indices) == np.sort(self.val_indices)):
+            if len(self.train_indices) == len(self.val_indices) and np.all(
+                np.sort(self.train_indices) == np.sort(self.val_indices)
+            ):
                 df_training = self.df.loc[list(self.train_indices), :]
             else:
                 df_training = self.df.loc[

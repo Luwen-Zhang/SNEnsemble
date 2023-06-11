@@ -140,9 +140,9 @@ class PytorchTabular(AbstractModel):
         warnings.simplefilter(action="ignore", category=UserWarning)
         label_name = self.trainer.label_name
         train_data = X_train.copy()
-        train_data[label_name[0]] = y_train
+        train_data[label_name] = y_train
         val_data = X_val.copy()
-        val_data[label_name[0]] = y_val
+        val_data[label_name] = y_val
         with HiddenPrints(
             disable_std=not verbose,
             disable_logging=not verbose,
@@ -162,7 +162,7 @@ class PytorchTabular(AbstractModel):
         tc.enable_tqdm()
 
     def _pred_single_model(self, model, X_test, verbose, **kwargs):
-        target = model.config.target[0]
+        targets = model.config.target
         with HiddenPrints():
             # Two annoying warnings that cannot be suppressed:
             # 1. DeprecationWarning: Default for ``include_input_features`` will change from True to False in the next
@@ -173,11 +173,12 @@ class PytorchTabular(AbstractModel):
             warnings.filterwarnings(
                 "ignore", category=DeprecationWarning, module="pytorch_tabular"
             )
-            res = np.array(
-                model.predict(X_test, include_input_features=False)[
-                    f"{target}_prediction"
-                ]
-            ).reshape(-1, 1)
+            all_res = model.predict(X_test, include_input_features=False)
+            preds = [
+                np.array(all_res[f"{target}_prediction"]).reshape(-1, 1)
+                for target in targets
+            ]
+            res = np.concatenate(preds, axis=1)
         return res
 
     def _get_model_names(self):

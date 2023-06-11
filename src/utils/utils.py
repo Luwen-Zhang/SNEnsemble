@@ -95,6 +95,8 @@ def set_torch(seed=0):
 
 
 def metric_sklearn(y_true, y_pred, metric):
+    y_true = np.array(y_true).flatten()
+    y_pred = np.array(y_pred).flatten()
     if metric == "mse":
         from sklearn.metrics import mean_squared_error
 

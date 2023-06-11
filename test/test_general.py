@@ -299,6 +299,113 @@ class TestGeneral(unittest.TestCase):
 
         shutil.rmtree(os.path.join(src.setting["default_output_path"]))
 
+    def test_trainer_multitarget(self):
+        print(f"\n-- Loading trainer --\n")
+        configfile = "composite_test"
+        src.setting["debug_mode"] = True
+        trainer = Trainer(device="cpu")
+        trainer.load_config(
+            configfile,
+            manual_config={
+                "data_splitter": "CycleSplitter",
+                "label_name": ["log(Cycles to Failure)", "Cycles to Failure"],
+            },
+        )
+        trainer.load_data()
+        trainer.summarize_setting()
+
+        print(f"\n-- Initialize models --\n")
+
+        with self.assertRaises(Exception):
+            WideDeep(trainer, model_subset=["TabMlp"])
+
+        models = [
+            # PytorchTabular(trainer, model_subset=["Category Embedding"]),
+            # AutoGluon(trainer, model_subset=["Linear Regression"]),
+            Transformer(
+                trainer,
+                model_subset=[
+                    "CategoryEmbedding",
+                ],
+            ),
+        ]
+        trainer.add_modelbases(models)
+
+        print(f"\n-- Pickling --\n")
+        save_trainer(trainer)
+
+        print(f"\n-- Training without bayes --\n")
+        trainer.train()
+
+        print(f"\n-- Leaderboard --\n")
+        l = trainer.get_leaderboard()
+
+        print(f"\n-- Prediction consistency --\n")
+        x_test = trainer.datamodule.X_test
+        d_test = trainer.datamodule.D_test
+        for model in models:
+            model_name = model.model_subset[0]
+            pred = model.predict(x_test, model_name=model_name)
+            direct_pred = model._predict(
+                x_test, derived_data=d_test, model_name=model_name
+            )
+            assert np.allclose(
+                pred, direct_pred
+            ), f"{model.__class__.__name__} does not get consistent inference results."
+
+        print(f"\n-- Detach modelbase --\n")
+        model_trainer = trainer.detach_model(
+            program="Transformer", model_name="CategoryEmbedding"
+        )
+        model_trainer.train()
+        direct_pred = trainer.get_modelbase("Transformer")._predict(
+            trainer.datamodule.X_test,
+            derived_data=trainer.datamodule.D_test,
+            model_name="CategoryEmbedding",
+        )
+        detached_pred = model_trainer.get_modelbase(
+            "Transformer_CategoryEmbedding"
+        )._predict(
+            model_trainer.datamodule.X_test,
+            derived_data=model_trainer.datamodule.D_test,
+            model_name="CategoryEmbedding",
+        )
+        assert np.allclose(
+            detached_pred, direct_pred
+        ), f"The detached model does not get consistent results."
+
+        print(f"\n-- pytorch cuda functionality --\n")
+        if torch.cuda.is_available():
+            model_trainer.set_device("cuda")
+            model_trainer.train()
+        else:
+            print(f"Skipping cuda tests since torch.cuda.is_available() is False.")
+
+        print(
+            f"\n-- Training after set_feature_names and without categorical features --\n"
+        )
+        model_trainer.datamodule.set_feature_names(
+            model_trainer.datamodule.cont_feature_names[:10]
+        )
+        model_trainer.train()
+
+        print(f"\n-- Bayes optimization --\n")
+        model_trainer.args["bayes_opt"] = True
+        model_trainer.train()
+
+        print(f"\n-- Load local trainer --\n")
+        root = trainer.project_root + "_rename_test"
+        shutil.copytree(trainer.project_root, root)
+        shutil.rmtree(trainer.project_root)
+        trainer = load_trainer(os.path.join(root, "trainer.pkl"))
+        l2 = trainer.get_leaderboard()
+        cols = ["Training RMSE", "Testing RMSE", "Validation RMSE"]
+        assert np.allclose(
+            l[cols].values.astype(float), l2[cols].values.astype(float)
+        ), f"Reloaded local trainer does not get consistent results."
+
+        shutil.rmtree(os.path.join(src.setting["default_output_path"]))
+
 
 if __name__ == "__main__":
     unittest.main()

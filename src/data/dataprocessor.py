@@ -1,3 +1,4 @@
+import warnings
 from src.utils import *
 from src.data import (
     AbstractProcessor,
@@ -299,9 +300,13 @@ class RFEFeatureSelector(AbstractFeatureSelector):
             verbose=verbose,
             importance_getter=importance_getter if method == "shap" else method,
         )
+        if len(datamodule.label_name) > 1:
+            warnings.warn(
+                f"Multi-target task is not supported by {self.__class__.__name__}. Only the first label is used."
+            )
         rfecv.fit(
             data[datamodule.all_feature_names],
-            data[datamodule.label_name].values.flatten(),
+            data[datamodule.label_name[0]].values.flatten(),
         )
         retain_features = list(rfecv.get_feature_names_out())
         return retain_features
@@ -322,7 +327,7 @@ class VarianceFeatureSelector(AbstractFeatureSelector):
         sel = VarianceThreshold(threshold=(thres * (1 - thres)))
         sel.fit(
             data[datamodule.all_feature_names],
-            data[datamodule.label_name].values.flatten(),
+            data[datamodule.label_name].values,  # Ignored.
         )
         retain_features = list(sel.get_feature_names_out())
         return retain_features
@@ -393,7 +398,7 @@ class CorrFeatureSelector(AbstractFeatureSelector):
         )
         rf.fit(
             data[datamodule.all_feature_names],
-            data[datamodule.label_name].values.flatten(),
+            data[datamodule.label_name].values,
         )
 
         explainer = shap.Explainer(rf)

@@ -4,6 +4,14 @@ from skopt.space import Integer, Categorical, Real
 
 
 class WideDeep(AbstractModel):
+    def __init__(self, *args, **kwargs):
+        super(WideDeep, self).__init__(*args, **kwargs)
+        if len(self.trainer.label_name) > 1:
+            raise Exception(
+                f"pytorch-widedeep does not support multi-target tasks. "
+                f"See https://github.com/jrzaurin/pytorch-widedeep/issues/152"
+            )
+
     def _get_program_name(self):
         return "WideDeep"
 

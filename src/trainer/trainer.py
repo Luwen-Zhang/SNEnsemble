@@ -1683,7 +1683,7 @@ class Trainer:
 
         all_m_code = train_m_code + list(val_only_m_code) + list(rest_m_code)
 
-        all_cycle = self.df[self.label_name].values.flatten()
+        all_cycle = self.df["log(Cycles to Failure)"].values.flatten()
         length = len(all_m_code)
         train_heat = np.zeros((length, bins))
         val_heat = np.zeros((length, bins))
@@ -1809,9 +1809,9 @@ class Trainer:
             right=False,
         )
         if percentile == "all":
-            ax.set_xlabel(self.label_name[0])
+            ax.set_xlabel("log(Cycles to Failure)")
         else:
-            ax.set_xlabel(f"Percentile of {self.label_name[0]} for each material")
+            ax.set_xlabel(f"Percentile of log(Cycles to Failure) for each material")
         ax.set_ylabel(f"ID of Material")
         warnings.filterwarnings("ignore", message="Tight layout not applied.")
         plt.savefig(
