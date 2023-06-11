@@ -339,6 +339,7 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
         layers,
         trainer,
         n_clusters,
+        n_clusters_per_cluster: int,
         n_pca_dim: int = None,
         **kwargs,
     ):
@@ -362,7 +363,7 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
             n_input_2=len(input_2_idx),
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
-            n_clusters_per_cluster=5,
+            n_clusters_per_cluster=n_clusters_per_cluster,
             n_pca_dim=n_pca_dim,
         )
         super(SNCatEmbedLR2LGMMNN, self).__init__(
@@ -385,6 +386,7 @@ class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
         layers,
         trainer,
         n_clusters,
+        n_clusters_per_cluster: int,
         n_pca_dim: int = None,
         **kwargs,
     ):
@@ -408,7 +410,7 @@ class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
             n_input_2=len(input_2_idx),
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
-            n_clusters_per_cluster=5,
+            n_clusters_per_cluster=n_clusters_per_cluster,
             n_pca_dim=n_pca_dim,
         )
         super(SNCatEmbedLR2LKMeansNN, self).__init__(
@@ -431,6 +433,7 @@ class SNCatEmbedLR2LBMMNN(AbstractClusteringModel):
         layers,
         trainer,
         n_clusters,
+        n_clusters_per_cluster: int,
         n_pca_dim: int = None,
         **kwargs,
     ):
@@ -454,7 +457,7 @@ class SNCatEmbedLR2LBMMNN(AbstractClusteringModel):
             n_input_2=len(input_2_idx),
             input_1_idx=input_1_idx,
             input_2_idx=input_2_idx,
-            n_clusters_per_cluster=10,
+            n_clusters_per_cluster=n_clusters_per_cluster,
             n_pca_dim=n_pca_dim,
         )
         super(SNCatEmbedLR2LBMMNN, self).__init__(
