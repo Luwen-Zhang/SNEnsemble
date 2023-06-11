@@ -19,5 +19,5 @@ models = [
     AutoGluon(trainer),
 ]
 trainer.add_modelbases(models)
-trainer.get_leaderboard(cross_validation=10)
+trainer.get_leaderboard(cross_validation=10, split_type="random")
 log.exit()
