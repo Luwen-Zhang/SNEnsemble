@@ -83,6 +83,8 @@ We wrote some useful utilities specifically for fatigue prediction and composite
 
   See examples in `src.data.dataderiver.py`.
 
+  **Remark**: In `_defaults`, `stacked` and `intermediate` are necessary. `stacked=True` means that the derived feature is stacked to the dataframe as a tabular feature, otherwise the feature is stored in `DataModule.derived_data` and can be accessed using `DataModule.D_train/val/test` (Note that these features can be **multi-modal**). When `stacked=True`,  `intermediate=False` means that the derived feature will be added to `DataModule.cont_feature_names`, otherwise it will not.
+
 * **Data processing**: Functions that increase/decrease the number of data points (data filtering and augmentation), decrease the number of features (feature selection), and modify values of data (category encoding or scaling, etc.).  See examples in `src.data.dataprocessor.py`
 
   * *Data filtering*: Inherit `src.data.AbstractProcessor` and implement `_fit_transform` and `_transform`. Note that when inferring new data (`datamodule.training==True`), do not decrease the number of data points.
