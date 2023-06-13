@@ -45,6 +45,7 @@ class SeqFTTransformer(FTTransformer):
             x_pos = self.pos_encoding(x)
             x_trans = self.transformer(x_pos, src_key_padding_mask=padding_mask)
             x_trans = x_trans.mean(1)
+            self.hidden_representation = x_trans
             x_trans = self.transformer_head(x_trans)
             return x_trans
         else:

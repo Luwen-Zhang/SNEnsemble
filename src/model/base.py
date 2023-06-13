@@ -1085,6 +1085,8 @@ class AbstractNN(pl.LightningModule):
         self.derived_feature_dims = trainer.datamodule.get_derived_data_sizes()
         self.derived_feature_names_dims = {}
         self.automatic_optimization = False
+        self.hidden_representation = None
+        self.hidden_rep_dim = None
         if len(kwargs) > 0:
             self.save_hyperparameters(*list(kwargs.keys()), ignore=["trainer"])
         for name, dim in zip(
@@ -1124,7 +1126,14 @@ class AbstractNN(pl.LightningModule):
                 derived_tensors = {}
                 for tensor, name in zip(additional_tensors, self.derived_feature_names):
                     derived_tensors[name] = tensor
-            return self._forward(x, derived_tensors)
+            res = self._forward(x, derived_tensors)
+            if len(res.shape) == 1:
+                res = res.view(-1, 1)
+            if self.hidden_representation is None:
+                self.hidden_representation = res
+            if self.hidden_rep_dim is None:
+                self.hidden_rep_dim = res.shape[1]
+            return res
 
     def _forward(
         self, x: torch.Tensor, derived_tensors: Dict[str, torch.Tensor]
