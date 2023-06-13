@@ -520,8 +520,10 @@ class SampleWeightDeriver(AbstractDeriver):
                 p_outlier = len(idx) / len(df)
                 feature_weight = -np.log10(p_outlier)
                 self.feature_weight[feature] = feature_weight
-            else:
+            elif feature in self.feature_weight.keys():
                 feature_weight = self.feature_weight[feature]
+            else:
+                continue
             weight.loc[idx, "weight"] = weight.loc[idx, "weight"] * (
                 1.0 + 0.1 * feature_weight
             )
@@ -536,9 +538,11 @@ class SampleWeightDeriver(AbstractDeriver):
                 )
                 self.unique_vals[feature] = unique_values
                 self.feature_weight[feature] = feature_weight
-            else:
+            elif feature in self.unique_vals.keys():
                 unique_values = self.unique_vals[feature]
                 feature_weight = self.feature_weight[feature]
+            else:
+                continue
             for value, w in zip(unique_values, feature_weight):
                 where_value = df.index[np.where(df[feature] == value)[0]]
                 weight.loc[where_value, "weight"] = weight.loc[
