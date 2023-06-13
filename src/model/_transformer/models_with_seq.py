@@ -1,4 +1,4 @@
-from ..base import get_sequential
+from ..base import get_sequential, get_linear
 from typing import List, Union
 from .models_basic import CategoryEmbeddingNN, FTTransformerNN
 from .common.lstm import LSTM
@@ -21,27 +21,23 @@ class AbstractSeqModel(AbstractNN):
         super(AbstractSeqModel, self).__init__(trainer, **kwargs)
         self.cont_cat_model = cont_cat_model
         self.seq_model = seq_model
-        if self.seq_model.run or n_outputs != 1:
-            self.w = get_sequential(
-                layers,
-                (1 + int(self.seq_model.run)) * n_outputs,
-                n_outputs,
-                nn.ReLU,
-                norm_type="layer",
-            )
-        else:
-            self.w = nn.Identity()
+        self.hidden_rep_dim = (
+            self.cont_cat_model.hidden_rep_dim
+            + int(self.seq_model.run) * self.seq_model.hidden_rep_dim
+        )
+        self.w = get_linear(self.hidden_rep_dim, n_outputs, "relu")
 
     def _forward(self, x, derived_tensors):
         x_contcat = self.cont_cat_model(x, derived_tensors)
-        all_res = [x_contcat]
+        all_res = [self.cont_cat_model.hidden_representation]
 
         x_seq = self.seq_model(x, derived_tensors)
         if self.seq_model.run:
-            all_res += [x_seq]
+            all_res += [self.seq_model.hidden_representation]
 
         output = torch.concat(all_res, dim=1)
-        output = self.w(output) + x_contcat
+        self.hidden_representation = output
+        output = self.w(output)
         return output
 
 

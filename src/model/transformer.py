@@ -88,6 +88,7 @@ class Transformer(TorchModel):
             cls = getattr(sys.modules[__name__], f"{model_name}NN")
             return cls(
                 **fix_kwargs,
+                embedding_dim=3,
                 attn_ff_dim=256,
                 **kwargs,
             )
@@ -207,11 +208,11 @@ class Transformer(TorchModel):
             ] + self.trainer.SPACE
         elif model_name in ["CatEmbedSeq"]:
             return [
-                Integer(
-                    low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
-                ),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
+                # Integer(
+                #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
+                # ),
+                Real(low=0.0, high=0.5, prior="uniform", name="embed_dropout"),
+                Real(low=0.0, high=0.5, prior="uniform", name="mlp_dropout"),
                 Categorical(categories=[16, 32, 64], name="seq_embedding_dim"),
                 Integer(
                     low=2, high=16, prior="uniform", name="seq_attn_layers", dtype=int
@@ -334,7 +335,7 @@ class Transformer(TorchModel):
             "CatEmbedSeq",
         ]:
             res = {
-                "embedding_dim": 3,
+                # "embedding_dim": 3,
                 "embed_dropout": 0.1,
                 "mlp_dropout": 0.0,
                 "seq_embedding_dim": 16,
