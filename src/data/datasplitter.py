@@ -259,6 +259,20 @@ class CycleSplitter(AbstractSplitter):
         return np.array(train_indices), np.array(val_indices), np.array(test_indices)
 
 
+class RatioCycleSplitter(CycleSplitter):
+    """
+    Split the dataset by the material code and the number of cycles to simulate the scenario of prediction using
+    limited data from accelerated fatigue tests. Validation/testing sets contain data that have larger number of cycles
+    than the training set (even much larger in the testing set). Given "R-value", the splitting is performed for each
+    material and for each R.
+    """
+
+    @classmethod
+    def split_method(cls, *args, **kwargs):
+        kwargs["freq"] = None
+        return super(RatioCycleSplitter, cls).split_method(*args, **kwargs)
+
+
 splitter_mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:
