@@ -220,6 +220,10 @@ class CycleSplitter(AbstractSplitter):
                 m_test_indices = []
                 m_val_indices = []
                 for fr in np.unique(material_freq_r):
+                    if not isinstance(fr, str) and np.isnan(fr):
+                        where_fr = np.where(np.isnan(material_freq_r))[0]
+                        m_train_indices += list(where_material[where_fr])
+                        continue
                     where_fr = np.where(material_freq_r == fr)[0]
                     fr_cycle = material_cycle[where_fr]
                     fr_train_indices = where_fr[
