@@ -237,6 +237,29 @@ class CycleSplitter(AbstractSplitter):
                         where_fr, np.append(fr_train_indices, fr_test_indices)
                     )
                     m_train_indices += list(where_material[fr_train_indices])
+                    """
+                    # To make train and val sets random, use this:
+                    fr_train_val_indices = where_fr[
+                        fr_cycle
+                        <= np.percentile(fr_cycle, np.sum(train_val_test[0:2]) * 100)
+                    ]
+                    if (
+                        len(fr_train_val_indices)
+                        >= np.sum(train_val_test[0:2]) // train_val_test[1]
+                    ):
+                        fr_train_indices, fr_val_indices = train_test_split(
+                            fr_train_val_indices,
+                            test_size=train_val_test[1] / np.sum(train_val_test[0:2]),
+                            shuffle=True,
+                        )
+                    elif len(fr_train_val_indices) >= 2:
+                        fr_train_indices = fr_train_val_indices[0:-1]
+                        fr_val_indices = fr_train_val_indices[-1:]
+                    else:
+                        fr_train_indices = fr_train_val_indices
+                        fr_val_indices = np.array([], dtype=int)
+                    fr_test_indices = np.setdiff1d(where_fr, fr_train_val_indices)
+                    """
                     m_test_indices += list(where_material[fr_test_indices])
                     m_val_indices += list(where_material[fr_val_indices])
             else:
