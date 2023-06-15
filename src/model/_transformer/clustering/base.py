@@ -34,7 +34,7 @@ class LinLog(AbstractSN):
 class LogLog(AbstractSN):
     def forward(self, s: torch.Tensor, x_cluster: torch.Tensor):
         s = torch.clamp(torch.abs(s), min=1e-8)
-        log_s = torch.log10(torch.add(s, 1))
+        log_s = torch.log10(s)
         return self._linear(log_s, x_cluster)
 
 
@@ -97,7 +97,12 @@ class AbstractSNClustering(nn.Module):
         x_sn = torch.concat([sn(s, x_cluster).unsqueeze(-1) for sn in self.sns], dim=1)
         # Weighted sum of SN predictions
         self.ridge_input = x_sn
-        x_sn = torch.mul(x_sn, self.running_sn_weight[x_cluster, :])
+        x_sn = torch.mul(
+            x_sn,
+            nn.functional.normalize(
+                torch.abs(self.running_sn_weight[x_cluster, :]), p=1
+            ),
+        )
         x_sn = torch.sum(x_sn, dim=1).view(-1, 1)
         self.ridge_output = x_sn.flatten()
 
