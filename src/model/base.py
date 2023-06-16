@@ -1,5 +1,6 @@
 import os
 import pickle
+import pandas as pd
 import torch.optim.optimizer
 import src
 from src.utils import *
@@ -275,7 +276,61 @@ class AbstractModel:
             :func:``_pred_single_model``.
         """
         set_random_seed(src.setting["random_seed"])
+        required_models = self._get_required_models(model_name=model_name)
+        if required_models is not None:
+            kwargs["required_models"] = required_models
         return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
+
+    def _get_required_models(self, model_name):
+        required_model_names = self.required_models(model_name)
+        if required_model_names is not None:
+            required_models = {}
+            for name in required_model_names:
+                if name == model_name:
+                    raise Exception(f"The model {model_name} is required by itself.")
+                if name in self._get_model_names():
+                    if name not in self.model.keys():
+                        raise Exception(
+                            f"Model {name} is required for model {model_name}, but is not trained."
+                        )
+                    required_models[name] = self.model[name]
+                elif name.startswith("EXTERN_"):
+                    if len(name.split("_")) != 3:
+                        raise Exception(
+                            f"Unrecognized required model name {name} from external model bases."
+                        )
+                    _, program, ext_model_name = name.split("_")
+                    try:
+                        modelbase = self.trainer.get_modelbase(program=program)
+                    except:
+                        raise Exception(
+                            f"Model base {program} is required for model {model_name}, but does not exist."
+                        )
+                    try:
+                        detached_model = modelbase.detach_model(
+                            model_name=ext_model_name
+                        )
+                    except Exception as e:
+                        raise Exception(
+                            f"Model {ext_model_name} can not be detached from model base {program}. Exception:\n{e}"
+                        )
+                    required_models[name] = detached_model
+                else:
+                    raise Exception(
+                        f"Unrecognized model name {name} required by {model_name}."
+                    )
+            return required_models
+        else:
+            return None
+
+    def required_models(self, model_name: str) -> Union[List[str], None]:
+        """
+        The name of the model required by the requested model. If not None and the required model is
+        trained, the required model is passed to `_new_model`.
+        If models from other model bases are required, the return name should be
+        ``EXTERN_{Name of the model base}_{Name of the model}``
+        """
+        return None
 
     def _predict_all(
         self, verbose: bool = True, test_data_only: bool = False
@@ -882,18 +937,53 @@ class TorchModel(AbstractModel):
 
     def _train_data_preprocess(self, model_name):
         datamodule = self.trainer.datamodule
+        required_models = self._get_required_models(model_name)
+        if required_models is None:
+            train_dataset, val_dataset, test_dataset = (
+                datamodule.train_dataset,
+                datamodule.val_dataset,
+                datamodule.test_dataset,
+            )
+        else:
+            full_data_required_models = {
+                name: mod._data_preprocess(
+                    df=datamodule.scaled_df,
+                    derived_data=datamodule.derived_data,
+                    model_name=name,
+                )
+                for name, mod in required_models.items()
+                if not isinstance(mod, AbstractNN)
+            }
+            for val in full_data_required_models.values():
+                if not isinstance(val, pd.DataFrame):
+                    raise Exception(
+                        f"Requiring a model (except TorchModel) that does not return a pd.DataFrame by "
+                        f"_data_preprocess is currently not supported."
+                    )
+            tensor_dataset = Data.TensorDataset(*datamodule.tensors)
+            if len(full_data_required_models) == 0:
+                dataset = tensor_dataset
+            else:
+                dict_df_dataset = DictDataFrameDataset(full_data_required_models)
+                dataset = DictDataset(
+                    ListDataset([tensor_dataset, dict_df_dataset]),
+                    keys=["self", "required"],
+                )
+            train_dataset, val_dataset, test_dataset = datamodule.generate_subset(
+                dataset
+            )
         train_loader = Data.DataLoader(
-            datamodule.train_dataset,
+            train_dataset,
             batch_size=len(datamodule.train_dataset),
             pin_memory=True,
         )
         val_loader = Data.DataLoader(
-            datamodule.val_dataset,
+            val_dataset,
             batch_size=len(datamodule.val_dataset),
             pin_memory=True,
         )
         test_loader = Data.DataLoader(
-            datamodule.test_dataset,
+            test_dataset,
             batch_size=len(datamodule.test_dataset),
             pin_memory=True,
         )
@@ -1069,28 +1159,6 @@ class TorchModel(AbstractModel):
         """
         return val_loss
 
-    def new_model(self, model_name: str, verbose: bool, **kwargs):
-        required_model_names = self.required_models(model_name)
-        if required_model_names is not None:
-            required_models = {}
-            for name in required_model_names:
-                if name not in self.model.keys():
-                    raise Exception(
-                        f"Model {name} is required for model {model_name}, but is not trained."
-                    )
-                required_models[name] = self.model[name]
-            kwargs["required_models"] = required_models
-        return super(TorchModel, self).new_model(
-            model_name=model_name, verbose=verbose, **kwargs
-        )
-
-    def required_models(self, model_name: str) -> Union[List[str], None]:
-        """
-        The name of the model in the model base required by the AbstractNN. If not None and the required model is
-        trained, the required model is passed to `_new_model`
-        """
-        return None
-
 
 class AbstractNN(pl.LightningModule):
     def __init__(self, trainer: Trainer, **kwargs):
@@ -1128,7 +1196,11 @@ class AbstractNN(pl.LightningModule):
     def device(self):
         return self._device_var.device
 
-    def forward(self, *tensors: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        *tensors: torch.Tensor,
+        data_required_models: Dict[str, pd.DataFrame] = None,
+    ) -> torch.Tensor:
         """
         A wrapper of the original forward of nn.Module. Input data are tensors with no names, but their names are
         obtained during initialization, so that a dict of derived data with names is generated and passed to
@@ -1138,6 +1210,9 @@ class AbstractNN(pl.LightningModule):
         ----------
         tensors:
             Input tensors to the torch model.
+        data_required_models:
+            The corresponding data processed by the required models (see ``AbstractModel.required_models`` and
+            ``AbstractModel._data_preprocess``).
 
         Returns
         -------
@@ -1155,6 +1230,8 @@ class AbstractNN(pl.LightningModule):
                 derived_tensors = {}
                 for tensor, name in zip(additional_tensors, self.derived_feature_names):
                     derived_tensors[name] = tensor
+            if data_required_models is not None:
+                derived_tensors["data_required_models"] = data_required_models
             res = self._forward(x, derived_tensors)
             if len(res.shape) == 1:
                 res = res.view(-1, 1)
@@ -1170,11 +1247,17 @@ class AbstractNN(pl.LightningModule):
         raise NotImplementedError
 
     def training_step(self, batch, batch_idx):
+        if type(batch) == dict:
+            tensors, data_required_models = batch["self"], batch["required"]
+        else:
+            tensors, data_required_models = batch, None
         self.cal_zero_grad()
-        yhat = batch[-1]
-        data = batch[0]
-        additional_tensors = [x for x in batch[1 : len(batch) - 1]]
-        y = self(*([data] + additional_tensors))
+        yhat = tensors[-1]
+        data = tensors[0]
+        additional_tensors = [x for x in tensors[1 : len(tensors) - 1]]
+        y = self(
+            *([data] + additional_tensors), data_required_models=data_required_models
+        )
         loss = self.loss_fn(yhat, y, *([data] + additional_tensors))
         self.cal_backward_step(loss)
         mse = self.default_loss_fn(yhat, y)
@@ -1182,11 +1265,18 @@ class AbstractNN(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        if type(batch) == dict:
+            tensors, data_required_models = batch["self"], batch["required"]
+        else:
+            tensors, data_required_models = batch, None
         with torch.no_grad():
-            yhat = batch[-1]
-            data = batch[0]
-            additional_tensors = [x for x in batch[1 : len(batch) - 1]]
-            y = self(*([data] + additional_tensors))
+            yhat = tensors[-1]
+            data = tensors[0]
+            additional_tensors = [x for x in tensors[1 : len(tensors) - 1]]
+            y = self(
+                *([data] + additional_tensors),
+                data_required_models=data_required_models,
+            )
             mse = self.default_loss_fn(yhat, y)
             self.log("valid_mean_squared_error", mse.item())
         return yhat, y
@@ -1222,13 +1312,20 @@ class AbstractNN(pl.LightningModule):
         with torch.no_grad() if src.setting["test_with_no_grad"] else torch_with_grad():
             # print(test_dataset)
             avg_loss = 0
-            for idx, tensors in enumerate(test_loader):
+            for idx, batch in enumerate(test_loader):
+                if type(batch) == dict:
+                    tensors, data_required_models = batch["self"], batch["required"]
+                else:
+                    tensors, data_required_models = batch, None
                 yhat = tensors[-1].to(self.device)
                 data = tensors[0].to(self.device)
                 additional_tensors = [
                     x.to(self.device) for x in tensors[1 : len(tensors) - 1]
                 ]
-                y = self(*([data] + additional_tensors))
+                y = self(
+                    *([data] + additional_tensors),
+                    data_required_models=data_required_models,
+                )
                 loss = self.default_loss_fn(y, yhat)
                 avg_loss += loss.item() * len(y)
                 pred += list(y.cpu().detach().numpy())
@@ -1432,3 +1529,51 @@ class PytorchLightningLossCallback(Callback):
                 f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
                 f"Min val loss: {np.min(self.val_ls):.4f}, Epoch time: {time.time()-self.start_time:.3f}s."
             )
+
+
+class DataFrameDataset(Data.Dataset):
+    def __init__(self, df: pd.DataFrame):
+        self.df = df
+        self.df_dict = {key: df.loc[[key], :] for key in df.index}
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, item):
+        return self.df_dict[item]
+
+
+class ListDataset(Data.Dataset):
+    def __init__(self, datasets: List[Data.Dataset]):
+        self.datasets = datasets
+        for dataset in self.datasets:
+            if len(dataset) != len(self.datasets[0]):
+                raise Exception(f"All datasets should have the equal length.")
+
+    def __len__(self):
+        return len(self.datasets[0])
+
+    def __getitem__(self, item):
+        return [dataset.__getitem__(item) for dataset in self.datasets]
+
+
+class DictDataset(Data.Dataset):
+    def __init__(self, ls_dataset: ListDataset, keys: List[str]):
+        self.keys = keys
+        self.datasets = ls_dataset
+
+    def __len__(self):
+        return len(self.datasets)
+
+    def __getitem__(self, item):
+        return {
+            key: data for key, data in zip(self.keys, self.datasets.__getitem__(item))
+        }
+
+
+class DictDataFrameDataset(DictDataset):
+    def __init__(self, dict_dfs: Dict[str, pd.DataFrame]):
+        keys = list(dict_dfs.keys())
+        df_ls = list(dict_dfs.values())
+        ls_dataset = ListDataset([DataFrameDataset(df) for df in df_ls])
+        super(DictDataFrameDataset, self).__init__(ls_dataset=ls_dataset, keys=keys)

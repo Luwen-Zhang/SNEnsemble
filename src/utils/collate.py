@@ -2,6 +2,7 @@ import collections.abc
 import torch
 import re
 from torch._six import string_classes
+import pandas as pd
 
 default_collate_err_msg_format = (
     "default_collate: batch must contain tensors, numpy arrays, numbers, "
@@ -13,6 +14,7 @@ np_str_obj_array_pattern = re.compile(r"[SaUO]")
 
 def fix_collate_fn(batch):
     """
+    This function implements the collation of pd.DataFrame.
     The calculation of ``transposed=list(zip(*batch))`` in ``default_collate`` is modified due to the following unknown
     exception. I implement this function to test whether the internal ``list``, ``zip``, or ``*`` is the reason.
     However, whether this function is effective is under testing. Since it does not influence the results, I will keep
@@ -39,6 +41,8 @@ def fix_collate_fn(batch):
             storage = elem.storage()._new_shared(numel, device=elem.device)
             out = elem.new(storage).resize_(len(batch), *list(elem.size()))
         return torch.stack(batch, 0, out=out)
+    elif "pandas" in elem_type.__module__ and isinstance(elem, pd.DataFrame):
+        return pd.concat(batch)
     elif (
         elem_type.__module__ == "numpy"
         and elem_type.__name__ != "str_"

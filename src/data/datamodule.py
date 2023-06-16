@@ -1113,10 +1113,31 @@ class DataModule:
         ]
         dataset = Data.TensorDataset(X, *D, y)
 
-        self.train_dataset = Subset(dataset, self.train_indices)
-        self.val_dataset = Subset(dataset, self.val_indices)
-        self.test_dataset = Subset(dataset, self.test_indices)
+        self.train_dataset, self.val_dataset, self.test_dataset = self.generate_subset(
+            dataset
+        )
         self.tensors = (X, *D, y) if len(D) > 0 else (X, None, y)
+
+    def generate_subset(
+        self, dataset: Data.Dataset
+    ) -> Tuple[Data.Subset, Data.Subset, Data.Subset]:
+        """
+        Split the dataset into training, validation and testing subsets.
+
+        Parameters
+        ----------
+        dataset
+            A torch.utils.data.Dataset instance.
+
+        Returns
+        -------
+        Training, validation and testing subsets.
+        """
+        return (
+            Subset(dataset, self.train_indices),
+            Subset(dataset, self.val_indices),
+            Subset(dataset, self.test_indices),
+        )
 
     def get_derived_data_slice(
         self, derived_data: Dict[str, np.ndarray], indices: Iterable

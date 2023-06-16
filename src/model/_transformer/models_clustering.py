@@ -6,6 +6,7 @@ from .clustering.singlelayer import KMeansSN, GMMSN, BMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN, TwolayerBMMSN
 import torch
 from torch import nn
+import warnings
 
 
 class AbstractClusteringModel(AbstractNN):
@@ -30,10 +31,10 @@ class AbstractClusteringModel(AbstractNN):
         if not hasattr(self.cont_cat_model, "hidden_representation") or not hasattr(
             self.cont_cat_model, "hidden_rep_dim"
         ):
-            raise Exception(
+            warnings.warn(
                 f"The backbone should have an attribute called `hidden_representation` that records the "
                 f"final output of the hidden layer, and `hidden_rep_dim` that records the dim of "
-                f"`hidden_representation`."
+                f"`hidden_representation`. Now the output of the backbone is used instead."
             )
         self.s_zero_slip = trainer.datamodule.get_zero_slip("Relative Maximum Stress")
         self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
@@ -43,16 +44,27 @@ class AbstractClusteringModel(AbstractNN):
         )
         self.cls_head_normalize = nn.Sigmoid()
         self.cls_head_loss = nn.CrossEntropyLoss()
-        self.set_requires_grad(self.cont_cat_model, requires_grad=False)
+        if isinstance(self.cont_cat_model, nn.Module):
+            self.set_requires_grad(self.cont_cat_model, requires_grad=False)
 
     def _forward(self, x, derived_tensors):
         # Prediction of deep learning models.
-        dl_pred = self.cont_cat_model(x, derived_tensors)
+        if isinstance(self.cont_cat_model, nn.Module):
+            dl_pred = self.cont_cat_model(x, derived_tensors)
+        else:
+            name = self.cont_cat_model.get_model_names()[0]
+            full_name = f"EXTERN_{self.cont_cat_model.program}_{name}"
+            ml_pred = self.cont_cat_model._pred_single_model(
+                self.cont_cat_model.model[name],
+                X_test=derived_tensors["data_required_models"][full_name],
+                verbose=False,
+            )
+            dl_pred = torch.tensor(ml_pred, device=x.device)
         # Prediction of physical models
         s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
         phy_pred = self.clustering_sn_model(x[:, self.clustering_features], s_wo_bias)
         # Projection from hidden output to deep learning weights
-        hidden = self.cont_cat_model.hidden_representation
+        hidden = getattr(self.cont_cat_model, "hidden_representation", dl_pred)
         dl_weight = self.cls_head_normalize(self.cls_head(hidden))
         # Weighted sum of prediction
         out = phy_pred + torch.mul(dl_weight, dl_pred - phy_pred)
