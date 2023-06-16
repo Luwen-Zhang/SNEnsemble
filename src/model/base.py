@@ -1261,7 +1261,7 @@ class AbstractNN(pl.LightningModule):
         loss = self.loss_fn(yhat, y, *([data] + additional_tensors))
         self.cal_backward_step(loss)
         mse = self.default_loss_fn(yhat, y)
-        self.log("train_mean_squared_error", mse.item())
+        self.log("train_mean_squared_error", mse.item(), batch_size=y.shape[0])
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -1278,7 +1278,7 @@ class AbstractNN(pl.LightningModule):
                 data_required_models=data_required_models,
             )
             mse = self.default_loss_fn(yhat, y)
-            self.log("valid_mean_squared_error", mse.item())
+            self.log("valid_mean_squared_error", mse.item(), batch_size=y.shape[0])
         return yhat, y
 
     def configure_optimizers(self) -> Any:
