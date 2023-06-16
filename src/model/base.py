@@ -401,12 +401,12 @@ class AbstractModel:
                 self.model = ModelDict(path=self.root)
             else:
                 self.model = {}
-        data = self._train_data_preprocess()
         for model_name in (
             self.get_model_names() if model_subset is None else model_subset
         ):
             if verbose:
                 print(f"Training {model_name}")
+            data = self._train_data_preprocess(model_name)
             tmp_params = self._get_params(model_name, verbose=verbose)
             space = self._space(model_name=model_name)
             if self.trainer.args["bayes_opt"] and not warm_start and len(space) > 0:
@@ -673,9 +673,14 @@ class AbstractModel:
         """
         raise NotImplementedError
 
-    def _train_data_preprocess(self) -> Union[DataModule, dict]:
+    def _train_data_preprocess(self, model_name) -> Union[DataModule, dict]:
         """
         Processing the data from self.trainer.datamodule for training.
+
+        Parameters
+        -------
+        model_name:
+            The name of a selected model.
 
         Returns
         -------
@@ -875,7 +880,7 @@ class TorchModel(AbstractModel):
     The specific class for PyTorch-like models. Some abstract methods in AbstractModel are implemented.
     """
 
-    def _train_data_preprocess(self):
+    def _train_data_preprocess(self, model_name):
         datamodule = self.trainer.datamodule
         train_loader = Data.DataLoader(
             datamodule.train_dataset,

@@ -100,7 +100,7 @@ class PytorchTabular(AbstractModel):
         ExperimentRunManager.__init__ = erm_original_init
         return tabular_model
 
-    def _train_data_preprocess(self):
+    def _train_data_preprocess(self, model_name):
         data = self.trainer.datamodule
         all_feature_names = self.trainer.all_feature_names
         X_train = data.categories_inverse_transform(data.X_train[all_feature_names])

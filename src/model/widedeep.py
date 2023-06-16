@@ -293,7 +293,7 @@ class WideDeep(AbstractModel):
         )
         return wd_trainer
 
-    def _train_data_preprocess(self):
+    def _train_data_preprocess(self, model_name):
         from pytorch_widedeep.preprocessing import TabPreprocessor
         from pandas._config import option_context
 

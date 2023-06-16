@@ -32,7 +32,7 @@ class AutoGluon(AbstractModel):
             os.mkdir(path)
         return (model_name, predictor)
 
-    def _train_data_preprocess(self):
+    def _train_data_preprocess(self, model_name):
         data = self.trainer.datamodule
         all_feature_names = self.trainer.all_feature_names
         X_train = data.categories_inverse_transform(data.X_train[all_feature_names])

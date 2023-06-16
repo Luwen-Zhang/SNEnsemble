@@ -42,7 +42,7 @@ class TabNet(AbstractModel):
         model.set_params(**params)
         return model
 
-    def _train_data_preprocess(self):
+    def _train_data_preprocess(self, model_name):
         data = self.trainer.datamodule
         cont_feature_names = self.trainer.cont_feature_names
         X_train = data.X_train[cont_feature_names].values.astype(np.float32)
