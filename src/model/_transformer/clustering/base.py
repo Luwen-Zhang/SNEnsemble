@@ -10,7 +10,6 @@ class AbstractSN(nn.Module):
         super(AbstractSN, self).__init__()
         self.activ = torch.abs
         self._register_params(**kwargs)
-        self.lstsq_input = None
         self.lstsq_output = None
 
     def _register_params(self, n_clusters=1, **kwargs):
@@ -18,7 +17,6 @@ class AbstractSN(nn.Module):
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 5))
 
     def _linear(self, s, x_cluster):
-        self.lstsq_input = s
         self.lstsq_output = -torch.mul(self.activ(self.a[x_cluster]), s) + self.activ(
             self.b[x_cluster]
         )
@@ -32,9 +30,31 @@ class LinLog(AbstractSN):
 
 
 class LogLog(AbstractSN):
+    def _register_params(self, n_clusters=1, **kwargs):
+        super(LogLog, self)._register_params(n_clusters=n_clusters, **kwargs)
+        self.sw = nn.Parameter(torch.zeros(n_clusters))
+        self.register_buffer("min_s", torch.ones(n_clusters))
+
     def forward(self, s: torch.Tensor, x_cluster: torch.Tensor):
         s = torch.clamp(torch.abs(s), min=1e-8)
-        log_s = torch.log10(s)
+        s_sw = torch.clamp(
+            s
+            - torch.clamp(torch.sigmoid(self.sw[x_cluster]), max=self.min_s[x_cluster]),
+            min=1e-8,
+        )
+        if self.training:
+            s_mat = torch.mul(
+                torch.ones(s.shape[0], self.min_s.shape[0], device=s.device), 100
+            )
+            s_mat[torch.arange(s.shape[0]), x_cluster] = s
+            self.min_s = torch.min(
+                torch.concat(
+                    [self.min_s.view(-1, 1), torch.min(s_mat, dim=0)[0].view(-1, 1)],
+                    dim=1,
+                ),
+                dim=1,
+            )[0]
+        log_s = torch.log10(s_sw)
         return self._linear(log_s, x_cluster)
 
 
