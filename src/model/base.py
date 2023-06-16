@@ -945,30 +945,12 @@ class TorchModel(AbstractModel):
                 datamodule.test_dataset,
             )
         else:
-            full_data_required_models = {
-                name: mod._data_preprocess(
-                    df=datamodule.scaled_df,
-                    derived_data=datamodule.derived_data,
-                    model_name=name,
-                )
-                for name, mod in required_models.items()
-                if not isinstance(mod, AbstractNN)
-            }
-            for val in full_data_required_models.values():
-                if not isinstance(val, pd.DataFrame):
-                    raise Exception(
-                        f"Requiring a model (except TorchModel) that does not return a pd.DataFrame by "
-                        f"_data_preprocess is currently not supported."
-                    )
-            tensor_dataset = Data.TensorDataset(*datamodule.tensors)
-            if len(full_data_required_models) == 0:
-                dataset = tensor_dataset
-            else:
-                dict_df_dataset = DictDataFrameDataset(full_data_required_models)
-                dataset = DictDataset(
-                    ListDataset([tensor_dataset, dict_df_dataset]),
-                    keys=["self", "required"],
-                )
+            dataset = self._generate_dataset_for_required_models(
+                df=datamodule.df,
+                derived_data=datamodule.derived_data,
+                tensors=datamodule.tensors,
+                required_models=required_models,
+            )
             train_dataset, val_dataset, test_dataset = datamodule.generate_subset(
                 dataset
             )
@@ -996,22 +978,62 @@ class TorchModel(AbstractModel):
             "y_test": datamodule.y_test,
         }
 
+    def _generate_dataset_for_required_models(
+        self, df, derived_data, tensors, required_models
+    ):
+        full_data_required_models = {
+            name: mod._data_preprocess(
+                df=df,
+                derived_data=derived_data,
+                model_name=name,
+            )
+            for name, mod in required_models.items()
+            if not isinstance(mod, AbstractNN)
+        }
+        for val in full_data_required_models.values():
+            if not isinstance(val, pd.DataFrame):
+                raise Exception(
+                    f"Requiring a model (except TorchModel) that does not return a pd.DataFrame by "
+                    f"_data_preprocess is currently not supported."
+                )
+        tensor_dataset = Data.TensorDataset(*tensors)
+        if len(full_data_required_models) == 0:
+            dataset = tensor_dataset
+        else:
+            dict_df_dataset = DictDataFrameDataset(full_data_required_models)
+            dataset = DictDataset(
+                ListDataset([tensor_dataset, dict_df_dataset]),
+                keys=["self", "required"],
+            )
+        return dataset
+
     def _data_preprocess(self, df, derived_data, model_name):
-        df = self.trainer.datamodule.data_transform(df, scaler_only=True)
+        scaled_df = self.trainer.datamodule.data_transform(df, scaler_only=True)
         X = torch.tensor(
-            df[self.trainer.cont_feature_names].values.astype(np.float32),
+            scaled_df[self.trainer.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
         )
         D = [
             torch.tensor(value, dtype=torch.float32) for value in derived_data.values()
         ]
         y = torch.tensor(
-            np.zeros((len(df), len(self.trainer.label_name))), dtype=torch.float32
+            np.zeros((len(scaled_df), len(self.trainer.label_name))),
+            dtype=torch.float32,
         )
-
+        tensors = (X, *D, y)
+        required_models = self._get_required_models(model_name)
+        if required_models is None:
+            dataset = Data.TensorDataset(*tensors)
+        else:
+            dataset = self._generate_dataset_for_required_models(
+                df=df,  # Use the unscaled one here
+                derived_data=derived_data,
+                tensors=tensors,
+                required_models=required_models,
+            )
         loader = Data.DataLoader(
-            Data.TensorDataset(X, *D, y),
-            batch_size=len(df),
+            dataset,
+            batch_size=len(scaled_df),
             shuffle=False,
             pin_memory=True,
         )
