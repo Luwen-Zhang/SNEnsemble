@@ -1064,6 +1064,28 @@ class TorchModel(AbstractModel):
         """
         return val_loss
 
+    def new_model(self, model_name: str, verbose: bool, **kwargs):
+        required_model_names = self.required_models(model_name)
+        if required_model_names is not None:
+            required_models = {}
+            for name in required_model_names:
+                if name not in self.model.keys():
+                    raise Exception(
+                        f"Model {name} is required for model {model_name}, but is not trained."
+                    )
+                required_models[name] = self.model[name]
+            kwargs["required_models"] = required_models
+        return super(TorchModel, self).new_model(
+            model_name=model_name, verbose=verbose, **kwargs
+        )
+
+    def required_models(self, model_name: str) -> Union[List[str], None]:
+        """
+        The name of the model in the model base required by the AbstractNN. If not None and the required model is
+        trained, the required model is passed to `_new_model`
+        """
+        return None
+
 
 class AbstractNN(pl.LightningModule):
     def __init__(self, trainer: Trainer, **kwargs):
@@ -1088,7 +1110,9 @@ class AbstractNN(pl.LightningModule):
         self.hidden_representation = None
         self.hidden_rep_dim = None
         if len(kwargs) > 0:
-            self.save_hyperparameters(*list(kwargs.keys()), ignore=["trainer"])
+            self.save_hyperparameters(
+                *list(kwargs.keys()), ignore=["trainer", "required_models"]
+            )
         for name, dim in zip(
             trainer.derived_data.keys(), trainer.datamodule.get_derived_data_sizes()
         ):

@@ -232,9 +232,7 @@ class Transformer(TorchModel):
                 # Integer(
                 #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
                 # ),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
-                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
             ] + self.trainer.SPACE
         elif model_name in [
             "SNCatEmbedLR2LKMeans",
@@ -248,7 +246,6 @@ class Transformer(TorchModel):
                 # Integer(
                 #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
                 # ),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
                 Integer(low=4, high=64, prior="uniform", name="n_clusters", dtype=int),
                 Integer(
                     low=4,
@@ -257,7 +254,6 @@ class Transformer(TorchModel):
                     name="n_clusters_per_cluster",
                     dtype=int,
                 ),
-                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
             ] + self.trainer.SPACE
         elif model_name in ["SNCatEmbedLRKMeansSeq"]:
             return [
@@ -353,9 +349,7 @@ class Transformer(TorchModel):
         ]:
             res = {
                 # "embedding_dim": 3,
-                "embed_dropout": 0.1,
                 "n_clusters": 16,
-                "mlp_dropout": 0.0,
             }
         elif model_name in [
             "SNCatEmbedLR2LKMeans",
@@ -367,10 +361,8 @@ class Transformer(TorchModel):
         ]:
             res = {
                 # "embedding_dim": 3,
-                "embed_dropout": 0.1,
                 "n_clusters": 16,
                 "n_clusters_per_cluster": 8,
-                "mlp_dropout": 0.0,
             }
         elif model_name in [
             "SNCatEmbedLRKMeansSeq",
@@ -395,6 +387,12 @@ class Transformer(TorchModel):
         ):
             return False
         return True
+
+    def required_models(self, model_name: str) -> Union[List[str], None]:
+        if "SNCatEmbed" in model_name and "Seq" not in model_name:
+            return ["CategoryEmbedding"]
+        else:
+            return None
 
     # def _bayes_eval(
     #     self,
