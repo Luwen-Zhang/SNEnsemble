@@ -1553,18 +1553,25 @@ class PytorchLightningLossCallback(Callback):
         logs = trainer.callback_metrics
         train_loss = logs["train_mean_squared_error"].detach().cpu().numpy()
         val_loss = logs["valid_mean_squared_error"].detach().cpu().numpy()
-        es_eval_loss = logs["early_stopping_eval"].detach().cpu().numpy()
         self.val_ls.append(val_loss)
-        self.es_val_ls.append(es_eval_loss)
+        if "early_stopping_eval" in logs.keys():
+            es_eval_loss = logs["early_stopping_eval"].detach().cpu().numpy()
+            self.es_val_ls.append(es_eval_loss)
         epoch = trainer.current_epoch
         if (
             (epoch + 1) % src.setting["verbose_per_epoch"] == 0 or epoch == 0
         ) and self.verbose:
-            print(
-                f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
-                f"Min val loss: {np.min(self.val_ls):.4f}, Min ES val loss: {np.min(self.es_val_ls):.4f}, "
-                f"Epoch time: {time.time()-self.start_time:.3f}s."
-            )
+            if "early_stopping_eval" in logs.keys():
+                print(
+                    f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
+                    f"Min val loss: {np.min(self.val_ls):.4f}, Min ES val loss: {np.min(self.es_val_ls):.4f}, "
+                    f"Epoch time: {time.time()-self.start_time:.3f}s."
+                )
+            else:
+                print(
+                    f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
+                    f"Min val loss: {np.min(self.val_ls):.4f}, Epoch time: {time.time() - self.start_time:.3f}s."
+                )
 
 
 class DataFrameDataset(Data.Dataset):
