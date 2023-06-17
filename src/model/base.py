@@ -1265,7 +1265,13 @@ class AbstractNN(pl.LightningModule):
         loss = self.loss_fn(yhat, y, *([data] + additional_tensors))
         self.cal_backward_step(loss)
         mse = self.default_loss_fn(yhat, y)
-        self.log("train_mean_squared_error", mse.item(), batch_size=y.shape[0])
+        self.log(
+            "train_mean_squared_error",
+            mse.item(),
+            on_step=False,
+            on_epoch=True,
+            batch_size=y.shape[0],
+        )
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -1282,18 +1288,14 @@ class AbstractNN(pl.LightningModule):
                 data_required_models=data_required_models,
             )
             mse = self.default_loss_fn(yhat, y)
-            self.log("valid_mean_squared_error", mse.item(), batch_size=y.shape[0])
-        return yhat, y
-
-    def on_validation_epoch_end(self) -> None:
-        if not self.trainer.sanity_checking:
             self.log(
-                "early_stopping_eval",
-                self._early_stopping_eval(
-                    self.trainer.logged_metrics["train_mean_squared_error"],
-                    self.trainer.logged_metrics["valid_mean_squared_error"],
-                ),
+                "valid_mean_squared_error",
+                mse.item(),
+                on_step=False,
+                on_epoch=True,
+                batch_size=y.shape[0],
             )
+        return yhat, y
 
     def configure_optimizers(self) -> Any:
         return torch.optim.Adam(
@@ -1554,14 +1556,20 @@ class PytorchLightningLossCallback(Callback):
         train_loss = logs["train_mean_squared_error"].detach().cpu().numpy()
         val_loss = logs["valid_mean_squared_error"].detach().cpu().numpy()
         self.val_ls.append(val_loss)
-        if "early_stopping_eval" in logs.keys():
-            es_eval_loss = logs["early_stopping_eval"].detach().cpu().numpy()
-            self.es_val_ls.append(es_eval_loss)
+        if hasattr(pl_module, "_early_stopping_eval"):
+            early_stopping_eval = pl_module._early_stopping_eval(
+                trainer.logged_metrics["train_mean_squared_error"],
+                trainer.logged_metrics["valid_mean_squared_error"],
+            ).item()
+            pl_module.log("early_stopping_eval", early_stopping_eval)
+            self.es_val_ls.append(early_stopping_eval)
+        else:
+            early_stopping_eval = None
         epoch = trainer.current_epoch
         if (
             (epoch + 1) % src.setting["verbose_per_epoch"] == 0 or epoch == 0
         ) and self.verbose:
-            if "early_stopping_eval" in logs.keys():
+            if early_stopping_eval is not None:
                 print(
                     f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
                     f"Min val loss: {np.min(self.val_ls):.4f}, Min ES val loss: {np.min(self.es_val_ls):.4f}, "
