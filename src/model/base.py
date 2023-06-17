@@ -923,7 +923,7 @@ class BayesCallback:
         self.cnt += 1
         tot_time = time.time() - self.init_time
         print(
-            f"Bayes-opt {self.cnt}/{self.total}, tot {tot_time:.2f}s, avg {tot_time/self.cnt:.2f}it/s: {self.postfix}"
+            f"Bayes-opt {self.cnt}/{self.total}, tot {tot_time:.2f}s, avg {tot_time/self.cnt:.2f}s/it: {self.postfix}"
         )
 
     def close(self):
