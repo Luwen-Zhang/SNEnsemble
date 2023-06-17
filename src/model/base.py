@@ -1074,13 +1074,13 @@ class TorchModel(AbstractModel):
         val_loader = X_val
 
         es_callback = EarlyStopping(
-            monitor="valid_mean_squared_error",
+            monitor="early_stopping_eval",
             min_delta=0.001,
             patience=self.trainer.static_params["patience"],
             mode="min",
         )
         ckpt_callback = ModelCheckpoint(
-            monitor="valid_mean_squared_error",
+            monitor="early_stopping_eval",
             dirpath=self.root,
             filename="early_stopping_ckpt",
             save_top_k=1,
@@ -1162,24 +1162,6 @@ class TorchModel(AbstractModel):
             return sum(p.numel() for p in model.parameters() if p.requires_grad)
         else:
             return sum(p.numel() for p in model.parameters())
-
-    def _early_stopping_eval(self, train_loss: float, val_loss: float) -> float:
-        """
-        Calculate the loss value (criteria) for early stopping. The validation loss is returned directly.
-
-        Parameters
-        ----------
-        train_loss
-            Training loss at the epoch.
-        val_loss
-            Validation loss at the epoch.
-
-        Returns
-        -------
-        result
-            The early stopping evaluation.
-        """
-        return val_loss
 
 
 class AbstractNN(pl.LightningModule):
@@ -1303,6 +1285,16 @@ class AbstractNN(pl.LightningModule):
             self.log("valid_mean_squared_error", mse.item(), batch_size=y.shape[0])
         return yhat, y
 
+    def on_validation_epoch_end(self) -> None:
+        if not self.trainer.sanity_checking:
+            self.log(
+                "early_stopping_eval",
+                self._early_stopping_eval(
+                    self.trainer.logged_metrics["train_mean_squared_error"],
+                    self.trainer.logged_metrics["valid_mean_squared_error"],
+                ),
+            )
+
     def configure_optimizers(self) -> Any:
         return torch.optim.Adam(
             self.parameters(),
@@ -1422,6 +1414,24 @@ class AbstractNN(pl.LightningModule):
                 param.requires_grad_(requires_grad)
             return state
 
+    def _early_stopping_eval(self, train_loss: float, val_loss: float) -> float:
+        """
+        Calculate the loss value (criteria) for early stopping. The validation loss is returned directly.
+
+        Parameters
+        ----------
+        train_loss
+            Training loss at the epoch.
+        val_loss
+            Validation loss at the epoch.
+
+        Returns
+        -------
+        result
+            The early stopping evaluation.
+        """
+        return val_loss
+
 
 class ModelDict:
     def __init__(self, path):
@@ -1527,6 +1537,7 @@ class PytorchLightningLossCallback(Callback):
     def __init__(self, verbose, total_epoch):
         super(PytorchLightningLossCallback, self).__init__()
         self.val_ls = []
+        self.es_val_ls = []
         self.verbose = verbose
         self.total_epoch = total_epoch
         self.start_time = 0
@@ -1542,14 +1553,17 @@ class PytorchLightningLossCallback(Callback):
         logs = trainer.callback_metrics
         train_loss = logs["train_mean_squared_error"].detach().cpu().numpy()
         val_loss = logs["valid_mean_squared_error"].detach().cpu().numpy()
+        es_eval_loss = logs["early_stopping_eval"].detach().cpu().numpy()
         self.val_ls.append(val_loss)
+        self.es_val_ls.append(es_eval_loss)
         epoch = trainer.current_epoch
         if (
             (epoch + 1) % src.setting["verbose_per_epoch"] == 0 or epoch == 0
         ) and self.verbose:
             print(
                 f"Epoch: {epoch + 1}/{self.total_epoch}, Train loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, "
-                f"Min val loss: {np.min(self.val_ls):.4f}, Epoch time: {time.time()-self.start_time:.3f}s."
+                f"Min val loss: {np.min(self.val_ls):.4f}, Min ES val loss: {np.min(self.es_val_ls):.4f}, "
+                f"Epoch time: {time.time()-self.start_time:.3f}s."
             )
 
 
