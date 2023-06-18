@@ -282,7 +282,7 @@ class PCAGMM(GMM):
                 if n_input < n_pca_dim:
                     raise Exception(msg)
                 elif n_input == n_pca_dim:
-                    warnings.warn(msg)
+                    print(msg)
                 super(PCAGMM, self).__init__(n_input=n_input, on_cpu=on_cpu, **kwargs)
             else:
                 self.n_clustering_features = np.min([n_input, n_pca_dim])

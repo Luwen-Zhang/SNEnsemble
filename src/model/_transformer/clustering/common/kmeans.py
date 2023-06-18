@@ -187,7 +187,7 @@ class PCAKMeans(KMeans):
                 if n_input < n_pca_dim:
                     raise Exception(msg)
                 elif n_input == n_pca_dim:
-                    warnings.warn(msg)
+                    print(msg)
                 super(PCAKMeans, self).__init__(
                     n_input=n_input, on_cpu=on_cpu, **kwargs
                 )
