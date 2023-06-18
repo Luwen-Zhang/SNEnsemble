@@ -517,6 +517,10 @@ class AbstractModel:
                         "ignore",
                         message="The objective has been evaluated at this point before",
                     )
+                    warnings.filterwarnings(
+                        "ignore",
+                        message="`pytorch_lightning.utilities.cloud_io.get_filesystem` has been deprecated in v1.8.0 and will be removed in v1.10.0.",
+                    )
                     result = gp_minimize(
                         _bayes_objective,
                         self._space(model_name=model_name),
