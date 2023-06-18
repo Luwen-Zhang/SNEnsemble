@@ -35,9 +35,9 @@ class AutoGluon(AbstractModel):
     def _train_data_preprocess(self, model_name):
         data = self.trainer.datamodule
         all_feature_names = self.trainer.all_feature_names
-        X_train = data.categories_inverse_transform(data.X_train[all_feature_names])
-        X_val = data.categories_inverse_transform(data.X_val[all_feature_names])
-        X_test = data.categories_inverse_transform(data.X_test[all_feature_names])
+        X_train = data.categories_inverse_transform(data.X_train)[all_feature_names]
+        X_val = data.categories_inverse_transform(data.X_val)[all_feature_names]
+        X_test = data.categories_inverse_transform(data.X_test)[all_feature_names]
         return {
             "X_train": X_train,
             "y_train": data.y_train,
@@ -49,9 +49,9 @@ class AutoGluon(AbstractModel):
 
     def _data_preprocess(self, df, derived_data, model_name):
         all_feature_names = self.trainer.all_feature_names
-        df = self.trainer.datamodule.categories_inverse_transform(
-            df[all_feature_names].copy()
-        )
+        df = self.trainer.datamodule.categories_inverse_transform(df.copy())[
+            all_feature_names
+        ]
         return df
 
     def _train_single_model(
