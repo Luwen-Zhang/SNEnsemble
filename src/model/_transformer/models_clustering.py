@@ -50,6 +50,7 @@ class AbstractClusteringModel(AbstractNN):
     def _forward(self, x, derived_tensors):
         # Prediction of deep learning models.
         if isinstance(self.cont_cat_model, nn.Module):
+            self.cont_cat_model.eval()
             dl_pred = self.cont_cat_model(x, derived_tensors)
         else:
             name = self.cont_cat_model.get_model_names()[0]
