@@ -18,7 +18,7 @@ models = [
         trainer,
         model_subset=[
             # "CatEmbedSeq"
-            # "CategoryEmbedding",
+            "CategoryEmbedding",
             # "SNCatEmbedLRKMeans",
             # "SNCatEmbedLRGMM",
             # "SNCatEmbedLRBMM",
