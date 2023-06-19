@@ -1,5 +1,6 @@
 import os
 import pickle
+import numpy as np
 import pandas as pd
 import torch.optim.optimizer
 import src
@@ -997,16 +998,16 @@ class TorchModel(AbstractModel):
             if not isinstance(mod, AbstractNN)
         }
         for val in full_data_required_models.values():
-            if not isinstance(val, pd.DataFrame):
+            if not isinstance(val, pd.DataFrame) and not isinstance(val, np.ndarray):
                 raise Exception(
-                    f"Requiring a model (except TorchModel) that does not return a pd.DataFrame by "
+                    f"Requiring a model (except TorchModel) that does not return a pd.DataFrame or np.ndarray by "
                     f"_data_preprocess is currently not supported."
                 )
         tensor_dataset = Data.TensorDataset(*tensors)
         if len(full_data_required_models) == 0:
             dataset = tensor_dataset
         else:
-            dict_df_dataset = DictDataFrameDataset(full_data_required_models)
+            dict_df_dataset = DictMixDataset(full_data_required_models)
             dataset = DictDataset(
                 ListDataset([tensor_dataset, dict_df_dataset]),
                 keys=["self", "required"],
@@ -1059,7 +1060,9 @@ class TorchModel(AbstractModel):
         **kwargs,
     ):
         if not isinstance(model, AbstractNN):
-            raise Exception("_new_model must return an AbstractNN instance.")
+            raise Exception(
+                f"_new_model must return an AbstractNN instance, but got {model}."
+            )
 
         warnings.filterwarnings(
             "ignore", "The dataloader, val_dataloader 0, does not have many workers"
@@ -1600,6 +1603,17 @@ class DataFrameDataset(Data.Dataset):
         return self.df_dict[item]
 
 
+class NDArrayDataset(Data.Dataset):
+    def __init__(self, array: np.ndarray):
+        self.array = array
+
+    def __len__(self):
+        return self.array.shape[0]
+
+    def __getitem__(self, item):
+        return self.array[item]
+
+
 class ListDataset(Data.Dataset):
     def __init__(self, datasets: List[Data.Dataset]):
         self.datasets = datasets
@@ -1634,3 +1648,31 @@ class DictDataFrameDataset(DictDataset):
         df_ls = list(dict_dfs.values())
         ls_dataset = ListDataset([DataFrameDataset(df) for df in df_ls])
         super(DictDataFrameDataset, self).__init__(ls_dataset=ls_dataset, keys=keys)
+
+
+class DictNDArrayDataset(DictDataset):
+    def __init__(self, dict_array: Dict[str, np.ndarray]):
+        keys = list(dict_array.keys())
+        array_ls = list(dict_array.values())
+        ls_dataset = ListDataset([NDArrayDataset(array) for array in array_ls])
+        super(DictNDArrayDataset, self).__init__(ls_dataset=ls_dataset, keys=keys)
+
+
+class DictMixDataset(DictDataset):
+    def __init__(self, dict_mix: Dict[str, Union[pd.DataFrame, np.ndarray]]):
+        keys = list(dict_mix.keys())
+        item_ls = list(dict_mix.values())
+        for item in item_ls:
+            if not isinstance(item, pd.DataFrame) and not isinstance(item, np.ndarray):
+                raise Exception(
+                    f"Generating a mixed type (pd.DataFrame or np.ndarray) dataset for type {type(item)}."
+                )
+        ls_dataset = ListDataset(
+            [
+                DataFrameDataset(item)
+                if isinstance(item, pd.DataFrame)
+                else NDArrayDataset(item)
+                for item in item_ls
+            ]
+        )
+        super(DictMixDataset, self).__init__(ls_dataset=ls_dataset, keys=keys)
