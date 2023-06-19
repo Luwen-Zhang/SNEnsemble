@@ -1035,7 +1035,7 @@ class TorchModel(AbstractModel):
             dataset = Data.TensorDataset(*tensors)
         else:
             dataset = self._generate_dataset_for_required_models(
-                df=df,  # Use the unscaled one here
+                df=df.reset_index(drop=True),  # Use the unscaled one here
                 derived_data=derived_data,
                 tensors=tensors,
                 required_models=required_models,
@@ -1595,7 +1595,8 @@ class PytorchLightningLossCallback(Callback):
 
 class DataFrameDataset(Data.Dataset):
     def __init__(self, df: pd.DataFrame):
-        self.df = df
+        # If predicting for a new dataframe, the index might be a mess.
+        self.df = df.reset_index(drop=True)
         self.df_dict = {
             key: row[1] for key, row in zip(self.df.index, self.df.iterrows())
         }
