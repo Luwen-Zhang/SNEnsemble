@@ -44,6 +44,12 @@ class Transformer(TorchModel):
             "SNCatEmbedLRPCAKMeans",
             "SNCatEmbedLR2LKMeans",
             "SNCatEmbedLR2LPCAKMeans",
+            "SNCategoryEmbedLR2LPCAKMeans",
+            "SNCategoryEmbedLR2LPCAGMM",
+            "SNCategoryEmbedLR2LPCABMM",
+            "SNFTTransLR2LPCAKMeans",
+            "SNFTTransLR2LPCAGMM",
+            "SNFTTransLR2LPCABMM",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -113,6 +119,12 @@ class Transformer(TorchModel):
             "SNCatEmbedLR2LPCAKMeans",
             "SNCatEmbedLR2LPCAGMM",
             "SNCatEmbedLR2LPCABMM",
+            "SNCategoryEmbedLR2LPCAKMeans",
+            "SNCategoryEmbedLR2LPCAGMM",
+            "SNCategoryEmbedLR2LPCABMM",
+            "SNFTTransLR2LPCAKMeans",
+            "SNFTTransLR2LPCAGMM",
+            "SNFTTransLR2LPCABMM",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name.replace('PCA', '')}NN")
             if "2L" not in model_name:
@@ -241,6 +253,12 @@ class Transformer(TorchModel):
             "SNCatEmbedLR2LPCAKMeans",
             "SNCatEmbedLR2LPCAGMM",
             "SNCatEmbedLR2LPCABMM",
+            "SNCategoryEmbedLR2LPCAKMeans",
+            "SNCategoryEmbedLR2LPCAGMM",
+            "SNCategoryEmbedLR2LPCABMM",
+            "SNFTTransLR2LPCAKMeans",
+            "SNFTTransLR2LPCAGMM",
+            "SNFTTransLR2LPCABMM",
         ]:
             return [
                 # Integer(
@@ -358,6 +376,12 @@ class Transformer(TorchModel):
             "SNCatEmbedLR2LPCAKMeans",
             "SNCatEmbedLR2LPCAGMM",
             "SNCatEmbedLR2LPCABMM",
+            "SNCategoryEmbedLR2LPCAKMeans",
+            "SNCategoryEmbedLR2LPCAGMM",
+            "SNCategoryEmbedLR2LPCABMM",
+            "SNFTTransLR2LPCAKMeans",
+            "SNFTTransLR2LPCAGMM",
+            "SNFTTransLR2LPCABMM",
         ]:
             res = {
                 # "embedding_dim": 3,
@@ -391,6 +415,10 @@ class Transformer(TorchModel):
     def required_models(self, model_name: str) -> Union[List[str], None]:
         if "SNCatEmbed" in model_name and "Seq" not in model_name:
             return ["CategoryEmbedding"]
+        if "SNCategoryEmbed" in model_name:
+            return ["EXTERN_PytorchTabular_Category Embedding"]
+        if "SNFTTrans" in model_name:
+            return ["EXTERN_WideDeep_FTTransformer"]
         else:
             return None
 

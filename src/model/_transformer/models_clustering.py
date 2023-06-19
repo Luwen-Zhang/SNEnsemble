@@ -505,3 +505,267 @@ class SNCatEmbedLR2LBMMNN(AbstractClusteringModel):
             hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
+
+
+class SNFTTransLR2LGMMNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_clusters_per_cluster: int,
+        required_models,
+        n_pca_dim: int = None,
+        **kwargs,
+    ):
+        clustering_features = list(self.basic_clustering_features_idx(trainer))
+        top_level_clustering_features = self.top_clustering_features_idx(trainer)
+        input_1_idx = [
+            list(clustering_features).index(x) for x in top_level_clustering_features
+        ]
+        input_2_idx = list(
+            np.setdiff1d(np.arange(len(clustering_features)), input_1_idx)
+        )
+        catembed = required_models["EXTERN_WideDeep_FTTransformer"]
+        sn = TwolayerGMMSN(
+            n_clusters=n_clusters,
+            n_input_1=len(input_1_idx),
+            n_input_2=len(input_2_idx),
+            input_1_idx=input_1_idx,
+            input_2_idx=input_2_idx,
+            n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNFTTransLR2LGMMNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
+            **kwargs,
+        )
+
+
+class SNFTTransLR2LKMeansNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_clusters_per_cluster: int,
+        required_models,
+        n_pca_dim: int = None,
+        **kwargs,
+    ):
+        clustering_features = list(self.basic_clustering_features_idx(trainer))
+        top_level_clustering_features = self.top_clustering_features_idx(trainer)
+        input_1_idx = [
+            list(clustering_features).index(x) for x in top_level_clustering_features
+        ]
+        input_2_idx = list(
+            np.setdiff1d(np.arange(len(clustering_features)), input_1_idx)
+        )
+        catembed = required_models["EXTERN_WideDeep_FTTransformer"]
+        sn = TwolayerKMeansSN(
+            n_clusters=n_clusters,
+            n_input_1=len(input_1_idx),
+            n_input_2=len(input_2_idx),
+            input_1_idx=input_1_idx,
+            input_2_idx=input_2_idx,
+            n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNFTTransLR2LKMeansNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
+            **kwargs,
+        )
+
+
+class SNFTTransLR2LBMMNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_clusters_per_cluster: int,
+        required_models,
+        n_pca_dim: int = None,
+        **kwargs,
+    ):
+        clustering_features = list(self.basic_clustering_features_idx(trainer))
+        top_level_clustering_features = self.top_clustering_features_idx(trainer)
+        input_1_idx = [
+            list(clustering_features).index(x) for x in top_level_clustering_features
+        ]
+        input_2_idx = list(
+            np.setdiff1d(np.arange(len(clustering_features)), input_1_idx)
+        )
+        catembed = required_models["EXTERN_WideDeep_FTTransformer"]
+        sn = TwolayerBMMSN(
+            n_clusters=n_clusters,
+            n_input_1=len(input_1_idx),
+            n_input_2=len(input_2_idx),
+            input_1_idx=input_1_idx,
+            input_2_idx=input_2_idx,
+            n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNFTTransLR2LBMMNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
+            **kwargs,
+        )
+
+
+class SNCategoryEmbedLR2LGMMNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_clusters_per_cluster: int,
+        required_models,
+        n_pca_dim: int = None,
+        **kwargs,
+    ):
+        clustering_features = list(self.basic_clustering_features_idx(trainer))
+        top_level_clustering_features = self.top_clustering_features_idx(trainer)
+        input_1_idx = [
+            list(clustering_features).index(x) for x in top_level_clustering_features
+        ]
+        input_2_idx = list(
+            np.setdiff1d(np.arange(len(clustering_features)), input_1_idx)
+        )
+        catembed = required_models["EXTERN_PytorchTabular_Category Embedding"]
+        sn = TwolayerGMMSN(
+            n_clusters=n_clusters,
+            n_input_1=len(input_1_idx),
+            n_input_2=len(input_2_idx),
+            input_1_idx=input_1_idx,
+            input_2_idx=input_2_idx,
+            n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNCategoryEmbedLR2LGMMNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
+            **kwargs,
+        )
+
+
+class SNCategoryEmbedLR2LKMeansNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_clusters_per_cluster: int,
+        required_models,
+        n_pca_dim: int = None,
+        **kwargs,
+    ):
+        clustering_features = list(self.basic_clustering_features_idx(trainer))
+        top_level_clustering_features = self.top_clustering_features_idx(trainer)
+        input_1_idx = [
+            list(clustering_features).index(x) for x in top_level_clustering_features
+        ]
+        input_2_idx = list(
+            np.setdiff1d(np.arange(len(clustering_features)), input_1_idx)
+        )
+        catembed = required_models["EXTERN_PytorchTabular_Category Embedding"]
+        sn = TwolayerKMeansSN(
+            n_clusters=n_clusters,
+            n_input_1=len(input_1_idx),
+            n_input_2=len(input_2_idx),
+            input_1_idx=input_1_idx,
+            input_2_idx=input_2_idx,
+            n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNCategoryEmbedLR2LKMeansNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
+            **kwargs,
+        )
+
+
+class SNCategoryEmbedLR2LBMMNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        n_clusters_per_cluster: int,
+        required_models,
+        n_pca_dim: int = None,
+        **kwargs,
+    ):
+        clustering_features = list(self.basic_clustering_features_idx(trainer))
+        top_level_clustering_features = self.top_clustering_features_idx(trainer)
+        input_1_idx = [
+            list(clustering_features).index(x) for x in top_level_clustering_features
+        ]
+        input_2_idx = list(
+            np.setdiff1d(np.arange(len(clustering_features)), input_1_idx)
+        )
+        catembed = required_models["EXTERN_PytorchTabular_Category Embedding"]
+        sn = TwolayerBMMSN(
+            n_clusters=n_clusters,
+            n_input_1=len(input_1_idx),
+            n_input_2=len(input_2_idx),
+            input_1_idx=input_1_idx,
+            input_2_idx=input_2_idx,
+            n_clusters_per_cluster=n_clusters_per_cluster,
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNCategoryEmbedLR2LBMMNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
+            **kwargs,
+        )
