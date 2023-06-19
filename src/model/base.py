@@ -601,8 +601,10 @@ class AbstractModel:
             The evaluation of bayesian hyperparameter optimization.
         """
         y_val_pred = self._pred_single_model(model, X_val, verbose=False)
-        res = metric_sklearn(y_val_pred, y_val, self.trainer.args["loss"])
-        return res
+        val_loss = metric_sklearn(y_val_pred, y_val, self.trainer.args["loss"])
+        y_train_pred = self._pred_single_model(model, X_train, verbose=False)
+        train_loss = metric_sklearn(y_train_pred, y_train, self.trainer.args["loss"])
+        return max([train_loss, val_loss])
 
     def _check_train_status(self):
         """
