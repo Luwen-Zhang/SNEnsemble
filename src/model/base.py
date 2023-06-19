@@ -1596,7 +1596,9 @@ class PytorchLightningLossCallback(Callback):
 class DataFrameDataset(Data.Dataset):
     def __init__(self, df: pd.DataFrame):
         self.df = df
-        self.df_dict = {key: df.loc[[key], :] for key in df.index}
+        self.df_dict = {
+            key: row[1] for key, row in zip(self.df.index, self.df.iterrows())
+        }
 
     def __len__(self):
         return len(self.df)

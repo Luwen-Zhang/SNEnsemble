@@ -3,6 +3,7 @@ import torch
 import re
 from torch._six import string_classes
 import pandas as pd
+import numpy as np
 
 default_collate_err_msg_format = (
     "default_collate: batch must contain tensors, numpy arrays, numbers, "
@@ -43,6 +44,12 @@ def fix_collate_fn(batch):
         return torch.stack(batch, 0, out=out)
     elif "pandas" in elem_type.__module__ and isinstance(elem, pd.DataFrame):
         return pd.concat(batch)
+    elif "pandas" in elem_type.__module__ and isinstance(elem, pd.Series):
+        return pd.DataFrame(
+            columns=elem.index,
+            index=np.arange(len(batch)),
+            data=np.vstack([i.values for i in batch]),
+        )
     elif (
         elem_type.__module__ == "numpy"
         and elem_type.__name__ != "str_"
