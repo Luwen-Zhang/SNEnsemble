@@ -528,6 +528,7 @@ class HiddenPrints:
             self._original_stdout = sys.stdout
             sys.stdout = open(os.devnull, "w")
         if self.disable_logging:
+            self.logging_state = logging.root.manager.disable
             logging.disable(logging.CRITICAL)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -535,7 +536,7 @@ class HiddenPrints:
             sys.stdout.close()
             sys.stdout = self._original_stdout
         if self.disable_logging:
-            logging.disable(logging.NOTSET)
+            logging.disable(self.logging_state)
 
 
 class HiddenPltShow:
