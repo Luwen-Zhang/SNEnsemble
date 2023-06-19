@@ -225,10 +225,12 @@ class AbstractModel:
         if not type(self.model) in [ModelDict, Dict]:
             raise Exception(f"The modelbase does not support model detaching.")
         program = program if program is not None else self.program
-        tmp_model = self.__class__(
-            trainer=self.trainer, program=program, model_subset=[model_name]
-        )
+        tmp_model = cp(self)
+        tmp_model.trainer = self.trainer
+        tmp_model.program = program
+        tmp_model.model_subset = [model_name]
         if tmp_model.store_in_harddisk and program != self.program:
+            tmp_model._mkdir()
             tmp_model.model = ModelDict(path=tmp_model.root)
         else:
             tmp_model.store_in_harddisk = False
