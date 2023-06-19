@@ -345,7 +345,7 @@ class WideDeep(AbstractModel):
         )
 
     def _pred_single_model(self, model, X_test, verbose, **kwargs):
-        return model.predict(X_tab=X_test)
+        return model.predict(X_tab=X_test).reshape(-1, 1)
 
     def _data_preprocess(self, df, derived_data, model_name):
         # SettingWithCopyWarning in TabPreprocessor.transform
