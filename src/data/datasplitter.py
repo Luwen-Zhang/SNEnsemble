@@ -1,3 +1,4 @@
+import numpy as np
 from src.utils import *
 from src.data import AbstractSplitter
 import inspect
@@ -229,6 +230,48 @@ class CycleSplitter(AbstractSplitter):
                     fr_train_indices = where_fr[
                         fr_cycle <= np.percentile(fr_cycle, train_val_test[0] * 100)
                     ]
+                    fr_test_val_indices = np.setdiff1d(where_fr, fr_train_indices)
+                    if (
+                        len(fr_test_val_indices)
+                        >= np.sum(train_val_test[1:]) // train_val_test[-1]
+                    ):
+                        fr_val_indices, fr_test_indices = train_test_split(
+                            fr_test_val_indices,
+                            test_size=train_val_test[-1] / np.sum(train_val_test[1:]),
+                            shuffle=True,
+                        )
+                    else:
+                        if np.random.randint(2) == 0:
+                            fr_val_indices = fr_test_val_indices
+                            fr_test_indices = np.array([], dtype=int)
+                        else:
+                            fr_test_indices = fr_test_val_indices
+                            fr_val_indices = np.array([], dtype=int)
+                    # Shuffle the training and validation sets.
+                    n_exchange = len(fr_val_indices) // 2
+                    from_val_to_train = np.random.choice(
+                        fr_val_indices, n_exchange, replace=False
+                    )
+                    from_train_to_val = np.random.choice(
+                        fr_train_indices, n_exchange, replace=False
+                    )
+                    fr_train_indices = np.concatenate(
+                        [
+                            np.setdiff1d(fr_train_indices, from_train_to_val),
+                            from_val_to_train,
+                        ]
+                    )
+                    fr_val_indices = np.concatenate(
+                        [
+                            np.setdiff1d(fr_val_indices, from_val_to_train),
+                            from_train_to_val,
+                        ]
+                    )
+                    """
+                    # To make val set further and test set even further, use this:
+                    fr_train_indices = where_fr[
+                        fr_cycle <= np.percentile(fr_cycle, train_val_test[0] * 100)
+                    ]
                     fr_test_indices = where_fr[
                         fr_cycle
                         > np.percentile(fr_cycle, np.sum(train_val_test[0:2]) * 100)
@@ -236,7 +279,7 @@ class CycleSplitter(AbstractSplitter):
                     fr_val_indices = np.setdiff1d(
                         where_fr, np.append(fr_train_indices, fr_test_indices)
                     )
-                    m_train_indices += list(where_material[fr_train_indices])
+                    """
                     """
                     # To make train and val sets random, use this:
                     fr_train_val_indices = where_fr[
@@ -260,6 +303,7 @@ class CycleSplitter(AbstractSplitter):
                         fr_val_indices = np.array([], dtype=int)
                     fr_test_indices = np.setdiff1d(where_fr, fr_train_val_indices)
                     """
+                    m_train_indices += list(where_material[fr_train_indices])
                     m_test_indices += list(where_material[fr_test_indices])
                     m_val_indices += list(where_material[fr_val_indices])
             else:
