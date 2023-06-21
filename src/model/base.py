@@ -332,6 +332,11 @@ class AbstractModel:
         trained, the required model is passed to `_new_model`.
         If models from other model bases are required, the return name should be
         ``EXTERN_{Name of the model base}_{Name of the model}``
+
+        Notes
+        -------
+        For TorchModel, if the required model is in the TorchModel itself, the AbstractNN is passed to ``_new_model``;
+        if the required model is in another model base, the AbstractModel is passed.
         """
         return None
 
@@ -1175,6 +1180,50 @@ class TorchModel(AbstractModel):
             return sum(p.numel() for p in model.parameters())
 
 
+class AbstractWrapper:
+    """
+    For those deep learning models required by TorchModel, this is a wrapper to make them have hidden information like
+    ``hidden_representation`` or something else from the forward process.
+    """
+
+    def __init__(self, model: AbstractModel):
+        if len(model.get_model_names()) > 1:
+            raise Exception(
+                f"More than one model is included in the input model base: {model.get_model_names()}."
+            )
+        self.wrapped_model = model
+        self.model_name = self.wrapped_model.get_model_names()[0]
+        self.wrap_forward()
+
+    def __getattr__(self, item):
+        if item in self.__dict__.keys():
+            return self.__dict__[item]
+        else:
+            return getattr(self.wrapped_model, item)
+
+    def eval(self):
+        pass
+
+    def __call__(
+        self, x: torch.Tensor, derived_tensors: Dict[str, torch.Tensor]
+    ) -> torch.Tensor:
+        """
+        Simulate ``AbstractNN._forward`` by calling ``AbstractNN._call_required_model``.
+        """
+        return AbstractNN._call_required_model(self.wrapped_model, x, derived_tensors)
+
+    def wrap_forward(self):
+        raise NotImplementedError
+
+    @property
+    def hidden_rep_dim(self):
+        raise NotImplementedError
+
+    @property
+    def hidden_representation(self):
+        raise NotImplementedError
+
+
 class AbstractNN(pl.LightningModule):
     def __init__(self, trainer: Trainer, **kwargs):
         """
@@ -1444,6 +1493,94 @@ class AbstractNN(pl.LightningModule):
             The early stopping evaluation.
         """
         return val_loss
+
+    @staticmethod
+    def _test_required_model(
+        n_inputs: int,
+        required_model: Union[AbstractModel, "AbstractNN", AbstractWrapper],
+    ) -> Tuple[bool, int]:
+        """
+        Test whether a required model has attribute ``hidden_rep_dim`` and find its value.
+
+        Parameters
+        ----------
+        n_inputs
+            The dimension of input features (i.e. x of _forward)
+        required_model
+            A required model specified in ``required_models()``.
+
+        Returns
+        -------
+        use_hidden_rep, hidden_rep_dim
+            Whether the required model has ``hidden_rep_dim`` and its value. If the required model does not have `
+            `hidden_rep_dim``, 1+``n_inputs`` is returned.
+        """
+        if isinstance(required_model, AbstractWrapper):
+            hidden_rep_dim = getattr(required_model, "hidden_rep_dim")
+            use_hidden_rep = True
+        elif not hasattr(required_model, "hidden_representation") or not hasattr(
+            required_model, "hidden_rep_dim"
+        ):
+            if not hasattr(required_model, "hidden_rep_dim"):
+                print(
+                    f"`hidden_rep_dim` is not given. The output of the backbone and the input features are used instead."
+                )
+                hidden_rep_dim = 1 + n_inputs
+            else:
+                hidden_rep_dim = getattr(required_model, "hidden_rep_dim")
+            if not hasattr(required_model, "hidden_representation") or not hasattr(
+                required_model, "hidden_rep_dim"
+            ):
+                print(
+                    f"The backbone should have an attribute called `hidden_representation` that records the "
+                    f"final output of the hidden layer, and `hidden_rep_dim` that records the dim of "
+                    f"`hidden_representation`. Now the output of the backbone is used instead."
+                )
+            use_hidden_rep = False
+        else:
+            hidden_rep_dim = getattr(required_model, "hidden_rep_dim")
+            use_hidden_rep = True
+        return use_hidden_rep, hidden_rep_dim
+
+    @staticmethod
+    def _call_required_model(required_model, x, derived_tensors) -> torch.Tensor:
+        """
+        Call a required model and return its result.
+
+        Parameters
+        ----------
+        required_model
+            A required model specified in ``required_models()``.
+        x
+            See AbstractNN._forward.
+        derived_tensors
+            See AbstractNN._forward.
+
+        Returns
+        -------
+        dl_pred
+            The result of the required model.
+        """
+        if isinstance(required_model, nn.Module) or isinstance(
+            required_model, AbstractWrapper
+        ):
+            required_model.eval()
+            dl_pred = required_model(x, derived_tensors)
+        elif isinstance(required_model, AbstractModel):
+            name = required_model.get_model_names()[0]
+            full_name = f"EXTERN_{required_model.program}_{name}"
+            ml_pred = required_model._pred_single_model(
+                required_model.model[name],
+                X_test=derived_tensors["data_required_models"][full_name],
+                verbose=False,
+            )
+            dl_pred = torch.tensor(ml_pred, device=x.device)
+        else:
+            raise Exception(
+                f"The required model should be a nn.Module, an AbstractWrapper, or an AbstractModel, but got"
+                f"{type(required_model)} instead."
+            )
+        return dl_pred
 
 
 class ModelDict:

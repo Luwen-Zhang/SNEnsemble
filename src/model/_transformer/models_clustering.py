@@ -19,7 +19,6 @@ class AbstractClusteringModel(AbstractNN):
         clustering_sn_model,
         cont_cat_model,
         layers,
-        hidden_rep_dim: int,
         ridge_penalty: float = 0.0,
         **kwargs,
     ):
@@ -29,24 +28,10 @@ class AbstractClusteringModel(AbstractNN):
         self.clustering_features = clustering_features
         self.clustering_sn_model = clustering_sn_model
         self.cont_cat_model = cont_cat_model
-        if (
-            not hasattr(self.cont_cat_model, "hidden_representation")
-            or not hasattr(self.cont_cat_model, "hidden_rep_dim")
-            or hidden_rep_dim is None
-        ):
-            if hidden_rep_dim is None:
-                print(
-                    f"`hidden_rep_dim` is not given. The output of the backbone and the input features are used instead."
-                )
-                hidden_rep_dim = 1 + n_inputs
-            if not hasattr(self.cont_cat_model, "hidden_representation") or not hasattr(
-                self.cont_cat_model, "hidden_rep_dim"
-            ):
-                print(
-                    f"The backbone should have an attribute called `hidden_representation` that records the "
-                    f"final output of the hidden layer, and `hidden_rep_dim` that records the dim of "
-                    f"`hidden_representation`. Now the output of the backbone is used instead."
-                )
+        self.use_hidden_rep, hidden_rep_dim = self._test_required_model(
+            n_inputs, self.cont_cat_model
+        )
+        if not self.use_hidden_rep:
             self.cls_head = get_sequential(
                 [128, 64, 32],
                 n_inputs=hidden_rep_dim,
@@ -55,12 +40,10 @@ class AbstractClusteringModel(AbstractNN):
                 dropout=0,
                 use_norm=False,
             )
-            self.use_hidden_rep = False
         else:
             self.cls_head = get_linear(
                 n_inputs=hidden_rep_dim, n_outputs=n_outputs, nonlinearity="relu"
             )
-            self.use_hidden_rep = True
         self.s_zero_slip = trainer.datamodule.get_zero_slip("Relative Maximum Stress")
         self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
         self.ridge_penalty = ridge_penalty
@@ -71,19 +54,10 @@ class AbstractClusteringModel(AbstractNN):
 
     def _forward(self, x, derived_tensors):
         # Prediction of deep learning models.
+        dl_pred = self._call_required_model(self.cont_cat_model, x, derived_tensors)
         if self.use_hidden_rep:
-            self.cont_cat_model.eval()
-            dl_pred = self.cont_cat_model(x, derived_tensors)
-            hidden = self.cont_cat_model.hidden_representation
+            hidden = self.cont_cat_model.hidden_representation.to(x.device)
         else:
-            name = self.cont_cat_model.get_model_names()[0]
-            full_name = f"EXTERN_{self.cont_cat_model.program}_{name}"
-            ml_pred = self.cont_cat_model._pred_single_model(
-                self.cont_cat_model.model[name],
-                X_test=derived_tensors["data_required_models"][full_name],
-                verbose=False,
-            )
-            dl_pred = torch.tensor(ml_pred, device=x.device)
             hidden = torch.concat([x, dl_pred], dim=1)
         # Prediction of physical models
         s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
@@ -237,7 +211,6 @@ class SNTransformerLRKMeansNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=transformer,
             layers=layers,
-            hidden_rep_dim=transformer.hidden_rep_dim,
             **kwargs,
         )
 
@@ -269,7 +242,6 @@ class SNCatEmbedLRKMeansNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -306,7 +278,6 @@ class SNCatEmbedLRKMeansSeqNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -338,7 +309,6 @@ class SNCatEmbedLRGMMNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -370,7 +340,6 @@ class SNCatEmbedLRBMMNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -414,7 +383,6 @@ class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -458,7 +426,6 @@ class SNCatEmbedLR2LKMeansNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -502,7 +469,6 @@ class SNCatEmbedLR2LBMMNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -546,7 +512,6 @@ class SNFTTransLR2LGMMNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -590,7 +555,6 @@ class SNFTTransLR2LKMeansNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -634,7 +598,6 @@ class SNFTTransLR2LBMMNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -678,7 +641,6 @@ class SNCategoryEmbedLR2LGMMNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -722,7 +684,6 @@ class SNCategoryEmbedLR2LKMeansNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )
 
@@ -766,6 +727,5 @@ class SNCategoryEmbedLR2LBMMNN(AbstractClusteringModel):
             clustering_sn_model=sn,
             cont_cat_model=catembed,
             layers=layers,
-            hidden_rep_dim=getattr(catembed, "hidden_rep_dim", None),
             **kwargs,
         )

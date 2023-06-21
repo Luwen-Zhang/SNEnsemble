@@ -1,3 +1,5 @@
+from .base import AbstractWrapper
+from torch import nn
 from src.utils import *
 from src.model import AbstractModel
 from skopt.space import Integer, Categorical, Real
@@ -369,3 +371,43 @@ class WideDeep(AbstractModel):
             "TabPerceiver",
             "TabFastFormer",
         ]
+
+
+def widedeep_forward(self, input):
+    """
+    This is the forward of nn.Sequential because WideDeep model is a nn.Module and WideDeep.deeptabular is a
+    nn.Sequential where the last module is a linear layer.
+    """
+    l = len(self)
+    for idx, module in enumerate(self):
+        if idx == l - 1:
+            setattr(self, "_hidden_representation", input)
+        input = module(input)
+    return input
+
+
+class WideDeepWrapper(AbstractWrapper):
+    def __init__(self, model: WideDeep):
+        super(WideDeepWrapper, self).__init__(model=model)
+
+    def wrap_forward(self):
+        component = self.wrapped_model.model[self.model_name].model.deeptabular
+        component.forward = widedeep_forward.__get__(component, nn.Sequential)
+
+    @property
+    def hidden_rep_dim(self):
+        """
+        In pytorch_widedeep.models.wide_deep, see WideDeep_add_pred_layer()
+        """
+        component = self.wrapped_model.model[self.model_name].model
+        if component.deeptext is not None or component.deepimage is not None:
+            warnings.warn(
+                f"The WideDeep model has deeptext or deepimage component, which is not supported for "
+                f"hidden representation extraction."
+            )
+        return component.deeptabular[0].output_dim
+
+    @property
+    def hidden_representation(self):
+        component = self.wrapped_model.model[self.model_name].model.deeptabular
+        return getattr(component, "_hidden_representation")

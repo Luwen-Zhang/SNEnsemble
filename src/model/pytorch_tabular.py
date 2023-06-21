@@ -4,6 +4,8 @@ from skopt.space import Integer, Real, Categorical
 import shutil
 import numpy as np
 from .base import PytorchLightningLossCallback
+from .base import AbstractWrapper
+from typing import Dict, Any
 
 
 class PytorchTabular(AbstractModel):
@@ -371,3 +373,50 @@ class PytorchTabular(AbstractModel):
         for key in params_dict.keys():
             params_dict[key].update(self.trainer.chosen_params)
         return params_dict[model_name]
+
+
+def pytorch_tabular_forward(self, x: Dict) -> Dict[str, Any]:
+    """The forward pass of the model.
+
+    Args:
+        x (Dict): The input of the model with 'continuous' and 'categorical' keys
+    """
+    x = self.embed_input(x)
+    x = self.compute_backbone(x)
+    setattr(self, "_hidden_representation", x)
+    return self.compute_head(x)
+
+
+class PytorchTabularWrapper(AbstractWrapper):
+    def __init__(self, model: PytorchTabular):
+        super(PytorchTabularWrapper, self).__init__(model=model)
+
+    def wrap_forward(self):
+        from pytorch_tabular.models.base_model import BaseModel
+
+        self.wrapped_model.model[
+            self.model_name
+        ].model.forward = pytorch_tabular_forward.__get__(
+            self.wrapped_model.model[self.model_name].model, BaseModel
+        )
+
+    @property
+    def hidden_rep_dim(self):
+        from pytorch_tabular.models.common.heads import LinearHead, MixtureDensityHead
+
+        head = self.wrapped_model.model[self.model_name].model.head
+        if type(head) == LinearHead:
+            return head.layers[0].in_features
+        elif type(head) == MixtureDensityHead:
+            return head.pi.in_features
+        else:
+            raise Exception(
+                f"Only LinearHead and MixtureDensityHead is supported to extract a hidden_rep_dim, but "
+                f"got {type(head)} instead. It might be a customized one."
+            )
+
+    @property
+    def hidden_representation(self):
+        return getattr(
+            self.wrapped_model.model[self.model_name].model, "_hidden_representation"
+        )
