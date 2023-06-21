@@ -2,6 +2,7 @@ import collections.abc
 import torch
 import re
 from torch._six import string_classes
+import torch.utils.data as Data
 import pandas as pd
 import numpy as np
 
@@ -50,6 +51,10 @@ def fix_collate_fn(batch):
             index=np.arange(len(batch)),
             data=np.vstack([i.values for i in batch]),
         )
+    elif isinstance(elem, Data.Subset):
+        dataset = elem.dataset
+        indices = np.concatenate([elem.indices for elem in batch])
+        return Data.Subset(dataset, indices)
     elif (
         elem_type.__module__ == "numpy"
         and elem_type.__name__ != "str_"

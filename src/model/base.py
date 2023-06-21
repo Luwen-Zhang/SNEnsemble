@@ -19,6 +19,7 @@ import pytorch_lightning as pl
 from functools import partial
 from pytorch_lightning import Callback
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from collections.abc import Iterable
 
 
 class AbstractModel:
@@ -968,27 +969,12 @@ class TorchModel(AbstractModel):
             train_dataset, val_dataset, test_dataset = datamodule.generate_subset(
                 dataset
             )
-        train_loader = Data.DataLoader(
-            train_dataset,
-            batch_size=len(datamodule.train_dataset),
-            pin_memory=True,
-        )
-        val_loader = Data.DataLoader(
-            val_dataset,
-            batch_size=len(datamodule.val_dataset),
-            pin_memory=True,
-        )
-        test_loader = Data.DataLoader(
-            test_dataset,
-            batch_size=len(datamodule.test_dataset),
-            pin_memory=True,
-        )
         return {
-            "X_train": train_loader,
+            "X_train": train_dataset,
             "y_train": datamodule.y_train,
-            "X_val": val_loader,
+            "X_val": val_dataset,
             "y_val": datamodule.y_val,
-            "X_test": test_loader,
+            "X_test": test_dataset,
             "y_test": datamodule.y_test,
         }
 
@@ -1004,8 +990,14 @@ class TorchModel(AbstractModel):
             for name, mod in required_models.items()
             if not isinstance(mod, AbstractNN)
         }
-        for val in full_data_required_models.values():
-            if not isinstance(val, pd.DataFrame) and not isinstance(val, np.ndarray):
+        for mod, val in zip(
+            required_models.values(), full_data_required_models.values()
+        ):
+            if (
+                not isinstance(val, pd.DataFrame)
+                and not isinstance(val, np.ndarray)
+                and not isinstance(mod, TorchModel)
+            ):
                 raise Exception(
                     f"Requiring a model (except TorchModel) that does not return a pd.DataFrame or np.ndarray by "
                     f"_data_preprocess is currently not supported."
@@ -1045,13 +1037,7 @@ class TorchModel(AbstractModel):
                 tensors=tensors,
                 required_models=required_models,
             )
-        loader = Data.DataLoader(
-            dataset,
-            batch_size=len(scaled_df),
-            shuffle=False,
-            pin_memory=True,
-        )
-        return loader
+        return dataset
 
     def _train_single_model(
         self,
@@ -1080,14 +1066,18 @@ class TorchModel(AbstractModel):
         warnings.filterwarnings("ignore", "Checkpoint directory")
 
         train_loader = Data.DataLoader(
-            X_train.dataset,
+            X_train,
             batch_size=int(kwargs["batch_size"]),
             sampler=torch.utils.data.RandomSampler(
-                data_source=X_train.dataset, replacement=False
+                data_source=X_train, replacement=False
             ),
             pin_memory=True,
         )
-        val_loader = X_val
+        val_loader = Data.DataLoader(
+            X_val,
+            batch_size=len(X_val),
+            pin_memory=True,
+        )
 
         es_callback = EarlyStopping(
             monitor="early_stopping_eval",
@@ -1155,8 +1145,14 @@ class TorchModel(AbstractModel):
         torch.cuda.empty_cache()
 
     def _pred_single_model(self, model: "AbstractNN", X_test, verbose, **kwargs):
+        test_loader = Data.DataLoader(
+            X_test,
+            batch_size=len(X_test),
+            shuffle=False,
+            pin_memory=True,
+        )
         model.to(self.device)
-        y_test_pred, _, _ = model.test_epoch(X_test, **kwargs)
+        y_test_pred, _, _ = model.test_epoch(test_loader, **kwargs)
         model.to("cpu")
         torch.cuda.empty_cache()
         return y_test_pred
@@ -1222,6 +1218,22 @@ class AbstractWrapper:
     @property
     def hidden_representation(self):
         raise NotImplementedError
+
+
+class TorchModelWrapper(AbstractWrapper):
+    def __init__(self, model: TorchModel):
+        super(TorchModelWrapper, self).__init__(model=model)
+
+    def wrap_forward(self):
+        pass
+
+    @property
+    def hidden_rep_dim(self):
+        return self.wrapped_model.model[self.model_name].hidden_rep_dim
+
+    @property
+    def hidden_representation(self):
+        return self.wrapped_model.model[self.model_name].hidden_representation
 
 
 class AbstractNN(pl.LightningModule):
@@ -1756,6 +1768,17 @@ class NDArrayDataset(Data.Dataset):
         return self.array[item]
 
 
+class SubsetDataset(Data.Dataset):
+    def __init__(self, dataset: Data.Dataset):
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, item):
+        return Data.Subset(self.dataset, [item])
+
+
 class ListDataset(Data.Dataset):
     def __init__(self, datasets: List[Data.Dataset]):
         self.datasets = datasets
@@ -1804,17 +1827,20 @@ class DictMixDataset(DictDataset):
     def __init__(self, dict_mix: Dict[str, Union[pd.DataFrame, np.ndarray]]):
         keys = list(dict_mix.keys())
         item_ls = list(dict_mix.values())
+        ls_data = []
         for item in item_ls:
-            if not isinstance(item, pd.DataFrame) and not isinstance(item, np.ndarray):
+            if isinstance(item, pd.DataFrame):
+                ls_data.append(DataFrameDataset(item))
+            elif isinstance(item, np.ndarray):
+                ls_data.append(NDArrayDataset(item))
+            elif isinstance(item, torch.Tensor):
+                ls_data.append(Data.TensorDataset(item))
+            elif isinstance(item, Data.Dataset):
+                ls_data.append(SubsetDataset(item))
+            else:
                 raise Exception(
-                    f"Generating a mixed type (pd.DataFrame or np.ndarray) dataset for type {type(item)}."
+                    f"Generating a mixed type dataset for type {type(item)}."
                 )
-        ls_dataset = ListDataset(
-            [
-                DataFrameDataset(item)
-                if isinstance(item, pd.DataFrame)
-                else NDArrayDataset(item)
-                for item in item_ls
-            ]
-        )
+
+        ls_dataset = ListDataset(ls_data)
         super(DictMixDataset, self).__init__(ls_dataset=ls_dataset, keys=keys)
