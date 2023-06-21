@@ -50,6 +50,12 @@ class Transformer(TorchModel):
             "SNFTTransLR2LPCAKMeans",
             "SNFTTransLR2LPCAGMM",
             "SNFTTransLR2LPCABMM",
+            "SNCategoryEmbedWrapLR2LPCAKMeans",
+            "SNCategoryEmbedWrapLR2LPCAGMM",
+            "SNCategoryEmbedWrapLR2LPCABMM",
+            "SNFTTransWrapLR2LPCAKMeans",
+            "SNFTTransWrapLR2LPCAGMM",
+            "SNFTTransWrapLR2LPCABMM",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -125,6 +131,12 @@ class Transformer(TorchModel):
             "SNFTTransLR2LPCAKMeans",
             "SNFTTransLR2LPCAGMM",
             "SNFTTransLR2LPCABMM",
+            "SNCategoryEmbedWrapLR2LPCAKMeans",
+            "SNCategoryEmbedWrapLR2LPCAGMM",
+            "SNCategoryEmbedWrapLR2LPCABMM",
+            "SNFTTransWrapLR2LPCAKMeans",
+            "SNFTTransWrapLR2LPCAGMM",
+            "SNFTTransWrapLR2LPCABMM",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name.replace('PCA', '')}NN")
             if "2L" not in model_name:
@@ -259,6 +271,12 @@ class Transformer(TorchModel):
             "SNFTTransLR2LPCAKMeans",
             "SNFTTransLR2LPCAGMM",
             "SNFTTransLR2LPCABMM",
+            "SNCategoryEmbedWrapLR2LPCAKMeans",
+            "SNCategoryEmbedWrapLR2LPCAGMM",
+            "SNCategoryEmbedWrapLR2LPCABMM",
+            "SNFTTransWrapLR2LPCAKMeans",
+            "SNFTTransWrapLR2LPCAGMM",
+            "SNFTTransWrapLR2LPCABMM",
         ]:
             return [
                 # Integer(
@@ -382,6 +400,12 @@ class Transformer(TorchModel):
             "SNFTTransLR2LPCAKMeans",
             "SNFTTransLR2LPCAGMM",
             "SNFTTransLR2LPCABMM",
+            "SNCategoryEmbedWrapLR2LPCAKMeans",
+            "SNCategoryEmbedWrapLR2LPCAGMM",
+            "SNCategoryEmbedWrapLR2LPCABMM",
+            "SNFTTransWrapLR2LPCAKMeans",
+            "SNFTTransWrapLR2LPCAGMM",
+            "SNFTTransWrapLR2LPCABMM",
         ]:
             res = {
                 # "embedding_dim": 3,
