@@ -397,11 +397,14 @@ class PytorchTabularWrapper(AbstractWrapper):
     def wrap_forward(self):
         from pytorch_tabular.models.base_model import BaseModel
 
-        self.wrapped_model.model[
-            self.model_name
-        ].model.forward = pytorch_tabular_forward.__get__(
-            self.wrapped_model.model[self.model_name].model, BaseModel
-        )
+        component = self.wrapped_model.model[self.model_name].model
+        self.original_forward = component.forward
+        component.forward = pytorch_tabular_forward.__get__(component, BaseModel)
+
+    def reset_forward(self):
+        if self.original_forward is not None:
+            component = self.wrapped_model.model[self.model_name].model
+            component.forward = self.original_forward
 
     @property
     def hidden_rep_dim(self):

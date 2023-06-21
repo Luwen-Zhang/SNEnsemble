@@ -1195,6 +1195,7 @@ class AbstractWrapper:
             )
         self.wrapped_model = model
         self.model_name = self.wrapped_model.get_model_names()[0]
+        self.original_forward = None
         self.wrap_forward()
 
     def __getattr__(self, item):
@@ -1217,6 +1218,9 @@ class AbstractWrapper:
     def wrap_forward(self):
         raise NotImplementedError
 
+    def reset_forward(self):
+        raise NotImplementedError
+
     @property
     def hidden_rep_dim(self):
         raise NotImplementedError
@@ -1224,6 +1228,14 @@ class AbstractWrapper:
     @property
     def hidden_representation(self):
         raise NotImplementedError
+
+    def __getstate__(self):
+        self.reset_forward()
+        return self.__dict__
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.wrap_forward()
 
 
 class TorchModelWrapper(AbstractWrapper):

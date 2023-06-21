@@ -396,7 +396,12 @@ class WideDeepWrapper(AbstractWrapper):
 
     def wrap_forward(self):
         component = self.wrapped_model.model[self.model_name].model.deeptabular
+        self.original_forward = component.forward
         component.forward = widedeep_forward.__get__(component, nn.Sequential)
+
+    def reset_forward(self):
+        component = self.wrapped_model.model[self.model_name].model.deeptabular
+        component.forward = self.original_forward
 
     @property
     def hidden_rep_dim(self):
