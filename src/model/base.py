@@ -856,6 +856,12 @@ class AbstractModel:
         -------
         pred:
             Prediction of the target.
+
+        Notes
+        -------
+        For deep learning models with mini-batch training (dataloaders), if an AbstractWrapper will be used for the model
+        base, the ``batch_size`` when inferring should be the length of the dataset. See ``PytorchTabular._pred_single_model``
+        and ``WideDeep._pred_single_model``.
         """
         raise NotImplementedError
 

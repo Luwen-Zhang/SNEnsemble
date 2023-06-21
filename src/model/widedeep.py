@@ -347,7 +347,11 @@ class WideDeep(AbstractModel):
         )
 
     def _pred_single_model(self, model, X_test, verbose, **kwargs):
-        return model.predict(X_tab=X_test).reshape(-1, 1)
+        original_batch_size = model.batch_size
+        delattr(model, "batch_size")
+        res = model.predict(X_tab=X_test, batch_size=len(X_test)).reshape(-1, 1)
+        setattr(model, "batch_size", original_batch_size)
+        return res
 
     def _data_preprocess(self, df, derived_data, model_name):
         # SettingWithCopyWarning in TabPreprocessor.transform

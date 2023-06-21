@@ -172,10 +172,13 @@ class PytorchTabular(AbstractModel):
             # 2. DeprecationWarning: "The ``out_ff_layers``, ``out_ff_activation``, ``out_ff_dropoout``, and
             # ``out_ff_initialization`` arguments are deprecated and will be removed next release. Please use head and
             # head_config as an alternative.
+            original_batch_size = model.datamodule.batch_size
+            model.datamodule.batch_size = len(X_test)
             warnings.filterwarnings(
                 "ignore", category=DeprecationWarning, module="pytorch_tabular"
             )
             all_res = model.predict(X_test, include_input_features=False)
+            model.datamodule.batch_size = original_batch_size
             preds = [
                 np.array(all_res[f"{target}_prediction"]).reshape(-1, 1)
                 for target in targets
