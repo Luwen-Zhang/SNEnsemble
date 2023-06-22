@@ -520,13 +520,13 @@ class AbstractModel:
                     # If a result from one bayes opt iteration is very large (over 10000) caused by instability of the
                     # model, it can not be fully reproduced during another execution and has error (though small, it
                     # disturbs bayes optimization).
-                    if res > 5000:
+                    if res > 1000:
                         print(
-                            f"The loss value ({res}) is greater than 5000 and 5000 will be returned. Consider "
+                            f"The loss value ({res}) is greater than 1000 and 1000 will be returned. Consider "
                             f"debugging such instability of the model, or check whether the loss value is normalized by"
                             f"the number of samples."
                         )
-                        return 5000
+                        return 1000
                     # To guarantee reproducibility on different machines.
                     return round(res, 4)
 
