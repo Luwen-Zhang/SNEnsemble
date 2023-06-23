@@ -375,28 +375,25 @@ class SuppStressDeriver(AbstractDeriver):
         return ["max_stress_col", "min_stress_col", "ucs_col", "uts_col"]
 
     def _required_params(self, **kwargs):
-        return ["relative"]
+        return ["relative", "absolute"]
 
     def _defaults(self):
-        return dict(stacked=True, intermediate=False, relative=False)
+        return dict(stacked=True, intermediate=False, relative=False, absolute=True)
 
     def _derived_names(self, **kwargs):
-        names = (
-            [
+        names = []
+        if kwargs["absolute"]:
+            names += [
                 "Absolute Maximum Stress",
                 "Absolute Peak-to-peak Stress",
                 "Absolute Mean Stress",
+            ]
+        if kwargs["relative"]:
+            names += [
                 "Relative Maximum Stress",
                 "Relative Peak-to-peak Stress",
                 "Relative Mean Stress",
             ]
-            if kwargs["relative"]
-            else [
-                "Absolute Maximum Stress",
-                "Absolute Peak-to-peak Stress",
-                "Absolute Mean Stress",
-            ]
-        )
         return names
 
     def _derive(
