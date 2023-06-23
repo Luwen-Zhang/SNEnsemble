@@ -56,6 +56,12 @@ class Transformer(TorchModel):
             "SNFTTransWrapLR2LPCAKMeans",
             "SNFTTransWrapLR2LPCAGMM",
             "SNFTTransWrapLR2LPCABMM",
+            "SNTabTransLR2LPCAKMeans",
+            "SNTabTransLR2LPCAGMM",
+            "SNTabTransLR2LPCABMM",
+            "SNTabTransWrapLR2LPCAKMeans",
+            "SNTabTransWrapLR2LPCAGMM",
+            "SNTabTransWrapLR2LPCABMM",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -137,6 +143,12 @@ class Transformer(TorchModel):
             "SNFTTransWrapLR2LPCAKMeans",
             "SNFTTransWrapLR2LPCAGMM",
             "SNFTTransWrapLR2LPCABMM",
+            "SNTabTransLR2LPCAKMeans",
+            "SNTabTransLR2LPCAGMM",
+            "SNTabTransLR2LPCABMM",
+            "SNTabTransWrapLR2LPCAKMeans",
+            "SNTabTransWrapLR2LPCAGMM",
+            "SNTabTransWrapLR2LPCABMM",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name.replace('PCA', '')}NN")
             if "2L" not in model_name:
@@ -277,6 +289,12 @@ class Transformer(TorchModel):
             "SNFTTransWrapLR2LPCAKMeans",
             "SNFTTransWrapLR2LPCAGMM",
             "SNFTTransWrapLR2LPCABMM",
+            "SNTabTransLR2LPCAKMeans",
+            "SNTabTransLR2LPCAGMM",
+            "SNTabTransLR2LPCABMM",
+            "SNTabTransWrapLR2LPCAKMeans",
+            "SNTabTransWrapLR2LPCAGMM",
+            "SNTabTransWrapLR2LPCABMM",
         ]:
             return [
                 # Integer(
@@ -406,6 +424,12 @@ class Transformer(TorchModel):
             "SNFTTransWrapLR2LPCAKMeans",
             "SNFTTransWrapLR2LPCAGMM",
             "SNFTTransWrapLR2LPCABMM",
+            "SNTabTransLR2LPCAKMeans",
+            "SNTabTransLR2LPCAGMM",
+            "SNTabTransLR2LPCABMM",
+            "SNTabTransWrapLR2LPCAKMeans",
+            "SNTabTransWrapLR2LPCAGMM",
+            "SNTabTransWrapLR2LPCABMM",
         ]:
             res = {
                 # "embedding_dim": 3,
@@ -443,6 +467,8 @@ class Transformer(TorchModel):
             return ["EXTERN_PytorchTabular_Category Embedding"]
         if "SNFTTrans" in model_name:
             return ["EXTERN_WideDeep_FTTransformer"]
+        if "SNTabTrans" in model_name:
+            return ["EXTERN_WideDeep_TabTransformer"]
         else:
             return None
 
