@@ -344,6 +344,204 @@ class SNCatEmbedLRBMMNN(AbstractClusteringModel):
         )
 
 
+class SNAutoIntLRKMeansNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        required_models,
+        n_pca_dim: int = None,
+        **kwargs,
+    ):
+        clustering_features = self.basic_clustering_features_idx(trainer)
+        catembed = required_models["EXTERN_PytorchTabular_AutoInt"]
+        sn = KMeansSN(
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNAutoIntLRKMeansNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            **kwargs,
+        )
+
+
+class SNAutoIntLRGMMNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        required_models,
+        n_pca_dim=None,
+        **kwargs,
+    ):
+        clustering_features = self.basic_clustering_features_idx(trainer)
+        catembed = required_models["EXTERN_PytorchTabular_AutoInt"]
+        sn = GMMSN(
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNAutoIntLRGMMNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            **kwargs,
+        )
+
+
+class SNAutoIntLRBMMNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        required_models,
+        n_pca_dim=None,
+        **kwargs,
+    ):
+        clustering_features = self.basic_clustering_features_idx(trainer)
+        catembed = required_models["EXTERN_PytorchTabular_AutoInt"]
+        sn = BMMSN(
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNAutoIntLRBMMNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            **kwargs,
+        )
+
+
+class SNAutoIntWrapLRKMeansNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        required_models,
+        n_pca_dim: int = None,
+        **kwargs,
+    ):
+        clustering_features = self.basic_clustering_features_idx(trainer)
+        from ..pytorch_tabular import PytorchTabularWrapper
+
+        catembed = PytorchTabularWrapper(
+            required_models["EXTERN_PytorchTabular_AutoInt"]
+        )
+        sn = KMeansSN(
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNAutoIntWrapLRKMeansNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            **kwargs,
+        )
+
+
+class SNAutoIntWrapLRGMMNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        required_models,
+        n_pca_dim=None,
+        **kwargs,
+    ):
+        clustering_features = self.basic_clustering_features_idx(trainer)
+        from ..pytorch_tabular import PytorchTabularWrapper
+
+        catembed = PytorchTabularWrapper(
+            required_models["EXTERN_PytorchTabular_AutoInt"]
+        )
+        sn = GMMSN(
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNAutoIntWrapLRGMMNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            **kwargs,
+        )
+
+
+class SNAutoIntWrapLRBMMNN(AbstractClusteringModel):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        trainer,
+        n_clusters,
+        required_models,
+        n_pca_dim=None,
+        **kwargs,
+    ):
+        clustering_features = self.basic_clustering_features_idx(trainer)
+        from ..pytorch_tabular import PytorchTabularWrapper
+
+        catembed = PytorchTabularWrapper(
+            required_models["EXTERN_PytorchTabular_AutoInt"]
+        )
+        sn = BMMSN(
+            n_clusters=n_clusters,
+            n_input=len(clustering_features),
+            n_pca_dim=n_pca_dim,
+        )
+        super(SNAutoIntWrapLRBMMNN, self).__init__(
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            trainer=trainer,
+            clustering_features=clustering_features,
+            clustering_sn_model=sn,
+            cont_cat_model=catembed,
+            layers=layers,
+            **kwargs,
+        )
+
+
 class SNCatEmbedLR2LGMMNN(AbstractClusteringModel):
     def __init__(
         self,

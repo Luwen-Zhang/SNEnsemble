@@ -62,6 +62,12 @@ class Transformer(TorchModel):
             "SNTabTransWrapLR2LPCAKMeans",
             "SNTabTransWrapLR2LPCAGMM",
             "SNTabTransWrapLR2LPCABMM",
+            "SNAutoIntLRPCAKMeans",
+            "SNAutoIntLRPCAGMM",
+            "SNAutoIntLRPCABMM",
+            "SNAutoIntWrapLRPCAKMeans",
+            "SNAutoIntWrapLRPCAGMM",
+            "SNAutoIntWrapLRPCABMM",
         ]
 
     def _new_model(self, model_name, verbose, **kwargs):
@@ -149,6 +155,12 @@ class Transformer(TorchModel):
             "SNTabTransWrapLR2LPCAKMeans",
             "SNTabTransWrapLR2LPCAGMM",
             "SNTabTransWrapLR2LPCABMM",
+            "SNAutoIntLRPCAKMeans",
+            "SNAutoIntLRPCAGMM",
+            "SNAutoIntLRPCABMM",
+            "SNAutoIntWrapLRPCAKMeans",
+            "SNAutoIntWrapLRPCAGMM",
+            "SNAutoIntWrapLRPCABMM",
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name.replace('PCA', '')}NN")
             if "2L" not in model_name:
@@ -263,6 +275,12 @@ class Transformer(TorchModel):
             "SNCatEmbedLRPCAKMeans",
             "SNCatEmbedLRPCAGMM",
             "SNCatEmbedLRPCABMM",
+            "SNAutoIntLRPCAKMeans",
+            "SNAutoIntLRPCAGMM",
+            "SNAutoIntLRPCABMM",
+            "SNAutoIntWrapLRPCAKMeans",
+            "SNAutoIntWrapLRPCAGMM",
+            "SNAutoIntWrapLRPCABMM",
         ]:
             return [
                 # Integer(
@@ -400,6 +418,12 @@ class Transformer(TorchModel):
             "SNCatEmbedLRPCAKMeans",
             "SNCatEmbedLRPCAGMM",
             "SNCatEmbedLRPCABMM",
+            "SNAutoIntLRPCAKMeans",
+            "SNAutoIntLRPCAGMM",
+            "SNAutoIntLRPCABMM",
+            "SNAutoIntWrapLRPCAKMeans",
+            "SNAutoIntWrapLRPCAGMM",
+            "SNAutoIntWrapLRPCABMM",
         ]:
             res = {
                 # "embedding_dim": 3,
@@ -469,6 +493,8 @@ class Transformer(TorchModel):
             return ["EXTERN_WideDeep_FTTransformer"]
         if "SNTabTrans" in model_name:
             return ["EXTERN_WideDeep_TabTransformer"]
+        if "SNAutoInt" in model_name:
+            return ["EXTERN_PytorchTabular_AutoInt"]
         else:
             return None
 
