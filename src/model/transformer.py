@@ -155,13 +155,13 @@ class Transformer(TorchModel):
                 feature_idx = cls.basic_clustering_features_idx(self.trainer)
             else:
                 feature_idx = cls.top_clustering_features_idx(self.trainer)
-            if len(feature_idx) > 1:
+            if len(feature_idx) > 2:
                 pca = self.trainer.datamodule.pca(feature_idx=feature_idx)
                 n_pca_dim = (
                     np.where(pca.explained_variance_ratio_.cumsum() < 0.9)[0][-1] + 1
                 )
             else:
-                n_pca_dim = 1
+                n_pca_dim = len(feature_idx)
             return cls(
                 **fix_kwargs,
                 embedding_dim=3,
