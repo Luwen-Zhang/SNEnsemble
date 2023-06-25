@@ -21,6 +21,9 @@ models = [
             "SNFTTransLR2LPCAKMeans",
             "SNFTTransLR2LPCAGMM",
             "SNFTTransLR2LPCABMM",
+            "SNFTTransWrapLR2LPCAKMeans",
+            "SNFTTransWrapLR2LPCAGMM",
+            "SNFTTransWrapLR2LPCABMM",
         ],
     ),
 ]

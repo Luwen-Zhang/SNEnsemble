@@ -21,6 +21,9 @@ models = [
             "SNCategoryEmbedLR2LPCAKMeans",
             "SNCategoryEmbedLR2LPCAGMM",
             "SNCategoryEmbedLR2LPCABMM",
+            "SNCategoryEmbedWrapLR2LPCAKMeans",
+            "SNCategoryEmbedWrapLR2LPCAGMM",
+            "SNCategoryEmbedWrapLR2LPCABMM",
         ],
     ),
 ]

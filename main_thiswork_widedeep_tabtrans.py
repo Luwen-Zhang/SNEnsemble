@@ -21,6 +21,9 @@ models = [
             "SNTabTransLR2LPCAKMeans",
             "SNTabTransLR2LPCAGMM",
             "SNTabTransLR2LPCABMM",
+            "SNTabTransWrapLR2LPCAKMeans",
+            "SNTabTransWrapLR2LPCAGMM",
+            "SNTabTransWrapLR2LPCABMM",
         ],
     ),
 ]
