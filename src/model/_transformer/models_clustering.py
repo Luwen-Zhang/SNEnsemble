@@ -173,7 +173,7 @@ class AbstractClusteringModel(AbstractNN):
                 trainer.datamodule.get_feature_idx_by_type(typ="Material"),
                 [trainer.cont_feature_names.index(x) for x in ["Frequency", "R-value"]],
             )
-        )
+        ).astype(int)
 
     @staticmethod
     def top_clustering_features_idx(trainer):
