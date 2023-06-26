@@ -26,13 +26,13 @@ class AbstractSN(nn.Module):
 
 
 class LinLog(AbstractSN):
-    def forward(self, s: torch.Tensor, x_cluster: torch.Tensor):
+    def forward(self, s: torch.Tensor, x_cluster: torch.Tensor, **kwargs):
         s = torch.abs(s)
         return self._linear(s, x_cluster)
 
 
 class LogLog(AbstractSN):
-    def forward(self, s: torch.Tensor, x_cluster: torch.Tensor):
+    def forward(self, s: torch.Tensor, x_cluster: torch.Tensor, **kwargs):
         s = torch.clamp(torch.abs(s), min=1e-8)
         """
         # To add fatigue limit:
@@ -79,7 +79,7 @@ def get_sns(**kwargs):
 
 
 class AbstractSNClustering(nn.Module):
-    def __init__(self, clustering: AbstractClustering, **kwargs):
+    def __init__(self, clustering: AbstractClustering, trainer, **kwargs):
         super(AbstractSNClustering, self).__init__()
         self.clustering = clustering
         self.n_clusters = self.clustering.n_total_clusters
