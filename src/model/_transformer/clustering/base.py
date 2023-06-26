@@ -3,6 +3,7 @@ import torch
 from torch import nn
 import inspect
 from .common.base import AbstractClustering
+from typing import Dict
 
 
 class AbstractSN(nn.Module):
@@ -24,16 +25,24 @@ class AbstractSN(nn.Module):
         )
         return self.lstsq_output
 
+    @staticmethod
+    def required_cols():
+        return ["Relative Maximum Stress"]
+
 
 class LinLog(AbstractSN):
-    def forward(self, s: torch.Tensor, x_cluster: torch.Tensor, **kwargs):
-        s = torch.abs(s)
+    def forward(
+        self, required_cols: Dict[str, torch.Tensor], x_cluster: torch.Tensor, **kwargs
+    ):
+        s = torch.abs(required_cols["Relative Maximum Stress"])
         return self._linear(s, x_cluster)
 
 
 class LogLog(AbstractSN):
-    def forward(self, s: torch.Tensor, x_cluster: torch.Tensor, **kwargs):
-        s = torch.clamp(torch.abs(s), min=1e-8)
+    def forward(
+        self, required_cols: Dict[str, torch.Tensor], x_cluster: torch.Tensor, **kwargs
+    ):
+        s = torch.clamp(torch.abs(required_cols["Relative Maximum Stress"]), min=1e-8)
         """
         # To add fatigue limit:
         s_sw = torch.clamp(
@@ -85,6 +94,16 @@ class AbstractSNClustering(nn.Module):
         self.n_clusters = self.clustering.n_total_clusters
         self.sns = get_sns(n_clusters=self.n_clusters)
 
+        required_cols = []
+        for sn in self.sns:
+            required_cols += sn.required_cols()
+        self.required_cols = list(sorted(set(required_cols)))
+        self.required_indices = [
+            trainer.cont_feature_names.index(col) for col in required_cols
+        ]
+        self.zero_slip = [
+            trainer.datamodule.get_zero_slip(col) for col in required_cols
+        ]
         # self.weight = 0.8
         # self.exp_avg_factor = 0.8
         # # Solved by exponential averaging
@@ -112,8 +131,18 @@ class AbstractSNClustering(nn.Module):
     #     else:
     #         return getattr(self, name)
 
-    def forward(self, x, s):
+    def extract_cols(self, x):
+        return {
+            col: x[:, idx] - zero_slip
+            for col, idx, zero_slip in zip(
+                self.required_cols, self.required_indices, self.zero_slip
+            )
+        }
+
+    def forward(self, x, clustering_features):
+        required_cols = self.extract_cols(x)
         # Clustering
+        x = x[:, clustering_features]
         x_cluster = self.clustering(x)
         resp = torch.zeros((x.shape[0], self.n_clusters), device=x.device)
         resp[torch.arange(x.shape[0]), x_cluster] = 1
@@ -123,7 +152,9 @@ class AbstractSNClustering(nn.Module):
         self.nk = nk
 
         # Calculate SN results in each cluster in parallel through vectorization.
-        x_sn = torch.concat([sn(s, x_cluster).unsqueeze(-1) for sn in self.sns], dim=1)
+        x_sn = torch.concat(
+            [sn(required_cols, x_cluster).unsqueeze(-1) for sn in self.sns], dim=1
+        )
         # Weighted sum of SN predictions
         self.ridge_input = x_sn
         x_sn = torch.mul(

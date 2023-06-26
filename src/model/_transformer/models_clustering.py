@@ -45,8 +45,6 @@ class AbstractClusteringModel(AbstractNN):
             self.cls_head = get_linear(
                 n_inputs=hidden_rep_dim, n_outputs=n_outputs, nonlinearity="relu"
             )
-        self.s_zero_slip = trainer.datamodule.get_zero_slip("Relative Maximum Stress")
-        self.s_idx = self.cont_feature_names.index("Relative Maximum Stress")
         self.ridge_penalty = ridge_penalty
         self.cls_head_normalize = nn.Sigmoid()
         self.cls_head_loss = nn.CrossEntropyLoss()
@@ -61,8 +59,7 @@ class AbstractClusteringModel(AbstractNN):
         else:
             hidden = torch.concat([x, dl_pred], dim=1)
         # Prediction of physical models
-        s_wo_bias = x[:, self.s_idx] - self.s_zero_slip
-        phy_pred = self.clustering_sn_model(x[:, self.clustering_features], s_wo_bias)
+        phy_pred = self.clustering_sn_model(x, self.clustering_features)
         # Projection from hidden output to deep learning weights
         dl_weight = self.cls_head_normalize(self.cls_head(hidden))
         # Weighted sum of prediction
