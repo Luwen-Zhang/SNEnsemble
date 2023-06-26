@@ -32,7 +32,10 @@ class AbstractSN(nn.Module):
 
 class LinLog(AbstractSN):
     def forward(
-        self, required_cols: Dict[str, torch.Tensor], x_cluster: torch.Tensor, **kwargs
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
     ):
         s = torch.abs(required_cols["Relative Maximum Stress"])
         return self._linear(s, x_cluster)
@@ -40,7 +43,10 @@ class LinLog(AbstractSN):
 
 class LogLog(AbstractSN):
     def forward(
-        self, required_cols: Dict[str, torch.Tensor], x_cluster: torch.Tensor, **kwargs
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
     ):
         s = torch.clamp(torch.abs(required_cols["Relative Maximum Stress"]), min=1e-8)
         """
@@ -153,7 +159,8 @@ class AbstractSNClustering(nn.Module):
 
         # Calculate SN results in each cluster in parallel through vectorization.
         x_sn = torch.concat(
-            [sn(required_cols, x_cluster).unsqueeze(-1) for sn in self.sns], dim=1
+            [sn(required_cols, x_cluster, self.sns).unsqueeze(-1) for sn in self.sns],
+            dim=1,
         )
         # Weighted sum of SN predictions
         self.ridge_input = x_sn
