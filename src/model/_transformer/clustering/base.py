@@ -17,6 +17,9 @@ class AbstractSN(nn.Module):
     def _register_params(self, n_clusters=1, **kwargs):
         self.a = nn.Parameter(torch.ones(n_clusters))
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 5))
+        if self.use_fatigue_limit:
+            self.sw = nn.Parameter(torch.zeros(n_clusters))
+            self.register_buffer("min_s", torch.ones(n_clusters))
 
     def _linear(self, s, x_cluster):
         self.lstsq_input = s
@@ -28,6 +31,37 @@ class AbstractSN(nn.Module):
     @staticmethod
     def required_cols():
         return ["Relative Maximum Stress"]
+
+    @property
+    def use_fatigue_limit(self):
+        return False
+
+    @property
+    def fatigue_limit(self):
+        if not self.use_fatigue_limit or not hasattr(self, "sw"):
+            raise Exception(
+                f"Set the property `use_fatigue_limit` to True or register attributes `sw` and `min_s` "
+                f"(see AbstractSN._register_params)."
+            )
+        return torch.clamp(torch.sigmoid(self.sw), max=self.min_s)
+
+    def update_fatigue_limit(self, s, x_cluster):
+        if not self.use_fatigue_limit:
+            raise Exception(
+                f"Set the property `use_fatigue_limit` to True if `update_fatigue_limit` is called."
+            )
+        if self.training:
+            s_mat = torch.mul(
+                torch.ones(s.shape[0], self.min_s.shape[0], device=s.device), 100
+            )
+            s_mat[torch.arange(s.shape[0]), x_cluster] = s
+            self.min_s = torch.min(
+                torch.concat(
+                    [self.min_s.view(-1, 1), torch.min(s_mat, dim=0)[0].view(-1, 1)],
+                    dim=1,
+                ),
+                dim=1,
+            )[0]
 
 
 class LinLog(AbstractSN):
@@ -49,37 +83,26 @@ class LogLog(AbstractSN):
         sns: nn.ModuleList,
     ):
         s = torch.clamp(torch.abs(required_cols["Relative Maximum Stress"]), min=1e-8)
-        """
-        # To add fatigue limit:
-        s_sw = torch.clamp(
-            s
-            - torch.clamp(torch.sigmoid(self.sw[x_cluster]), max=self.min_s[x_cluster]),
-            min=1e-8,
-        )
-        if self.training:
-            s_mat = torch.mul(
-                torch.ones(s.shape[0], self.min_s.shape[0], device=s.device), 100
-            )
-            s_mat[torch.arange(s.shape[0]), x_cluster] = s
-            self.min_s = torch.min(
-                torch.concat(
-                    [self.min_s.view(-1, 1), torch.min(s_mat, dim=0)[0].view(-1, 1)],
-                    dim=1,
-                ),
-                dim=1,
-            )[0]
-        log_s = torch.log10(s_sw)
-        """
         log_s = torch.log10(s)
         return self._linear(log_s, x_cluster)
 
-    """
-    # To add fatigue limit:
-    def _register_params(self, n_clusters=1, **kwargs):
-        super(LogLog, self)._register_params(n_clusters=n_clusters, **kwargs)
-        self.sw = nn.Parameter(torch.zeros(n_clusters))
-        self.register_buffer("min_s", torch.ones(n_clusters))
-    """
+
+# class LogLogFatigueLimit(AbstractSN):
+#     def forward(
+#         self,
+#         required_cols: Dict[str, torch.Tensor],
+#         x_cluster: torch.Tensor,
+#         sns: nn.ModuleList,
+#     ):
+#         s = torch.clamp(torch.abs(required_cols["Relative Maximum Stress"]), min=1e-8)
+#         s_sw = torch.clamp(s - self.fatigue_limit[x_cluster], min=1e-8)
+#         self.update_fatigue_limit(s, x_cluster)
+#         log_s = torch.log10(s_sw)
+#         return self._linear(log_s, x_cluster)
+#
+#     @property
+#     def use_fatigue_limit(self):
+#         return True
 
 
 available_sn = []
