@@ -550,6 +550,40 @@ class Transformer(TorchModel):
         else:
             return None
 
+    def _prepare_custom_datamodule(self, model_name):
+        from src.data import DataModule
+
+        base = self.trainer.datamodule
+        datamodule = DataModule(config=self.trainer.datamodule.args, initialize=False)
+        datamodule.set_data_imputer("MeanImputer")
+        datamodule.set_data_derivers(
+            [("UnscaledDataDeriver", {"derived_name": "Unscaled"})]
+        )
+        datamodule.set_data_processors([("StandardScaler", {})])
+        datamodule.set_data(
+            base.df,
+            cont_feature_names=base.cont_feature_names,
+            cat_feature_names=base.cat_feature_names,
+            label_name=base.label_name,
+            train_indices=base.train_indices,
+            val_indices=base.val_indices,
+            test_indices=base.test_indices,
+            verbose=False,
+        )
+        tmp_derived_data = base.derived_data.copy()
+        tmp_derived_data.update(datamodule.derived_data)
+        datamodule.derived_data = tmp_derived_data
+        datamodule._update_dataset_auto()
+        self.datamodule = datamodule
+        return datamodule
+
+    def _run_custom_data_module(self, df, derived_data, model_name):
+        df, my_derived_data = self.datamodule.prepare_new_data(df, ignore_absence=True)
+        derived_data = derived_data.copy()
+        derived_data.update(my_derived_data)
+        derived_data = self.datamodule.sort_derived_data(derived_data)
+        return df, derived_data, self.datamodule
+
     # def _bayes_eval(
     #     self,
     #     model,
