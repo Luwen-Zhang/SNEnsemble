@@ -967,7 +967,23 @@ class TorchModel(AbstractModel):
     """
 
     def _train_data_preprocess(self, model_name):
-        datamodule = self.trainer.datamodule
+        datamodule = self._prepare_custom_datamodule(model_name)
+        train_dataset, val_dataset, test_dataset = self._generate_dataset(
+            datamodule, model_name
+        )
+        return {
+            "X_train": train_dataset,
+            "y_train": datamodule.y_train,
+            "X_val": val_dataset,
+            "y_val": datamodule.y_val,
+            "X_test": test_dataset,
+            "y_test": datamodule.y_test,
+        }
+
+    def _prepare_custom_datamodule(self, model_name):
+        return self.trainer.datamodule
+
+    def _generate_dataset(self, datamodule, model_name):
         required_models = self._get_required_models(model_name)
         if required_models is None:
             train_dataset, val_dataset, test_dataset = (
@@ -985,14 +1001,7 @@ class TorchModel(AbstractModel):
             train_dataset, val_dataset, test_dataset = datamodule.generate_subset(
                 dataset
             )
-        return {
-            "X_train": train_dataset,
-            "y_train": datamodule.y_train,
-            "X_val": val_dataset,
-            "y_val": datamodule.y_val,
-            "X_test": test_dataset,
-            "y_test": datamodule.y_test,
-        }
+        return train_dataset, val_dataset, test_dataset
 
     def _generate_dataset_for_required_models(
         self, df, derived_data, tensors, required_models
@@ -1029,17 +1038,23 @@ class TorchModel(AbstractModel):
             )
         return dataset
 
+    def _run_custom_data_module(self, df, derived_data, model_name):
+        return df, derived_data, self.trainer.datamodule
+
     def _data_preprocess(self, df, derived_data, model_name):
-        scaled_df = self.trainer.datamodule.data_transform(df, scaler_only=True)
+        df, derived_data, datamodule = self._run_custom_data_module(
+            df, derived_data, model_name
+        )
+        scaled_df = datamodule.data_transform(df, scaler_only=True)
         X = torch.tensor(
-            scaled_df[self.trainer.cont_feature_names].values.astype(np.float32),
+            scaled_df[datamodule.cont_feature_names].values.astype(np.float32),
             dtype=torch.float32,
         )
         D = [
             torch.tensor(value, dtype=torch.float32) for value in derived_data.values()
         ]
         y = torch.tensor(
-            np.zeros((len(scaled_df), len(self.trainer.label_name))),
+            np.zeros((len(scaled_df), len(datamodule.label_name))),
             dtype=torch.float32,
         )
         tensors = (X, *D, y)
