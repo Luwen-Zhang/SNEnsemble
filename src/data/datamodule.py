@@ -17,12 +17,14 @@ class DataModule:
         self,
         config: Union[UserConfig, Dict],
         verbose: bool = True,
+        initialize: bool = True,
     ):
         self.args = config
-        self.set_data_splitter(self.args["data_splitter"], verbose=verbose)
-        self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
-        self.set_data_processors(self.args["data_processors"], verbose=verbose)
-        self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
+        if initialize:
+            self.set_data_splitter(self.args["data_splitter"], verbose=verbose)
+            self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
+            self.set_data_processors(self.args["data_processors"], verbose=verbose)
+            self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
         self.training = False
         self.data_path = None
 
