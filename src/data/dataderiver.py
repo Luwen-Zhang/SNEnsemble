@@ -232,6 +232,34 @@ class WalkerStressDeriver(AbstractDeriver):
         return value
 
 
+class UnscaledDataDeriver(AbstractDeriver):
+    """
+    Record unscaled data in DataModule.derived_data so that TorchModels can access it.
+    """
+
+    def _required_cols(self, **kwargs):
+        return []
+
+    def _required_params(self, **kwargs):
+        return []
+
+    def _defaults(self):
+        return dict(stacked=False, intermediate=False)
+
+    def _derive(
+        self,
+        df,
+        datamodule,
+        **kwargs,
+    ):
+        if kwargs["stacked"]:
+            raise Exception(
+                f"{self.__class__.__name__} can not derive stacked features (behavior when "
+                f"``datamodule._force_features=True`` is not defined)."
+            )
+        return df[datamodule.cont_feature_names].values
+
+
 # class DriveCoeffDeriver(AbstractDeriver):
 #     def __init__(self):
 #         super(DriveCoeffDeriver, self).__init__()
