@@ -8,18 +8,6 @@ from ._transformer.models_basic import *
 
 
 class Transformer(TorchModel):
-    def __init__(
-        self,
-        trainer,
-        manual_activate_sn=None,
-        layers=None,
-        *args,
-        **kwargs,
-    ):
-        super(Transformer, self).__init__(trainer, *args, **kwargs)
-        self.manual_activate_sn = manual_activate_sn
-        self.layers = layers
-
     def _get_program_name(self):
         return "Transformer"
 
@@ -86,9 +74,7 @@ class Transformer(TorchModel):
         fix_kwargs = dict(
             n_inputs=len(self.datamodule.cont_feature_names),
             n_outputs=len(self.datamodule.label_name),
-            layers=self.datamodule.args["layers"]
-            if self.layers is None
-            else self.layers,
+            layers=self.datamodule.args["layers"],
             cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
             datamodule=self.datamodule,
         )
