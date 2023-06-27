@@ -968,6 +968,7 @@ class TorchModel(AbstractModel):
 
     def _train_data_preprocess(self, model_name):
         datamodule = self._prepare_custom_datamodule(model_name)
+        datamodule.update_dataset()
         train_dataset, val_dataset, test_dataset = self._generate_dataset(
             datamodule, model_name
         )
@@ -982,12 +983,7 @@ class TorchModel(AbstractModel):
 
     def _prepare_custom_datamodule(self, model_name) -> DataModule:
         """
-        Change this method if a customized preprocessing stage is needed.
-
-        Notes
-        -------
-        Call datamodule._update_dataset_auto() after manual modifications on the datamodule.
-        See ``transformer.py`` for example.
+        Change this method if a customized preprocessing stage is needed. See ``transformer.py`` for example.
         """
         return self.trainer.datamodule
 

@@ -559,7 +559,6 @@ class Transformer(TorchModel):
         tmp_derived_data = base.derived_data.copy()
         tmp_derived_data.update(datamodule.derived_data)
         datamodule.derived_data = tmp_derived_data
-        datamodule._update_dataset_auto()
         self.datamodule = datamodule
         return datamodule
 

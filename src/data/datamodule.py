@@ -365,7 +365,7 @@ class DataModule:
             if derived_data is None
             else self.sort_derived_data(derived_data)
         )
-        self._update_dataset_auto()
+        self.update_dataset()
         self._material_code = (
             pd.DataFrame(self.df["Material_Code"])
             if "Material_Code" in self.df.columns
@@ -644,7 +644,7 @@ class DataModule:
                 x in self.derived_stacked_features and x not in derived_stacked_features
             )
         ]
-        self._update_dataset_auto()
+        self.update_dataset()
         self._force_features = True
         self.set_status(training=False)
 
@@ -1100,7 +1100,7 @@ class DataModule:
             scaler_only=scaler_only,
         )
 
-    def _update_dataset_auto(self):
+    def update_dataset(self):
         """
         Update PyTorch tensors and datasets for the datamodule. This is called after features change.
         """
