@@ -84,11 +84,13 @@ class Transformer(TorchModel):
 
     def _new_model(self, model_name, verbose, **kwargs):
         fix_kwargs = dict(
-            n_inputs=len(self.trainer.cont_feature_names),
-            n_outputs=len(self.trainer.label_name),
-            layers=self.trainer.args["layers"] if self.layers is None else self.layers,
+            n_inputs=len(self.datamodule.cont_feature_names),
+            n_outputs=len(self.datamodule.label_name),
+            layers=self.datamodule.args["layers"]
+            if self.layers is None
+            else self.layers,
             cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
-            trainer=self.trainer,
+            datamodule=self.datamodule,
         )
         if model_name == "TransformerLSTM":
             return TransformerLSTMNN(
@@ -188,11 +190,11 @@ class Transformer(TorchModel):
         ]:
             cls = getattr(sys.modules[__name__], f"{model_name.replace('PCA', '')}NN")
             if "2L" not in model_name:
-                feature_idx = cls.basic_clustering_features_idx(self.trainer)
+                feature_idx = cls.basic_clustering_features_idx(self.datamodule)
             else:
-                feature_idx = cls.top_clustering_features_idx(self.trainer)
+                feature_idx = cls.top_clustering_features_idx(self.datamodule)
             if len(feature_idx) > 2:
-                pca = self.trainer.datamodule.pca(feature_idx=feature_idx)
+                pca = self.datamodule.pca(feature_idx=feature_idx)
                 n_pca_dim = (
                     np.where(pca.explained_variance_ratio_.cumsum() < 0.9)[0][-1] + 1
                 )
@@ -527,7 +529,7 @@ class Transformer(TorchModel):
     def _conditional_validity(self, model_name: str) -> bool:
         if (
             model_name in ["SNTransformerLRKMeans"]
-            and "Relative Mean Stress" not in self.trainer.cont_feature_names
+            and "Relative Mean Stress" not in self.datamodule.cont_feature_names
         ):
             return False
         return True

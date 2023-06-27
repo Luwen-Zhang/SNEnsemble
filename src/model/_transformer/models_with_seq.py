@@ -13,12 +13,12 @@ class AbstractSeqModel(AbstractNN):
         self,
         n_outputs,
         layers,
-        trainer,
+        datamodule,
         cont_cat_model: AbstractNN,
         seq_model: Union[AbstractNN, nn.Module],
         **kwargs,
     ):
-        super(AbstractSeqModel, self).__init__(trainer, **kwargs)
+        super(AbstractSeqModel, self).__init__(datamodule, **kwargs)
         self.cont_cat_model = cont_cat_model
         self.seq_model = seq_model
         self.hidden_rep_dim = (
@@ -47,15 +47,15 @@ class TransformerLSTMNN(AbstractSeqModel):
         n_inputs,
         n_outputs,
         layers,
-        trainer,
+        datamodule,
         cat_num_unique: List[int] = None,
         **kwargs,
     ):
-        AbstractNN.__init__(self, trainer, **kwargs)
+        AbstractNN.__init__(self, datamodule, **kwargs)
         transformer = FTTransformerNN(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
-            trainer=trainer,
+            datamodule=datamodule,
             cat_num_unique=cat_num_unique,
             embedding_dim=self.hparams.embedding_dim,
             embed_dropout=self.hparams.embed_dropout,
@@ -74,7 +74,7 @@ class TransformerLSTMNN(AbstractSeqModel):
         super(TransformerLSTMNN, self).__init__(
             n_outputs=n_outputs,
             layers=layers,
-            trainer=trainer,
+            datamodule=datamodule,
             cont_cat_model=transformer,
             seq_model=lstm,
         )
@@ -86,15 +86,15 @@ class TransformerSeqNN(AbstractSeqModel):
         n_inputs,
         n_outputs,
         layers,
-        trainer,
+        datamodule,
         cat_num_unique: List[int] = None,
         **kwargs,
     ):
-        AbstractNN.__init__(self, trainer, **kwargs)
+        AbstractNN.__init__(self, datamodule, **kwargs)
         transformer = FTTransformerNN(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
-            trainer=trainer,
+            datamodule=datamodule,
             cat_num_unique=cat_num_unique,
             embedding_dim=self.hparams.embedding_dim,
             embed_dropout=self.hparams.embed_dropout,
@@ -123,7 +123,7 @@ class TransformerSeqNN(AbstractSeqModel):
         super(TransformerSeqNN, self).__init__(
             n_outputs=n_outputs,
             layers=layers,
-            trainer=trainer,
+            datamodule=datamodule,
             cont_cat_model=transformer,
             seq_model=seq_transformer,
         )
@@ -135,15 +135,15 @@ class CatEmbedSeqNN(AbstractSeqModel):
         n_inputs,
         n_outputs,
         layers,
-        trainer,
+        datamodule,
         cat_num_unique: List[int] = None,
         **kwargs,
     ):
-        AbstractNN.__init__(self, trainer, **kwargs)
+        AbstractNN.__init__(self, datamodule, **kwargs)
         catembed = CategoryEmbeddingNN(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
-            trainer=trainer,
+            datamodule=datamodule,
             cat_num_unique=cat_num_unique,
             embedding_dim=self.hparams.embedding_dim,
             embed_dropout=self.hparams.embed_dropout,
@@ -167,7 +167,7 @@ class CatEmbedSeqNN(AbstractSeqModel):
         super(CatEmbedSeqNN, self).__init__(
             n_outputs=n_outputs,
             layers=layers,
-            trainer=trainer,
+            datamodule=datamodule,
             cont_cat_model=catembed,
             seq_model=seq_transformer,
         )

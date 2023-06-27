@@ -11,11 +11,11 @@ class CategoryEmbeddingNN(AbstractNN):
         self,
         n_inputs,
         n_outputs,
-        trainer,
+        datamodule,
         cat_num_unique: List[int] = None,
         **kwargs,
     ):
-        super(CategoryEmbeddingNN, self).__init__(trainer, **kwargs)
+        super(CategoryEmbeddingNN, self).__init__(datamodule, **kwargs)
 
         run_cat = "categorical" in self.derived_feature_names
 
@@ -62,11 +62,11 @@ class FTTransformerNN(AbstractNN):
         self,
         n_inputs,
         n_outputs,
-        trainer,
+        datamodule,
         cat_num_unique: List[int] = None,
         **kwargs,
     ):
-        super(FTTransformerNN, self).__init__(trainer, **kwargs)
+        super(FTTransformerNN, self).__init__(datamodule, **kwargs)
 
         self.embed = Embedding(
             self.hparams.embedding_dim,

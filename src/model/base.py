@@ -980,7 +980,15 @@ class TorchModel(AbstractModel):
             "y_test": datamodule.y_test,
         }
 
-    def _prepare_custom_datamodule(self, model_name):
+    def _prepare_custom_datamodule(self, model_name) -> DataModule:
+        """
+        Change this method if a customized preprocessing stage is needed.
+
+        Notes
+        -------
+        Call datamodule._update_dataset_auto() after manual modifications on the datamodule.
+        See ``transformer.py`` for example.
+        """
         return self.trainer.datamodule
 
     def _generate_dataset(self, datamodule, model_name):
@@ -1039,6 +1047,10 @@ class TorchModel(AbstractModel):
         return dataset
 
     def _run_custom_data_module(self, df, derived_data, model_name):
+        """
+        Change this method if a customized preprocessing stage is implemented in ``_prepare_custom_datamodule``. The
+        returned datamodule only provide feature names and a scaler (AbstractScaler). See ``transformer.py`` for example.
+        """
         return df, derived_data, self.trainer.datamodule
 
     def _data_preprocess(self, df, derived_data, model_name):
@@ -1280,33 +1292,34 @@ class TorchModelWrapper(AbstractWrapper):
 
 
 class AbstractNN(pl.LightningModule):
-    def __init__(self, trainer: Trainer, **kwargs):
+    def __init__(self, datamodule: DataModule, **kwargs):
         """
         PyTorch model that contains derived data names and dimensions from the trainer.
 
         Parameters
         ----------
-        trainer:
-            A Trainer instance.
+        datamodule:
+            A DataModule instance.
         """
         super(AbstractNN, self).__init__()
-        self.default_loss_fn = trainer.get_loss_fn()
-        self.cont_feature_names = cp(trainer.cont_feature_names)
-        self.cat_feature_names = cp(trainer.cat_feature_names)
+        self.default_loss_fn = nn.MSELoss()
+        self.cont_feature_names = cp(datamodule.cont_feature_names)
+        self.cat_feature_names = cp(datamodule.cat_feature_names)
         self.n_cont = len(self.cont_feature_names)
         self.n_cat = len(self.cat_feature_names)
-        self.derived_feature_names = list(trainer.derived_data.keys())
-        self.derived_feature_dims = trainer.datamodule.get_derived_data_sizes()
+        self.derived_feature_names = list(datamodule.derived_data.keys())
+        self.derived_feature_dims = datamodule.get_derived_data_sizes()
         self.derived_feature_names_dims = {}
         self.automatic_optimization = False
         self.hidden_representation = None
         self.hidden_rep_dim = None
         if len(kwargs) > 0:
             self.save_hyperparameters(
-                *list(kwargs.keys()), ignore=["trainer", "required_models"]
+                *list(kwargs.keys()),
+                ignore=["trainer", "datamodule", "required_models"],
             )
         for name, dim in zip(
-            trainer.derived_data.keys(), trainer.datamodule.get_derived_data_sizes()
+            datamodule.derived_data.keys(), datamodule.get_derived_data_sizes()
         ):
             self.derived_feature_names_dims[name] = dim
         self._device_var = nn.Parameter(torch.empty(0, requires_grad=False))

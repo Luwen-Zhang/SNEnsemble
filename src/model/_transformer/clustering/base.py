@@ -94,7 +94,7 @@ def get_sns(**kwargs):
 
 
 class AbstractSNClustering(nn.Module):
-    def __init__(self, clustering: AbstractClustering, trainer, **kwargs):
+    def __init__(self, clustering: AbstractClustering, datamodule, **kwargs):
         super(AbstractSNClustering, self).__init__()
         self.clustering = clustering
         self.n_clusters = self.clustering.n_total_clusters
@@ -105,10 +105,10 @@ class AbstractSNClustering(nn.Module):
             required_cols += sn.required_cols()
         self.required_cols = list(sorted(set(required_cols)))
         self.required_indices = [
-            trainer.cont_feature_names.index(col) for col in required_cols
+            datamodule.cont_feature_names.index(col) for col in required_cols
         ]
         self.zero_slip = [
-            trainer.datamodule.get_zero_slip(col) for col in required_cols
+            datamodule.datamodule.get_zero_slip(col) for col in required_cols
         ]
         # self.weight = 0.8
         # self.exp_avg_factor = 0.8

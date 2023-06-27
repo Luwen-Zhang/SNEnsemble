@@ -15,7 +15,7 @@ class AbstractClusteringModel(AbstractNN):
         self,
         n_inputs,
         n_outputs,
-        trainer,
+        datamodule,
         clustering_features,
         clustering_sn_model,
         cont_cat_model,
@@ -23,7 +23,7 @@ class AbstractClusteringModel(AbstractNN):
         ridge_penalty: float = 0.0,
         **kwargs,
     ):
-        super(AbstractClusteringModel, self).__init__(trainer, **kwargs)
+        super(AbstractClusteringModel, self).__init__(datamodule, **kwargs)
         if n_outputs != 1:
             raise Exception("n_outputs > 1 is not supported.")
         self.clustering_features = clustering_features
@@ -165,17 +165,20 @@ class AbstractClusteringModel(AbstractNN):
         regression_optimizer.step()
 
     @staticmethod
-    def basic_clustering_features_idx(trainer) -> np.ndarray:
+    def basic_clustering_features_idx(datamodule) -> np.ndarray:
         return np.concatenate(
             (
-                trainer.datamodule.get_feature_idx_by_type(typ="Material"),
-                [trainer.cont_feature_names.index(x) for x in ["Frequency", "R-value"]],
+                datamodule.get_feature_idx_by_type(typ="Material"),
+                [
+                    datamodule.cont_feature_names.index(x)
+                    for x in ["Frequency", "R-value"]
+                ],
             )
         ).astype(int)
 
     @staticmethod
-    def top_clustering_features_idx(trainer):
-        return AbstractClusteringModel.basic_clustering_features_idx(trainer)[:-2]
+    def top_clustering_features_idx(datamodule):
+        return AbstractClusteringModel.basic_clustering_features_idx(datamodule)[:-2]
 
 
 class Abstract1LClusteringModel(AbstractClusteringModel):
@@ -184,24 +187,24 @@ class Abstract1LClusteringModel(AbstractClusteringModel):
         n_inputs,
         n_outputs,
         layers,
-        trainer,
+        datamodule,
         n_clusters,
         sn_class,
         cont_cat_model,
         n_pca_dim: int = None,
         **kwargs,
     ):
-        clustering_features = self.basic_clustering_features_idx(trainer)
+        clustering_features = self.basic_clustering_features_idx(datamodule)
         sn = sn_class(
             n_clusters=n_clusters,
             n_input=len(clustering_features),
             n_pca_dim=n_pca_dim,
-            trainer=trainer,
+            datamodule=datamodule,
         )
         super(Abstract1LClusteringModel, self).__init__(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
-            trainer=trainer,
+            datamodule=datamodule,
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=cont_cat_model,
@@ -216,7 +219,7 @@ class Abstract2LClusteringModel(AbstractClusteringModel):
         n_inputs,
         n_outputs,
         layers,
-        trainer,
+        datamodule,
         n_clusters,
         n_clusters_per_cluster: int,
         sn_class,
@@ -224,8 +227,8 @@ class Abstract2LClusteringModel(AbstractClusteringModel):
         n_pca_dim: int = None,
         **kwargs,
     ):
-        clustering_features = list(self.basic_clustering_features_idx(trainer))
-        top_level_clustering_features = self.top_clustering_features_idx(trainer)
+        clustering_features = list(self.basic_clustering_features_idx(datamodule))
+        top_level_clustering_features = self.top_clustering_features_idx(datamodule)
         input_1_idx = [
             list(clustering_features).index(x) for x in top_level_clustering_features
         ]
@@ -240,12 +243,12 @@ class Abstract2LClusteringModel(AbstractClusteringModel):
             input_2_idx=input_2_idx,
             n_clusters_per_cluster=n_clusters_per_cluster,
             n_pca_dim=n_pca_dim,
-            trainer=trainer,
+            datamodule=datamodule,
         )
         super(Abstract2LClusteringModel, self).__init__(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
-            trainer=trainer,
+            datamodule=datamodule,
             clustering_features=clustering_features,
             clustering_sn_model=sn,
             cont_cat_model=cont_cat_model,
