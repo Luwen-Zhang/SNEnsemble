@@ -197,11 +197,11 @@ class DataModule:
         cont_feature_names: List[str],
         cat_feature_names: List[str],
         label_name: List[str],
+        derived_stacked_features: List[str] = None,
         derived_data: Dict[str, np.ndarray] = None,
         warm_start: bool = False,
         verbose: bool = True,
         all_training: bool = False,
-        force_features: bool = False,
         train_indices: np.ndarray = None,
         val_indices: np.ndarray = None,
         test_indices: np.ndarray = None,
@@ -219,6 +219,9 @@ class DataModule:
             A list of categorical features in the tabular dataset.
         label_name
             A list of targets. Currently, only one target is supported.
+        derived_stacked_features
+            A list of derived features in the tabular dataset. If specified, only these features are retained after
+            derivation.
         derived_data
             The derived data calculated using data derivers with the argument "stacked" to False, i.e. unstacked data.
         warm_start
@@ -227,8 +230,6 @@ class DataModule:
             Verbosity.
         all_training
             Whether all samples are used for training.
-        force_features
-            Ignore derived features and do not remove features.
         train_indices
             Manually specify the training set by indices.
         val_indices
@@ -243,7 +244,6 @@ class DataModule:
             )
 
         self.set_status(training=True)
-        self._force_features = force_features
         self.cont_feature_names = cont_feature_names
         self.cat_feature_names = cat_feature_names
         self.cat_feature_mapping = {}
@@ -296,8 +296,15 @@ class DataModule:
             self.df,
             cont_feature_names,
         ) = self.derive_stacked(self.df)
-        if not self._force_features:
-            self.cont_feature_names = cont_feature_names
+        if derived_stacked_features is not None:
+            current_derived_stacked_features = (
+                self.extract_derived_stacked_feature_names(cont_feature_names)
+            )
+            removed = np.setdiff1d(
+                current_derived_stacked_features, derived_stacked_features
+            )
+            cont_feature_names = [x for x in cont_feature_names if x not in removed]
+        self.cont_feature_names = cont_feature_names
         # There may exist nan in stacked features.
         self._cont_imputed_mask = pd.concat(
             [
@@ -630,22 +637,12 @@ class DataModule:
             cont_feature_names,
             cat_feature_names,
             self.label_name,
+            derived_stacked_features=derived_stacked_features,
             verbose=False,
-            force_features=True,
             train_indices=self.train_indices if has_indices else None,
             val_indices=self.val_indices if has_indices else None,
             test_indices=self.test_indices if has_indices else None,
         )
-        # Some derived stacked features are not in the specified list.
-        self.cont_feature_names = [
-            x
-            for x in self.cont_feature_names
-            if not (
-                x in self.derived_stacked_features and x not in derived_stacked_features
-            )
-        ]
-        self.update_dataset()
-        self._force_features = True
         self.set_status(training=False)
 
     def sort_derived_data(
