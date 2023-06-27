@@ -107,9 +107,7 @@ class AbstractSNClustering(nn.Module):
         self.required_indices = [
             datamodule.cont_feature_names.index(col) for col in required_cols
         ]
-        self.zero_slip = [
-            datamodule.datamodule.get_zero_slip(col) for col in required_cols
-        ]
+        self.zero_slip = [datamodule.get_zero_slip(col) for col in required_cols]
         # self.weight = 0.8
         # self.exp_avg_factor = 0.8
         # # Solved by exponential averaging
