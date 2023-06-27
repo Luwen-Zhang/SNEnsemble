@@ -12,7 +12,6 @@ import inspect
 from sklearn.model_selection import KFold
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import StandardScaler as skStandardScaler
-from sklearn.preprocessing import Normalizer as skNormalizer
 from sklearn.preprocessing import OrdinalEncoder
 from typing import Type
 
@@ -439,30 +438,6 @@ class StandardScaler(AbstractTransformer, AbstractScaler):
 
     def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         scaler = skStandardScaler()
-        data.loc[:, datamodule.cont_feature_names] = scaler.fit_transform(
-            data.loc[:, datamodule.cont_feature_names]
-        ).astype(np.float32)
-
-        self.transformer = scaler
-        return data
-
-    def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
-        data.loc[:, datamodule.cont_feature_names] = self.transformer.transform(
-            data.loc[:, datamodule.cont_feature_names]
-        ).astype(np.float32)
-        return data
-
-
-class Normalizer(AbstractTransformer, AbstractScaler):
-    """
-    The standard scaler implemented using StandardScaler from sklearn.
-    """
-
-    def __init__(self):
-        super(Normalizer, self).__init__()
-
-    def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
-        scaler = skNormalizer()
         data.loc[:, datamodule.cont_feature_names] = scaler.fit_transform(
             data.loc[:, datamodule.cont_feature_names]
         ).astype(np.float32)
