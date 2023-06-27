@@ -313,15 +313,53 @@ class SNFTTransLR2LKMeansNN(Abstract2LClusteringModel):
 
 
 class SNFTTransLR2LBMMNN(Abstract2LClusteringModel):
-    def __init__(
-        self,
-        required_models,
-        **kwargs,
-    ):
+    def __init__(self, required_models, **kwargs):
         cont_cat_model = required_models["EXTERN_WideDeep_FTTransformer"]
         super().__init__(
             sn_class=TwolayerBMMSN, cont_cat_model=cont_cat_model, **kwargs
         )
+
+
+class SNPyFTTransLRGMMNN(Abstract1LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = required_models["EXTERN_PytorchTabular_FTTransformer"]
+        super().__init__(sn_class=GMMSN, cont_cat_model=cont_cat_model, **kwargs)
+
+
+class SNPyFTTransLRKMeansNN(Abstract1LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = required_models["EXTERN_PytorchTabular_FTTransformer"]
+        super().__init__(sn_class=KMeansSN, cont_cat_model=cont_cat_model, **kwargs)
+
+
+class SNPyFTTransLRBMMNN(Abstract1LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = required_models["EXTERN_PytorchTabular_FTTransformer"]
+        super().__init__(sn_class=BMMSN, cont_cat_model=cont_cat_model, **kwargs)
+
+
+class SNPyFTTransWrapLRGMMNN(Abstract1LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = PytorchTabularWrapper(
+            required_models["EXTERN_PytorchTabular_FTTransformer"]
+        )
+        super().__init__(sn_class=GMMSN, cont_cat_model=cont_cat_model, **kwargs)
+
+
+class SNPyFTTransWrapLRKMeansNN(Abstract1LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = PytorchTabularWrapper(
+            required_models["EXTERN_PytorchTabular_FTTransformer"]
+        )
+        super().__init__(sn_class=KMeansSN, cont_cat_model=cont_cat_model, **kwargs)
+
+
+class SNPyFTTransWrapLRBMMNN(Abstract1LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = PytorchTabularWrapper(
+            required_models["EXTERN_PytorchTabular_FTTransformer"]
+        )
+        super().__init__(sn_class=BMMSN, cont_cat_model=cont_cat_model, **kwargs)
 
 
 class SNTabTransLR2LGMMNN(Abstract2LClusteringModel):

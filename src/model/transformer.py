@@ -50,6 +50,12 @@ class Transformer(TorchModel):
             "SNFTTransLR2LPCAKMeans",
             "SNFTTransLR2LPCAGMM",
             "SNFTTransLR2LPCABMM",
+            "SNPyFTTransLRPCAKMeans",
+            "SNPyFTTransLRPCAGMM",
+            "SNPyFTTransLRPCABMM",
+            "SNPyFTTransWrapLRPCAKMeans",
+            "SNPyFTTransWrapLRPCAGMM",
+            "SNPyFTTransWrapLRPCABMM",
             "SNCategoryEmbedLRPCAKMeans",
             "SNCategoryEmbedLRPCAGMM",
             "SNCategoryEmbedLRPCABMM",
@@ -149,6 +155,12 @@ class Transformer(TorchModel):
             "SNFTTransLR2LPCAKMeans",
             "SNFTTransLR2LPCAGMM",
             "SNFTTransLR2LPCABMM",
+            "SNPyFTTransLRPCAKMeans",
+            "SNPyFTTransLRPCAGMM",
+            "SNPyFTTransLRPCABMM",
+            "SNPyFTTransWrapLRPCAKMeans",
+            "SNPyFTTransWrapLRPCAGMM",
+            "SNPyFTTransWrapLRPCABMM",
             "SNCategoryEmbedLRPCAKMeans",
             "SNCategoryEmbedLRPCAGMM",
             "SNCategoryEmbedLRPCABMM",
@@ -287,6 +299,12 @@ class Transformer(TorchModel):
             "SNCatEmbedLRPCAKMeans",
             "SNCatEmbedLRPCAGMM",
             "SNCatEmbedLRPCABMM",
+            "SNPyFTTransLRPCAKMeans",
+            "SNPyFTTransLRPCAGMM",
+            "SNPyFTTransLRPCABMM",
+            "SNPyFTTransWrapLRPCAKMeans",
+            "SNPyFTTransWrapLRPCAGMM",
+            "SNPyFTTransWrapLRPCABMM",
             "SNAutoIntLRPCAKMeans",
             "SNAutoIntLRPCAGMM",
             "SNAutoIntLRPCABMM",
@@ -436,6 +454,12 @@ class Transformer(TorchModel):
             "SNCatEmbedLRPCAKMeans",
             "SNCatEmbedLRPCAGMM",
             "SNCatEmbedLRPCABMM",
+            "SNPyFTTransLRPCAKMeans",
+            "SNPyFTTransLRPCAGMM",
+            "SNPyFTTransLRPCABMM",
+            "SNPyFTTransWrapLRPCAKMeans",
+            "SNPyFTTransWrapLRPCAGMM",
+            "SNPyFTTransWrapLRPCABMM",
             "SNAutoIntLRPCAKMeans",
             "SNAutoIntLRPCAGMM",
             "SNAutoIntLRPCABMM",
@@ -519,6 +543,8 @@ class Transformer(TorchModel):
             return ["EXTERN_WideDeep_TabTransformer"]
         if "SNAutoInt" in model_name:
             return ["EXTERN_PytorchTabular_AutoInt"]
+        if "SNPyFTTrans" in model_name:
+            return ["EXTERN_PytorchTabular_FTTransformer"]
         else:
             return None
 
