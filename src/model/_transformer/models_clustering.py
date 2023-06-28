@@ -59,7 +59,9 @@ class AbstractClusteringModel(AbstractNN):
         else:
             hidden = torch.concat([x, dl_pred], dim=1)
         # Prediction of physical models
-        phy_pred = self.clustering_sn_model(x, self.clustering_features)
+        phy_pred = self.clustering_sn_model(
+            x, self.clustering_features, derived_tensors
+        )
         # Projection from hidden output to deep learning weights
         dl_weight = self.cls_head_normalize(self.cls_head(hidden))
         # Weighted sum of prediction

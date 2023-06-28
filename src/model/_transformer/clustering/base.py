@@ -158,7 +158,7 @@ class AbstractSNClustering(nn.Module):
     #     else:
     #         return getattr(self, name)
 
-    def extract_cols(self, x):
+    def extract_cols(self, x, derived_tensors):
         return {
             col: x[:, idx] - zero_slip
             for col, idx, zero_slip in zip(
@@ -166,8 +166,8 @@ class AbstractSNClustering(nn.Module):
             )
         }
 
-    def forward(self, x, clustering_features):
-        required_cols = self.extract_cols(x)
+    def forward(self, x, clustering_features, derived_tensors):
+        required_cols = self.extract_cols(x, derived_tensors)
         # Clustering
         x = x[:, clustering_features]
         x_cluster = self.clustering(x)
