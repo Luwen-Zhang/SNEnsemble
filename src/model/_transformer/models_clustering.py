@@ -53,7 +53,7 @@ class AbstractClusteringModel(AbstractNN):
 
     def _forward(self, x, derived_tensors):
         # Prediction of deep learning models.
-        dl_pred = self._call_required_model(self.cont_cat_model, x, derived_tensors)
+        dl_pred = self.call_required_model(self.cont_cat_model, x, derived_tensors)
         if self.use_hidden_rep:
             hidden = self.cont_cat_model.hidden_representation.to(x.device)
         else:

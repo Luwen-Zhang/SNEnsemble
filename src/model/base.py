@@ -299,11 +299,13 @@ class AbstractModel:
                         )
                     required_models[name] = self.model[name]
                 elif name.startswith("EXTERN_"):
-                    if len(name.split("_")) != 3:
+                    spl = name.split("_")
+                    if len(spl) not in [3, 4] or (len(spl) == 4 and spl[-1] != "WRAP"):
                         raise Exception(
                             f"Unrecognized required model name {name} from external model bases."
                         )
-                    _, program, ext_model_name = name.split("_")
+                    program, ext_model_name = spl[1], spl[2]
+                    wrap = spl[-1] == "WRAP"
                     try:
                         modelbase = self.trainer.get_modelbase(program=program)
                     except:
@@ -318,6 +320,24 @@ class AbstractModel:
                         raise Exception(
                             f"Model {ext_model_name} can not be detached from model base {program}. Exception:\n{e}"
                         )
+                    if wrap:
+                        from .pytorch_tabular import (
+                            PytorchTabular,
+                            PytorchTabularWrapper,
+                        )
+                        from .widedeep import WideDeep, WideDeepWrapper
+
+                        if isinstance(detached_model, PytorchTabular):
+                            detached_model = PytorchTabularWrapper(detached_model)
+                        elif isinstance(detached_model, WideDeep):
+                            detached_model = WideDeepWrapper(detached_model)
+                        elif isinstance(detached_model, TorchModel):
+                            detached_model = TorchModelWrapper(detached_model)
+                        else:
+                            raise Exception(
+                                f"{type(detached_model)} does not support wrapping. Supported model bases "
+                                f"are PytorchTabular, WideDeep, and TorchModels."
+                            )
                     required_models[name] = detached_model
                 else:
                     raise Exception(
@@ -1010,27 +1030,29 @@ class TorchModel(AbstractModel):
     def _generate_dataset_for_required_models(
         self, df, derived_data, tensors, required_models
     ):
-        full_data_required_models = {
-            name: mod._data_preprocess(
-                df=df,
-                derived_data=derived_data,
-                model_name=name,
-            )
-            for name, mod in required_models.items()
-            if not isinstance(mod, AbstractNN)
-        }
-        for mod, val in zip(
-            required_models.values(), full_data_required_models.values()
-        ):
-            if (
-                not isinstance(val, pd.DataFrame)
-                and not isinstance(val, np.ndarray)
-                and not isinstance(mod, TorchModel)
-            ):
-                raise Exception(
-                    f"Requiring a model (except TorchModel) that does not return a pd.DataFrame or np.ndarray by "
-                    f"_data_preprocess is currently not supported."
+        full_data_required_models = {}
+        for name, mod in required_models.items():
+            if not isinstance(mod, AbstractNN):
+                name_wo_wrap = name.split("_WRAP")[0]
+                data = mod._data_preprocess(
+                    df=df,
+                    derived_data=derived_data,
+                    model_name=name_wo_wrap.split("_")[-1],
                 )
+                full_data_required_models[name_wo_wrap] = data
+                res = AbstractNN.call_required_model(
+                    mod, None, {"data_required_models": {name_wo_wrap: data}}
+                )
+                full_data_required_models[name_wo_wrap + "_pred"] = res
+                if isinstance(mod, AbstractWrapper):
+                    hidden = mod.hidden_representation.to("cpu")
+                    full_data_required_models[name_wo_wrap + "_hidden"] = hidden
+            else:
+                mod.eval()
+                res = mod(*tensors)
+                hidden = mod.hidden_representation.to("cpu")
+                full_data_required_models[name + "_pred"] = res
+                full_data_required_models[name + "_hidden"] = hidden
         tensor_dataset = Data.TensorDataset(*tensors)
         if len(full_data_required_models) == 0:
             dataset = tensor_dataset
@@ -1244,9 +1266,9 @@ class AbstractWrapper:
         self, x: torch.Tensor, derived_tensors: Dict[str, torch.Tensor]
     ) -> torch.Tensor:
         """
-        Simulate ``AbstractNN._forward`` by calling ``AbstractNN._call_required_model``.
+        Simulate ``AbstractNN._forward`` by calling ``AbstractNN.call_required_model``.
         """
-        return AbstractNN._call_required_model(self.wrapped_model, x, derived_tensors)
+        return AbstractNN.call_required_model(self.wrapped_model, x, derived_tensors)
 
     def wrap_forward(self):
         raise NotImplementedError
@@ -1607,7 +1629,7 @@ class AbstractNN(pl.LightningModule):
         return use_hidden_rep, hidden_rep_dim
 
     @staticmethod
-    def _call_required_model(required_model, x, derived_tensors) -> torch.Tensor:
+    def call_required_model(required_model, x, derived_tensors) -> torch.Tensor:
         """
         Call a required model and return its result.
 
@@ -1638,7 +1660,7 @@ class AbstractNN(pl.LightningModule):
                 X_test=derived_tensors["data_required_models"][full_name],
                 verbose=False,
             )
-            dl_pred = torch.tensor(ml_pred, device=x.device)
+            dl_pred = torch.tensor(ml_pred, device=x.device if x is not None else "cpu")
         else:
             raise Exception(
                 f"The required model should be a nn.Module, an AbstractWrapper, or an AbstractModel, but got"
