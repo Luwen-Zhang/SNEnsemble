@@ -1647,26 +1647,81 @@ class AbstractNN(pl.LightningModule):
         dl_pred
             The result of the required model.
         """
+        device = x.device if x is not None else "cpu"
         if isinstance(required_model, nn.Module) or isinstance(
             required_model, AbstractWrapper
         ):
-            required_model.eval()
-            dl_pred = required_model(x, derived_tensors)
+            name = required_model.get_model_names()[0]
+            if name + "_pred" in derived_tensors["data_required_models"].keys():
+                dl_pred = derived_tensors["data_required_models"][name + "_pred"][0].to(
+                    device
+                )
+            else:
+                required_model.eval()
+                dl_pred = required_model(x, derived_tensors)
         elif isinstance(required_model, AbstractModel):
             name = required_model.get_model_names()[0]
             full_name = f"EXTERN_{required_model.program}_{name}"
-            ml_pred = required_model._pred_single_model(
-                required_model.model[name],
-                X_test=derived_tensors["data_required_models"][full_name],
-                verbose=False,
-            )
-            dl_pred = torch.tensor(ml_pred, device=x.device if x is not None else "cpu")
+            if full_name + "_pred" in derived_tensors["data_required_models"].keys():
+                dl_pred = derived_tensors["data_required_models"][full_name + "_pred"][
+                    0
+                ].to(device)
+            else:
+                # _pred_single_model might disturb random sampling of dataloaders because
+                # in torch.utils.data._BaseDataLoaderIter.__init__, the following line uses random:
+                # self._base_seed = torch.empty((), dtype=torch.int64).random_(generator=loader.generator).item()
+                ml_pred = required_model._pred_single_model(
+                    required_model.model[name],
+                    X_test=derived_tensors["data_required_models"][full_name],
+                    verbose=False,
+                )
+                dl_pred = torch.tensor(ml_pred, device=device)
         else:
             raise Exception(
                 f"The required model should be a nn.Module, an AbstractWrapper, or an AbstractModel, but got"
                 f"{type(required_model)} instead."
             )
         return dl_pred
+
+    @staticmethod
+    def get_hidden_state(
+        required_model, x, derived_tensors
+    ) -> Union[torch.Tensor, None]:
+        """
+        The output of the last hidden layer of a deep learning model, i.e. the hidden representation, whose dimension is
+        (batch_size, required_model.hidden_rep_dim).
+
+        Parameters
+        ----------
+        required_model
+            A required model specified in ``required_models()``.
+        x
+            See AbstractNN._forward.
+        derived_tensors
+            See AbstractNN._forward.
+
+        Returns
+        -------
+        hidden
+            The output of the last hidden layer of a deep learning model.
+        """
+        device = x.device if x is not None else "cpu"
+        if isinstance(required_model, nn.Module):
+            name = required_model.get_model_names()[0]
+        elif isinstance(required_model, AbstractModel) or isinstance(
+            required_model, AbstractWrapper
+        ):
+            name = required_model.get_model_names()[0]
+            name = f"EXTERN_{required_model.program}_{name}"
+        else:
+            return None
+        if name + "_hidden" in derived_tensors["data_required_models"].keys():
+            hidden = derived_tensors["data_required_models"][name + "_hidden"][0].to(
+                device
+            )
+        else:
+            hidden = required_model.hidden_representation.to(device)
+        return hidden
 
 
 class ModelDict:

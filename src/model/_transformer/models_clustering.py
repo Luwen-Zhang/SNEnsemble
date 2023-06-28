@@ -1,5 +1,5 @@
 from .models_with_seq import CatEmbedSeqNN
-from ..base import AbstractNN, get_linear, get_sequential
+from ..base import AbstractNN, get_linear, get_sequential, AbstractModel
 import numpy as np
 from .clustering.singlelayer import KMeansSN, GMMSN, BMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN, TwolayerBMMSN
@@ -55,7 +55,7 @@ class AbstractClusteringModel(AbstractNN):
         # Prediction of deep learning models.
         dl_pred = self.call_required_model(self.cont_cat_model, x, derived_tensors)
         if self.use_hidden_rep:
-            hidden = self.cont_cat_model.hidden_representation.to(x.device)
+            hidden = self.get_hidden_state(self.cont_cat_model, x, derived_tensors)
         else:
             hidden = torch.concat([x, dl_pred], dim=1)
         # Prediction of physical models
