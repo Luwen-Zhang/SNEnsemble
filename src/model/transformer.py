@@ -522,19 +522,23 @@ class Transformer(TorchModel):
 
     def required_models(self, model_name: str) -> Union[List[str], None]:
         if "SNCatEmbed" in model_name and "Seq" not in model_name:
-            return ["CategoryEmbedding"]
-        if "SNCategoryEmbed" in model_name:
-            return ["EXTERN_PytorchTabular_Category Embedding"]
-        if "SNFTTrans" in model_name:
-            return ["EXTERN_WideDeep_FTTransformer"]
-        if "SNTabTrans" in model_name:
-            return ["EXTERN_WideDeep_TabTransformer"]
-        if "SNAutoInt" in model_name:
-            return ["EXTERN_PytorchTabular_AutoInt"]
-        if "SNPyFTTrans" in model_name:
-            return ["EXTERN_PytorchTabular_FTTransformer"]
+            models = ["CategoryEmbedding"]
+        elif "SNCategoryEmbed" in model_name:
+            models = ["EXTERN_PytorchTabular_Category Embedding"]
+        elif "SNFTTrans" in model_name:
+            models = ["EXTERN_WideDeep_FTTransformer"]
+        elif "SNTabTrans" in model_name:
+            models = ["EXTERN_WideDeep_TabTransformer"]
+        elif "SNAutoInt" in model_name:
+            models = ["EXTERN_PytorchTabular_AutoInt"]
+        elif "SNPyFTTrans" in model_name:
+            models = ["EXTERN_PytorchTabular_FTTransformer"]
         else:
-            return None
+            models = None
+        if models is not None:
+            if "Wrap" in model_name:
+                models = [x + "_WRAP" for x in models]
+        return models
 
     def _prepare_custom_datamodule(self, model_name):
         from src.data import DataModule

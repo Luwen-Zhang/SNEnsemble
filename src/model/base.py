@@ -309,9 +309,16 @@ class AbstractModel:
                     try:
                         modelbase = self.trainer.get_modelbase(program=program)
                     except:
-                        raise Exception(
-                            f"Model base {program} is required for model {model_name}, but does not exist."
-                        )
+                        if self.trainer.training:
+                            raise Exception(
+                                f"Model base {program} is required for model {model_name}, but does not exist."
+                            )
+                        else:
+                            raise Exception(
+                                f"Model base {program} is required for model {model_name}, but does not exist. It is "
+                                f"mainly caused by model detaching and is currently not supported for models that "
+                                f"requires other models."
+                            )
                     try:
                         detached_model = modelbase.detach_model(
                             model_name=ext_model_name
