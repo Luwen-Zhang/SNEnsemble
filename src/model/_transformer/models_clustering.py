@@ -117,18 +117,19 @@ class AbstractClusteringModel(AbstractNN):
             lr=self.hparams.lr,
             weight_decay=self.hparams.weight_decay,
         )
-        regression_optimizer = torch.optim.Adam(
-            list(self.clustering_sn_model.sns.parameters())
-            + [self.clustering_sn_model.running_sn_weight],
+        ridge_optimizer = torch.optim.Adam(
+            [self.clustering_sn_model.running_sn_weight],
             lr=0.8,
             weight_decay=0,
         )
-        return [all_optimizer, regression_optimizer]
+        lstsq_optimizer = [sn.get_optimizer() for sn in self.clustering_sn_model.sns]
+        return [all_optimizer, ridge_optimizer] + lstsq_optimizer
 
     def cal_backward_step(self, loss):
         optimizers = self.optimizers()
         all_optimizer = optimizers[0]
-        regression_optimizer = optimizers[1]
+        ridge_optimizer = optimizers[1]
+        lstsq_optimizers = optimizers[2:]
         # The following commented zero_grad() operations are not necessary because `inputs`s are specified and no other
         # gradient is calculated.
         # 1st back-propagation: for deep learning weights.
@@ -164,7 +165,9 @@ class AbstractClusteringModel(AbstractNN):
         # self.manual_backward(self.dl_loss)
 
         all_optimizer.step()
-        regression_optimizer.step()
+        for optimizer in lstsq_optimizers:
+            optimizer.step()
+        ridge_optimizer.step()
 
     @staticmethod
     def basic_clustering_features_idx(datamodule) -> np.ndarray:

@@ -63,6 +63,12 @@ class AbstractSN(nn.Module):
                 dim=1,
             )[0]
 
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.8,
+            weight_decay=0,
+        )
 
 class LinLog(AbstractSN):
     def forward(
