@@ -159,6 +159,9 @@ class AbstractClusteringModel(AbstractNN):
             inputs=list(self.clustering_sn_model.sns.parameters()),
             retain_graph=True,
         )
+        # torch.nn.utils.clip_grad_value_(
+        #     list(self.clustering_sn_model.sns.parameters()), 1
+        # )
         # self.cont_cat_model.zero_grad()
 
         # 4th back-propagation: for deep learning backbones.

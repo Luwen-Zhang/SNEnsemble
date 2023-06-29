@@ -112,6 +112,571 @@ class LogLog(AbstractSN):
 #         return True
 
 
+class Sendeckyj(AbstractSN):
+    # Sendeckyj, G.P. Fitting models to composite materials fatigue data. In Test Methods and Design Allowables for
+    # Fibrous Composites; ASTM STP 734; Chamis, C.C., Ed.; ASTM International: West Conshohocken, PA, USA, 1981; pp.
+    # 245–260.
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.001))
+        self.b = nn.Parameter(
+            torch.mul(torch.ones(n_clusters), 0.083)
+        )  # beta is b+0.01
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        self.lstsq_input = s
+        alpha = self.activ(self.a[x_cluster]) + 1e-4
+        beta = self.activ(self.b[x_cluster]) + 0.01
+        self.lstsq_output = torch.log10(
+            torch.clamp(
+                torch.nan_to_num(
+                    torch.pow(1 / s, 1 / beta) - 1 + alpha,
+                    nan=1,
+                    posinf=1e10,
+                    neginf=1e10,
+                ),
+                min=1e-8,
+            )
+        ) - torch.log10(alpha)
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols() -> List[str]:
+        return ["Relative Maximum Stress_UNSCALED"]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.05,
+            weight_decay=0,
+        )
+
+
+class Hwang(AbstractSN):
+    # Hwang, W.; Han, K.S. Fatigue of Composites—Fatigue Modulus Concept and Life Prediction. J. Compos. Mater. 1986,
+    # 20, 154–165.
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 35))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.21))
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        beta = self.activ(self.b[x_cluster]) + 1e-8
+        self.lstsq_input = s
+        self.lstsq_output = (
+            1 / beta * torch.log10(torch.clamp(alpha * (1 - s), min=1e-8))
+        )
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols() -> List[str]:
+        return ["Relative Maximum Stress_UNSCALED"]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.1,
+            weight_decay=0,
+        )
+
+
+class Kohout(AbstractSN):
+    # Kohout, J.; Vechet, S. A new function for fatigue curves characterization and its multiple merits. Int. J. Fatigue
+    # 2001, 23, 175–183.
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 776.25))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.0895))
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        alpha = self.activ(self.a[x_cluster]) + 1e-8 + 1
+        beta = -self.activ(self.b[x_cluster]) - 1e-8
+        self.lstsq_input = s
+        self.lstsq_output = 1 / beta * torch.log10(s) + torch.log10(
+            alpha
+        )  # this is simplified since alpha << Nf
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols() -> List[str]:
+        return ["Relative Maximum Stress_UNSCALED"]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.1,
+            weight_decay=0,
+        )
+
+
+class KimZhang(AbstractSN):
+    # Kim, H.S.; Zhang, J. Fatigue Damage and Life Prediction of Glass/Vinyl Ester Composites. J. Reinf. Plast. Compos.
+    # 2001, 20, 834–848.
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 38.44))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 10.809))  # beta is b+1
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        r = required_cols["R-value_UNSCALED"]
+        s_max = required_cols["Maximum Stress_UNSCALED"]
+        s_min = required_cols["Minimum Stress_UNSCALED"]
+        s_ut = torch.clone(s)
+        where_use_min = torch.logical_or(r < -1, r > 1)
+        where_use_max = torch.logical_not(where_use_min)
+        s_ut[where_use_min] = s_min[where_use_min] / s[where_use_min]
+        s_ut[where_use_max] = s_max[where_use_max] / s[where_use_max]
+        s_ut = torch.clamp(torch.abs(s_ut), min=1e-8)
+        log_alpha = -self.activ(self.a[x_cluster]) - 1e-8
+        beta = self.activ(self.b[x_cluster]) + 1e-8 + 1
+        self.lstsq_input = s
+        self.lstsq_output = (
+            -beta * torch.log10(s_ut)
+            - log_alpha
+            - torch.log10(beta - 1)
+            + torch.log10(
+                torch.clamp(
+                    torch.nan_to_num(
+                        torch.pow(s, 1 - beta), nan=1, posinf=1e10, neginf=1e10
+                    )
+                    - 1,
+                    min=1e-8,
+                )
+            )
+        )
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols():
+        return [
+            "Relative Maximum Stress_UNSCALED",
+            "R-value_UNSCALED",
+            "Maximum Stress_UNSCALED",
+            "Minimum Stress_UNSCALED",
+        ]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.2,
+            weight_decay=0,
+        )
+
+
+class KawaiKoizumi(AbstractSN):
+    # Kawai, M.; Koizumi, M. Nonlinear constant fatigue life diagrams for carbon/epoxy laminates at room temperature.
+    # Compos. Part A Appl. Sci. Manuf. 2007, 38, 2342–2353.
+    # The paper uses data at the critical stress ratio (UCS/UTS) to fit the proposed model, and predict data at other
+    # stress ratios.
+    # In the following implementation, params are fitted using data at all stress ratios. The basic idea of the paper
+    # is that data at the critical stress ratio is representative enough to fit the material parameters under the small
+    # data assumption, which is not quite the thing for us.
+    def _register_params(self, n_clusters=1, **kwargs):
+        # the initial values are from Section 4.2 of the paper. Note that in the paper, for different materials, these
+        # params vary a lot.
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.003))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 1))
+        self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), 8.5))
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        # Using relative maximum stress means that the reference strength (\sigma_B) is selected to be |UTS| if
+        # |s_max|>|s_min| and |UCS| if |s_max|<|s_min|. This is definitely a simplification of the original formula for
+        # implementation, but it is ok since the paper does not give strict restrictions on the reference strength.
+        s = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        beta = self.activ(self.b[x_cluster]) + 1e-8
+        gamma = self.activ(self.c[x_cluster]) + 1e-8
+        self.lstsq_input = s
+        self.lstsq_output = (
+            -torch.log10(alpha) + beta * torch.log10(1 - s) - gamma * torch.log10(s)
+        )
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols():
+        return ["Relative Maximum Stress_UNSCALED"]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.1,
+            weight_decay=0,
+        )
+
+
+class Poursatip(AbstractSN):
+    # Poursartip, A.; Ashby, M.F.; Beaumont, P.W.R. The fatigue damage mechanics of carbon fibre composite laminate:
+    # I—Development of the model. Compos. Sci. Technol. 1986, 25, 193–218.
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s_max = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        s_a = torch.clamp(
+            torch.abs(required_cols["Relative Peak-to-peak Stress_UNSCALED"]),
+            min=1e-5,
+            max=2 - 1e-5,
+        )
+        r = required_cols["R-value_UNSCALED"]
+        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        beta = self.activ(self.b[x_cluster]) + 1e-8
+        gamma = self.activ(self.c[x_cluster]) + 1e-8
+        alpha_alter = self.activ(self.d[x_cluster]) + 1e-8
+        beta_alter = self.activ(self.e[x_cluster]) + 1e-8
+        self.lstsq_input = s_max
+        # The third component suggests that the formula can not be applied for r<-1 or r>1. Indeed, the original paper
+        # only discuss 0<r<1 where no compression is applied.
+        where_valid = torch.logical_and(r > 0, r < 1)
+        where_not_valid = torch.logical_not(where_valid)
+        self.lstsq_output = torch.ones_like(s_max)
+        self.lstsq_output[where_valid] = (
+            torch.log10(alpha[where_valid])
+            - beta[where_valid] * torch.log10(s_a[where_valid])
+            + gamma[where_valid]
+            * torch.log10((1 - r[where_valid]) / (1 + r[where_valid]))
+            + torch.log10(1 - s_max[where_valid])
+        )
+        # This is equation 30 from the review:
+        # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative
+        # Review.” Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
+        self.lstsq_output[where_not_valid] = (
+            torch.log10(alpha_alter[where_not_valid])
+            - beta_alter[where_not_valid] * torch.log10(s_max[where_not_valid])
+            + torch.log10(1 - s_max[where_not_valid])
+        )
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols():
+        return [
+            "Relative Peak-to-peak Stress_UNSCALED",
+            "Relative Maximum Stress_UNSCALED",
+            "R-value_UNSCALED",
+        ]
+
+    def _register_params(self, n_clusters=1, **kwargs):
+        # Compared to values in the paper, alpha is 3.108x10^4x1.222^p, beta is 6.393, gamma is p.
+        # p depends on the stress range: p=1.6 for high stress range and 2.7 for small stress range.
+        self.a = nn.Parameter(
+            torch.mul(torch.ones(n_clusters), 3.108 * 1e4 * 1.222**1.6)
+        )
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
+        self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), (1.6 + 2.7) / 2))
+        self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), 3.108 * 1e4))
+        self.e = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
+
+
+class PoursatipSimplified(AbstractSN):
+    # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
+    # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s_max = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        beta = self.activ(self.b[x_cluster]) + 1e-8
+        self.lstsq_input = s_max
+
+        self.lstsq_output = (
+            torch.log10(alpha) - beta * torch.log10(s_max) + torch.log10(1 - s_max)
+        )
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols():
+        return ["Relative Maximum Stress_UNSCALED"]
+
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 17000.0))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
+
+
+class DAmore(AbstractSN):
+    # A. D’Amore, G. Caprino, P. Stupak, J. Zhou, and L. Nicolais. “Effect of Stress Ratio on the Flexural Fatigue
+    # Behaviour of Continuous Strand Mat Reinforced Plastics.” Science and Engineering of Composite Materials 5, no. 1
+    # (March 1, 1996): 1–8.
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        r = required_cols["R-value_UNSCALED"]
+        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        beta = self.activ(self.b[x_cluster]) + 1e-8
+        self.lstsq_input = s
+        # The applicability when r<0 is not known.
+        self.lstsq_output = (
+            torch.log10(torch.clamp(1 + (1 / s - 1) / alpha / (1 - r), min=1e-8)) / beta
+        )
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols():
+        return ["Relative Maximum Stress_UNSCALED", "R-value_UNSCALED"]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.05,
+            weight_decay=0,
+        )
+
+
+class DAmoreSimplified(AbstractSN):
+    # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
+    # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.053))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        beta = self.activ(self.b[x_cluster]) + 1e-8
+        self.lstsq_input = s
+        # The applicability when r<0 is not known.
+        self.lstsq_output = 1 / beta * torch.log10(1 + (1 / s - 1) / alpha)
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols():
+        return ["Relative Maximum Stress_UNSCALED"]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.05,
+            weight_decay=0,
+        )
+
+
+class Epaarachchi(AbstractSN):
+    # Epaarachchi, J.A.; Clausen, P.D. An empirical model for fatigue behavior prediction of glass fibre-reinforced
+    # plastic composites for various stress ratios and test frequencies. Compos. Part A Appl. Sci. Manuf. 2003, 34,
+    # 313–326.
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.053))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
+        self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.0007))
+        self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.245))
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        r = required_cols["R-value_UNSCALED"]
+        f = required_cols["Frequency_UNSCALED"]
+        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        beta = self.activ(self.b[x_cluster]) + 1e-8
+        alpha_alter = self.activ(self.c[x_cluster]) + 1e-8
+        beta_alter = self.activ(self.d[x_cluster]) + 1e-8
+
+        where_valid = r < 1
+        where_not_valid = torch.logical_not(where_valid)
+        s_max = required_cols["Maximum Stress_UNSCALED"]
+        s_min = required_cols["Minimum Stress_UNSCALED"]
+
+        s_used = torch.clone(s)
+        s_ut = torch.clone(s)
+        where_use_min = torch.logical_or(r < -1, r > 1)
+        where_use_max = torch.logical_not(where_use_min)
+        s_used[where_use_min] = s_min[where_use_min]
+        s_used[where_use_max] = s_max[where_use_max]
+        s_used = torch.abs(s_used)
+        s_ut[where_use_min] = s_min[where_use_min] / s[where_use_min]
+        s_ut[where_use_max] = s_max[where_use_max] / s[where_use_max]
+        s_ut = torch.abs(s_ut)
+        # Verification: torch.allclose(s_used/s_ut, s)
+
+        self.lstsq_input = s
+        self.lstsq_output = torch.ones_like(s)
+        self.lstsq_output[where_valid] = (
+            torch.log10(1 / s[where_valid] - 1)
+            - torch.log10(alpha[where_valid])
+            - 0.6 * torch.log10(s[where_valid])
+            + 1.6 * torch.log10(1 - r[where_valid])
+            + beta[where_valid] * torch.log10(f[where_valid])
+        ) / beta[where_valid]
+        self.lstsq_output[where_not_valid] = (
+            1
+            / beta_alter[where_not_valid]
+            * torch.log10(
+                torch.clamp(s_ut[where_not_valid] - s_used[where_not_valid], min=1e-8)
+                / alpha_alter[where_not_valid]
+                / torch.pow(s_used[where_not_valid], 1.6)
+                + 1
+            )
+        )
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols():
+        return [
+            "Relative Maximum Stress_UNSCALED",
+            "Frequency_UNSCALED",
+            "R-value_UNSCALED",
+            "Maximum Stress_UNSCALED",
+            "Minimum Stress_UNSCALED",
+        ]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.01,
+            weight_decay=0,
+        )
+
+
+class EpaarachchiSimplified(AbstractSN):
+    # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
+    # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
+    def _register_params(self, n_clusters=1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.0007))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.245))
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        sns: nn.ModuleList,
+    ):
+        s = torch.clamp(
+            torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
+            min=1e-5,
+            max=1 - 1e-5,
+        )
+        r = required_cols["R-value_UNSCALED"]
+        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        beta = self.activ(self.b[x_cluster]) + 1e-8
+
+        s_max = required_cols["Maximum Stress_UNSCALED"]
+        s_min = required_cols["Minimum Stress_UNSCALED"]
+
+        s_used = torch.clone(s)
+        s_ut = torch.clone(s)
+        where_use_min = torch.logical_or(r < -1, r > 1)
+        where_use_max = torch.logical_not(where_use_min)
+        s_used[where_use_min] = s_min[where_use_min]
+        s_used[where_use_max] = s_max[where_use_max]
+        s_used = torch.abs(s_used)
+        s_ut[where_use_min] = s_min[where_use_min] / s[where_use_min]
+        s_ut[where_use_max] = s_max[where_use_max] / s[where_use_max]
+        s_ut = torch.abs(s_ut)
+        # Verification: torch.allclose(s_used/s_ut, s)
+
+        self.lstsq_input = s
+        self.lstsq_output = (
+            1
+            / beta
+            * torch.log10(
+                torch.clamp(s_ut - s_used, min=1e-8) / alpha / torch.pow(s_used, 1.6)
+                + 1
+            )
+        )
+        return self.lstsq_output
+
+    @staticmethod
+    def required_cols():
+        return [
+            "Relative Maximum Stress_UNSCALED",
+            "R-value_UNSCALED",
+            "Maximum Stress_UNSCALED",
+            "Minimum Stress_UNSCALED",
+        ]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.01,
+            weight_decay=0,
+        )
+
+
 available_sn = []
 for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
     if issubclass(cls, AbstractSN) and cls != AbstractSN:
