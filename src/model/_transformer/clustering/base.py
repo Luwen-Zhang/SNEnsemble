@@ -3,7 +3,7 @@ import torch
 from torch import nn
 import inspect
 from .common.base import AbstractClustering
-from typing import Dict
+from typing import Dict, List
 
 
 class AbstractSN(nn.Module):
@@ -29,7 +29,7 @@ class AbstractSN(nn.Module):
         return self.lstsq_output
 
     @staticmethod
-    def required_cols():
+    def required_cols() -> List[str]:
         return ["Relative Maximum Stress"]
 
     @property
@@ -69,6 +69,7 @@ class AbstractSN(nn.Module):
             lr=0.8,
             weight_decay=0,
         )
+
 
 class LinLog(AbstractSN):
     def forward(
@@ -132,11 +133,15 @@ class AbstractSNClustering(nn.Module):
         required_cols = []
         for sn in self.sns:
             required_cols += sn.required_cols()
-        self.required_cols = list(sorted(set(required_cols)))
+        self.required_cols: List[str] = list(sorted(set(required_cols)))
         self.required_indices = [
-            datamodule.cont_feature_names.index(col) for col in required_cols
+            datamodule.cont_feature_names.index(col.split("_UNSCALED")[0])
+            for col in self.required_cols
         ]
-        self.zero_slip = [datamodule.get_zero_slip(col) for col in required_cols]
+        self.zero_slip = [
+            datamodule.get_zero_slip(col.split("_UNSCALED")[0])
+            for col in self.required_cols
+        ]
         # self.weight = 0.8
         # self.exp_avg_factor = 0.8
         # # Solved by exponential averaging
@@ -165,8 +170,11 @@ class AbstractSNClustering(nn.Module):
     #         return getattr(self, name)
 
     def extract_cols(self, x, derived_tensors):
+        unscaled = derived_tensors["Unscaled"]
         return {
             col: x[:, idx] - zero_slip
+            if not col.endswith("_UNSCALED")
+            else unscaled[:, idx]
             for col, idx, zero_slip in zip(
                 self.required_cols, self.required_indices, self.zero_slip
             )
