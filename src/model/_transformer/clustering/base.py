@@ -182,9 +182,7 @@ class Hwang(AbstractSN):
         alpha = self.activ(self.a[x_cluster]) + 1e-8
         beta = self.activ(self.b[x_cluster]) + 1e-8
         self.lstsq_input = s
-        self.lstsq_output = (
-            1 / beta * torch.log10(torch.clamp(alpha * (1 - s), min=1e-8))
-        )
+        self.lstsq_output = 1 / beta * (torch.log10(alpha) + torch.log10(1 - s))
         return self.lstsq_output
 
     @staticmethod
@@ -220,9 +218,8 @@ class Kohout(AbstractSN):
         alpha = self.activ(self.a[x_cluster]) + 1e-8 + 1
         beta = -self.activ(self.b[x_cluster]) - 1e-8
         self.lstsq_input = s
-        self.lstsq_output = 1 / beta * torch.log10(s) + torch.log10(
-            alpha
-        )  # this is simplified since alpha << Nf
+        # this is simplified since alpha << Nf
+        self.lstsq_output = 1 / beta * torch.log10(s) + torch.log10(alpha)
         return self.lstsq_output
 
     @staticmethod
@@ -410,11 +407,11 @@ class Poursatip(AbstractSN):
         # Compared to values in the paper, alpha is 3.108x10^4x1.222^p, beta is 6.393, gamma is p.
         # p depends on the stress range: p=1.6 for high stress range and 2.7 for small stress range.
         self.a = nn.Parameter(
-            torch.mul(torch.ones(n_clusters), 3.108 * 1e4 * 1.222**1.6)
+            torch.mul(torch.ones(n_clusters), 3.108 * 1e4 * 1.222 ** ((1.6 + 2.7) / 2))
         )
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
         self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), (1.6 + 2.7) / 2))
-        self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), 3.108 * 1e4))
+        self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), 17000.0))
         self.e = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
 
 
