@@ -576,7 +576,7 @@ class Epaarachchi(AbstractSN):
             torch.log10(1 / s[where_valid] - 1)
             - torch.log10(alpha[where_valid])
             - 0.6 * torch.log10(s[where_valid])
-            + 1.6 * torch.log10(1 - r[where_valid])
+            - 1.6 * torch.log10(1 - r[where_valid])
             + beta[where_valid] * torch.log10(f[where_valid])
         ) / beta[where_valid]
         self.lstsq_output[where_not_valid] = (
