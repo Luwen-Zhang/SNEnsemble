@@ -2,7 +2,7 @@ import sys
 import torch
 from torch import nn
 import inspect
-from .common.base import AbstractClustering
+from src.model._transformer.clustering.common.base import AbstractClustering
 from typing import Dict, List
 
 
@@ -136,7 +136,12 @@ class Sendeckyj(AbstractSN):
         self.lstsq_input = s
         alpha = self.activ(self.a[x_cluster]) + 1e-4
         beta = self.activ(self.b[x_cluster]) + 0.01
-        self.lstsq_output = torch.log10(
+        self.lstsq_output = self.formula(s, alpha, beta)
+        return self.lstsq_output
+
+    @staticmethod
+    def formula(s, alpha, beta):
+        return torch.log10(
             torch.clamp(
                 torch.nan_to_num(
                     torch.pow(1 / s, 1 / beta) - 1 + alpha,
@@ -147,7 +152,6 @@ class Sendeckyj(AbstractSN):
                 min=1e-8,
             )
         ) - torch.log10(alpha)
-        return self.lstsq_output
 
     @staticmethod
     def required_cols() -> List[str]:
@@ -182,8 +186,12 @@ class Hwang(AbstractSN):
         alpha = self.activ(self.a[x_cluster]) + 1e-8
         beta = self.activ(self.b[x_cluster]) + 1e-8
         self.lstsq_input = s
-        self.lstsq_output = 1 / beta * (torch.log10(alpha) + torch.log10(1 - s))
+        self.lstsq_output = self.formula(s, alpha, beta)
         return self.lstsq_output
+
+    @staticmethod
+    def formula(s, alpha, beta):
+        return 1 / beta * (torch.log10(alpha) + torch.log10(1 - s))
 
     @staticmethod
     def required_cols() -> List[str]:
@@ -219,8 +227,12 @@ class Kohout(AbstractSN):
         beta = -self.activ(self.b[x_cluster]) - 1e-8
         self.lstsq_input = s
         # this is simplified since alpha << Nf
-        self.lstsq_output = 1 / beta * torch.log10(s) + torch.log10(alpha)
+        self.lstsq_output = self.formula(s, alpha, beta)
         return self.lstsq_output
+
+    @staticmethod
+    def formula(s, alpha, beta):
+        return 1 / beta * torch.log10(s) + torch.log10(alpha)
 
     @staticmethod
     def required_cols() -> List[str]:
@@ -264,7 +276,12 @@ class KimZhang(AbstractSN):
         log_alpha = -self.activ(self.a[x_cluster]) - 1e-8
         beta = self.activ(self.b[x_cluster]) + 1e-8 + 1
         self.lstsq_input = s
-        self.lstsq_output = (
+        self.lstsq_output = self.formula(s, s_ut, log_alpha, beta)
+        return self.lstsq_output
+
+    @staticmethod
+    def formula(s, s_ut, log_alpha, beta):
+        return (
             -beta * torch.log10(s_ut)
             - log_alpha
             - torch.log10(beta - 1)
@@ -278,7 +295,6 @@ class KimZhang(AbstractSN):
                 )
             )
         )
-        return self.lstsq_output
 
     @staticmethod
     def required_cols():
@@ -330,10 +346,12 @@ class KawaiKoizumi(AbstractSN):
         beta = self.activ(self.b[x_cluster]) + 1e-8
         gamma = self.activ(self.c[x_cluster]) + 1e-8
         self.lstsq_input = s
-        self.lstsq_output = (
-            -torch.log10(alpha) + beta * torch.log10(1 - s) - gamma * torch.log10(s)
-        )
+        self.lstsq_output = self.formula(s, alpha, beta, gamma)
         return self.lstsq_output
+
+    @staticmethod
+    def formula(s, alpha, beta, gamma):
+        return -torch.log10(alpha) + beta * torch.log10(1 - s) - gamma * torch.log10(s)
 
     @staticmethod
     def required_cols():
@@ -378,22 +396,32 @@ class Poursatip(AbstractSN):
         where_valid = torch.logical_and(r > 0, r < 1)
         where_not_valid = torch.logical_not(where_valid)
         self.lstsq_output = torch.ones_like(s_max)
-        self.lstsq_output[where_valid] = (
-            torch.log10(alpha[where_valid])
-            - beta[where_valid] * torch.log10(s_a[where_valid])
-            + gamma[where_valid]
-            * torch.log10((1 - r[where_valid]) / (1 + r[where_valid]))
-            + torch.log10(1 - s_max[where_valid])
+        self.lstsq_output[where_valid] = self.formula(
+            s_a[where_valid],
+            s_max[where_valid],
+            r[where_valid],
+            alpha[where_valid],
+            beta[where_valid],
+            gamma[where_valid],
         )
         # This is equation 30 from the review:
         # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative
         # Review.” Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
-        self.lstsq_output[where_not_valid] = (
-            torch.log10(alpha_alter[where_not_valid])
-            - beta_alter[where_not_valid] * torch.log10(s_max[where_not_valid])
-            + torch.log10(1 - s_max[where_not_valid])
+        self.lstsq_output[where_not_valid] = PoursatipSimplified.formula(
+            s_max[where_not_valid],
+            alpha_alter[where_not_valid],
+            beta_alter[where_not_valid],
         )
         return self.lstsq_output
+
+    @staticmethod
+    def formula(s_a, s_max, r, alpha, beta, gamma):
+        return (
+            torch.log10(alpha)
+            - beta * torch.log10(s_a)
+            + gamma * torch.log10((1 - r) / (1 + r))
+            + torch.log10(1 - s_max)
+        )
 
     @staticmethod
     def required_cols():
@@ -432,11 +460,12 @@ class PoursatipSimplified(AbstractSN):
         alpha = self.activ(self.a[x_cluster]) + 1e-8
         beta = self.activ(self.b[x_cluster]) + 1e-8
         self.lstsq_input = s_max
-
-        self.lstsq_output = (
-            torch.log10(alpha) - beta * torch.log10(s_max) + torch.log10(1 - s_max)
-        )
+        self.lstsq_output = self.formula(s_max, alpha, beta)
         return self.lstsq_output
+
+    @staticmethod
+    def formula(s_max, alpha, beta):
+        return torch.log10(alpha) - beta * torch.log10(s_max) + torch.log10(1 - s_max)
 
     @staticmethod
     def required_cols():
@@ -471,10 +500,14 @@ class DAmore(AbstractSN):
         beta = self.activ(self.b[x_cluster]) + 1e-8
         self.lstsq_input = s
         # The applicability when r<0 is not known.
-        self.lstsq_output = (
+        self.lstsq_output = self.formula(s, r, alpha, beta)
+        return self.lstsq_output
+
+    @staticmethod
+    def formula(s, r, alpha, beta):
+        return (
             torch.log10(torch.clamp(1 + (1 / s - 1) / alpha / (1 - r), min=1e-8)) / beta
         )
-        return self.lstsq_output
 
     @staticmethod
     def required_cols():
@@ -510,8 +543,12 @@ class DAmoreSimplified(AbstractSN):
         beta = self.activ(self.b[x_cluster]) + 1e-8
         self.lstsq_input = s
         # The applicability when r<0 is not known.
-        self.lstsq_output = 1 / beta * torch.log10(1 + (1 / s - 1) / alpha)
+        self.lstsq_output = self.formula(s, alpha, beta)
         return self.lstsq_output
+
+    @staticmethod
+    def formula(s, alpha, beta):
+        return 1 / beta * torch.log10(1 + (1 / s - 1) / alpha)
 
     @staticmethod
     def required_cols():
@@ -572,24 +609,30 @@ class Epaarachchi(AbstractSN):
 
         self.lstsq_input = s
         self.lstsq_output = torch.ones_like(s)
-        self.lstsq_output[where_valid] = (
-            torch.log10(1 / s[where_valid] - 1)
-            - torch.log10(alpha[where_valid])
-            - 0.6 * torch.log10(s[where_valid])
-            - 1.6 * torch.log10(1 - r[where_valid])
-            + beta[where_valid] * torch.log10(f[where_valid])
-        ) / beta[where_valid]
-        self.lstsq_output[where_not_valid] = (
-            1
-            / beta_alter[where_not_valid]
-            * torch.log10(
-                torch.clamp(s_ut[where_not_valid] - s_used[where_not_valid], min=1e-8)
-                / alpha_alter[where_not_valid]
-                / torch.pow(s_used[where_not_valid], 1.6)
-                + 1
-            )
+        self.lstsq_output[where_valid] = self.formula(
+            s[where_valid],
+            r[where_valid],
+            f[where_valid],
+            alpha[where_valid],
+            beta[where_valid],
+        )
+        self.lstsq_output[where_not_valid] = EpaarachchiSimplified.formula(
+            s_used[where_not_valid],
+            s_ut[where_not_valid],
+            alpha_alter[where_not_valid],
+            beta[where_not_valid],
         )
         return self.lstsq_output
+
+    @staticmethod
+    def formula(s, r, f, alpha, beta):
+        return (
+            torch.log10(1 / s - 1)
+            - torch.log10(alpha)
+            - 0.6 * torch.log10(s)
+            - 1.6 * torch.log10(1 - r)
+            + beta * torch.log10(f)
+        ) / beta
 
     @staticmethod
     def required_cols():
@@ -647,15 +690,18 @@ class EpaarachchiSimplified(AbstractSN):
         # Verification: torch.allclose(s_used/s_ut, s)
 
         self.lstsq_input = s
-        self.lstsq_output = (
+        self.lstsq_output = self.formula(s_used, s_ut, alpha, beta)
+        return self.lstsq_output
+
+    @staticmethod
+    def formula(s, s_ut, alpha, beta):
+        return (
             1
             / beta
             * torch.log10(
-                torch.clamp(s_ut - s_used, min=1e-8) / alpha / torch.pow(s_used, 1.6)
-                + 1
+                torch.clamp(s_ut - s, min=1e-8) / alpha / torch.pow(s, 1.6) + 1
             )
         )
-        return self.lstsq_output
 
     @staticmethod
     def required_cols():
