@@ -1,9 +1,18 @@
 import sys
 import torch
 from torch import nn
+import numpy as np
 import inspect
 from src.model._transformer.clustering.common.base import AbstractClustering
 from typing import Dict, List
+
+
+def clamp_for_log(x):
+    return torch.clamp(x, min=1e-8)
+
+
+def clamp_overflow(x):
+    return torch.nan_to_num(x, nan=1, posinf=1e10, neginf=1e10)
 
 
 class AbstractSN(nn.Module):
@@ -89,7 +98,7 @@ class LogLog(AbstractSN):
         x_cluster: torch.Tensor,
         sns: nn.ModuleList,
     ):
-        s = torch.clamp(torch.abs(required_cols["Relative Maximum Stress"]), min=1e-8)
+        s = clamp_for_log(torch.abs(required_cols["Relative Maximum Stress"]))
         log_s = torch.log10(s)
         return self._linear(log_s, x_cluster)
 
@@ -117,7 +126,7 @@ class Sendeckyj(AbstractSN):
     # Fibrous Composites; ASTM STP 734; Chamis, C.C., Ed.; ASTM International: West Conshohocken, PA, USA, 1981; pp.
     # 245–260.
     def _register_params(self, n_clusters=1, **kwargs):
-        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.001))
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), np.log10(0.001)))
         self.b = nn.Parameter(
             torch.mul(torch.ones(n_clusters), 0.083)
         )  # beta is b+0.01
@@ -134,24 +143,23 @@ class Sendeckyj(AbstractSN):
             max=1 - 1e-5,
         )
         self.lstsq_input = s
-        alpha = self.activ(self.a[x_cluster]) + 1e-4
+        log_alpha = self.a[x_cluster]
         beta = self.activ(self.b[x_cluster]) + 0.01
-        self.lstsq_output = self.formula(s, alpha, beta)
+        self.lstsq_output = self.formula(s, log_alpha, beta)
         return self.lstsq_output
 
     @staticmethod
-    def formula(s, alpha, beta):
-        return torch.log10(
-            torch.clamp(
-                torch.nan_to_num(
-                    torch.pow(1 / s, 1 / beta) - 1 + alpha,
-                    nan=1,
-                    posinf=1e10,
-                    neginf=1e10,
-                ),
-                min=1e-8,
+    def formula(s, log_alpha, beta):
+        return (
+            torch.log10(
+                clamp_for_log(
+                    clamp_overflow(
+                        torch.pow(1 / s, 1 / beta) - 1 + clamp_overflow(10**log_alpha)
+                    )
+                )
             )
-        ) - torch.log10(alpha)
+            - log_alpha
+        )
 
     @staticmethod
     def required_cols() -> List[str]:
@@ -169,7 +177,7 @@ class Hwang(AbstractSN):
     # Hwang, W.; Han, K.S. Fatigue of Composites—Fatigue Modulus Concept and Life Prediction. J. Compos. Mater. 1986,
     # 20, 154–165.
     def _register_params(self, n_clusters=1, **kwargs):
-        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 35))
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), np.log10(35)))
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.21))
 
     def forward(
@@ -183,15 +191,15 @@ class Hwang(AbstractSN):
             min=1e-5,
             max=1 - 1e-5,
         )
-        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        log_alpha = self.a[x_cluster]
         beta = self.activ(self.b[x_cluster]) + 1e-8
         self.lstsq_input = s
-        self.lstsq_output = self.formula(s, alpha, beta)
+        self.lstsq_output = self.formula(s, log_alpha, beta)
         return self.lstsq_output
 
     @staticmethod
-    def formula(s, alpha, beta):
-        return 1 / beta * (torch.log10(alpha) + torch.log10(1 - s))
+    def formula(s, log_alpha, beta):
+        return 1 / beta * (log_alpha + torch.log10(1 - s))
 
     @staticmethod
     def required_cols() -> List[str]:
@@ -209,7 +217,7 @@ class Kohout(AbstractSN):
     # Kohout, J.; Vechet, S. A new function for fatigue curves characterization and its multiple merits. Int. J. Fatigue
     # 2001, 23, 175–183.
     def _register_params(self, n_clusters=1, **kwargs):
-        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 776.25))
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), np.log10(776.25)))
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.0895))
 
     def forward(
@@ -223,23 +231,20 @@ class Kohout(AbstractSN):
             min=1e-5,
             max=1 - 1e-5,
         )
-        alpha = self.activ(self.a[x_cluster]) + 1e-8 + 1
+        log_alpha = self.a[x_cluster]
         beta = -self.activ(self.b[x_cluster]) - 1e-8
         self.lstsq_input = s
-        self.lstsq_output = self.formula(s, alpha, beta)
+        self.lstsq_output = self.formula(s, log_alpha, beta)
         return self.lstsq_output
 
     @staticmethod
-    def formula(s, alpha, beta):
+    def formula(s, log_alpha, beta):
         return torch.log10(
-            torch.clamp(
-                torch.nan_to_num(
-                    10 ** (1 / beta * torch.log10(s) + torch.log10(alpha)) - alpha,
-                    nan=1,
-                    posinf=1e10,
-                    neginf=1e10,
-                ),
-                min=1e-8,
+            clamp_for_log(
+                clamp_overflow(
+                    10 ** (1 / beta * torch.log10(s) + log_alpha)
+                    - clamp_overflow(10**log_alpha)
+                )
             )
         )
 
@@ -259,7 +264,7 @@ class KimZhang(AbstractSN):
     # Kim, H.S.; Zhang, J. Fatigue Damage and Life Prediction of Glass/Vinyl Ester Composites. J. Reinf. Plast. Compos.
     # 2001, 20, 834–848.
     def _register_params(self, n_clusters=1, **kwargs):
-        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 38.44))
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), -38.44))
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 10.809))  # beta is b+1
 
     def forward(
@@ -281,8 +286,8 @@ class KimZhang(AbstractSN):
         where_use_max = torch.logical_not(where_use_min)
         s_ut[where_use_min] = s_min[where_use_min] / s[where_use_min]
         s_ut[where_use_max] = s_max[where_use_max] / s[where_use_max]
-        s_ut = torch.clamp(torch.abs(s_ut), min=1e-8)
-        log_alpha = -self.activ(self.a[x_cluster]) - 1e-8
+        s_ut = clamp_for_log(torch.abs(s_ut))
+        log_alpha = self.a[x_cluster]
         beta = self.activ(self.b[x_cluster]) + 1e-8 + 1
         self.lstsq_input = s
         self.lstsq_output = self.formula(s, s_ut, log_alpha, beta)
@@ -294,15 +299,7 @@ class KimZhang(AbstractSN):
             -beta * torch.log10(s_ut)
             - log_alpha
             - torch.log10(beta - 1)
-            + torch.log10(
-                torch.clamp(
-                    torch.nan_to_num(
-                        torch.pow(s, 1 - beta), nan=1, posinf=1e10, neginf=1e10
-                    )
-                    - 1,
-                    min=1e-8,
-                )
-            )
+            + torch.log10(clamp_for_log(clamp_overflow(torch.pow(s, 1 - beta)) - 1))
         )
 
     @staticmethod
@@ -333,7 +330,7 @@ class KawaiKoizumi(AbstractSN):
     def _register_params(self, n_clusters=1, **kwargs):
         # the initial values are from Section 4.2 of the paper. Note that in the paper, for different materials, these
         # params vary a lot.
-        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.003))
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), np.log10(0.003)))
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 1))
         self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), 8.5))
 
@@ -351,16 +348,16 @@ class KawaiKoizumi(AbstractSN):
             min=1e-5,
             max=1 - 1e-5,
         )
-        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        log_alpha = self.a[x_cluster]
         beta = self.activ(self.b[x_cluster]) + 1e-8
         gamma = self.activ(self.c[x_cluster]) + 1e-8
         self.lstsq_input = s
-        self.lstsq_output = self.formula(s, alpha, beta, gamma)
+        self.lstsq_output = self.formula(s, log_alpha, beta, gamma)
         return self.lstsq_output
 
     @staticmethod
-    def formula(s, alpha, beta, gamma):
-        return -torch.log10(alpha) + beta * torch.log10(1 - s) - gamma * torch.log10(s)
+    def formula(s, log_alpha, beta, gamma):
+        return -log_alpha + beta * torch.log10(1 - s) - gamma * torch.log10(s)
 
     @staticmethod
     def required_cols():
@@ -394,10 +391,10 @@ class Poursatip(AbstractSN):
             max=2 - 1e-5,
         )
         r = required_cols["R-value_UNSCALED"]
-        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        log_alpha = self.a[x_cluster]
         beta = self.activ(self.b[x_cluster]) + 1e-8
         gamma = self.activ(self.c[x_cluster]) + 1e-8
-        alpha_alter = self.activ(self.d[x_cluster]) + 1e-8
+        log_alpha_alter = self.d[x_cluster]
         beta_alter = self.activ(self.e[x_cluster]) + 1e-8
         self.lstsq_input = s_max
         # The third component suggests that the formula can not be applied for r<-1 or r>1. Indeed, the original paper
@@ -409,7 +406,7 @@ class Poursatip(AbstractSN):
             s_a[where_valid],
             s_max[where_valid],
             r[where_valid],
-            alpha[where_valid],
+            log_alpha[where_valid],
             beta[where_valid],
             gamma[where_valid],
         )
@@ -418,15 +415,15 @@ class Poursatip(AbstractSN):
         # Review.” Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
         self.lstsq_output[where_not_valid] = PoursatipSimplified.formula(
             s_max[where_not_valid],
-            alpha_alter[where_not_valid],
+            log_alpha_alter[where_not_valid],
             beta_alter[where_not_valid],
         )
         return self.lstsq_output
 
     @staticmethod
-    def formula(s_a, s_max, r, alpha, beta, gamma):
+    def formula(s_a, s_max, r, log_alpha, beta, gamma):
         return (
-            torch.log10(alpha)
+            log_alpha
             - beta * torch.log10(s_a)
             + gamma * torch.log10((1 - r) / (1 + r))
             + torch.log10(1 - s_max)
@@ -444,11 +441,14 @@ class Poursatip(AbstractSN):
         # Compared to values in the paper, alpha is 3.108x10^4x1.222^p, beta is 6.393, gamma is p.
         # p depends on the stress range: p=1.6 for high stress range and 2.7 for small stress range.
         self.a = nn.Parameter(
-            torch.mul(torch.ones(n_clusters), 3.108 * 1e4 * 1.222 ** ((1.6 + 2.7) / 2))
+            torch.mul(
+                torch.ones(n_clusters),
+                np.log10(3.108 * 1e4 * 1.222 ** ((1.6 + 2.7) / 2)),
+            )
         )
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
         self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), (1.6 + 2.7) / 2))
-        self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), 17000.0))
+        self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), np.log10(17000.0)))
         self.e = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
 
 
@@ -466,22 +466,22 @@ class PoursatipSimplified(AbstractSN):
             min=1e-5,
             max=1 - 1e-5,
         )
-        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        log_alpha = self.a[x_cluster]
         beta = self.activ(self.b[x_cluster]) + 1e-8
         self.lstsq_input = s_max
-        self.lstsq_output = self.formula(s_max, alpha, beta)
+        self.lstsq_output = self.formula(s_max, log_alpha, beta)
         return self.lstsq_output
 
     @staticmethod
-    def formula(s_max, alpha, beta):
-        return torch.log10(alpha) - beta * torch.log10(s_max) + torch.log10(1 - s_max)
+    def formula(s_max, log_alpha, beta):
+        return log_alpha - beta * torch.log10(s_max) + torch.log10(1 - s_max)
 
     @staticmethod
     def required_cols():
         return ["Relative Maximum Stress_UNSCALED"]
 
     def _register_params(self, n_clusters=1, **kwargs):
-        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 17000.0))
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), np.log10(17000.0)))
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
 
 
@@ -514,9 +514,7 @@ class DAmore(AbstractSN):
 
     @staticmethod
     def formula(s, r, alpha, beta):
-        return (
-            torch.log10(torch.clamp(1 + (1 / s - 1) / alpha / (1 - r), min=1e-8)) / beta
-        )
+        return torch.log10(clamp_for_log(1 + (1 / s - 1) / alpha / (1 - r))) / beta
 
     @staticmethod
     def required_cols():
@@ -576,7 +574,7 @@ class Epaarachchi(AbstractSN):
     # plastic composites for various stress ratios and test frequencies. Compos. Part A Appl. Sci. Manuf. 2003, 34,
     # 313–326.
     def _register_params(self, n_clusters=1, **kwargs):
-        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.053))
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), np.log10(0.053)))
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
         self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.0007))
         self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.245))
@@ -594,7 +592,7 @@ class Epaarachchi(AbstractSN):
         )
         r = required_cols["R-value_UNSCALED"]
         f = required_cols["Frequency_UNSCALED"]
-        alpha = self.activ(self.a[x_cluster]) + 1e-8
+        log_alpha = self.a[x_cluster]
         beta = self.activ(self.b[x_cluster]) + 1e-8
         alpha_alter = self.activ(self.c[x_cluster]) + 1e-8
         beta_alter = self.activ(self.d[x_cluster]) + 1e-8
@@ -622,22 +620,22 @@ class Epaarachchi(AbstractSN):
             s[where_valid],
             r[where_valid],
             f[where_valid],
-            alpha[where_valid],
+            log_alpha[where_valid],
             beta[where_valid],
         )
         self.lstsq_output[where_not_valid] = EpaarachchiSimplified.formula(
             s_used[where_not_valid],
             s_ut[where_not_valid],
             alpha_alter[where_not_valid],
-            beta[where_not_valid],
+            beta_alter[where_not_valid],
         )
         return self.lstsq_output
 
     @staticmethod
-    def formula(s, r, f, alpha, beta):
+    def formula(s, r, f, log_alpha, beta):
         return (
             torch.log10(1 / s - 1)
-            - torch.log10(alpha)
+            - log_alpha
             - 0.6 * torch.log10(s)
             - 1.6 * torch.log10(1 - r)
             + beta * torch.log10(f)
@@ -705,11 +703,7 @@ class EpaarachchiSimplified(AbstractSN):
     @staticmethod
     def formula(s, s_ut, alpha, beta):
         return (
-            1
-            / beta
-            * torch.log10(
-                torch.clamp(s_ut - s, min=1e-8) / alpha / torch.pow(s, 1.6) + 1
-            )
+            torch.log10(clamp_for_log(s_ut - s) / alpha / torch.pow(s, 1.6) + 1) / beta
         )
 
     @staticmethod
