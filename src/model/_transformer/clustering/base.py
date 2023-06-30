@@ -226,13 +226,22 @@ class Kohout(AbstractSN):
         alpha = self.activ(self.a[x_cluster]) + 1e-8 + 1
         beta = -self.activ(self.b[x_cluster]) - 1e-8
         self.lstsq_input = s
-        # this is simplified since alpha << Nf
         self.lstsq_output = self.formula(s, alpha, beta)
         return self.lstsq_output
 
     @staticmethod
     def formula(s, alpha, beta):
-        return 1 / beta * torch.log10(s) + torch.log10(alpha)
+        return torch.log10(
+            torch.clamp(
+                torch.nan_to_num(
+                    10 ** (1 / beta * torch.log10(s) + torch.log10(alpha)) - alpha,
+                    nan=1,
+                    posinf=1e10,
+                    neginf=1e10,
+                ),
+                min=1e-8,
+            )
+        )
 
     @staticmethod
     def required_cols() -> List[str]:
