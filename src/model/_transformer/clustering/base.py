@@ -844,3 +844,240 @@ class AbstractSNClustering(nn.Module):
         # else:
         #     tune_weight = self.running_tune_weight[x_cluster]
         return x_sn
+
+
+if __name__ == "__main__":
+    s_max = 10 ** torch.tensor(
+        [
+            2.866007194244604,
+            2.8363309352517985,
+            2.803956834532374,
+            2.76978417266187,
+            2.7320143884892087,
+            2.7068345323741005,
+            2.918165467625899,
+            2.6906474820143886,
+            2.672661870503597,
+            2.653776978417266,
+            2.634892086330935,
+            2.6142086330935252,
+            2.593525179856115,
+        ]
+    )
+    s_ut = 829
+    s_max_grid = torch.linspace(torch.min(s_max), torch.max(s_max), 100)
+    s_grid = s_max_grid / s_ut
+    s = s_max / s_ut
+
+    truth = [
+        3.3962264150943398,
+        3.883647798742138,
+        4.276729559748428,
+        4.622641509433962,
+        4.8742138364779874,
+        5.220125786163522,
+        0.015723270440251458,
+        5.298742138364779,
+        5.4559748427672945,
+        5.880503144654086,
+        5.9905660377358485,
+        6.069182389937107,
+        6.682389937106918,
+    ]
+    sendeckyj = Sendeckyj.formula(s_grid, torch.tensor([-3]), torch.tensor([0.093]))
+    hwang = Hwang.formula(s_grid, torch.tensor([np.log10(35)]), torch.tensor([0.21]))
+    kohout = Kohout.formula(
+        s_grid, torch.tensor([np.log10(776.25)]), torch.tensor([-0.0895])
+    )
+    kimzhang = KimZhang.formula(
+        s_grid, torch.tensor([s_ut]), torch.tensor([-38.44]), torch.tensor([11.809])
+    )
+    import matplotlib.pyplot as plt
+
+    plt.figure()
+    y = torch.log10(s_max).numpy()
+    y_grid = torch.log10(s_max_grid).numpy()
+    plt.scatter(truth, y, label="truth")
+    plt.plot(sendeckyj.numpy(), y_grid, label="sendeckyj")
+    plt.plot(hwang.numpy(), y_grid, label="hwang")
+    plt.plot(kohout.numpy(), y_grid, label="kohout")
+    plt.plot(kimzhang.numpy(), y_grid, label="kimzhang")
+    plt.xlim([0, 10])
+    plt.ylim([2.5, 3])
+    plt.legend()
+    plt.show()
+
+    s_max = torch.tensor(
+        [
+            828.8793103448274,
+            734.4827586206895,
+            685.3448275862067,
+            636.206896551724,
+            587.0689655172413,
+            537.9310344827585,
+            508.1896551724136,
+            488.7931034482757,
+            468.10344827586187,
+            448.70689655172396,
+            429.31034482758605,
+            409.91379310344814,
+            390.51724137931024,
+        ]
+    )
+    s_ut = 829
+    s_max_grid = torch.linspace(torch.min(s_max), torch.max(s_max), 100)
+    s_grid = s_max_grid / s_ut
+    s = s_max / s_ut
+
+    truth = [
+        -0.015804597701150058,
+        3.3716897678611657,
+        3.864562204192022,
+        4.2593954248366,
+        4.605209037638043,
+        4.869323304034258,
+        5.214080459770114,
+        5.280496393959882,
+        5.445021974306962,
+        5.870915032679739,
+        5.986350574712643,
+        6.052766508902411,
+        6.674737998647735,
+    ]
+    kawaikoizumi = KawaiKoizumi.formula(
+        s_grid, torch.tensor([-4]), torch.tensor([1.0]), torch.tensor([8.5])
+    )
+    poursatip = PoursatipSimplified.formula(
+        s_grid, torch.tensor([np.log10(17000.0)]), torch.tensor([6.393])
+    )
+    damore = DAmoreSimplified.formula(
+        s_grid, torch.tensor([0.053]), torch.tensor([0.2])
+    )
+    epaarachchi = EpaarachchiSimplified.formula(
+        s_max_grid, s_ut, torch.tensor([0.0007]), torch.tensor([0.245])
+    )
+
+    plt.figure()
+    y = s_max.numpy()
+    y_grid = s_max_grid.numpy()
+    plt.scatter(truth, y, label="truth")
+    plt.plot(kawaikoizumi.numpy(), y_grid, label="kawaikoizumi")
+    plt.plot(kimzhang.numpy(), y_grid, label="kimzhang")
+    plt.plot(poursatip.numpy(), y_grid, label="poursatip")
+    plt.plot(damore.numpy(), y_grid, label="damore")
+    plt.plot(epaarachchi.numpy(), y_grid, label="epaarachchi")
+    plt.xlim([-1, 9])
+    plt.ylim([300, 900])
+    plt.legend()
+    plt.show()
+
+    s_max = torch.tensor(
+        [
+            2075,
+            2043.75,
+            2018.75,
+            1975,
+            1337.5,
+            1350,
+            1293.75,
+            1300,
+            968.7500000000002,
+            962.5000000000002,
+            762.5,
+            756.25,
+            756.25,
+            587.5,
+            587.5,
+            587.5,
+            487.5000000000002,
+            487.5000000000002,
+            487.5000000000002,
+            487.5000000000002,
+            387.5,
+            387.5,
+            381.25,
+        ]
+    )
+    s_ut = 2013
+    s_max_grid = torch.linspace(torch.min(s_max), torch.max(s_max), 100)
+    s_grid = s_max_grid / s_ut
+    r = 0.1
+    f = 1  # not known
+    s_a_grid = s_max_grid * (1 - r)
+    s = s_max / s_ut
+
+    truth = [
+        0.015479876160990447,
+        0.015479876160990447,
+        0.015479876160990447,
+        0.015479876160990447,
+        2.195046439628483,
+        2.6408668730650153,
+        2.4427244582043337,
+        2.517027863777089,
+        3.111455108359133,
+        3.260061919504644,
+        3.8297213622291024,
+        3.9287925696594432,
+        4.027863777089783,
+        4.547987616099071,
+        4.696594427244582,
+        4.845201238390095,
+        4.7213622291021675,
+        4.969040247678018,
+        5.142414860681114,
+        5.3653250773993815,
+        5.340557275541796,
+        5.662538699690403,
+        6.058823529411766,
+    ]
+    kimzhang = KimZhang.formula(
+        s_grid, torch.tensor([s_ut]), torch.tensor([-26.505]), torch.tensor([7.3813])
+    )
+    kawaikoizumi = KawaiKoizumi.formula(
+        s_grid, torch.tensor([-2]), torch.tensor([1.0]), torch.tensor([5.5])
+    )
+    poursatip = Poursatip.formula(
+        s_a_grid,
+        s_grid,
+        torch.tensor([r]),
+        torch.tensor([16]),
+        torch.tensor([3.9]),
+        torch.tensor([6.393]),
+    )
+    poursatip_simp = PoursatipSimplified.formula(
+        s_grid, torch.tensor([np.log10(60.0)]), torch.tensor([6.393])
+    )
+    damore = DAmore.formula(
+        s_grid, torch.tensor([r]), torch.tensor([0.033]), torch.tensor([0.44])
+    )
+    damore_simp = DAmoreSimplified.formula(
+        s_grid, torch.tensor([0.033]), torch.tensor([0.44])
+    )
+    epaarachchi = Epaarachchi.formula(
+        s_grid,
+        torch.tensor([r]),
+        torch.tensor([f]),
+        torch.tensor([-1.5]),
+        torch.tensor([0.51]),
+    )
+    epaarachchi_simp = EpaarachchiSimplified.formula(
+        s_max_grid, s_ut, torch.tensor([0.00035]), torch.tensor([0.51])
+    )
+
+    plt.figure()
+    y = s_max.numpy()
+    y_grid = s_max_grid.numpy()
+    plt.scatter(truth, y, label="truth")
+    plt.plot(kawaikoizumi.numpy(), y_grid, label="kawaikoizumi")
+    plt.plot(kimzhang.numpy(), y_grid, label="kimzhang")
+    plt.plot(poursatip.numpy(), y_grid, label="poursatip")
+    plt.plot(poursatip_simp.numpy(), y_grid, label="poursatip simp")
+    plt.plot(damore.numpy(), y_grid, label="damore")
+    plt.plot(damore_simp.numpy(), y_grid, label="damore simp")
+    plt.plot(epaarachchi.numpy(), y_grid, label="epaarachchi")
+    plt.plot(epaarachchi_simp.numpy(), y_grid, label="epaarachchi simp")
+    plt.xlim([-1, 7])
+    plt.ylim([350, 2100])
+    plt.legend()
+    plt.show()
