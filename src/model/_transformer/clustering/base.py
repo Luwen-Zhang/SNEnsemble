@@ -255,7 +255,7 @@ class Kohout(AbstractSN):
     def get_optimizer(self):
         return torch.optim.Adam(
             self.parameters(),
-            lr=0.1,
+            lr=0.05,
             weight_decay=0,
         )
 
@@ -366,7 +366,7 @@ class KawaiKoizumi(AbstractSN):
     def get_optimizer(self):
         return torch.optim.Adam(
             self.parameters(),
-            lr=0.1,
+            lr=0.8,
             weight_decay=0,
         )
 
@@ -397,9 +397,8 @@ class Poursatip(AbstractSN):
         log_alpha_alter = self.d[x_cluster]
         beta_alter = self.activ(self.e[x_cluster]) + 1e-8
         self.lstsq_input = s_max
-        # The third component suggests that the formula can not be applied for r<-1 or r>1. Indeed, the original paper
-        # only discuss 0<r<1 where no compression is applied.
-        where_valid = torch.logical_and(r > 0, r < 1)
+        # The third component suggests that the formula can not be applied for r<-1 or r>1.
+        where_valid = torch.logical_and(r > -1, r < 1)
         where_not_valid = torch.logical_not(where_valid)
         self.lstsq_output = torch.ones_like(s_max)
         self.lstsq_output[where_valid] = self.formula(
@@ -492,6 +491,8 @@ class DAmore(AbstractSN):
     def _register_params(self, n_clusters=1, **kwargs):
         self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
+        self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
+        self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
 
     def forward(
         self,
@@ -507,9 +508,23 @@ class DAmore(AbstractSN):
         r = required_cols["R-value_UNSCALED"]
         alpha = self.activ(self.a[x_cluster]) + 1e-8
         beta = self.activ(self.b[x_cluster]) + 1e-8
+        alpha_alter = self.activ(self.c[x_cluster]) + 1e-8
+        beta_alter = self.activ(self.d[x_cluster]) + 1e-8
         self.lstsq_input = s
-        # The applicability when r<0 is not known.
-        self.lstsq_output = self.formula(s, r, alpha, beta)
+        where_r = torch.logical_and(r > -1, r < 1)
+        where_1_r = torch.logical_not(where_r)
+        self.lstsq_output = torch.ones_like(s)
+        self.lstsq_output[where_r] = self.formula(
+            s[where_r], r[where_r], alpha[where_r], beta[where_r]
+        )
+        # Caprino, G., and G. Giorleo. “Fatigue Lifetime of Glass Fabric/Epoxy Composites.” Composites Part A:
+        # Applied Science and Manufacturing 30, no. 3 (March 1, 1999): 299–304.
+        self.lstsq_output[where_1_r] = self.formula(
+            s[where_1_r],
+            1 / r[where_1_r],
+            alpha_alter[where_1_r],
+            beta_alter[where_1_r],
+        )
         return self.lstsq_output
 
     @staticmethod
@@ -523,7 +538,7 @@ class DAmore(AbstractSN):
     def get_optimizer(self):
         return torch.optim.Adam(
             self.parameters(),
-            lr=0.05,
+            lr=0.01,
             weight_decay=0,
         )
 
@@ -549,7 +564,6 @@ class DAmoreSimplified(AbstractSN):
         alpha = self.activ(self.a[x_cluster]) + 1e-8
         beta = self.activ(self.b[x_cluster]) + 1e-8
         self.lstsq_input = s
-        # The applicability when r<0 is not known.
         self.lstsq_output = self.formula(s, alpha, beta)
         return self.lstsq_output
 
@@ -576,8 +590,8 @@ class Epaarachchi(AbstractSN):
     def _register_params(self, n_clusters=1, **kwargs):
         self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), np.log10(0.053)))
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
-        self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.0007))
-        self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.245))
+        self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), np.log10(0.053)))
+        self.d = nn.Parameter(torch.mul(torch.ones(n_clusters), 0.2))
 
     def forward(
         self,
@@ -594,40 +608,28 @@ class Epaarachchi(AbstractSN):
         f = required_cols["Frequency_UNSCALED"]
         log_alpha = self.a[x_cluster]
         beta = self.activ(self.b[x_cluster]) + 1e-8
-        alpha_alter = self.activ(self.c[x_cluster]) + 1e-8
+        log_alpha_alter = self.c[x_cluster]
         beta_alter = self.activ(self.d[x_cluster]) + 1e-8
 
-        where_valid = r < 1
-        where_not_valid = torch.logical_not(where_valid)
-        s_max = required_cols["Maximum Stress_UNSCALED"]
-        s_min = required_cols["Minimum Stress_UNSCALED"]
-
-        s_used = torch.clone(s)
-        s_ut = torch.clone(s)
-        where_use_min = torch.logical_or(r < -1, r > 1)
-        where_use_max = torch.logical_not(where_use_min)
-        s_used[where_use_min] = s_min[where_use_min]
-        s_used[where_use_max] = s_max[where_use_max]
-        s_used = torch.abs(s_used)
-        s_ut[where_use_min] = s_min[where_use_min] / s[where_use_min]
-        s_ut[where_use_max] = s_max[where_use_max] / s[where_use_max]
-        s_ut = torch.abs(s_ut)
-        # Verification: torch.allclose(s_used/s_ut, s)
+        where_r = torch.logical_and(r > -1, r < 1)
+        where_1_r = torch.logical_not(where_r)
 
         self.lstsq_input = s
         self.lstsq_output = torch.ones_like(s)
-        self.lstsq_output[where_valid] = self.formula(
-            s[where_valid],
-            r[where_valid],
-            f[where_valid],
-            log_alpha[where_valid],
-            beta[where_valid],
+        self.lstsq_output[where_r] = self.formula(
+            s[where_r],
+            r[where_r],
+            f[where_r],
+            log_alpha[where_r],
+            beta[where_r],
         )
-        self.lstsq_output[where_not_valid] = EpaarachchiSimplified.formula(
-            s_used[where_not_valid],
-            s_ut[where_not_valid],
-            alpha_alter[where_not_valid],
-            beta_alter[where_not_valid],
+        # Follow a similar approach of Caprino et al for D'Amore's model.
+        self.lstsq_output[where_1_r] = self.formula(
+            s[where_1_r],
+            1 / r[where_1_r],
+            f[where_1_r],
+            log_alpha_alter[where_1_r],
+            beta_alter[where_1_r],
         )
         return self.lstsq_output
 
@@ -647,8 +649,6 @@ class Epaarachchi(AbstractSN):
             "Relative Maximum Stress_UNSCALED",
             "Frequency_UNSCALED",
             "R-value_UNSCALED",
-            "Maximum Stress_UNSCALED",
-            "Minimum Stress_UNSCALED",
         ]
 
     def get_optimizer(self):
@@ -718,7 +718,7 @@ class EpaarachchiSimplified(AbstractSN):
     def get_optimizer(self):
         return torch.optim.Adam(
             self.parameters(),
-            lr=0.01,
+            lr=0.005,
             weight_decay=0,
         )
 
