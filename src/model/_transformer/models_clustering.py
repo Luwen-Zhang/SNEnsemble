@@ -361,6 +361,54 @@ class SNPyFTTransWrapLRBMMNN(Abstract1LClusteringModel):
         super().__init__(sn_class=BMMSN, cont_cat_model=cont_cat_model, **kwargs)
 
 
+class SNPyFTTransLR2LGMMNN(Abstract2LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = required_models["EXTERN_PytorchTabular_FTTransformer"]
+        super().__init__(
+            sn_class=TwolayerGMMSN, cont_cat_model=cont_cat_model, **kwargs
+        )
+
+
+class SNPyFTTransLR2LKMeansNN(Abstract2LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = required_models["EXTERN_PytorchTabular_FTTransformer"]
+        super().__init__(
+            sn_class=TwolayerKMeansSN, cont_cat_model=cont_cat_model, **kwargs
+        )
+
+
+class SNPyFTTransLR2LBMMNN(Abstract2LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = required_models["EXTERN_PytorchTabular_FTTransformer"]
+        super().__init__(
+            sn_class=TwolayerBMMSN, cont_cat_model=cont_cat_model, **kwargs
+        )
+
+
+class SNPyFTTransWrapLR2LGMMNN(Abstract2LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = required_models["EXTERN_PytorchTabular_FTTransformer_WRAP"]
+        super().__init__(
+            sn_class=TwolayerGMMSN, cont_cat_model=cont_cat_model, **kwargs
+        )
+
+
+class SNPyFTTransWrapLR2LKMeansNN(Abstract2LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = required_models["EXTERN_PytorchTabular_FTTransformer_WRAP"]
+        super().__init__(
+            sn_class=TwolayerKMeansSN, cont_cat_model=cont_cat_model, **kwargs
+        )
+
+
+class SNPyFTTransWrapLR2LBMMNN(Abstract2LClusteringModel):
+    def __init__(self, required_models, **kwargs):
+        cont_cat_model = required_models["EXTERN_PytorchTabular_FTTransformer_WRAP"]
+        super().__init__(
+            sn_class=TwolayerBMMSN, cont_cat_model=cont_cat_model, **kwargs
+        )
+
+
 class SNTabTransLR2LGMMNN(Abstract2LClusteringModel):
     def __init__(self, required_models, **kwargs):
         cont_cat_model = required_models["EXTERN_WideDeep_TabTransformer"]
