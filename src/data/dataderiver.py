@@ -1,9 +1,8 @@
-import pandas as pd
-
 from src.utils import *
 from src.data import AbstractDeriver
 import inspect
 from typing import Type
+from .utils import get_corr_sets
 
 
 class DegLayerDeriver(AbstractDeriver):
@@ -578,6 +577,97 @@ class SampleWeightDeriver(AbstractDeriver):
             self.denominator = 1 / np.sum(weight.values) * len(df)
         weight = weight.values * self.denominator
         return weight
+
+
+class TheoreticalFiftyPofDeriver(AbstractDeriver):
+    def _derive(
+        self,
+        df: pd.DataFrame,
+        datamodule,
+        **kwargs,
+    ) -> np.ndarray:
+        from sklearn.preprocessing import MinMaxScaler
+        from scipy import stats
+
+        measure_features = datamodule.cont_feature_names
+        target = datamodule.label_name
+        distrib = kwargs["distribution"]
+        distrib_estimator = {
+            "gaussian": stats.norm,
+            "weibull": stats.exponweib,
+        }[distrib]
+        mat_lay = df["Material_Code"].copy()
+        unique_mat_lay = list(set(mat_lay))
+        pof50 = df.loc[:, target].values
+        if distrib == "weibull":
+            import tqdm.auto
+
+            bar = tqdm.auto.tqdm(total=len(unique_mat_lay))
+        else:
+            bar = None
+        for material in unique_mat_lay:
+            where_material = np.where(mat_lay == material)[0]
+            df_material = df.loc[where_material, measure_features].copy()
+            label_material = df.loc[where_material, target].values.flatten()
+            scaler = MinMaxScaler()
+            values = scaler.fit_transform(df_material)
+            dist = np.sqrt(
+                np.sum(np.power((values[:, None, :] - values[None, :, :]), 2), axis=-1)
+            )
+            where_same = np.where(dist < 0.05)
+            _, same_sets = get_corr_sets(where_same, list(np.arange(len(df_material))))
+            for same_set in same_sets:
+                target_set = label_material[same_set]
+                unique_vals = len(set(target_set))
+                if unique_vals < 2:
+                    continue
+                warnings.filterwarnings("ignore", "invalid value encountered in add")
+                pof50[where_material[same_set]] = distrib_estimator.ppf(
+                    0.5, *distrib_estimator.fit(target_set)
+                )
+            if bar is not None:
+                bar.update(1)
+        if bar is not None:
+            bar.close()
+        return pof50
+
+    @staticmethod
+    def describe_acc(target, pof50, datamodule, distribution):
+        from sklearn.metrics import mean_squared_error
+
+        train_mse = mean_squared_error(
+            target[datamodule.train_indices], pof50[datamodule.train_indices]
+        )
+        train_rmse = np.sqrt(train_mse)
+        val_mse = mean_squared_error(
+            target[datamodule.val_indices], pof50[datamodule.val_indices]
+        )
+        val_rmse = np.sqrt(val_mse)
+        test_mse = mean_squared_error(
+            target[datamodule.test_indices], pof50[datamodule.test_indices]
+        )
+        test_rmse = np.sqrt(test_mse)
+        mse = mean_squared_error(target, pof50)
+        rmse = np.sqrt(mse)
+        print(f"Theoretical accuracy at PoF=50% ({distribution} distribution):")
+        print(
+            f"\t Training MSE {train_mse:.5f}, RMSE {train_rmse:.5f}\n"
+            f"\t Validation MSE {val_mse:.5f}, RMSE {val_rmse:.5f}\n"
+            f"\t Testing MSE {test_mse:.5f}, RMSE {test_rmse:.5f}\n"
+            f"\t Overall MSE {mse:.5f}, RMSE {rmse:.5f}"
+        )
+
+    def _defaults(self):
+        return dict(stacked=True, intermediate=True, distribution="gaussian")
+
+    def _derived_names(self, **kwargs):
+        return ["TheoreticalFiftyPof"]
+
+    def _required_cols(self, **kwargs):
+        return []
+
+    def _required_params(self, **kwargs):
+        return []
 
 
 deriver_mapping = {}

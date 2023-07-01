@@ -1279,6 +1279,32 @@ class Trainer:
         )
         return attr
 
+    def cal_theoretical_pof50(
+        self,
+        max_stress_col="Maximum Stress",
+        r_value_col="R-value",
+        freq_col="Frequency",
+        distribution="gaussian",
+    ):
+        from ..data.dataderiver import TheoreticalFiftyPofDeriver
+
+        deriver = TheoreticalFiftyPofDeriver()
+        pof50, _, _ = deriver.derive(
+            self.df,
+            self.datamodule,
+            derived_name="_",
+            **dict(
+                max_stress_col=max_stress_col,
+                r_value_col=r_value_col,
+                freq_col=freq_col,
+                distribution=distribution,
+            ),
+        )
+        deriver.describe_acc(
+            self.df[self.label_name].values, pof50, self.datamodule, distribution
+        )
+        return pof50
+
     def plot_feature_importance(
         self,
         program: str,
