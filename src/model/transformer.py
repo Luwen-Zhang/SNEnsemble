@@ -360,9 +360,9 @@ class Transformer(TorchModel):
                 # Integer(
                 #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
                 # ),
-                Integer(low=4, high=64, prior="uniform", name="n_clusters", dtype=int),
+                Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
                 Integer(
-                    low=4,
+                    low=1,
                     high=32,
                     prior="uniform",
                     name="n_clusters_per_cluster",
@@ -375,7 +375,7 @@ class Transformer(TorchModel):
                     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
                 ),
                 Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Integer(low=2, high=16, prior="uniform", name="n_clusters", dtype=int),
+                Integer(low=1, high=16, prior="uniform", name="n_clusters", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
                 Categorical(categories=[16, 32, 64], name="seq_embedding_dim"),
                 Integer(
