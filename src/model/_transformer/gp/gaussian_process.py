@@ -70,13 +70,13 @@ class MiniBatchGP(nn.Module):
         else:
             # Running sanity check.
             if name == "L":
-                return torch.eye(x.shape[0])
+                return torch.eye(x.shape[0], device=x.device)
             elif name == "X":
                 return x
             elif name == "y":
-                return torch.ones(x.shape[0], 1)
+                return torch.ones(x.shape[0], 1, device=x.device)
             elif name == "alpha":
-                return torch.ones(x.shape[0], 1)
+                return torch.ones(x.shape[0], 1, device=x.device)
             else:
                 return getattr(self, name)
 
@@ -178,7 +178,7 @@ class MiniBatchGP(nn.Module):
         sqdist = sq + sq.T - 2 * X.mm(X.T)
         return torch.mul(
             self.amplitude_scale, torch.exp(-0.5 * sqdist / self.length_scale)
-        ) + torch.mul(self.noise_scale, torch.eye(len(X)))
+        ) + torch.mul(self.noise_scale, torch.eye(len(X), device=X.device))
 
     def kernel_mat(self, X, Z):
         Xsq = (X**2).sum(dim=1, keepdim=True)
