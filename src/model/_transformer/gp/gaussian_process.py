@@ -34,12 +34,16 @@ class MiniBatchGP(nn.Module):
         noise_scale=1.0,
         amplitude_scale=1.0,
         dynamic_input=False,
+        on_cpu=False,
+        sampling_on_hpo=False,
     ):
         super().__init__()
         self.trained = False
         self.optim_hp = True
         self.dynamic_input = dynamic_input
         self.input_changing = dynamic_input
+        self.on_cpu = on_cpu
+        self.sampling_on_hpo = sampling_on_hpo
         self._records = {}
         self.length_scale_ = nn.Parameter(torch.tensor(np.log(length_scale)))
         self.noise_scale_ = nn.Parameter(torch.tensor(np.log(noise_scale)))
@@ -96,6 +100,7 @@ class MiniBatchGP(nn.Module):
                     self.__delattr__(param)
                 except:
                     pass
+            torch.cuda.empty_cache()
 
     def on_epoch_end(self):
         self.trained = True
@@ -130,6 +135,9 @@ class MiniBatchGP(nn.Module):
             self.length_scale_.requires_grad_(False)
 
     def forward(self, x, y=None):
+        device, x = self.to_cpu(x)
+        if y is not None:
+            _, y = self.to_cpu(y)
         if self.training and not self.trained:
             if y is not None:
                 X = self.append_to_data_buffer(x, "X")
@@ -144,8 +152,10 @@ class MiniBatchGP(nn.Module):
         if self.training and self.optim_hp:
             D = X.shape[1]
             K = self.kernel_mat_self(X)
-            L = torch.linalg.cholesky(K)
-            alpha = torch.linalg.solve(L.T, torch.linalg.solve(L, y))
+            L = torch.linalg.cholesky(K.to(torch.float64))
+            alpha = torch.linalg.solve(
+                L.T, torch.linalg.solve(L, y.to(torch.float64))
+            ).to(torch.float32)
             marginal_likelihood = (
                 -0.5 * y.T.mm(alpha)
                 - torch.log(torch.diag(L)).sum()
@@ -158,9 +168,13 @@ class MiniBatchGP(nn.Module):
             L = self.request_param(x, "L")
             alpha = self.request_param(x, "alpha")
         k = self.kernel_mat(X, x)
-        v = torch.linalg.solve(L, k)
+        v = torch.linalg.solve(L.to(torch.float64), k.to(torch.float64)).to(
+            torch.float32
+        )
         mu = k.T.mm(alpha)
         var = -torch.diag(v.T.mm(v)) + self.amplitude_scale + self.noise_scale
+        mu = self.to_device(mu, device)
+        var = self.to_device(var, device)
         return mu, var
 
     def append_to_data_buffer(self, x, name):
@@ -219,6 +233,19 @@ class MiniBatchGP(nn.Module):
             self.optimizer.zero_grad()
             self.nll_loss.backward()
             self.optimizer.step()
+
+    def to_cpu(self, x):
+        if self.on_cpu:
+            self.to("cpu")
+            return x.device, x.to("cpu")
+        else:
+            return x.device, x
+
+    def to_device(self, x, device):
+        if self.on_cpu:
+            return x.to(device)
+        else:
+            return x
 
 
 if __name__ == "__main__":
