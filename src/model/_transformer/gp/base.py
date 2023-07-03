@@ -1,8 +1,11 @@
 import torch
 import torch.nn as nn
-from torch.optim import Adam
 import numpy as np
 from typing import List, Tuple
+from typing import Union
+from gpytorch.likelihoods import Likelihood
+from gpytorch.models import ExactGP, ApproximateGP
+import matplotlib.pyplot as plt
 
 
 class AbstractGP(nn.Module):
@@ -28,7 +31,6 @@ class AbstractGP(nn.Module):
         self,
         dynamic_input=False,
         on_cpu=False,
-        sampling_on_hpo=False,
         **kwargs,
     ):
         super().__init__()
@@ -37,7 +39,6 @@ class AbstractGP(nn.Module):
         self.dynamic_input = dynamic_input
         self.input_changing = dynamic_input
         self.on_cpu = on_cpu
-        self.sampling_on_hpo = sampling_on_hpo
         self._records = {}
         self._register_params(**kwargs)
         try:
