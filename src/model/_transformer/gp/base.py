@@ -52,6 +52,14 @@ class AbstractGP(nn.Module):
         self.kwargs = kwargs
         self.optimizer = None
 
+    @property
+    def incremental(self):
+        """
+        Whether the GP model accept incremental training (usually a gpytorch.model.ApproximateGP or some other
+        variational models)
+        """
+        return False
+
     def _register_params(self, **kwargs):
         """
         Register torch.nn.Parameter to self. It is also ok to register them in ``__init__`` after calling
@@ -126,10 +134,16 @@ class AbstractGP(nn.Module):
         Parameters
         ----------
         X
-            All received data in previous steps during this epoch and the current step if it is the first epoch or
-            (``self.dynamic_input=True`` and ``self.input_changing=True``). Otherwise, it is all received data during
-            the first epoch if ``self.dynamic_input=False``; or the converged data
-            if ``self.dynamic_input=True`` and `self.input_changing=False``.
+            If ``self.incremental=False``:
+
+                All received data in previous steps during this epoch and the current step if it is the first epoch or
+                (``self.dynamic_input=True`` and ``self.input_changing=True``). Otherwise, it is all received data during
+                the first epoch if ``self.dynamic_input=False``; or the converged data
+                if ``self.dynamic_input=True`` and `self.input_changing=False``.
+
+            If ``self.incremental=True``:
+
+                Received data in the current step.
         y
             The corresponding target.
 
@@ -235,13 +249,7 @@ class AbstractGP(nn.Module):
         if y is not None:
             _, y = self.to_cpu(y)
         if self.training and not self.trained:
-            if y is not None:
-                X = self.append_to_data_buffer(x, "X")
-                y = self.append_to_data_buffer(y, "y")
-            else:
-                raise Exception(
-                    f"Gaussian Process is training but the label is not provided."
-                )
+            X, y = self._prepare_data_for_training(x, y)
         else:
             X = self.request_param(x, "X")
             y = self.request_param(x, "y")
@@ -252,6 +260,18 @@ class AbstractGP(nn.Module):
             mu = self.to_device(mu, device)
             var = self.to_device(var, device)
             return mu, var
+
+    def _prepare_data_for_training(self, x, y):
+        if self.incremental:
+            return x, y
+        if y is not None:
+            X = self.append_to_data_buffer(x, "X")
+            y = self.append_to_data_buffer(y, "y")
+        else:
+            raise Exception(
+                f"Gaussian Process is training but the label is not provided."
+            )
+        return X, y
 
     def append_to_data_buffer(self, x: torch.Tensor, name: str):
         if name not in self.data_buffer_ls:
@@ -283,10 +303,13 @@ class AbstractGP(nn.Module):
         for i_iter in range(n_iter if n_iter is not None else 1):
             self.on_epoch_start()
             for x, y_hat in dataloader:
-                self(x, y_hat, return_prediction=False)
+                self._train_step(x, y_hat)
                 if n_iter is not None:
                     self.optim_step()
             self.on_epoch_end()
+
+    def _train_step(self, x, y):
+        self(x, y, return_prediction=False)
 
     def predict(self, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         self.eval()
