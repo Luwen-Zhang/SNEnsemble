@@ -6,6 +6,7 @@ from typing import Union
 from gpytorch.likelihoods import Likelihood
 from gpytorch.models import ExactGP, ApproximateGP
 import matplotlib.pyplot as plt
+from collections import Iterable
 
 
 class AbstractGP(nn.Module):
@@ -73,7 +74,7 @@ class AbstractGP(nn.Module):
 
     def _get_optimizer(self, **kwargs):
         """
-        Get an optimizer from torch.optim.
+        Get an optimizer or an Iterable of optimizers from torch.optim.
 
         Parameters
         -------
@@ -83,7 +84,7 @@ class AbstractGP(nn.Module):
         Returns
         -------
         optimizer
-            An optimizer for nn.Module.
+            An optimizer or an Iterable of optimizers for nn.Module.
         """
         raise NotImplementedError
 
@@ -296,9 +297,16 @@ class AbstractGP(nn.Module):
         if self.optimizer is None:
             self.optimizer = self._get_optimizer(**self.kwargs)
         if self.optim_hp:
-            self.optimizer.zero_grad()
-            self.loss.backward()
-            self.optimizer.step()
+            if isinstance(self.optimizer, Iterable):
+                for opt in self.optimizer:
+                    opt.zero_grad()
+                self.loss.backward()
+                for opt in self.optimizer:
+                    opt.step()
+            else:
+                self.optimizer.zero_grad()
+                self.loss.backward()
+                self.optimizer.step()
 
     def to_cpu(self, x: torch.Tensor):
         if self.on_cpu:
