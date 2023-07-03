@@ -101,10 +101,13 @@ def predict_approx_gp(model, likelihood, grid):
 
 
 if __name__ == "__main__":
+    import time
+
     X, y, grid = get_test_case_1d(100, 1)
 
     inducing_points = X[:10, :]
     torch.manual_seed(0)
+    start = time.time()
     model = _StochasticVariationalModel(inducing_points=inducing_points)
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
 
@@ -121,11 +124,16 @@ if __name__ == "__main__":
     train_approx_gp(
         model, likelihood, mll, optimizer, X, y, training_iter=10, batch_size=10
     )
+    train_end = time.time()
     mu, var = predict_approx_gp(model, likelihood, grid)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
     plot_mu_var_1d(X, y, grid, mu, var)
 
     torch.manual_seed(0)
+    start = time.time()
     gp = StochasticVariationalModel(inducing_points=inducing_points, num_data=y.size(0))
     gp.fit(X, y, batch_size=10, n_iter=10)
+    train_end = time.time()
     mu, var = gp.predict(grid)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
     plot_mu_var_1d(X, y, grid, mu, var)
