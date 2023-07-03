@@ -101,3 +101,19 @@ class MiniBatchGP(AbstractGP):
         return torch.mul(
             self.amplitude_scale, torch.exp(-0.5 * sqdist / self.length_scale)
         )
+
+
+if __name__ == "__main__":
+    from base import get_test_case_1d, plot_mu_var_1d
+    import time
+
+    X, y, grid = get_test_case_1d(100, 1)
+
+    torch.manual_seed(0)
+    start = time.time()
+    gp = MiniBatchGP()
+    gp.fit(X, y, batch_size=None, n_iter=100)
+    train_end = time.time()
+    mu, var = gp.predict(grid)
+    print(f"Train {train_end-start} s, Predict {time.time()-train_end} s")
+    plot_mu_var_1d(X, y, grid, mu, var)

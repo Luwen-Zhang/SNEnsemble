@@ -314,49 +314,47 @@ class AbstractGP(nn.Module):
             return x
 
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    import time
-    from ssgpr import MiniBatchSSGPR
-    from original_gp import MiniBatchGP
 
+
+
+
+def get_test_case_1d(
+    n_samples=100,
+    n_dim=1,
+    noise=0.1,
+    sample_std=1,
+    grid_low=-5,
+    grid_high=5,
+    n_grid=200,
+    func=None,
+):
     torch.manual_seed(0)
 
-    X = torch.randn(100, 1) / 3
-    f = (1 + X + 3 * X**2 + 0.5 * X**3).flatten()
-    y = f + torch.randn_like(f) * 0.1
-    y = y[:, None] + 1
-    grid = torch.linspace(-5, 5, 200)[:, None]
+    X = torch.randn(n_samples, n_dim) / sample_std
+    if func is None:
+        f = (1 + X + 3 * X**2 + 0.5 * X**3).flatten()
+    else:
+        f = func(X).flatten()
+    if f.shape[0] != n_samples:
+        raise Exception(
+            f"Get the target with {f.shape[0]} components from `func`, but expect n_samples={n_samples} components."
+        )
+    y = f + torch.randn_like(f) * noise
+    y = y[:, None]
+    grid = torch.linspace(grid_low, grid_high, n_grid)[:, None]
+    return X, y, grid
 
-    torch.manual_seed(0)
-    start = time.time()
-    gp = MiniBatchGP(on_cpu=False)
-    gp.fit(X, y, batch_size=None, n_iter=100)
-    train_end = time.time()
-    mu, var = gp.predict(grid)
-    print(f"GP: Train {train_end-start} s, Predict {time.time()-train_end} s")
-    mu = mu.detach().numpy().flatten()
-    std = torch.sqrt(var).detach().numpy().flatten()
+
+def plot_mu_var_1d(X, y, grid, mu, var, markersize=2, alpha=0.3):
+    X = X.detach().cpu().numpy().flatten()
+    y = y.detach().cpu().numpy().flatten()
+    grid = grid.detach().cpu().numpy().flatten()
+    mu = mu.detach().cpu().numpy().flatten()
+    var = var.detach().cpu().numpy().flatten()
+    std = np.sqrt(var)
     plt.figure()
-    plt.plot(X.flatten(), y, ".", markersize=2)
-    plt.plot(grid.flatten(), mu)
-    plt.fill_between(grid.flatten(), y1=mu + std, y2=mu - std, alpha=0.3)
-    plt.show()
-    plt.close()
-
-    torch.manual_seed(0)
-    start = time.time()
-    ssgpr = MiniBatchSSGPR(input_dim=1, num_basis_func=100, on_cpu=False)
-    ssgpr.fit(X, y, batch_size=None, n_iter=100)
-    train_end = time.time()
-    mu, var = ssgpr.predict(grid)
-    print(f"SSGPR: Train {train_end-start} s, Predict {time.time()-train_end} s")
-    mu = mu.detach().numpy().flatten()
-    std = torch.sqrt(var).detach().numpy().flatten()
-
-    plt.figure()
-    plt.plot(X.flatten(), y, ".", markersize=2)
-    plt.plot(grid.flatten(), mu)
-    plt.fill_between(grid.flatten(), y1=mu + std, y2=mu - std, alpha=0.3)
+    plt.plot(X, y, ".", markersize=markersize)
+    plt.plot(grid, mu)
+    plt.fill_between(grid, y1=mu + std, y2=mu - std, alpha=alpha)
     plt.show()
     plt.close()

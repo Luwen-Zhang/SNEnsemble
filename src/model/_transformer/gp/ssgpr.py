@@ -127,3 +127,19 @@ class MiniBatchSSGPR(AbstractGP):
         phi_x[:, : self.num_basis_func] = torch.cos(X @ W.T)
         phi_x[:, self.num_basis_func :] = torch.sin(X @ W.T)
         return phi_x
+
+
+if __name__ == "__main__":
+    import time
+    from base import get_test_case_1d, plot_mu_var_1d
+
+    X, y, grid = get_test_case_1d(100, 1)
+
+    torch.manual_seed(0)
+    start = time.time()
+    ssgpr = MiniBatchSSGPR(input_dim=1, num_basis_func=100)
+    ssgpr.fit(X, y, batch_size=None, n_iter=1000)
+    train_end = time.time()
+    mu, var = ssgpr.predict(grid)
+    print(f"Train {train_end-start} s, Predict {time.time()-train_end} s")
+    plot_mu_var_1d(X, y, grid, mu, var)
