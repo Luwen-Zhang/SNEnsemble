@@ -7,7 +7,11 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 import numpy as np
-from .base import AbstractGP
+
+try:
+    from .base import AbstractGP
+except:
+    from base import AbstractGP
 
 
 class MiniBatchGP(AbstractGP):

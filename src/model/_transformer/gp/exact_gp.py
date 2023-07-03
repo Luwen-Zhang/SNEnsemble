@@ -1,9 +1,12 @@
 import gpytorch
-from .base import AbstractGPyTorch
 from torch.optim import Adam
 import numpy as np
 from typing import List
-import torch
+
+try:
+    from .base import AbstractGPyTorch
+except:
+    from base import AbstractGPyTorch
 
 
 class _ExactGPModel(gpytorch.models.ExactGP):

@@ -2,10 +2,14 @@ from gpytorch.models import ApproximateGP
 from gpytorch.variational import CholeskyVariationalDistribution
 from gpytorch.variational import VariationalStrategy
 import gpytorch
-from .base import AbstractGPyTorch, get_test_case_1d, plot_mu_var_1d
 import torch
 from torch.optim import Adam
 from typing import List
+
+try:
+    from .base import AbstractGPyTorch, get_test_case_1d, plot_mu_var_1d
+except:
+    from base import AbstractGPyTorch, get_test_case_1d, plot_mu_var_1d
 
 
 class _StochasticVariationalModel(ApproximateGP):
