@@ -41,7 +41,7 @@ class MiniBatchSSGPR(AbstractGP):
         self._variance = nn.Parameter(torch.tensor(1.0))
 
     def _record_params(self):
-        self.previous_hp = [
+        return [
             self._length_scales.clone(),
             self._frequencies.clone(),
             self._amplitude.clone(),

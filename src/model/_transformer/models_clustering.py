@@ -139,7 +139,7 @@ class AbstractClusteringModel(AbstractNN):
             lr=0.8,
             weight_decay=0,
         )
-        # gp_optimizer = self.gp.optimizer
+        # gp_optimizer = self.gp._get_optimizer(**self.gp.kwargs)
         lstsq_optimizer = [sn.get_optimizer() for sn in self.clustering_sn_model.sns]
         # return [all_optimizer, ridge_optimizer, gp_optimizer] + lstsq_optimizer
         return [all_optimizer, ridge_optimizer] + lstsq_optimizer

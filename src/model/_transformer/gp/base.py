@@ -40,10 +40,15 @@ class AbstractGP(nn.Module):
         self.sampling_on_hpo = sampling_on_hpo
         self._records = {}
         self._register_params(**kwargs)
-        self.previous_hp = []
-        self._record_params()
+        try:
+            self.previous_hp = self._record_params()
+        except NotImplementedError:
+            raise NotImplementedError(f"_record_params is not implemented.")
+        except:
+            self.previous_hp = []
         self.data_buffer_ls = []
-        self.optimizer = self._get_optimizer(**kwargs)
+        self.kwargs = kwargs
+        self.optimizer = None
 
     def _register_params(self, **kwargs):
         raise NotImplementedError
@@ -103,7 +108,7 @@ class AbstractGP(nn.Module):
     def on_epoch_end(self):
         self.trained = True
         previous_hp = self.previous_hp
-        self._record_params()
+        self.previous_hp = self._record_params()
         if self.input_changing and len(self._records) > 0:
             norm_previous = [
                 torch.linalg.norm(self._records[x]) for x in self.data_buffer_ls
@@ -118,10 +123,11 @@ class AbstractGP(nn.Module):
                 ]
             ):
                 self.input_changing = False
-        if (
-            self._hp_converge_crit(previous_hp, self.previous_hp)
-            and not self.input_changing
-        ):
+        if len(previous_hp) != 0:
+            hp_converged = self._hp_converge_crit(previous_hp, self.previous_hp)
+        else:
+            hp_converged = False
+        if hp_converged and not self.input_changing:
             self.optim_hp = False
             self._set_requires_grad(False)
 
@@ -191,6 +197,8 @@ class AbstractGP(nn.Module):
         return mu, var
 
     def optim_step(self):
+        if self.optimizer is None:
+            self.optimizer = self._get_optimizer(**self.kwargs)
         if self.optim_hp:
             self.optimizer.zero_grad()
             self.loss.backward()

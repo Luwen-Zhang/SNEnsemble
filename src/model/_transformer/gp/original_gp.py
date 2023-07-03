@@ -31,7 +31,7 @@ class MiniBatchGP(AbstractGP):
         self.amplitude_scale_ = nn.Parameter(torch.tensor(np.log(amplitude_scale)))
 
     def _record_params(self):
-        self.previous_hp = [
+        return [
             self.length_scale_.item(),
             self.noise_scale_.item(),
             self.amplitude_scale_.item(),
