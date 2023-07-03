@@ -5,7 +5,6 @@ from .clustering.singlelayer import KMeansSN, GMMSN, BMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN, TwolayerBMMSN
 import torch
 from torch import nn
-from .gp.original_gp import MiniBatchGP
 from ..widedeep import WideDeepWrapper
 from ..pytorch_tabular import PytorchTabularWrapper
 from ..base import TorchModelWrapper
