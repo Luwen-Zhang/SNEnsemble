@@ -51,27 +51,122 @@ class AbstractGP(nn.Module):
         self.optimizer = None
 
     def _register_params(self, **kwargs):
+        """
+        Register torch.nn.Parameter to self. It is also ok to register them in ``__init__`` after calling
+        ``super().__init__(**kwargs)``. These parameters will be optimized by the optimizer from
+        ``self._get_optimizer`` if they ``requires_grad``.
+
+        Parameters
+        -------
+        kwargs
+            kwargs passed to ``__init__``
+        """
         raise NotImplementedError
 
-    def _record_params(self):
+    def _record_params(self) -> List:
+        """
+        Record hyperparameters registered in ``_register_params``. These records are used to check the convergence and
+        will be passed to ``_hp_converge_crit``.
+        """
         raise NotImplementedError
 
     def _get_optimizer(self, **kwargs):
+        """
+        Get an optimizer from torch.optim.
+
+        Parameters
+        -------
+        kwargs
+            kwargs passed to ``__init__``
+
+        Returns
+        -------
+        optimizer
+            An optimizer for nn.Module.
+        """
         raise NotImplementedError
 
     def _get_default_results(self, x: torch.Tensor, name: str) -> torch.Tensor:
+        """
+        For pytorch_lightning, the sanity check runs several evaluation steps before the first training step. It is
+        possible that some attributes are not initialized; therefore, when implementing ``_train``, it is better to use
+        ``self.request_param`` instead of directly calling ``self.XXX`` to get default attributes from this method.
+        The returned value should reveal the dimensions of the requested attribute to prevent runtime error. These
+        values will not be used during actual training or evaluating stages.
+
+        Parameters
+        ----------
+        x
+            The tensor passed to ``forward``
+        name
+            The name of requested attribute passed to ``self.request_param``.
+
+        Returns
+        -------
+        value
+            A tensor that reveal the dimensions of the requested attribute.
+        """
         raise NotImplementedError
 
     def _set_requires_grad(self, requires_grad: bool):
+        """
+        Set requires_grad for parameters registered in ``_register_params``. It is used to control the optimization of
+        hyperparameters. The simplest way could be self.train(requires_grad) if no other params are trained after
+        hyperparameters converge.
+        """
         raise NotImplementedError
 
     def _train(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        The main training step. An objective value (loss) should be returned. Necessary results should be stored as
+        attributes of the instance for ``_predict``.
+
+        Parameters
+        ----------
+        X
+            All received data in previous steps during this epoch and the current step if it is the first epoch or
+            (``self.dynamic_input=True`` and ``self.input_changing=True``). Otherwise, it is all received data during
+            the first epoch if ``self.dynamic_input=False``; or the converged data
+            if ``self.dynamic_input=True`` and `self.input_changing=False``.
+        y
+            The corresponding target.
+
+        Returns
+        -------
+        loss
+            A scalar loss value
+        """
         raise NotImplementedError
 
-    def _predict(self, X: torch.Tensor, x: torch.Tensor):
+    def _predict(
+        self, X: torch.Tensor, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Prediction. It is called after calling ``_train``. It is possible that the model is under the sanity
+        check of pytorch_lightning, so in this method, it is better to call attributes using ``self.request_param``.
+        See also ``_get_default_results``.
+
+        Parameters
+        ----------
+        X
+            The training data. See the docstring of ``_train``.
+        x
+            The new data.
+
+        Returns
+        -------
+        mu, var
+            Means and variances.
+        """
         raise NotImplementedError
 
-    def _hp_converge_crit(self, previous_recorded: List, current_recorded: List):
+    def _hp_converge_crit(
+        self, previous_recorded: List, current_recorded: List
+    ) -> bool:
+        """
+        Check convergence of hyperparameters recorded by ``_record_params``. Inputs are lists recorded before and after
+        optimization respectively.
+        """
         raise NotImplementedError
 
     def request_param(self, x: torch.Tensor, name: str) -> torch.Tensor:
