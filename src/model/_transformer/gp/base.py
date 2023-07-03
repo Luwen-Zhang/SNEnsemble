@@ -314,8 +314,51 @@ class AbstractGP(nn.Module):
             return x
 
 
+class AbstractGPyTorch(AbstractGP):
+    def __init__(
+        self,
+        gp: Union[ExactGP, ApproximateGP],
+        likelihood: Likelihood,
+        loss_func,
+        **kwargs,
+    ):
+        super(AbstractGPyTorch, self).__init__(**kwargs)
+        self.gp = gp
+        self.likelihood = likelihood
+        self.loss_func = loss_func
 
+    def _register_params(self, **kwargs):
+        pass
 
+    def _get_default_results(self, x: torch.Tensor, name: str) -> torch.Tensor:
+        pass
+
+    def _set_requires_grad(self, requires_grad: bool):
+        self.gp.train(requires_grad)
+        self.likelihood.train(requires_grad)
+
+    def _train(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        if isinstance(self.gp, ExactGP):
+            if self.gp.train_targets is None or not torch.allclose(
+                self.gp.train_targets, y.flatten()
+            ):
+                self.gp.set_train_data(X, y.flatten(), strict=False)
+        output = self.gp(X)
+        return -self.loss_func(output, y.flatten())
+
+    def _predict(self, X: torch.Tensor, x: torch.Tensor):
+        with torch.no_grad():
+            observed_pred = self.likelihood(self.gp(x))
+        return observed_pred.mean, observed_pred.variance
+
+    def _record_params(self):
+        raise NotImplementedError
+
+    def _get_optimizer(self, **kwargs):
+        raise NotImplementedError
+
+    def _hp_converge_crit(self, previous_recorded: List, current_recorded: List):
+        raise NotImplementedError
 
 
 def get_test_case_1d(
