@@ -35,7 +35,7 @@ class AbstractGP(nn.Module):
         **kwargs,
     ):
         super().__init__()
-        self.trained = False
+        self.finish_first_epoch = False
         self.optim_hp = True
         self.dynamic_input = dynamic_input
         self.input_changing = dynamic_input
@@ -201,13 +201,13 @@ class AbstractGP(nn.Module):
                     return getattr(self, name)
 
     def on_train_start(self):
-        self.trained = False
+        self.finish_first_epoch = False
         self.optim_hp = True
         self._set_requires_grad(True)
 
     def on_epoch_start(self):
-        if self.input_changing and self.trained:
-            self.trained = False
+        if self.input_changing and self.finish_first_epoch:
+            self.finish_first_epoch = False
             for param in self.data_buffer_ls:
                 self._records[param] = getattr(self, param)
                 try:
@@ -217,7 +217,9 @@ class AbstractGP(nn.Module):
             torch.cuda.empty_cache()
 
     def on_epoch_end(self):
-        self.trained = True
+        if not self.incremental:
+            # For incremental models, finish_first_epoch is always false.
+            self.finish_first_epoch = True
         previous_hp = self.previous_hp
         self.previous_hp = self._record_params()
         if self.input_changing and len(self._records) > 0:
@@ -248,7 +250,7 @@ class AbstractGP(nn.Module):
         device, x = self.to_cpu(x)
         if y is not None:
             _, y = self.to_cpu(y)
-        if self.training and not self.trained:
+        if self.training and not self.finish_first_epoch:
             X, y = self._prepare_data_for_training(x, y)
         else:
             X = self.request_param(x, "X")
