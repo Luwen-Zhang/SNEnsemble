@@ -319,8 +319,7 @@ class WideDeep(AbstractModel):
         across batches, which is not what we do (in a precise way for MSE) at the end of training and makes
         results from the callback differ from our final metrics.
         """
-        from pytorch_widedeep.callbacks import EarlyStopping
-        from ._widedeep.widedeep_callback import WideDeepCallback
+        from ._widedeep.widedeep_callback import WideDeepCallback, EarlyStopping
 
         optimizer = torch.optim.Adam(
             model.model.deeptabular.parameters(),
