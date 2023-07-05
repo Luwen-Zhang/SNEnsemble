@@ -231,8 +231,6 @@ class WideDeep(AbstractModel):
             TabFastFormer,
         )
         from pytorch_widedeep import Trainer as wd_Trainer
-        from pytorch_widedeep.callbacks import EarlyStopping
-        from ._widedeep.widedeep_callback import WideDeepCallback
 
         cont_feature_names = self.trainer.cont_feature_names
         cat_feature_names = self.trainer.cat_feature_names
@@ -269,27 +267,10 @@ class WideDeep(AbstractModel):
         tab_model = mapping[model_name](**args)
         model = WideDeep(deeptabular=tab_model)
 
-        optimizer = torch.optim.Adam(
-            model.deeptabular.parameters(),
-            lr=kwargs["lr"],
-            weight_decay=kwargs["weight_decay"],
-        )
-
         wd_trainer = wd_Trainer(
             model,
             objective="regression",
             verbose=0,
-            callbacks=[
-                EarlyStopping(
-                    patience=self.trainer.static_params["patience"],
-                    verbose=1 if verbose else 0,
-                    restore_best_weights=True,
-                ),
-                WideDeepCallback(total_epoch=self.total_epoch, verbose=verbose),
-            ],
-            optimizers={"deeptabular": optimizer}
-            if self.trainer.args["bayes_opt"]
-            else None,
             device="cpu" if self.trainer.device == "cpu" else "cuda",
             num_workers=0,
         )
@@ -338,12 +319,35 @@ class WideDeep(AbstractModel):
         across batches, which is not what we do (in a precise way for MSE) at the end of training and makes
         results from the callback differ from our final metrics.
         """
+        from pytorch_widedeep.callbacks import EarlyStopping
+        from ._widedeep.widedeep_callback import WideDeepCallback
+
+        optimizer = torch.optim.Adam(
+            model.model.deeptabular.parameters(),
+            lr=kwargs["lr"] if not warm_start else 1e-8,
+            weight_decay=kwargs["weight_decay"],
+        )
+        model.optimizer = model._set_optimizer({"deeptabular": optimizer})
+
+        model._set_callbacks_and_metrics(
+            callbacks=[
+                EarlyStopping(
+                    patience=self.trainer.static_params["patience"],
+                    verbose=1 if verbose else 0,
+                    restore_best_weights=True,
+                ),
+                WideDeepCallback(total_epoch=self.total_epoch, verbose=verbose),
+            ],
+            metrics=None,
+        )
+
         model.fit(
             X_train={"X_tab": X_train, "target": y_train},
             X_val={"X_tab": X_val, "target": y_val},
-            n_epochs=epoch,
+            n_epochs=epoch if not warm_start else 1,
             batch_size=int(kwargs["batch_size"]),
             finetune=warm_start,
+            finetune_epochs=10,
         )
 
     def _pred_single_model(self, model, X_test, verbose, **kwargs):
