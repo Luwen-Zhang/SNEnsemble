@@ -2,6 +2,7 @@ import gpytorch
 from torch.optim import Adam
 import numpy as np
 from typing import List
+import torch
 
 try:
     from .base import AbstractGPyTorch
@@ -86,7 +87,6 @@ def predict_exact_gp(model, likelihood, grid):
 
 if __name__ == "__main__":
     import time
-    import torch
     from base import get_test_case_1d, plot_mu_var_1d
 
     X, y, grid = get_test_case_1d(100, 1)
