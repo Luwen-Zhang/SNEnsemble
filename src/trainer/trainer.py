@@ -1891,6 +1891,7 @@ class Trainer:
         program: str = "ThisWork",
         model_name: str = "ThisWork",
         refit: bool = True,
+        log_stress: bool = False,
         **kwargs,
     ):
         """
@@ -1932,6 +1933,8 @@ class Trainer:
             The selected model in the database.
         refit
             Whether to refit models on bootstrapped datasets. See Trainer._bootstrap.
+        log_stress
+            Whether to plot the stress in log scale.
         **kwargs
             Other arguments for ``Trainer._bootstrap``
         """
@@ -2239,6 +2242,8 @@ class Trainer:
             handleheight=0.9,
             fontsize=plt.rcParams["font.size"] * 0.8,
         )
+        if log_stress:
+            ax.set_yscale("log")
         ax.set_xlabel(n_col)
         ax.set_ylabel(s_col)
         ax.set_xlim([0, 10])
