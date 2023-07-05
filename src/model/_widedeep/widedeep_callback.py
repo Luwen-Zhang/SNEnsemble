@@ -2,7 +2,7 @@ from typing import Optional, Dict
 from pytorch_widedeep.callbacks import Callback, EarlyStopping as ES
 import src
 import numpy as np
-from copy import deepcopy as cp
+import copy
 
 
 class WideDeepCallback(Callback):
@@ -41,17 +41,17 @@ class EarlyStopping(ES):
             self.best = current
             self.wait = 0
             if self.restore_best_weights:
-                self.state_dict = cp(self.model.state_dict())
+                self.state_dict = copy.deepcopy(self.model.state_dict())
         else:
             self.wait += 1
             if self.wait >= self.patience:
                 self.stopped_epoch = epoch
                 self.trainer.early_stop = True
-                if self.restore_best_weights:
-                    if self.verbose > 0:
-                        print("Restoring model weights from the end of the best epoch")
-                    self.model.load_state_dict(self.state_dict)
 
     def on_train_end(self, logs: Optional[Dict] = None):
-        super(EarlyStopping, self).on_train_end(logs)
-        self.model.load_state_dict(self.state_dict)
+        if self.stopped_epoch > 0 and self.verbose > 0:
+            print("Epoch %05d: early stopping" % (self.stopped_epoch + 1))
+        if self.restore_best_weights and self.state_dict is not None:
+            if self.verbose > 0:
+                print("Restoring model weights from the end of the best epoch")
+            self.model.load_state_dict(self.state_dict)
