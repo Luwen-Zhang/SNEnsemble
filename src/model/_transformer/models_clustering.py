@@ -3,6 +3,7 @@ from ..base import AbstractNN, get_linear, get_sequential, AbstractModel
 import numpy as np
 from .clustering.singlelayer import KMeansSN, GMMSN, BMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN, TwolayerBMMSN
+from .gp.exact_gp import ExactGPModel
 import torch
 from torch import nn
 from ..widedeep import WideDeepWrapper
@@ -32,7 +33,7 @@ class AbstractClusteringModel(AbstractNN):
         self.use_hidden_rep, hidden_rep_dim = self._test_required_model(
             n_inputs, self.cont_cat_model
         )
-        # self.gp = MiniBatchGP(dynamic_input=not self.use_hidden_rep)
+        # self.gp = ExactGPModel(dynamic_input=not self.use_hidden_rep)
         if not self.use_hidden_rep:
             self.cls_head = get_sequential(
                 [128, 64, 32],
@@ -52,7 +53,6 @@ class AbstractClusteringModel(AbstractNN):
         if isinstance(self.cont_cat_model, nn.Module):
             self.set_requires_grad(self.cont_cat_model, requires_grad=False)
 
-    #
     # def on_train_start(self) -> None:
     #     super(AbstractClusteringModel, self).on_train_start()
     #     self.gp.on_train_start()
@@ -78,7 +78,17 @@ class AbstractClusteringModel(AbstractNN):
         )
         # Projection from hidden output to deep learning weights
         dl_weight = self.cls_head_normalize(self.cls_head(hidden))
-        # mu, var = self.gp(hidden, dl_weight)
+        # gp_input = torch.concat(
+        #     [
+        #         val.view(-1, 1)
+        #         for val in self.clustering_sn_model.extract_cols_ignore_unscaled(
+        #             x, derived_tensors, return_list=True
+        #         )
+        #         + [self.clustering_sn_model.x_cluster]
+        #     ],
+        #     dim=1,
+        # )
+        # mu, var = self.gp(gp_input, dl_weight)
         # Weighted sum of prediction
         out = phy_pred + torch.mul(dl_weight, dl_pred - phy_pred)
         self.dl_pred = dl_pred
@@ -124,7 +134,7 @@ class AbstractClusteringModel(AbstractNN):
         ) + torch.mul(
             torch.sum(torch.mul(ridge_weight, ridge_weight)), self.ridge_penalty
         )
-        # self.gp_loss = self.gp.nll_loss
+        # self.gp_loss = self.gp.loss
         return self.output_loss
 
     def configure_optimizers(self):
