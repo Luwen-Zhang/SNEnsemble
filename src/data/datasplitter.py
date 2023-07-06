@@ -180,9 +180,8 @@ class CycleSplitter(AbstractSplitter):
        and testing.
     3. In the 40% part, validation and testing sets are randomly split by train_test_split. If only one point is
        available, it will be randomly decided as a validation or testing point.
-    4. To prevent over-fitting on the validation set when optimizing hyperparameters, half of the validation set will be
-       randomly selected to be moved to the training set, and the same number of training points are exchanged to the
-       testing set.
+    4. To simulation the real scenario and to prevent over-fitting on the validation set, the training and validation
+       sets are completely shuffled.
     """
 
     def _split(self, df, cont_feature_names, cat_feature_names, label_name):
@@ -242,42 +241,6 @@ class CycleSplitter(AbstractSplitter):
                         fr_val_indices,
                         fr_test_indices,
                     ) = cls._split_one_fr(where_fr, fr_cycle, train_val_test)
-                    """
-                    # To make val set further and test set even further, use this:
-                    fr_train_indices = where_fr[
-                        fr_cycle <= np.percentile(fr_cycle, train_val_test[0] * 100)
-                    ]
-                    fr_test_indices = where_fr[
-                        fr_cycle
-                        > np.percentile(fr_cycle, np.sum(train_val_test[0:2]) * 100)
-                    ]
-                    fr_val_indices = np.setdiff1d(
-                        where_fr, np.append(fr_train_indices, fr_test_indices)
-                    )
-                    """
-                    """
-                    # To make train and val sets random, use this:
-                    fr_train_val_indices = where_fr[
-                        fr_cycle
-                        <= np.percentile(fr_cycle, np.sum(train_val_test[0:2]) * 100)
-                    ]
-                    if (
-                        len(fr_train_val_indices)
-                        >= np.sum(train_val_test[0:2]) // train_val_test[1]
-                    ):
-                        fr_train_indices, fr_val_indices = train_test_split(
-                            fr_train_val_indices,
-                            test_size=train_val_test[1] / np.sum(train_val_test[0:2]),
-                            shuffle=True,
-                        )
-                    elif len(fr_train_val_indices) >= 2:
-                        fr_train_indices = fr_train_val_indices[0:-1]
-                        fr_val_indices = fr_train_val_indices[-1:]
-                    else:
-                        fr_train_indices = fr_train_val_indices
-                        fr_val_indices = np.array([], dtype=int)
-                    fr_test_indices = np.setdiff1d(where_fr, fr_train_val_indices)
-                    """
                     m_train_indices += list(where_material[fr_train_indices])
                     m_test_indices += list(where_material[fr_test_indices])
                     m_val_indices += list(where_material[fr_val_indices])
@@ -298,6 +261,12 @@ class CycleSplitter(AbstractSplitter):
             val_indices += list(m_val_indices)
             test_indices += list(m_test_indices)
 
+        train_val_indices = np.concatenate([train_indices, val_indices])
+        train_indices, val_indices = train_test_split(
+            train_val_indices,
+            test_size=train_val_test[1] / np.sum(train_val_test[:2]),
+            shuffle=True,
+        )
         return np.array(train_indices), np.array(val_indices), np.array(test_indices)
 
     @classmethod
@@ -325,24 +294,6 @@ class CycleSplitter(AbstractSplitter):
             else:
                 fr_test_indices = fr_test_val_indices
                 fr_val_indices = np.array([], dtype=int)
-        # Shuffle the training and validation sets.
-        n_exchange = len(fr_val_indices) // 2
-        from_val_to_train = np.random.choice(fr_val_indices, n_exchange, replace=False)
-        from_train_to_val = np.random.choice(
-            fr_train_indices, n_exchange, replace=False
-        )
-        fr_train_indices = np.concatenate(
-            [
-                np.setdiff1d(fr_train_indices, from_train_to_val),
-                from_val_to_train,
-            ]
-        )
-        fr_val_indices = np.concatenate(
-            [
-                np.setdiff1d(fr_val_indices, from_val_to_train),
-                from_train_to_val,
-            ]
-        )
         return (
             where_fr[fr_train_indices],
             where_fr[fr_val_indices],
@@ -380,24 +331,6 @@ class StrictCycleSplitter(CycleSplitter):
             else:
                 fr_test_indices = fr_test_val_indices
                 fr_val_indices = np.array([], dtype=int)
-        # Shuffle the training and validation sets.
-        n_exchange = len(fr_val_indices) // 2
-        from_val_to_train = np.random.choice(fr_val_indices, n_exchange, replace=False)
-        from_train_to_val = np.random.choice(
-            fr_train_indices, n_exchange, replace=False
-        )
-        fr_train_indices = np.concatenate(
-            [
-                np.setdiff1d(fr_train_indices, from_train_to_val),
-                from_val_to_train,
-            ]
-        )
-        fr_val_indices = np.concatenate(
-            [
-                np.setdiff1d(fr_val_indices, from_val_to_train),
-                from_train_to_val,
-            ]
-        )
         return (
             where_fr[fr_train_indices],
             where_fr[fr_val_indices],
