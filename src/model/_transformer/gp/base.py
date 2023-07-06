@@ -223,16 +223,13 @@ class AbstractGP(nn.Module):
         previous_hp = self.previous_hp
         self.previous_hp = self._record_params()
         if self.input_changing and len(self._records) > 0:
-            norm_previous = [
-                torch.linalg.norm(self._records[x]) for x in self.data_buffer_ls
-            ]
-            norm_current = [
-                torch.linalg.norm(getattr(self, x)) for x in self.data_buffer_ls
-            ]
+            previous_data_buffer = [self._records[x] for x in self.data_buffer_ls]
+            current_data_buffer = [getattr(self, x) for x in self.data_buffer_ls]
             if all(
                 [
-                    torch.abs(x - y) / y < 1e-5
-                    for x, y in zip(norm_previous, norm_current)
+                    torch.equal(torch.tensor(x.size()), torch.tensor(y.size()))
+                    and torch.allclose(x, y)
+                    for x, y in zip(previous_data_buffer, current_data_buffer)
                 ]
             ):
                 self.input_changing = False
