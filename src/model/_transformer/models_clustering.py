@@ -33,7 +33,7 @@ class AbstractClusteringModel(AbstractNN):
         self.use_hidden_rep, hidden_rep_dim = self._test_required_model(
             n_inputs, self.cont_cat_model
         )
-        # self.gp = ExactGPModel(dynamic_input=not self.use_hidden_rep)
+        # self.gp = ExactGPModel(dynamic_input=True)
         if not self.use_hidden_rep:
             self.cls_head = get_sequential(
                 [128, 64, 32],
@@ -88,7 +88,7 @@ class AbstractClusteringModel(AbstractNN):
         #     ],
         #     dim=1,
         # )
-        # mu, var = self.gp(gp_input, dl_weight)
+        # mu, var = self.gp(hidden, dl_weight)
         # Weighted sum of prediction
         out = phy_pred + torch.mul(dl_weight, dl_pred - phy_pred)
         self.dl_pred = dl_pred
