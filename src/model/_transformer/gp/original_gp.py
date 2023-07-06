@@ -44,7 +44,7 @@ class MiniBatchGP(AbstractGP):
     def _get_optimizer(self, lr=0.1, **kwargs):
         return Adam(self.parameters(), lr=lr)
 
-    def _get_default_param(self, x, name):
+    def _get_default_results(self, x: torch.Tensor, name: str):
         if name == "L":
             return torch.eye(x.shape[0], device=x.device)
         elif name == "alpha":
