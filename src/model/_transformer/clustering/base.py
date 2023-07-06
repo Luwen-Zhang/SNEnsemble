@@ -280,7 +280,7 @@ class KimZhang(AbstractSN):
         )
         r = required_cols["R-value_UNSCALED"]
         s_max = required_cols["Maximum Stress_UNSCALED"]
-        s_min = required_cols["Minimum Stress_UNSCALED"]
+        s_min = r * s_max
         s_ut = torch.clone(s)
         where_use_min = torch.logical_or(r < -1, r > 1)
         where_use_max = torch.logical_not(where_use_min)
@@ -308,7 +308,6 @@ class KimZhang(AbstractSN):
             "Relative Maximum Stress_UNSCALED",
             "R-value_UNSCALED",
             "Maximum Stress_UNSCALED",
-            "Minimum Stress_UNSCALED",
         ]
 
     def get_optimizer(self):
@@ -682,7 +681,7 @@ class EpaarachchiSimplified(AbstractSN):
         beta = self.activ(self.b[x_cluster]) + 1e-8
 
         s_max = required_cols["Maximum Stress_UNSCALED"]
-        s_min = required_cols["Minimum Stress_UNSCALED"]
+        s_min = r * s_max
 
         s_used = torch.clone(s)
         s_ut = torch.clone(s)
@@ -712,7 +711,6 @@ class EpaarachchiSimplified(AbstractSN):
             "Relative Maximum Stress_UNSCALED",
             "R-value_UNSCALED",
             "Maximum Stress_UNSCALED",
-            "Minimum Stress_UNSCALED",
         ]
 
     def get_optimizer(self):
