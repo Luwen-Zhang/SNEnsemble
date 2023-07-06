@@ -38,7 +38,7 @@ class TestGP(unittest.TestCase):
 
         torch.manual_seed(0)
         start = time.time()
-        gp = ExactGPModel()
+        gp = ExactGPModel(lr=0.1)
         gp.fit(X, y, batch_size=None, n_iter=50)
         train_end = time.time()
         mu2, var2 = gp.predict(grid)
@@ -72,7 +72,9 @@ class TestGP(unittest.TestCase):
 
         torch.manual_seed(0)
         gp = StochasticVariationalModel(
-            inducing_points=inducing_points, num_data=y.size(0)
+            inducing_points=inducing_points,
+            num_data=y.size(0),
+            lr=0.01,
         )
         gp.fit(X, y, batch_size=10, n_iter=10)
         mu2, var2 = gp.predict(grid)

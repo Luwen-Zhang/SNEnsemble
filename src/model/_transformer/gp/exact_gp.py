@@ -89,7 +89,7 @@ if __name__ == "__main__":
     import time
     from base import get_test_case_1d, plot_mu_var_1d
 
-    X, y, grid = get_test_case_1d(100, 1)
+    X, y, grid = get_test_case_1d(100, 1, grid_low=-10, grid_high=10)
 
     torch.manual_seed(0)
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     train_exact_gp(
-        model, likelihood, mll, optimizer, X, y, training_iter=50, verbose=False
+        model, likelihood, mll, optimizer, X, y, training_iter=200, verbose=False
     )
     train_end = time.time()
     mu, var = predict_exact_gp(model, likelihood, grid)
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     torch.manual_seed(0)
     start = time.time()
     gp = ExactGPModel(on_cpu=False)
-    gp.fit(X, y, batch_size=None, n_iter=50)
+    gp.fit(X, y, batch_size=None, n_iter=200)
     train_end = time.time()
     mu, var = gp.predict(grid)
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")

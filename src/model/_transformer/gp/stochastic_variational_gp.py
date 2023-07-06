@@ -49,7 +49,7 @@ class StochasticVariationalModel(AbstractGPyTorch):
     def _record_params(self):
         return [param.clone() for param in self.parameters() if param.requires_grad]
 
-    def _get_optimizer(self, lr=0.01, **kwargs):
+    def _get_optimizer(self, lr=0.1, **kwargs):
         return Adam(
             [
                 {"params": self.gp.parameters()},
@@ -103,7 +103,7 @@ def predict_approx_gp(model, likelihood, grid):
 if __name__ == "__main__":
     import time
 
-    X, y, grid = get_test_case_1d(100, 1)
+    X, y, grid = get_test_case_1d(100, 1, grid_low=-10, grid_high=10)
 
     inducing_points = X[:10, :]
     torch.manual_seed(0)
@@ -116,13 +116,13 @@ if __name__ == "__main__":
             {"params": model.parameters()},
             {"params": likelihood.parameters()},
         ],
-        lr=0.01,
+        lr=0.1,
     )
 
     mll = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=y.size(0))
 
     train_approx_gp(
-        model, likelihood, mll, optimizer, X, y, training_iter=10, batch_size=10
+        model, likelihood, mll, optimizer, X, y, training_iter=500, batch_size=100
     )
     train_end = time.time()
     mu, var = predict_approx_gp(model, likelihood, grid)
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     torch.manual_seed(0)
     start = time.time()
     gp = StochasticVariationalModel(inducing_points=inducing_points, num_data=y.size(0))
-    gp.fit(X, y, batch_size=10, n_iter=10)
+    gp.fit(X, y, batch_size=100, n_iter=500)
     train_end = time.time()
     mu, var = gp.predict(grid)
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
