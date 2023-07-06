@@ -173,6 +173,16 @@ class CycleSplitter(AbstractSplitter):
     than the training set (even much larger in the testing set). If given at least one of "Frequency" and "R-value",
     the splitting is performed for each material and for each combination of frequency-R (instead of only for each
     material).
+
+    Steps of the splitting are:
+    1. Find data points for each material and for each combination of frequency-R.
+    2. In these data points, find 60% points with lower Nf for the training set, and the rest of them are for validation
+       and testing.
+    3. In the 40% part, validation and testing sets are randomly split by train_test_split. If only one point is
+       available, it will be randomly decided as a validation or testing point.
+    4. To prevent over-fitting on the validation set when optimizing hyperparameters, half of the validation set will be
+       randomly selected to be moved to the training set, and the same number of training points are exchanged to the
+       testing set.
     """
 
     def _split(self, df, cont_feature_names, cat_feature_names, label_name):
@@ -227,46 +237,11 @@ class CycleSplitter(AbstractSplitter):
                         continue
                     where_fr = np.where(material_freq_r == fr)[0]
                     fr_cycle = material_cycle[where_fr]
-                    fr_train_indices = where_fr[
-                        fr_cycle <= np.percentile(fr_cycle, train_val_test[0] * 100)
-                    ]
-                    fr_test_val_indices = np.setdiff1d(where_fr, fr_train_indices)
-                    if (
-                        len(fr_test_val_indices)
-                        >= np.sum(train_val_test[1:]) // train_val_test[-1]
-                    ):
-                        fr_val_indices, fr_test_indices = train_test_split(
-                            fr_test_val_indices,
-                            test_size=train_val_test[-1] / np.sum(train_val_test[1:]),
-                            shuffle=True,
-                        )
-                    else:
-                        if np.random.randint(2) == 0:
-                            fr_val_indices = fr_test_val_indices
-                            fr_test_indices = np.array([], dtype=int)
-                        else:
-                            fr_test_indices = fr_test_val_indices
-                            fr_val_indices = np.array([], dtype=int)
-                    # Shuffle the training and validation sets.
-                    n_exchange = len(fr_val_indices) // 2
-                    from_val_to_train = np.random.choice(
-                        fr_val_indices, n_exchange, replace=False
-                    )
-                    from_train_to_val = np.random.choice(
-                        fr_train_indices, n_exchange, replace=False
-                    )
-                    fr_train_indices = np.concatenate(
-                        [
-                            np.setdiff1d(fr_train_indices, from_train_to_val),
-                            from_val_to_train,
-                        ]
-                    )
-                    fr_val_indices = np.concatenate(
-                        [
-                            np.setdiff1d(fr_val_indices, from_val_to_train),
-                            from_train_to_val,
-                        ]
-                    )
+                    (
+                        fr_train_indices,
+                        fr_val_indices,
+                        fr_test_indices,
+                    ) = cls._split_one_fr(where_fr, fr_cycle, train_val_test)
                     """
                     # To make val set further and test set even further, use this:
                     fr_train_indices = where_fr[
@@ -325,13 +300,58 @@ class CycleSplitter(AbstractSplitter):
 
         return np.array(train_indices), np.array(val_indices), np.array(test_indices)
 
+    @classmethod
+    def _split_one_fr(cls, where_fr, fr_cycle, train_val_test):
+        fr_train_indices = np.where(
+            fr_cycle <= np.percentile(fr_cycle, train_val_test[0] * 100)
+        )[0]
+        fr_test_val_indices = np.setdiff1d(np.arange(len(fr_cycle)), fr_train_indices)
+        if len(fr_test_val_indices) >= np.sum(train_val_test[1:]) // train_val_test[-1]:
+            fr_val_indices, fr_test_indices = train_test_split(
+                fr_test_val_indices,
+                test_size=train_val_test[-1] / np.sum(train_val_test[1:]),
+                shuffle=True,
+            )
+        elif len(fr_test_val_indices) > 1:
+            fr_val_indices, fr_test_indices = train_test_split(
+                fr_test_val_indices,
+                test_size=1 / len(fr_test_val_indices),
+                shuffle=True,
+            )
+        else:
+            if np.random.randint(2) == 0:
+                fr_val_indices = fr_test_val_indices
+                fr_test_indices = np.array([], dtype=int)
+            else:
+                fr_test_indices = fr_test_val_indices
+                fr_val_indices = np.array([], dtype=int)
+        # Shuffle the training and validation sets.
+        n_exchange = len(fr_val_indices) // 2
+        from_val_to_train = np.random.choice(fr_val_indices, n_exchange, replace=False)
+        from_train_to_val = np.random.choice(
+            fr_train_indices, n_exchange, replace=False
+        )
+        fr_train_indices = np.concatenate(
+            [
+                np.setdiff1d(fr_train_indices, from_train_to_val),
+                from_val_to_train,
+            ]
+        )
+        fr_val_indices = np.concatenate(
+            [
+                np.setdiff1d(fr_val_indices, from_val_to_train),
+                from_train_to_val,
+            ]
+        )
+        return (
+            where_fr[fr_train_indices],
+            where_fr[fr_val_indices],
+            where_fr[fr_test_indices],
+        )
 
 class RatioCycleSplitter(CycleSplitter):
     """
-    Split the dataset by the material code and the number of cycles to simulate the scenario of prediction using
-    limited data from accelerated fatigue tests. Validation/testing sets contain data that have larger number of cycles
-    than the training set (even much larger in the testing set). Given "R-value", the splitting is performed for each
-    material and for each R.
+    Compared to CycleSplitter, only R-value is considered instead of the combination of R-value and frequency.
     """
 
     @classmethod
