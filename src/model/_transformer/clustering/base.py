@@ -751,6 +751,16 @@ class AbstractSNClustering(nn.Module):
             datamodule.get_zero_slip(col.split("_UNSCALED")[0])
             for col in self.required_cols
         ]
+        self.required_cols_ignore_unscaled = list(
+            sorted(set([x.replace("_UNSCALED", "") for x in self.required_cols]))
+        )
+        self.required_indices_ignore_unscaled = [
+            datamodule.cont_feature_names.index(col)
+            for col in self.required_cols_ignore_unscaled
+        ]
+        self.zero_slip_ignore_unscaled = [
+            datamodule.get_zero_slip(col) for col in self.required_cols_ignore_unscaled
+        ]
         # self.weight = 0.8
         # self.exp_avg_factor = 0.8
         # # Solved by exponential averaging
@@ -778,16 +788,34 @@ class AbstractSNClustering(nn.Module):
     #     else:
     #         return getattr(self, name)
 
-    def extract_cols(self, x, derived_tensors):
+    def extract_cols(self, x, derived_tensors, return_list=False):
         unscaled = derived_tensors["Unscaled"]
-        return {
-            col: x[:, idx] - zero_slip
-            if not col.endswith("_UNSCALED")
-            else unscaled[:, idx]
+        res = [
+            x[:, idx] - zero_slip if not col.endswith("_UNSCALED") else unscaled[:, idx]
             for col, idx, zero_slip in zip(
                 self.required_cols, self.required_indices, self.zero_slip
             )
-        }
+        ]
+        if return_list:
+            return res
+        else:
+            return {col: val for col, val in zip(self.required_cols, res)}
+
+    def extract_cols_ignore_unscaled(self, x, derived_tensors, return_list=False):
+        res = [
+            x[:, idx] - zero_slip
+            for col, idx, zero_slip in zip(
+                self.required_cols_ignore_unscaled,
+                self.required_indices_ignore_unscaled,
+                self.zero_slip_ignore_unscaled,
+            )
+        ]
+        if return_list:
+            return res
+        else:
+            return {
+                col: val for col, val in zip(self.required_cols_ignore_unscaled, res)
+            }
 
     def forward(self, x, clustering_features, derived_tensors):
         required_cols = self.extract_cols(x, derived_tensors)
