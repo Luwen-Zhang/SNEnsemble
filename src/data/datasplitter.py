@@ -349,6 +349,62 @@ class CycleSplitter(AbstractSplitter):
             where_fr[fr_test_indices],
         )
 
+class StrictCycleSplitter(CycleSplitter):
+    """
+    Compared to CycleSplitter, the third step is different:
+
+    3. In the 40% part, data points with lower Nf are selected as the validation set. If only one point isavailable,
+    it will be randomly decided as a validation or testing point. If the number of points is an odd number, the
+    validation set would have one more point than the testing set.
+    """
+
+    @classmethod
+    def _split_one_fr(cls, where_fr, fr_cycle, train_val_test):
+        fr_train_indices = np.where(
+            fr_cycle <= np.percentile(fr_cycle, train_val_test[0] * 100)
+        )[0]
+        fr_test_val_indices = np.setdiff1d(np.arange(len(fr_cycle)), fr_train_indices)
+        if len(fr_test_val_indices) > 1:
+            fr_test_indices = fr_test_val_indices[
+                fr_cycle[fr_test_val_indices]
+                > np.percentile(
+                    fr_cycle[fr_test_val_indices],
+                    train_val_test[-1] / np.sum(train_val_test[1:]) * 100,
+                )
+            ]
+            fr_val_indices = np.setdiff1d(fr_test_val_indices, fr_test_indices)
+        else:
+            if np.random.randint(2) == 0:
+                fr_val_indices = fr_test_val_indices
+                fr_test_indices = np.array([], dtype=int)
+            else:
+                fr_test_indices = fr_test_val_indices
+                fr_val_indices = np.array([], dtype=int)
+        # Shuffle the training and validation sets.
+        n_exchange = len(fr_val_indices) // 2
+        from_val_to_train = np.random.choice(fr_val_indices, n_exchange, replace=False)
+        from_train_to_val = np.random.choice(
+            fr_train_indices, n_exchange, replace=False
+        )
+        fr_train_indices = np.concatenate(
+            [
+                np.setdiff1d(fr_train_indices, from_train_to_val),
+                from_val_to_train,
+            ]
+        )
+        fr_val_indices = np.concatenate(
+            [
+                np.setdiff1d(fr_val_indices, from_val_to_train),
+                from_train_to_val,
+            ]
+        )
+        return (
+            where_fr[fr_train_indices],
+            where_fr[fr_val_indices],
+            where_fr[fr_test_indices],
+        )
+
+
 class RatioCycleSplitter(CycleSplitter):
     """
     Compared to CycleSplitter, only R-value is considered instead of the combination of R-value and frequency.
