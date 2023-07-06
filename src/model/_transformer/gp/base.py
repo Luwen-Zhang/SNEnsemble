@@ -256,8 +256,10 @@ class AbstractGP(nn.Module):
             X = self.request_param(x, "X")
             y = self.request_param(x, "y")
         if self.training and self.optim_hp:
+            self.train()
             self.loss = self._train(X, y)
         if return_prediction:
+            self.eval()
             mu, var = self._predict(X, x)
             mu = self.to_device(mu, device)
             var = self.to_device(var, device)
@@ -372,8 +374,10 @@ class AbstractGPyTorch(AbstractGP):
 
     def _train(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         if isinstance(self.gp, ExactGP):
-            if self.gp.train_targets is None or not torch.allclose(
-                self.gp.train_targets, y.flatten()
+            if (
+                self.gp.train_targets is None
+                or self.gp.train_targets.shape[0] != y.shape[0]
+                or not torch.allclose(self.gp.train_targets, y.flatten())
             ):
                 self.gp.set_train_data(X, y.flatten(), strict=False)
         output = self.gp(X)
