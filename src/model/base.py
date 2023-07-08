@@ -20,6 +20,7 @@ from functools import partial
 from pytorch_lightning import Callback
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from collections.abc import Iterable
+import traceback
 
 
 class AbstractModel:
@@ -540,9 +541,15 @@ class AbstractModel:
                             data["y_val"],
                         )
                     except Exception as e:
+                        print(f"An exception occurs when evaluating a bayes call:")
                         print(
-                            f"An exception occurs when evaluating a bayes call: {e}. Returning a large value instead."
+                            "".join(
+                                traceback.format_exception(
+                                    e.__class__, e, e.__traceback__
+                                )
+                            )
                         )
+                        print(f"Returning a large value instead.")
                         res = 100
                     # If a result from one bayes opt iteration is very large (over 10000) caused by instability of the
                     # model, it can not be fully reproduced during another execution and has error (though small, it
