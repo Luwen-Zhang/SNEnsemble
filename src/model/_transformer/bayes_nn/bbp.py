@@ -119,14 +119,24 @@ class BayesLinearLayer(nn.Module):
 
 
 class HeteroscedasticBBP(nn.Module):
-    def __init__(self, n_inputs, n_outputs, n_hidden, on_cpu=False, **kwargs):
+    def __init__(
+        self, n_inputs, n_outputs, n_hidden, n_layers=2, on_cpu=False, **kwargs
+    ):
         super(HeteroscedasticBBP, self).__init__()
 
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
         # network with two hidden and one output layer
-        self.layer1 = BayesLinearLayer(n_inputs, n_hidden, Gaussian(0, 1))
-        self.layer2 = BayesLinearLayer(n_hidden, 2 * n_outputs, Gaussian(0, 1))
+        self.layers = nn.ModuleList([])
+        for i in range(n_layers):
+            if i == 0:
+                self.layers.append(BayesLinearLayer(n_inputs, n_hidden, Gaussian(0, 1)))
+            elif i == n_layers - 1:
+                self.layers.append(
+                    BayesLinearLayer(n_hidden, 2 * n_outputs, Gaussian(0, 1))
+                )
+            else:
+                self.layers.append(BayesLinearLayer(n_hidden, n_hidden, Gaussian(0, 1)))
 
         # activation to be used between hidden layers
         self.activation = nn.ReLU(inplace=True)
@@ -153,12 +163,12 @@ class HeteroscedasticBBP(nn.Module):
         KL_loss_total = 0
         x = x.view(-1, self.n_inputs)
 
-        x, KL_loss = self.layer1(x)
-        KL_loss_total = KL_loss_total + KL_loss
-        x = self.activation(x)
+        for idx, layer in enumerate(self.layers):
+            x, KL_loss = layer(x)
+            KL_loss_total = KL_loss_total + KL_loss
+            if idx != len(self.layers) - 1:
+                x = self.activation(x)
 
-        x, KL_loss = self.layer2(x)
-        KL_loss_total = KL_loss_total + KL_loss
         x = self.to_device(x, device)
         KL_loss_total = self.to_device(KL_loss_total, device)
         return x, KL_loss_total
