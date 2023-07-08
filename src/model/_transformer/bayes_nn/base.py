@@ -11,7 +11,6 @@ class AbstractBNN(nn.Module):
 
 def get_test_case_1d(
     n_samples=100,
-    n_dim=1,
     noise=0.1,
     sample_std=1,
     grid_low=-5,
@@ -21,7 +20,7 @@ def get_test_case_1d(
 ):
     torch.manual_seed(0)
 
-    X = torch.randn(n_samples, n_dim) / sample_std
+    X = torch.randn(n_samples, 1) / sample_std
     if func is None:
         f = (1 + X + 3 * X**2 + 0.5 * X**3).flatten()
     else:

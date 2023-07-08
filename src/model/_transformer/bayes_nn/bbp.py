@@ -219,7 +219,7 @@ if __name__ == "__main__":
     from torch.utils import data as Data
 
     device = "cuda"
-    X, y, grid = get_test_case_1d(100, 1, grid_low=-3, grid_high=3)
+    X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3)
     torch.manual_seed(0)
     start = time.time()
     net = HeteroscedasticBBP(n_inputs=1, n_outputs=1, n_hidden=10, on_cpu=False)
