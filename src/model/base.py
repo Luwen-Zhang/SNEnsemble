@@ -545,6 +545,20 @@ class AbstractModel:
                             traceback.format_exception(e.__class__, e, e.__traceback__)
                         )
                         if (
+                            model_name == "TabNet"
+                            and "CUDA error: device-side assert triggered"
+                            in joint_trackback
+                        ):
+                            print(
+                                "You are using TabNet and a CUDA device-side assert is triggered. You encountered\n"
+                                "the same issue as I did. For TabNet, it is really weird that under some specific\n"
+                                "situation, during back-propagation, the gradient of its embedding may contain NaN,\n"
+                                "which, in the next step, causes CUDA device-side assert in sparsemax. See these two\n"
+                                "issues:\n"
+                                "https://github.com/dreamquark-ai/tabnet/issues/135\n"
+                                "https://github.com/dreamquark-ai/tabnet/issues/432\n"
+                            )
+                        if (
                             "CUDA error: device-side assert triggered"
                             in joint_trackback
                         ):
