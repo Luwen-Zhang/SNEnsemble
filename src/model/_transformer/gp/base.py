@@ -256,10 +256,13 @@ class AbstractGP(nn.Module):
             self.train()
             self.loss = self._train(X, y)
         if return_prediction:
+            previous = self.training
             self.eval()
             mu, var = self._predict(X, x)
             mu = self.to_device(mu, device)
             var = self.to_device(var, device)
+            if previous:
+                self.train()
             return mu, var
 
     def _prepare_data_for_training(self, x, y):
