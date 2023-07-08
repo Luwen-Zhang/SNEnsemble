@@ -207,7 +207,7 @@ class HeteroscedasticBBP(nn.Module):
             samples.append(preds[:, :1])
             noises.append(preds[:, 1:])
         mean = torch.mean(torch.concat(samples, dim=-1), dim=-1)
-        epistemic_var = torch.var(torch.concat(samples, dim=-1), dim=-1)
+        epistemic_var = torch.var(torch.concat(samples, dim=-1), dim=-1, unbiased=False)
         stds = torch.exp(torch.concat(noises, dim=-1))
         aleatoric_var = torch.mean(stds**2, dim=-1)
         var = epistemic_var + aleatoric_var
