@@ -115,7 +115,9 @@ if __name__ == "__main__":
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
     plot_mu_var_1d(X, y, grid, mu, var)
 
-    X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(10, 10)
+    X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(
+        30, 30, grid_high_x=3, grid_low_x=-3, grid_low_y=-3, grid_high_y=3
+    )
     torch.manual_seed(0)
     start = time.time()
     gp = ExactGPModel(on_cpu=False)

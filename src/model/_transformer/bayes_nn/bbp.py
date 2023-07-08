@@ -215,8 +215,12 @@ class HeteroscedasticBBP(nn.Module):
 
 
 if __name__ == "__main__":
-    from base import get_test_case_1d, plot_mu_var_1d
-    from torch.utils import data as Data
+    from src.model._transformer.gp.base import (
+        get_test_case_1d,
+        plot_mu_var_1d,
+        get_test_case_2d,
+        plot_mu_var_2d,
+    )
 
     device = "cuda"
     X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3)
@@ -226,8 +230,23 @@ if __name__ == "__main__":
     X = X.to(device)
     y = y.to(device)
     net.to(device)
+    net.fit(X, y, n_epoch=5, n_samples=10, batch_size=100)
+    train_end = time.time()
+    mu, var = net.predict(grid.to(device), n_samples=5)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    plot_mu_var_1d(X, y, grid, mu, var)
+
+    X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(
+        30, 30, grid_low_x=-2, grid_high_x=2, grid_low_y=-2, grid_high_y=2
+    )
+    torch.manual_seed(0)
+    start = time.time()
+    net = HeteroscedasticBBP(n_inputs=2, n_outputs=1, n_hidden=20, on_cpu=False)
+    X = X.to(device)
+    y = y.to(device)
+    net.to(device)
     net.fit(X, y, n_epoch=2000, n_samples=10, batch_size=100)
     train_end = time.time()
     mu, var = net.predict(grid.to(device), n_samples=100)
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
-    plot_mu_var_1d(X, y, grid, mu, var)
+    plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
