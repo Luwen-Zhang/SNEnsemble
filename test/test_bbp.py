@@ -224,63 +224,73 @@ class BBP_Heteroscedastic_Model_Wrapper:
         return logliks, rmse
 
 
+def bbp(X, y, grid):
+    torch.manual_seed(0)
+    start = time.time()
+    num_epochs, batch_size, nb_train = 5, X.shape[0], X.shape[0]
+
+    net = BBP_Heteroscedastic_Model_Wrapper(
+        network=BBP_Heteroscedastic_Model(
+            input_dim=X.shape[1], output_dim=1, num_units=10
+        ),
+        learn_rate=1e-2,
+        batch_size=batch_size,
+        no_batches=1,
+    )
+
+    fit_loss_train = np.zeros(num_epochs)
+    KL_loss_train = np.zeros(num_epochs)
+    total_loss = np.zeros(num_epochs)
+
+    for i in range(num_epochs):
+        fit_loss, KL_loss = net.fit(X, y, no_samples=10)
+        fit_loss_train[i] += fit_loss.cpu().data.numpy()
+        KL_loss_train[i] += KL_loss.cpu().data.numpy()
+
+        total_loss[i] = fit_loss_train[i] + KL_loss_train[i]
+
+        if i % 100 == 0 or i == num_epochs - 1:
+            print(
+                "Epoch: %5d/%5d, Fit loss = %7.3f, KL loss = %8.3f"
+                % (i + 1, num_epochs, fit_loss_train[i], KL_loss_train[i])
+            )
+    train_end = time.time()
+    net.network.eval()
+    samples, noises = [], []
+    for i in range(5):
+        preds = net.network.forward(grid)[0]
+        samples.append(preds[:, 0].cpu().data.numpy())
+        noises.append(preds[:, 1].exp().cpu().data.numpy())
+
+    samples = np.array(samples)
+    noises = np.array(noises)
+    means = samples.mean(axis=0)
+
+    aleatoric = (noises**2).mean(axis=0)
+    epistemic = samples.var(axis=0)
+
+    total_unc = aleatoric + epistemic
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    mu1 = torch.tensor(means)
+    var1 = torch.tensor(aleatoric + epistemic)
+
+    torch.manual_seed(0)
+    start = time.time()
+    net2 = HeteroscedasticBBP(
+        n_inputs=X.shape[1], n_outputs=1, n_hidden=10, on_cpu=True
+    )
+    net2.fit(X, y, n_epoch=5, n_samples=10, batch_size=100)
+    train_end = time.time()
+    mu2, var2 = net2.predict(grid, n_samples=5)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+
+    assert torch.allclose(mu1, mu2), f"Means are not consistent"
+    assert torch.allclose(var1, var2), f"Variances are not consistent"
+
+
 class TestBBP(unittest.TestCase):
     def test_bbp(self):
         X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3)
-        torch.manual_seed(0)
-        start = time.time()
-        num_epochs, batch_size, nb_train = 5, X.shape[0], X.shape[0]
-
-        net = BBP_Heteroscedastic_Model_Wrapper(
-            network=BBP_Heteroscedastic_Model(input_dim=1, output_dim=1, num_units=10),
-            learn_rate=1e-2,
-            batch_size=batch_size,
-            no_batches=1,
-        )
-
-        fit_loss_train = np.zeros(num_epochs)
-        KL_loss_train = np.zeros(num_epochs)
-        total_loss = np.zeros(num_epochs)
-
-        for i in range(num_epochs):
-            fit_loss, KL_loss = net.fit(X, y, no_samples=10)
-            fit_loss_train[i] += fit_loss.cpu().data.numpy()
-            KL_loss_train[i] += KL_loss.cpu().data.numpy()
-
-            total_loss[i] = fit_loss_train[i] + KL_loss_train[i]
-
-            if i % 100 == 0 or i == num_epochs - 1:
-                print(
-                    "Epoch: %5d/%5d, Fit loss = %7.3f, KL loss = %8.3f"
-                    % (i + 1, num_epochs, fit_loss_train[i], KL_loss_train[i])
-                )
-        train_end = time.time()
-        net.network.eval()
-        samples, noises = [], []
-        for i in range(5):
-            preds = net.network.forward(grid)[0]
-            samples.append(preds[:, 0].cpu().data.numpy())
-            noises.append(preds[:, 1].exp().cpu().data.numpy())
-
-        samples = np.array(samples)
-        noises = np.array(noises)
-        means = samples.mean(axis=0)
-
-        aleatoric = (noises**2).mean(axis=0)
-        epistemic = samples.var(axis=0)
-
-        total_unc = aleatoric + epistemic
-        print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
-        mu1 = torch.tensor(means)
-        var1 = torch.tensor(aleatoric + epistemic)
-
-        torch.manual_seed(0)
-        start = time.time()
-        net2 = HeteroscedasticBBP(n_inputs=1, n_outputs=1, n_hidden=10, on_cpu=True)
-        net2.fit(X, y, n_epoch=5, n_samples=10, batch_size=100)
-        train_end = time.time()
-        mu2, var2 = net2.predict(grid, n_samples=5)
-        print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
-
-        assert torch.allclose(mu1, mu2), f"Means are not consistent"
-        assert torch.allclose(var1, var2), f"Variances are not consistent"
+        bbp(X, y, grid)
+        X, y, grid, _, _ = get_test_case_2d(10, 10)
+        bbp(X, y, grid)
