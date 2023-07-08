@@ -433,8 +433,7 @@ def get_test_case_1d(
 
 
 def get_test_case_2d(
-    n_samples_x=10,
-    n_samples_y=10,
+    n_samples=10,
     noise=0.1,
     sample_std_x=1,
     sample_std_y=1,
@@ -452,9 +451,9 @@ def get_test_case_2d(
         re_x2 = x2.repeat(1, len(x1)).T
         return torch.vstack([re_x1.flatten(), re_x2.flatten()]).T, re_x1, re_x2
 
-    X1 = torch.randn(n_samples_x) / sample_std_x
-    X2 = torch.randn(n_samples_y) / sample_std_y
-    X, _, _ = make_grid(X1, X2)
+    X1 = torch.randn(n_samples) / sample_std_x
+    X2 = torch.randn(n_samples) / sample_std_y
+    X = torch.vstack([X1, X2]).T
     x1 = X[:, 0]
     x2 = X[:, 1]
     f = (
@@ -470,7 +469,7 @@ def get_test_case_2d(
     return X, y, grid, plot_grid_x, plot_grid_y
 
 
-def plot_mu_var_1d(X, y, grid, mu, var, markersize=2, alpha=0.3):
+def plot_mu_var_1d(X, y, grid, mu, var, markersize=2, alpha=0.3, limit_y=True):
     X = X.detach().cpu().numpy().flatten()
     y = y.detach().cpu().numpy().flatten()
     grid = grid.detach().cpu().numpy().flatten()
@@ -481,13 +480,18 @@ def plot_mu_var_1d(X, y, grid, mu, var, markersize=2, alpha=0.3):
     plt.plot(X, y, ".", markersize=markersize)
     plt.plot(grid, mu)
     plt.fill_between(grid, y1=mu + std, y2=mu - std, alpha=alpha)
+    if limit_y:
+        r = np.max(y) - np.min(y)
+        plt.ylim([np.min(y) - 0.2 * r, np.max(y) + 0.2 * r])
     plt.show()
     plt.close()
 
 
 def plot_mu_var_2d(
-    X, y, grid, mu, var, plot_grid_x, plot_grid_y, markersize=2, alpha=0.3
+    X, y, grid, mu, var, plot_grid_x, plot_grid_y, markersize=2, alpha=0.3, limit_y=True
 ):
+    import copy
+
     X = X.detach().cpu().numpy()
     y = y.detach().cpu().numpy().flatten()
     grid = grid.detach().cpu().numpy()
@@ -497,14 +501,22 @@ def plot_mu_var_2d(
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
     ax.scatter(X[:, 0], X[:, 1], y, ".", c="r", s=markersize)
-    ax.plot_surface(
-        plot_grid_x, plot_grid_y, mu.reshape(*plot_grid_x.shape), alpha=alpha
-    )
-    ax.plot_surface(
-        plot_grid_x, plot_grid_y, (mu + std).reshape(*plot_grid_x.shape), alpha=alpha
-    )
-    ax.plot_surface(
-        plot_grid_x, plot_grid_y, (mu - std).reshape(*plot_grid_x.shape), alpha=alpha
-    )
+    if limit_y:
+        r = np.max(y) - np.min(y)
+        lim = [np.min(y) - 0.2 * r, np.max(y) + 0.2 * r]
+        ax.set_zlim(lim)
+
+    def plot_once(value):
+        cliped = copy.deepcopy(value)
+        if limit_y:
+            cliped[cliped < lim[0]] = np.nan
+            cliped[cliped > lim[1]] = np.nan
+        ax.plot_surface(
+            plot_grid_x, plot_grid_y, cliped.reshape(*plot_grid_x.shape), alpha=alpha
+        )
+
+    plot_once(mu)
+    plot_once(mu + std)
+    plot_once(mu - std)
     plt.show()
     plt.close()

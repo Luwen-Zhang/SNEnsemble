@@ -89,6 +89,7 @@ if __name__ == "__main__":
     import time
     from base import get_test_case_1d, plot_mu_var_1d, get_test_case_2d, plot_mu_var_2d
     import matplotlib.pyplot as plt
+    import src.utils
 
     X, y, grid = get_test_case_1d(100, grid_low=-10, grid_high=10, noise=1)
 
@@ -116,7 +117,7 @@ if __name__ == "__main__":
     plot_mu_var_1d(X, y, grid, mu, var)
 
     X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(
-        30, 30, grid_high_x=3, grid_low_x=-3, grid_low_y=-3, grid_high_y=3
+        100, grid_high_x=3, grid_low_x=-3, grid_low_y=-3, grid_high_y=3
     )
     torch.manual_seed(0)
     start = time.time()

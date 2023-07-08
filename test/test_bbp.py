@@ -292,5 +292,5 @@ class TestBBP(unittest.TestCase):
     def test_bbp(self):
         X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3)
         bbp(X, y, grid)
-        X, y, grid, _, _ = get_test_case_2d(10, 10)
+        X, y, grid, _, _ = get_test_case_2d(10)
         bbp(X, y, grid)

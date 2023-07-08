@@ -83,11 +83,11 @@ class TestGP(unittest.TestCase):
     def test_exact_gp(self):
         X, y, grid = get_test_case_1d(100)
         exact_gp(X, y, grid)
-        X, y, grid, _, _ = get_test_case_2d(10, 10)
+        X, y, grid, _, _ = get_test_case_2d(10)
         exact_gp(X, y, grid)
 
     def test_variational_gp(self):
         X, y, grid = get_test_case_1d(100)
         variational_gp(X, y, grid)
-        X, y, grid, _, _ = get_test_case_2d(10, 10)
+        X, y, grid, _, _ = get_test_case_2d(10)
         variational_gp(X, y, grid)
