@@ -22,6 +22,7 @@ class AbstractClusteringModel(AbstractNN):
         cont_cat_model,
         layers,
         ridge_penalty: float = 0.0,
+        use_gp: bool = True,
         **kwargs,
     ):
         super(AbstractClusteringModel, self).__init__(datamodule, **kwargs)
@@ -33,7 +34,10 @@ class AbstractClusteringModel(AbstractNN):
         self.use_hidden_rep, hidden_rep_dim = self._test_required_model(
             n_inputs, self.cont_cat_model
         )
-        # self.gp = ExactGPModel(dynamic_input=True)
+        if use_gp:
+            self.gp = ExactGPModel(dynamic_input=True)
+        else:
+            self.gp = None
         if not self.use_hidden_rep:
             self.cls_head = get_sequential(
                 [128, 64, 32],
@@ -53,17 +57,20 @@ class AbstractClusteringModel(AbstractNN):
         if isinstance(self.cont_cat_model, nn.Module):
             self.set_requires_grad(self.cont_cat_model, requires_grad=False)
 
-    # def on_train_start(self) -> None:
-    #     super(AbstractClusteringModel, self).on_train_start()
-    #     self.gp.on_train_start()
-    #
-    # def on_train_epoch_start(self) -> None:
-    #     super(AbstractClusteringModel, self).on_train_epoch_start()
-    #     self.gp.on_epoch_start()
-    #
-    # def on_train_epoch_end(self) -> None:
-    #     super(AbstractClusteringModel, self).on_train_epoch_end()
-    #     self.gp.on_epoch_end()
+    def on_train_start(self) -> None:
+        super(AbstractClusteringModel, self).on_train_start()
+        if self.gp is not None:
+            self.gp.on_train_start()
+
+    def on_train_epoch_start(self) -> None:
+        super(AbstractClusteringModel, self).on_train_epoch_start()
+        if self.gp is not None:
+            self.gp.on_epoch_start()
+
+    def on_train_epoch_end(self) -> None:
+        super(AbstractClusteringModel, self).on_train_epoch_end()
+        if self.gp is not None:
+            self.gp.on_epoch_end()
 
     def _forward(self, x, derived_tensors):
         # Prediction of deep learning models.
@@ -78,19 +85,14 @@ class AbstractClusteringModel(AbstractNN):
         )
         # Projection from hidden output to deep learning weights
         dl_weight = self.cls_head_normalize(self.cls_head(hidden))
-        # gp_input = torch.concat(
-        #     [
-        #         val.view(-1, 1)
-        #         for val in self.clustering_sn_model.extract_cols_ignore_unscaled(
-        #             x, derived_tensors, return_list=True
-        #         )
-        #         + [self.clustering_sn_model.x_cluster]
-        #     ],
-        #     dim=1,
-        # )
-        # mu, var = self.gp(hidden, dl_weight)
-        # Weighted sum of prediction
-        out = phy_pred + torch.mul(dl_weight, dl_pred - phy_pred)
+        if self.gp is not None:
+            mu, var = self.gp(hidden, dl_weight)
+            std = torch.sqrt(mu)
+            uncertain_dl_weight = torch.clamp(dl_weight - std.view(-1, 1), min=1e-8)
+            out = phy_pred + torch.mul(uncertain_dl_weight, dl_pred - phy_pred)
+        else:
+            # Weighted sum of prediction
+            out = phy_pred + torch.mul(dl_weight, dl_pred - phy_pred)
         self.dl_pred = dl_pred
         self.phy_pred = phy_pred
         self.dl_weight = dl_weight
@@ -134,7 +136,8 @@ class AbstractClusteringModel(AbstractNN):
         ) + torch.mul(
             torch.sum(torch.mul(ridge_weight, ridge_weight)), self.ridge_penalty
         )
-        # self.gp_loss = self.gp.loss
+        if self.gp is not None:
+            self.gp_loss = self.gp.loss
         return self.output_loss
 
     def configure_optimizers(self):
@@ -148,18 +151,25 @@ class AbstractClusteringModel(AbstractNN):
             lr=0.8,
             weight_decay=0,
         )
-        # gp_optimizer = self.gp._get_optimizer(**self.gp.kwargs)
         lstsq_optimizer = [sn.get_optimizer() for sn in self.clustering_sn_model.sns]
-        # return [all_optimizer, ridge_optimizer, gp_optimizer] + lstsq_optimizer
-        return [all_optimizer, ridge_optimizer] + lstsq_optimizer
+        if self.gp is not None:
+            gp_optimizer = self.gp._get_optimizer(**self.gp.kwargs)
+            return [all_optimizer, ridge_optimizer, gp_optimizer] + lstsq_optimizer
+        else:
+            return [all_optimizer, ridge_optimizer] + lstsq_optimizer
 
     def cal_backward_step(self, loss):
         optimizers = self.optimizers()
-        all_optimizer = optimizers[0]
-        ridge_optimizer = optimizers[1]
-        # gp_optimizer = optimizers[2]
-        # lstsq_optimizers = optimizers[3:]
-        lstsq_optimizers = optimizers[2:]
+        if self.gp is not None:
+            all_optimizer = optimizers[0]
+            ridge_optimizer = optimizers[1]
+            gp_optimizer = optimizers[2]
+            lstsq_optimizers = optimizers[3:]
+        else:
+            all_optimizer = optimizers[0]
+            ridge_optimizer = optimizers[1]
+            lstsq_optimizers = optimizers[2:]
+            gp_optimizer = None
         # The following commented zero_grad() operations are not necessary because `inputs`s are specified and no other
         # gradient is calculated.
         # 1st back-propagation: for deep learning weights.
@@ -180,10 +190,11 @@ class AbstractClusteringModel(AbstractNN):
             retain_graph=True,
             inputs=self.clustering_sn_model.running_sn_weight,
         )
-        # if self.gp.optim_hp:
-        #     self.manual_backward(
-        #         self.gp_loss, retain_graph=True, inputs=list(self.gp.parameters())
-        #     )
+        if self.gp is not None:
+            if self.gp.optim_hp:
+                self.manual_backward(
+                    self.gp_loss, retain_graph=True, inputs=list(self.gp.parameters())
+                )
         # self.cont_cat_model.zero_grad()
         # self.clustering_sn_model.sns.zero_grad()
 
@@ -205,8 +216,9 @@ class AbstractClusteringModel(AbstractNN):
         for optimizer in lstsq_optimizers:
             optimizer.step()
         ridge_optimizer.step()
-        # if self.gp.optim_hp:
-        #     gp_optimizer.step()
+        if self.gp is not None:
+            if self.gp.optim_hp:
+                gp_optimizer.step()
 
     @staticmethod
     def basic_clustering_features_idx(datamodule) -> np.ndarray:
