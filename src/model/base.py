@@ -541,14 +541,22 @@ class AbstractModel:
                             data["y_val"],
                         )
                     except Exception as e:
-                        print(f"An exception occurs when evaluating a bayes call:")
-                        print(
-                            "".join(
-                                traceback.format_exception(
-                                    e.__class__, e, e.__traceback__
-                                )
-                            )
+                        joint_trackback = "".join(
+                            traceback.format_exception(e.__class__, e, e.__traceback__)
                         )
+                        if (
+                            "CUDA error: device-side assert triggered"
+                            in joint_trackback
+                        ):
+                            raise ValueError(
+                                "A CUDA device-side assert is triggered. Unfortunately, CUDA device-side assert will\n"
+                                "make the entire GPU session not accessible, the whole hyperparameter optimization\n"
+                                "process is invalid, and the final model training raises an exception. The error is\n"
+                                "just re-raised because currently there is no way to restart the GPU session and\n"
+                                "continue the HPO process. Please tell me if there is a solution."
+                            )
+                        print(f"An exception occurs when evaluating a bayes call:")
+                        print(joint_trackback)
                         print(f"Returning a large value instead.")
                         res = 100
                     # If a result from one bayes opt iteration is very large (over 10000) caused by instability of the
