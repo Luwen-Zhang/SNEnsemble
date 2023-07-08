@@ -290,6 +290,7 @@ class AbstractGP(nn.Module):
         y: torch.Tensor,
         batch_size: int = None,
         n_iter: int = None,
+        verbose_per_epoch: int = None,
     ):
         self.on_train_start()
         self.train()
@@ -307,6 +308,9 @@ class AbstractGP(nn.Module):
                 self._train_step(x, y_hat)
                 if n_iter is not None:
                     self.optim_step()
+            if verbose_per_epoch is not None and n_iter is not None:
+                if i_iter % verbose_per_epoch == 0 or i_iter == n_iter - 1:
+                    print(f"{i_iter+1}/{n_iter}")
             self.on_epoch_end()
 
     def _train_step(self, x, y):
@@ -397,7 +401,7 @@ class AbstractGPyTorch(AbstractGP):
 
 def get_test_case_1d(
     n_samples=100,
-    noise=0.1,
+    noise=1,
     sample_std=1,
     grid_low=-5,
     grid_high=5,
@@ -408,7 +412,11 @@ def get_test_case_1d(
 
     X = torch.randn(n_samples, 1) / sample_std
     if func is None:
-        f = (1 + X + 3 * X**2 + 0.5 * X**3).flatten()
+        f = (
+            3 * (1 - X) ** 2 * torch.exp(-(X**2) - 1)
+            - 10 * (X / 5 - X**3) * torch.exp(-(X**2))
+            - 1 / 3 * torch.exp(-((X + 1) ** 2))
+        ).flatten()
     else:
         f = func(X).flatten()
     if f.shape[0] != n_samples:
@@ -419,6 +427,44 @@ def get_test_case_1d(
     y = y[:, None]
     grid = torch.linspace(grid_low, grid_high, n_grid)[:, None]
     return X, y, grid
+
+
+def get_test_case_2d(
+    n_samples_x=10,
+    n_samples_y=10,
+    noise=0.1,
+    sample_std_x=1,
+    sample_std_y=1,
+    grid_low_x=-3,
+    grid_high_x=3,
+    grid_low_y=-3,
+    grid_high_y=3,
+    n_grid_x=100,
+    n_grid_y=100,
+):
+    torch.manual_seed(0)
+
+    def make_grid(x1, x2):
+        re_x1 = x1.repeat(1, len(x2))
+        re_x2 = x2.repeat(1, len(x1)).T
+        return torch.vstack([re_x1.flatten(), re_x2.flatten()]).T, re_x1, re_x2
+
+    X1 = torch.randn(n_samples_x) / sample_std_x
+    X2 = torch.randn(n_samples_y) / sample_std_y
+    X, _, _ = make_grid(X1, X2)
+    x1 = X[:, 0]
+    x2 = X[:, 1]
+    f = (
+        3 * (1 - x1) ** 2 * torch.exp(-(x1**2) - (x2 + 1) ** 2)
+        - 10 * (x1 / 5 - x1**3 - x2**5) * torch.exp(-(x1**2) - x2**2)
+        - 1 / 3 * torch.exp(-((x1 + 1) ** 2) - x2**2)
+    )
+    y = f + torch.randn_like(f) * noise
+    y = y[:, None]
+    grid_x1 = torch.linspace(grid_low_x, grid_high_x, n_grid_x)[:, None]
+    grid_x2 = torch.linspace(grid_low_y, grid_high_y, n_grid_y)[:, None]
+    grid, plot_grid_x, plot_grid_y = make_grid(grid_x1, grid_x2)
+    return X, y, grid, plot_grid_x, plot_grid_y
 
 
 def plot_mu_var_1d(X, y, grid, mu, var, markersize=2, alpha=0.3):
@@ -432,5 +478,30 @@ def plot_mu_var_1d(X, y, grid, mu, var, markersize=2, alpha=0.3):
     plt.plot(X, y, ".", markersize=markersize)
     plt.plot(grid, mu)
     plt.fill_between(grid, y1=mu + std, y2=mu - std, alpha=alpha)
+    plt.show()
+    plt.close()
+
+
+def plot_mu_var_2d(
+    X, y, grid, mu, var, plot_grid_x, plot_grid_y, markersize=2, alpha=0.3
+):
+    X = X.detach().cpu().numpy()
+    y = y.detach().cpu().numpy().flatten()
+    grid = grid.detach().cpu().numpy()
+    mu = mu.detach().cpu().numpy().flatten()
+    var = var.detach().cpu().numpy().flatten()
+    std = np.sqrt(var)
+    fig = plt.figure()
+    ax = fig.add_subplot(projection="3d")
+    ax.scatter(X[:, 0], X[:, 1], y, ".", c="r", s=markersize)
+    ax.plot_surface(
+        plot_grid_x, plot_grid_y, mu.reshape(*plot_grid_x.shape), alpha=alpha
+    )
+    ax.plot_surface(
+        plot_grid_x, plot_grid_y, (mu + std).reshape(*plot_grid_x.shape), alpha=alpha
+    )
+    ax.plot_surface(
+        plot_grid_x, plot_grid_y, (mu - std).reshape(*plot_grid_x.shape), alpha=alpha
+    )
     plt.show()
     plt.close()

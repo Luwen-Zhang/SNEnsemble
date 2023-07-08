@@ -21,7 +21,7 @@ from src.model._transformer.gp.base import get_test_case_1d, plot_mu_var_1d
 
 class TestGP(unittest.TestCase):
     def test_exact_gp(self):
-        X, y, grid = get_test_case_1d(100, 1)
+        X, y, grid = get_test_case_1d(100)
 
         torch.manual_seed(0)
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
@@ -48,7 +48,7 @@ class TestGP(unittest.TestCase):
         assert torch.allclose(var1, var2), f"Variances are not consistent"
 
     def test_variational_gp(self):
-        X, y, grid = get_test_case_1d(100, 1)
+        X, y, grid = get_test_case_1d(100)
 
         inducing_points = X[:10, :]
         torch.manual_seed(0)
