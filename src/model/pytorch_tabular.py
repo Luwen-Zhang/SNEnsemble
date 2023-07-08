@@ -217,17 +217,15 @@ class PytorchTabular(AbstractModel):
             ]
             + self.trainer.SPACE,
             "TabNet": [
-                Integer(low=4, high=64, prior="uniform", name="n_d", dtype=int),  # 8
-                Integer(low=4, high=64, prior="uniform", name="n_a", dtype=int),  # 8
+                Integer(low=4, high=16, prior="uniform", name="n_d", dtype=int),  # 8
+                Integer(low=4, high=16, prior="uniform", name="n_a", dtype=int),  # 8
+                Integer(low=1, high=6, prior="uniform", name="n_steps", dtype=int),  # 3
+                Real(low=1.0, high=1.5, prior="uniform", name="gamma"),  # 1.3
                 Integer(
-                    low=3, high=10, prior="uniform", name="n_steps", dtype=int
-                ),  # 3
-                Real(low=1.0, high=2.0, prior="uniform", name="gamma"),  # 1.3
-                Integer(
-                    low=1, high=5, prior="uniform", name="n_independent", dtype=int
+                    low=1, high=4, prior="uniform", name="n_independent", dtype=int
                 ),  # 2
                 Integer(
-                    low=1, high=5, prior="uniform", name="n_shared", dtype=int
+                    low=1, high=4, prior="uniform", name="n_shared", dtype=int
                 ),  # 2
             ]
             + self.trainer.SPACE,
