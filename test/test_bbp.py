@@ -7,7 +7,7 @@ from torch.autograd import Variable
 import torch
 import time
 from src.model._transformer.gp.base import get_test_case_1d, get_test_case_2d
-from src.model._transformer.bayes_nn.bbp import HeteroscedasticBBP
+from src.model._transformer.bayes_nn.bbp import BayesByBackprop
 
 
 def to_variable(var=(), cuda=True, volatile=False):
@@ -187,41 +187,24 @@ class BBP_Heteroscedastic_Model_Wrapper:
         # reset gradient and total loss
         self.optimizer.zero_grad()
         fit_loss_total = 0
-
+        KL_loss_total = 0
         for i in range(no_samples):
-            output, KL_loss_total = self.network(x)
+            output, KL_loss = self.network(x)
 
             # calculate fit loss based on mean and standard deviation of output
-            fit_loss = self.loss_func(output[:, :1], y, output[:, 1:].exp(), 1)
-            fit_loss_total = fit_loss_total + fit_loss
+            fit_loss = (
+                log_gaussian_loss(output[:, :1], y, output[:, 1:].exp(), 1) / x.shape[0]
+            )
+            fit_loss_total = fit_loss_total + fit_loss / no_samples
+            KL_loss_total = (
+                KL_loss_total + KL_loss / self.no_batches / x.shape[0] / no_samples
+            )
 
-        KL_loss_total = KL_loss_total / self.no_batches
-        total_loss = (fit_loss_total + KL_loss_total) / (no_samples * x.shape[0])
+        total_loss = fit_loss_total + KL_loss_total
         total_loss.backward()
         self.optimizer.step()
 
-        return fit_loss_total / no_samples, KL_loss_total
-
-    def get_loss_and_rmse(self, x, y, no_samples):
-        x, y = to_variable(var=(x, y), cuda=False)
-
-        means, stds = [], []
-        for i in range(no_samples):
-            output, KL_loss_total = self.network(x)
-            means.append(output[:, :1, None])
-            stds.append(output[:, 1:, None].exp())
-
-        means, stds = torch.cat(means, 2), torch.cat(stds, 2)
-        mean = means.mean(dim=2)
-        std = (means.var(dim=2) + stds.mean(dim=2) ** 2) ** 0.5
-
-        # calculate fit loss based on mean and standard deviation of output
-        logliks = self.loss_func(
-            output[:, :1], y, output[:, 1:].exp(), 1, sum_reduce=False
-        )
-        rmse = float((((mean - y) ** 2).mean() ** 0.5).cpu().data)
-
-        return logliks, rmse
+        return fit_loss_total, KL_loss_total
 
 
 def bbp(X, y, grid):
@@ -276,10 +259,10 @@ def bbp(X, y, grid):
 
     torch.manual_seed(0)
     start = time.time()
-    net2 = HeteroscedasticBBP(
-        n_inputs=X.shape[1], n_outputs=1, n_hidden=10, on_cpu=True
+    net2 = BayesByBackprop(
+        n_inputs=X.shape[1], n_outputs=1, n_hidden=10, on_cpu=True, eps=0.0
     )
-    net2.fit(X, y, n_epoch=5, n_samples=10, batch_size=100)
+    net2.fit(X, y, n_epoch=5, n_samples=10, batch_size=None)
     train_end = time.time()
     mu2, var2 = net2.predict(grid, n_samples=5)
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
