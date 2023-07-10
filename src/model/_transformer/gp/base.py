@@ -378,12 +378,7 @@ class AbstractGPyTorch(AbstractGP):
 
     def _train(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         if isinstance(self.gp, ExactGP):
-            if (
-                self.gp.train_targets is None
-                or self.gp.train_targets.shape[0] != y.shape[0]
-                or not torch.allclose(self.gp.train_targets, y.flatten())
-            ):
-                self.gp.set_train_data(X, y.flatten(), strict=False)
+            self.gp.set_train_data(X, y.flatten(), strict=False)
         output = self.gp(X)
         return -self.loss_func(output, y.flatten())
 
