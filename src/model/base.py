@@ -1,5 +1,6 @@
 import os
 import pickle
+import warnings
 import numpy as np
 import pandas as pd
 import torch.optim.optimizer
@@ -282,6 +283,33 @@ class AbstractModel:
         """
         set_random_seed(src.setting["random_seed"])
         required_models = self._get_required_models(model_name=model_name)
+        if "batch_size" in kwargs.keys():
+            batch_size = kwargs["batch_size"]
+            n_train = len(self.trainer.train_indices)
+            limit_batch_size = src.setting["limit_batch_size"]
+            if limit_batch_size == -1:
+                if 1 < n_train % batch_size < 4 or batch_size < 4:
+                    warnings.warn(
+                        f"Using batch_size={batch_size} and len(training set)={n_train}, which will make the mini "
+                        f"batch extremely small. A very small batch may cause unexpected numerical issue, especially "
+                        f"for TabNet. However, the global setting `limit_batch_size` is set to -1."
+                    )
+                if n_train % batch_size == 1:
+                    raise Exception(
+                        f"Using batch_size={batch_size} and len(training set)={n_train}, which will make the "
+                        f"mini batch illegal. However, the global setting `limit_batch_size` is set to -1."
+                    )
+            if -1 < limit_batch_size < 2:
+                warnings.warn(
+                    f"limit_batch_size={limit_batch_size} is illegal. Use limit_batch_size=2 instead."
+                )
+                limit_batch_size = 2
+            if n_train % batch_size < limit_batch_size or batch_size < limit_batch_size:
+                warnings.warn(
+                    f"Using batch_size={batch_size} and len(training set)={n_train}, which will make the mini batch "
+                    f"smaller than limit_batch_size={limit_batch_size}. Using batch_size={n_train} instead."
+                )
+                kwargs["batch_size"] = n_train
         if required_models is not None:
             kwargs["required_models"] = required_models
         return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
@@ -551,10 +579,10 @@ class AbstractModel:
                         ):
                             print(
                                 "You are using TabNet and a CUDA device-side assert is triggered. You encountered\n"
-                                "the same issue as I did. For TabNet, it is really weird that under some specific\n"
-                                "situation, during back-propagation, the gradient of its embedding may contain NaN,\n"
-                                "which, in the next step, causes CUDA device-side assert in sparsemax. See these two\n"
-                                "issues:\n"
+                                "the same issue as I did. For TabNet, it is really weird that if a batch is extremely\n"
+                                "small (less than 5 maybe), during back-propagation, the gradient of its embedding\n"
+                                "may contain NaN, which, in the next step, causes CUDA device-side assert in\n"
+                                "sparsemax. See these two issues:\n"
                                 "https://github.com/dreamquark-ai/tabnet/issues/135\n"
                                 "https://github.com/dreamquark-ai/tabnet/issues/432\n"
                             )
@@ -571,6 +599,8 @@ class AbstractModel:
                             )
                         print(f"An exception occurs when evaluating a bayes call:")
                         print(joint_trackback)
+                        print("with the following parameters:")
+                        print(params)
                         print(f"Returning a large value instead.")
                         res = 100
                     # If a result from one bayes opt iteration is very large (over 10000) caused by instability of the

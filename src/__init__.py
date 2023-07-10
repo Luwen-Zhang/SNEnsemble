@@ -21,6 +21,10 @@ setting = dict(
     # Debug mode might change behaviors of models. By default, epoch will be set to 2, n_calls to minimum, and
     # bayes_epoch to 1.
     debug_mode=False,
+    # If batch_size // len(training set) < limit_batch_size, the batch_size is forced to be len(training set) to avoid
+    # potential numerical issue. For Tabnet, this is extremely important because a small batch may cause NaNs and
+    # further CUDA device-side assert in the sparsemax function. Set to -1 to turn off this check (NOT RECOMMENDED!!).
+    limit_batch_size=8,
     # Default paths to configure trainers, data modules, and models.
     default_output_path="output",
     default_config_path="configs",
@@ -29,6 +33,12 @@ setting = dict(
 
 if setting["debug_mode"]:
     warnings.warn("The debug mode is activated. Please confirm whether it is desired.")
+
+if setting["limit_batch_size"] == -1:
+    warnings.warn(
+        "limit_batch_size is disabled, which is not recommended. A very small batch may cause unexpected "
+        "numerical issue, especially for TabNet."
+    )
 
 
 def check_grad_in_loss():
