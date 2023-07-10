@@ -94,6 +94,8 @@ class AbstractClusteringModel(AbstractNN):
             std = torch.sqrt(var)
             uncertain_dl_weight = torch.clamp(dl_weight - std.view(-1, 1), min=1e-8)
             self.uncertain_dl_weight = uncertain_dl_weight
+            self.mu = mu
+            self.std = std
             out = phy_pred + torch.mul(uncertain_dl_weight, dl_pred - phy_pred)
         else:
             # Weighted sum of prediction

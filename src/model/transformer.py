@@ -597,6 +597,88 @@ class Transformer(TorchModel):
         derived_data = self.datamodule.sort_derived_data(derived_data)
         return df, derived_data, self.datamodule
 
+    def inspect_attr(self, model_name):
+        data = self.trainer.datamodule
+        model = self.model[model_name]
+        target_attr = ["dl_weight", "dl_pred", "phy_pred"]
+        if not hasattr(model, "dl_weight"):
+            raise Exception(
+                f"The model does not have the attribute `dl_weight`. Is it trained?"
+            )
+        if hasattr(model, "uncertain_dl_weight"):
+            target_attr += ["uncertain_dl_weight", "mu", "std"]
+        inspect_dict = {part: {} for part in ["train", "val", "test"]}
+        for X, D, part in [
+            (data.X_train, data.D_train, "train"),
+            (data.X_val, data.D_val, "val"),
+            (data.X_test, data.D_test, "test"),
+        ]:
+            self._predict(X, derived_data=D, model_name=model_name, model=model)
+            for attr in target_attr:
+                inspect_dict[part][attr] = getattr(model, attr).detach().cpu().numpy()
+        return inspect_dict
+
+    def plot_uncertain_dl_weight(self, inspect_dict, save_to=None):
+        import matplotlib.ticker as ticker
+
+        def plot_once(dl_weight, mu, std, title, ax):
+            sorted_idx = np.argsort(dl_weight.flatten())
+            x = np.arange(1, len(dl_weight) + 1)
+            ax.scatter(
+                x,
+                dl_weight[sorted_idx],
+                c="#D81159",
+                label="Truth",
+            )
+            ax.errorbar(
+                x,
+                mu[sorted_idx],
+                yerr=std[sorted_idx],
+                fmt="co",
+                mfc="#0496FF",
+                mec="#0496FF",
+                ecolor="#0496FF",
+                # capsize=5,
+                label="GPR prediction (±std)",
+            )
+            ax.legend(fontsize="x-small", loc="upper left")
+            ax.set_title(title)
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
+            ax.set_xlim([0.5, len(dl_weight) + 1.5])
+            ax.set_ylim([0, 1])
+
+        def plot_part(part_dict, title, ax):
+            dl_weight, mu, std = (
+                part_dict["dl_weight"],
+                part_dict["mu"],
+                part_dict["std"],
+            )
+            plot_once(dl_weight, mu, std, title, ax)
+
+        fig = plt.figure(figsize=(12, 4))
+        ax = plt.subplot(131)
+        plot_part(inspect_dict["train"], "Training set", ax)
+        ax = plt.subplot(132)
+        plot_part(inspect_dict["val"], "Validation set", ax)
+        ax = plt.subplot(133)
+        plot_part(inspect_dict["test"], "Testing set", ax)
+        ax = fig.add_subplot(111, frameon=False)
+        plt.tick_params(
+            labelcolor="none",
+            which="both",
+            top=False,
+            bottom=False,
+            left=False,
+            right=False,
+        )
+        ax.set_ylabel("Deep learning weight")
+        ax.set_xlabel("Indices of data points (sorted by the target value)")
+        plt.tight_layout()
+        if save_to is not None:
+            plt.savefig(save_to, dpi=500)
+        plt.show()
+        plt.close()
+
     # def _bayes_eval(
     #     self,
     #     model,

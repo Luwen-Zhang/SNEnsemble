@@ -473,7 +473,12 @@ class AbstractModel:
         return predictions
 
     def _predict(
-        self, df: pd.DataFrame, model_name: str, derived_data: Dict = None, **kwargs
+        self,
+        df: pd.DataFrame,
+        model_name: str,
+        derived_data: Dict = None,
+        model: Any = None,
+        **kwargs,
     ) -> np.ndarray:
         """
         Make prediction based on a tabular dataset using the selected model.
@@ -483,9 +488,12 @@ class AbstractModel:
         df:
             A new tabular dataset that has the same structure as self.trainer.datamodule.X_test.
         model_name:
-            A name of a selected model, which is already trained.
+            A name of a selected model, which is already trained. It is used to process the input data if any specific
+            routine is defined for this model.
         derived_data:
             Data derived from datamodule.derive that has the same structure as self.trainer.datamodule.D_test.
+        model:
+            The `model_name` model. If None, the model will be loaded from self.model.
         **kwargs:
             Ignored.
 
@@ -497,7 +505,7 @@ class AbstractModel:
         self.trainer.set_status(training=False)
         X_test = self._data_preprocess(df, derived_data, model_name=model_name)
         return self._pred_single_model(
-            self.model[model_name],
+            self.model[model_name] if model is None else model,
             X_test=X_test,
             verbose=False,
         )
