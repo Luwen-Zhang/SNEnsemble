@@ -78,6 +78,7 @@ class PytorchTabular(AbstractModel):
         del legal_kwargs["lr"]
         del legal_kwargs["weight_decay"]
         del legal_kwargs["batch_size"]
+        del legal_kwargs["original_batch_size"]
         for key in legal_kwargs.keys():
             if type(legal_kwargs[key]) in [np.str_, np.int_]:
                 try:

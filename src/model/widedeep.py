@@ -239,6 +239,7 @@ class WideDeep(AbstractModel):
         del model_args["lr"]
         del model_args["weight_decay"]
         del model_args["batch_size"]
+        del model_args["original_batch_size"]
         args = dict(
             column_idx=self.tab_preprocessor.column_idx,
             continuous_cols=cont_feature_names,

@@ -22,6 +22,7 @@ from pytorch_lightning import Callback
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from collections.abc import Iterable
 import traceback
+import math
 
 
 class AbstractModel:
@@ -71,6 +72,16 @@ class AbstractModel:
         self.model_params = {}
         self._check_space()
         self._mkdir()
+
+        # If batch_size // len(training set) < limit_batch_size, the batch_size is forced to be len(training set) to avoid
+        # potential numerical issue. For Tabnet, this is extremely important because a small batch may cause NaNs and
+        # further CUDA device-side assert in the sparsemax function. Set to -1 to turn off this check (NOT RECOMMENDED!!).
+        # Note: Setting drop_last=True for torch.utils.data.DataLoader is fine, but I think (i) having access to all data
+        # points in one epoch is beneficial for some models, (ii) If using a large dataset and a large batch_size, it is
+        # possible that the last batch is so large that contains essential information, (iii) the user should have full
+        # control for this. If you want to use drop_last in your code, use the original_batch_size in kwargs passed to
+        # AbstractModel methods.
+        self.limit_batch_size = 6
 
     @property
     def device(self):
@@ -285,19 +296,20 @@ class AbstractModel:
         required_models = self._get_required_models(model_name=model_name)
         if "batch_size" in kwargs.keys():
             batch_size = kwargs["batch_size"]
+            kwargs["original_batch_size"] = batch_size
             n_train = len(self.trainer.train_indices)
-            limit_batch_size = src.setting["limit_batch_size"]
+            limit_batch_size = self.limit_batch_size
             if limit_batch_size == -1:
                 if 1 < n_train % batch_size < 4 or batch_size < 4:
                     warnings.warn(
                         f"Using batch_size={batch_size} and len(training set)={n_train}, which will make the mini "
                         f"batch extremely small. A very small batch may cause unexpected numerical issue, especially "
-                        f"for TabNet. However, the global setting `limit_batch_size` is set to -1."
+                        f"for TabNet. However, the attribute `limit_batch_size` is set to -1."
                     )
                 if n_train % batch_size == 1:
                     raise Exception(
                         f"Using batch_size={batch_size} and len(training set)={n_train}, which will make the "
-                        f"mini batch illegal. However, the global setting `limit_batch_size` is set to -1."
+                        f"mini batch illegal. However, the attribute `limit_batch_size` is set to -1."
                     )
             if -1 < limit_batch_size < 2:
                 warnings.warn(
@@ -305,11 +317,15 @@ class AbstractModel:
                 )
                 limit_batch_size = 2
             if n_train % batch_size < limit_batch_size or batch_size < limit_batch_size:
+                if n_train % batch_size < limit_batch_size:
+                    new_batch_size = int(math.ceil(n_train / (n_train // batch_size)))
+                else:
+                    new_batch_size = n_train
                 warnings.warn(
                     f"Using batch_size={batch_size} and len(training set)={n_train}, which will make the mini batch "
-                    f"smaller than limit_batch_size={limit_batch_size}. Using batch_size={n_train} instead."
+                    f"smaller than limit_batch_size={limit_batch_size}. Using batch_size={new_batch_size} instead."
                 )
-                kwargs["batch_size"] = n_train
+                kwargs["batch_size"] = new_batch_size
         if required_models is not None:
             kwargs["required_models"] = required_models
         return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
