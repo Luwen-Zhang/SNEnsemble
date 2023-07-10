@@ -300,6 +300,7 @@ class CycleSplitter(AbstractSplitter):
             where_fr[fr_test_indices],
         )
 
+
 class StrictCycleSplitter(CycleSplitter):
     """
     Compared to CycleSplitter, the third step is different:
@@ -336,6 +337,46 @@ class StrictCycleSplitter(CycleSplitter):
             where_fr[fr_val_indices],
             where_fr[fr_test_indices],
         )
+
+
+class StressCycleSplitter(StrictCycleSplitter):
+    def _split(self, df, cont_feature_names, cat_feature_names, label_name):
+        self._check_exist(df, "Material_Code", "Material_Code")
+        mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
+        mat_lay_set = list(sorted(set(mat_lay)))
+        if "log(Cycles to Failure)" not in label_name:
+            raise Exception(
+                f"{self.__class__.__name__} requires log(Cycles to Failure) being the target, but only {label_name} exist."
+            )
+        cycle = df["log(Cycles to Failure)"].values.flatten()
+        max_stress = df["Maximum Stress"].values.flatten()
+        freq = df["Frequency"].values.flatten() if "Frequency" in df.columns else None
+        r_value = df["R-value"].values.flatten() if "R-value" in df.columns else None
+        min_stress = max_stress * r_value
+        peak_stress = np.max(
+            np.abs(np.vstack([max_stress, min_stress]).T), axis=1
+        ).flatten()
+        peak_stress = np.nan_to_num(peak_stress, nan=float(np.nanmax(peak_stress)))
+        cycle_stress = np.linalg.norm(
+            np.vstack([cycle, np.log10(peak_stress)]).T - np.array([10, 0]),
+            axis=1,
+        )
+        inv_cycle_stress = np.max(cycle_stress) - cycle_stress
+
+        train_indices, val_indices, test_indices = self.split_method(
+            mat_lay_set,
+            mat_lay,
+            inv_cycle_stress,
+            self.train_val_test,
+            freq=freq,
+            r_value=r_value,
+        )
+
+        np.random.shuffle(train_indices)
+        np.random.shuffle(val_indices)
+        np.random.shuffle(test_indices)
+
+        return np.array(train_indices), np.array(val_indices), np.array(test_indices)
 
 
 class RatioCycleSplitter(CycleSplitter):
