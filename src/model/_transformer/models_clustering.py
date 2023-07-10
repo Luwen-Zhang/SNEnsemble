@@ -1,3 +1,4 @@
+import src
 from .models_with_seq import CatEmbedSeqNN
 from ..base import AbstractNN, get_linear, get_sequential, AbstractModel
 import numpy as np
@@ -36,6 +37,9 @@ class AbstractClusteringModel(AbstractNN):
         )
         if use_gp:
             self.gp = ExactGPModel(dynamic_input=True)
+            import gpytorch
+
+            gpytorch.settings.debug._set_state(src.setting["debug_mode"])
         else:
             self.gp = None
         if not self.use_hidden_rep:
