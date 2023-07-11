@@ -237,13 +237,14 @@ class AbstractBNN(nn.Module):
 
     def predict(self, X, n_samples=100):
         samples, noises = [], []
-        for i in range(n_samples):
-            preds = self._predict_step(X)
-            if self.type == "hete":
-                samples.append(preds[:, :1])
-                noises.append(preds[:, 1:])
-            else:
-                samples.append(preds)
+        with torch.no_grad():
+            for i in range(n_samples):
+                preds = self._predict_step(X)
+                if self.type == "hete":
+                    samples.append(preds[:, :1])
+                    noises.append(preds[:, 1:])
+                else:
+                    samples.append(preds)
         mean = torch.mean(torch.concat(samples, dim=-1), dim=-1)
         epistemic_var = torch.var(torch.concat(samples, dim=-1), dim=-1, unbiased=False)
         if self.type == "hete":
