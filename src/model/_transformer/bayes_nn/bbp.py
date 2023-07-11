@@ -212,8 +212,8 @@ class AbstractBNN(nn.Module):
         else:
             return x
 
-    def _get_optimizer(self, lr=0.01, **kwargs):
-        return torch.optim.Adam(self.parameters(), lr=lr)
+    def _get_optimizer(self, lr=0.01, weight_decay=1e-9, **kwargs):
+        return torch.optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
     def fit(self, X, y, batch_size=None, n_epoch=100, n_samples=10):
         if self.optimizer is None:
@@ -416,7 +416,7 @@ class MCDropout(AbstractBNN):
         x = self.to_device(x, device)
         return x
 
-    def _train_step(self, x, y, n_samples, n_batches, **kwargs):
+    def _train_step(self, x, y, **kwargs):
         output = self(x)
         fit_loss_step = self.get_sample_fitness_loss(output, y, n_samples=1)
         if self.verbose:
