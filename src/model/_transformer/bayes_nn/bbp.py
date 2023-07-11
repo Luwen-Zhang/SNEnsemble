@@ -160,6 +160,7 @@ class AbstractBNN(nn.Module):
         eps=1e-6,
         init_log_noise=0.0,
         ignore_aleatoric=False,
+        verbose=True,
         **kwargs,
     ):
         super(AbstractBNN, self).__init__()
@@ -169,6 +170,7 @@ class AbstractBNN(nn.Module):
         self.task = task
         self.type = type
         self.eps = eps
+        self.verbose = verbose
         self.optimizer = None
         self.ignore_aleatoric = ignore_aleatoric
         self.kwargs = kwargs
@@ -239,7 +241,7 @@ class AbstractBNN(nn.Module):
         samples, noises = [], []
         with torch.no_grad():
             for i in range(n_samples):
-                preds = self._predict_step(X)
+                preds = self._predict_step(X).to(X.device)
                 if self.type == "hete":
                     samples.append(preds[:, :1])
                     noises.append(preds[:, 1:])
@@ -296,24 +298,13 @@ class BayesByBackprop(AbstractBNN):
         n_outputs,
         n_hidden,
         n_layers=2,
-        on_cpu=False,
-        task="regression",
-        type="hete",
-        ignore_aleatoric=False,
         eps=1e-6,
         kl_weight=1.0,
         local_reparam=False,
         **kwargs,
     ):
         super(BayesByBackprop, self).__init__(
-            n_inputs=n_inputs,
-            n_outputs=n_outputs,
-            on_cpu=on_cpu,
-            task=task,
-            type=type,
-            eps=eps,
-            ignore_aleatoric=ignore_aleatoric,
-            **kwargs,
+            n_inputs=n_inputs, n_outputs=n_outputs, eps=eps, **kwargs
         )
         self.activation = nn.ReLU(inplace=True)
         self.layers = nn.ModuleList([])
@@ -371,46 +362,39 @@ class BayesByBackprop(AbstractBNN):
             fit_loss_step = fit_loss_step + fit_loss_sample
             kl_loss_step = kl_loss_step + kl_loss_sample
         total_loss = fit_loss_step + self.kl_weight * kl_loss_step
-        self.fit_loss_epoch += fit_loss_step.item() * x.shape[0]
-        self.kl_loss_epoch += kl_loss_step.item() * x.shape[0]
+        if self.verbose:
+            self.fit_loss_epoch += fit_loss_step.item() * x.shape[0]
+            self.kl_loss_epoch += kl_loss_step.item() * x.shape[0]
         return total_loss
 
     def _predict_step(self, X):
         return self(X)[0]
 
     def on_train_epoch_start(self, X, y):
-        self.fit_loss_epoch = 0
-        self.kl_loss_epoch = 0
+        if self.verbose:
+            self.fit_loss_epoch = 0
+            self.kl_loss_epoch = 0
 
     def on_train_epoch_end(self, X, y, i_epoch, n_epoch):
-        self.fit_loss_epoch /= X.shape[0]
-        self.kl_loss_epoch /= X.shape[0]
-        if i_epoch % 100 == 0 or i_epoch == n_epoch - 1:
-            print(
-                "Epoch: %5d/%5d, Fit loss = %7.3f, KL loss = %8.3f"
-                % (
-                    i_epoch + 1,
-                    n_epoch,
-                    self.fit_loss_epoch,
-                    self.kl_loss_epoch,
+        if self.verbose:
+            self.fit_loss_epoch /= X.shape[0]
+            self.kl_loss_epoch /= X.shape[0]
+            if i_epoch % 100 == 0 or i_epoch == n_epoch - 1:
+                print(
+                    "Epoch: %5d/%5d, Fit loss = %7.3f, KL loss = %8.3f"
+                    % (
+                        i_epoch + 1,
+                        n_epoch,
+                        self.fit_loss_epoch,
+                        self.kl_loss_epoch,
+                    )
                 )
-            )
 
 
 class MCDropout(AbstractBNN):
-    def __init__(
-        self,
-        n_inputs,
-        n_outputs,
-        layers,
-        on_cpu=False,
-        task="regression",
-        type="hete",
-        eps=1e-6,
-        **kwargs,
-    ):
+    def __init__(self, n_inputs, n_outputs, layers, dropout=0.2, **kwargs):
         super(MCDropout, self).__init__(
-            n_inputs, n_outputs, on_cpu, task, type, eps, **kwargs
+            n_inputs=n_inputs, n_outputs=n_outputs, **kwargs
         )
         from src.model.base import get_sequential
 
@@ -420,7 +404,7 @@ class MCDropout(AbstractBNN):
             n_inputs=n_inputs,
             n_outputs=2 * n_outputs if self.type == "hete" else n_outputs,
             use_norm=False,
-            dropout=0.2,
+            dropout=dropout,
             act_func=nn.ReLU,
             dropout_keep_training=True,
         )
@@ -435,26 +419,29 @@ class MCDropout(AbstractBNN):
     def _train_step(self, x, y, n_samples, n_batches, **kwargs):
         output = self(x)
         fit_loss_step = self.get_sample_fitness_loss(output, y, n_samples=1)
-        self.fit_loss_epoch += fit_loss_step * x.shape[0]
+        if self.verbose:
+            self.fit_loss_epoch += fit_loss_step * x.shape[0]
         return fit_loss_step
 
     def _predict_step(self, X):
         return self(X)
 
     def on_train_epoch_start(self, X, y):
-        self.fit_loss_epoch = 0
+        if self.verbose:
+            self.fit_loss_epoch = 0
 
     def on_train_epoch_end(self, X, y, i_epoch, n_epoch):
-        self.fit_loss_epoch /= X.shape[0]
-        if i_epoch % 100 == 0 or i_epoch == n_epoch - 1:
-            print(
-                "Epoch: %5d/%5d, Fit loss = %7.3f"
-                % (
-                    i_epoch + 1,
-                    n_epoch,
-                    self.fit_loss_epoch,
+        if self.verbose:
+            self.fit_loss_epoch /= X.shape[0]
+            if i_epoch % 100 == 0 or i_epoch == n_epoch - 1:
+                print(
+                    "Epoch: %5d/%5d, Fit loss = %7.3f"
+                    % (
+                        i_epoch + 1,
+                        n_epoch,
+                        self.fit_loss_epoch,
+                    )
                 )
-            )
 
 
 if __name__ == "__main__":
