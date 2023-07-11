@@ -148,7 +148,114 @@ class BayesLinearLayer(nn.Module):
             return output, None
 
 
-class BayesByBackprop(nn.Module):
+class AbstractBNN(nn.Module):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        on_cpu=False,
+        task="regression",
+        type="hete",
+        eps=1e-6,
+        init_log_noise=0.0,
+        **kwargs,
+    ):
+        super(AbstractBNN, self).__init__()
+        self.n_inputs = n_inputs
+        self.n_outputs = n_outputs
+        self.on_cpu = on_cpu
+        self.task = task
+        self.type = type
+        self.eps = eps
+        self.optimizer = None
+        self.kwargs = kwargs
+        self.activation = nn.ReLU(inplace=True)
+        if self.type == "hete":
+            self.loss_func = _isotropic_gauss_log_likelihood
+        elif self.type == "homo":
+            if self.task == "regression":
+                self.log_noise = nn.Parameter(torch.tensor([init_log_noise]))
+                self.loss_func = _isotropic_gauss_log_likelihood
+            elif self.task == "classification":
+                self.loss_func = nn.CrossEntropyLoss()
+        else:
+            raise Exception(
+                f"Type {self.type} for {task} tasks is not implemented. "
+                f"Select from hete+regression or homo/hete+classification."
+            )
+
+    def to_cpu(self, x: torch.Tensor):
+        if self.on_cpu:
+            self.to("cpu")
+            return x.device, x.to("cpu")
+        else:
+            return x.device, x
+
+    def to_device(self, x: torch.Tensor, device):
+        if self.on_cpu:
+            return x.to(device)
+        else:
+            return x
+
+    def _get_optimizer(self, lr=0.01, **kwargs):
+        return torch.optim.Adam(self.parameters(), lr=lr)
+
+    def fit(self, X, y, batch_size=None, n_epoch=100, n_samples=10):
+        if self.optimizer is None:
+            self.optimizer = self._get_optimizer(**self.kwargs)
+        if batch_size is None:
+            loader = [(X, y)]
+            n_batches = 1
+        else:
+            loader = Data.DataLoader(
+                Data.TensorDataset(X, y), shuffle=True, batch_size=batch_size
+            )
+            n_batches = len(loader)
+        for epoch in range(n_epoch):
+            self.on_train_epoch_start(X, y)
+            for x, y_hat in loader:
+                self.optimizer.zero_grad()
+                total_loss = self._train_step(
+                    x, y_hat, n_samples=n_samples, n_batches=n_batches
+                )
+                total_loss.backward()
+                self.optimizer.step()
+            self.on_train_epoch_end(X, y, epoch, n_epoch)
+
+    def predict(self, X, n_samples=100):
+        samples, noises = [], []
+        for i in range(n_samples):
+            preds = self(X)[0]
+            if self.type == "hete":
+                samples.append(preds[:, :1])
+                noises.append(preds[:, 1:])
+            else:
+                samples.append(preds)
+        mean = torch.mean(torch.concat(samples, dim=-1), dim=-1)
+        epistemic_var = torch.var(torch.concat(samples, dim=-1), dim=-1, unbiased=False)
+        if self.type == "hete":
+            stds = torch.exp(torch.concat(noises, dim=-1))
+            aleatoric_var = torch.mean(_safe_pow(stds, 2), dim=-1)
+        else:
+            stds = _safe_exp(self.log_noise)
+            aleatoric_var = torch.ones_like(epistemic_var) * stds
+        var = epistemic_var + aleatoric_var
+        return mean, var
+
+    def get_sample_loss(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def _train_step(self, x, y, n_samples, n_batches, **kwargs):
+        raise NotImplementedError
+
+    def on_train_epoch_start(self, X, y):
+        pass
+
+    def on_train_epoch_end(self, X, y, i_epoch, n_epoch):
+        pass
+
+
+class BayesByBackprop(AbstractBNN):
     def __init__(
         self,
         n_inputs,
@@ -163,10 +270,9 @@ class BayesByBackprop(nn.Module):
         local_reparam=False,
         **kwargs,
     ):
-        super(BayesByBackprop, self).__init__()
-
-        self.n_inputs = n_inputs
-        self.n_outputs = n_outputs
+        super(BayesByBackprop, self).__init__(
+            n_inputs, n_outputs, on_cpu, task, type, eps, **kwargs
+        )
         # network with two hidden and one output layer
         self.layers = nn.ModuleList([])
         for i in range(n_layers):
@@ -184,41 +290,9 @@ class BayesByBackprop(nn.Module):
                     n_in, n_out, Gaussian(0, 1), eps=eps, local_reparam=local_reparam
                 )
             )
-        self.task = task
         self.type = type
-        self.eps = eps
         self.kl_weight = kl_weight
         self.local_reparam = local_reparam
-        # activation to be used between hidden layers
-        self.activation = nn.ReLU(inplace=True)
-        if type == "hete":
-            self.loss_func = _isotropic_gauss_log_likelihood
-        elif type == "homo":
-            if self.task == "regression":
-                self.loss_func = nn.MSELoss()
-            elif self.task == "classification":
-                self.loss_func = nn.CrossEntropyLoss()
-        else:
-            raise Exception(
-                f"Type {type} for {task} tasks is not implemented. "
-                f"Select from hete+regression or homo/hete+classification."
-            )
-        self.optimizer = None
-        self.kwargs = kwargs
-        self.on_cpu = on_cpu
-
-    def to_cpu(self, x: torch.Tensor):
-        if self.on_cpu:
-            self.to("cpu")
-            return x.device, x.to("cpu")
-        else:
-            return x.device, x
-
-    def to_device(self, x: torch.Tensor, device):
-        if self.on_cpu:
-            return x.to(device)
-        else:
-            return x
 
     def forward(self, x):
         device, x = self.to_cpu(x)
@@ -235,84 +309,57 @@ class BayesByBackprop(nn.Module):
         kl_loss_total = self.to_device(kl_loss_total, device)
         return x, kl_loss_total
 
-    def _get_optimizer(self, lr=0.01, **kwargs):
-        return torch.optim.Adam(self.parameters(), lr=lr)
-
     def get_sample_loss(self, output, y_hat, kl_loss, batch_size, n_batches, n_samples):
         if self.loss_func == _isotropic_gauss_log_likelihood:
-            fit_loss = -self.loss_func(
-                output[:, :1], y_hat, _safe_exp(output[:, 1:]), eps=self.eps
-            ).mean()
+            if self.type == "hete":
+                fit_loss = -self.loss_func(
+                    output[:, :1], y_hat, _safe_exp(output[:, 1:]), eps=self.eps
+                ).mean()
+            else:
+                fit_loss = -self.loss_func(
+                    output, y_hat, _safe_exp(self.log_noise), eps=self.eps
+                ).mean()
         else:
             fit_loss = self.loss_func(output, y_hat)
         return fit_loss / n_samples, kl_loss / batch_size / n_batches / n_samples
 
-    def fit(self, X, y, batch_size=None, n_epoch=100, n_samples=10):
-        if self.optimizer is None:
-            self.optimizer = self._get_optimizer(**self.kwargs)
-        if batch_size is None:
-            loader = [(X, y)]
-            n_batches = 1
-        else:
-            loader = Data.DataLoader(
-                Data.TensorDataset(X, y), shuffle=True, batch_size=batch_size
-            )
-            n_batches = len(loader)
-        for epoch in range(n_epoch):
-            fit_loss_epoch = 0
-            kl_loss_epoch = 0
-            for x, y_hat in loader:
-                self.optimizer.zero_grad()
-                fit_loss_step = 0
-                kl_loss_step = 0
-                for i in range(n_samples):
-                    output, kl_loss = self(x)
-                    fit_loss_sample, kl_loss_sample = self.get_sample_loss(
-                        output,
-                        y_hat,
-                        kl_loss,
-                        batch_size=x.shape[0],
-                        n_batches=n_batches,
-                        n_samples=n_samples,
-                    )
-                    fit_loss_step = fit_loss_step + fit_loss_sample
-                    kl_loss_step = kl_loss_step + kl_loss_sample
-                total_loss = fit_loss_step + self.kl_weight * kl_loss_step
-                total_loss.backward()
-                self.optimizer.step()
-                fit_loss_epoch += fit_loss_step.item() * x.shape[0]
-                kl_loss_epoch += kl_loss_step.item() * x.shape[0]
-            fit_loss_epoch /= X.shape[0]
-            kl_loss_epoch /= X.shape[0]
-            if epoch % 100 == 0 or epoch == n_epoch - 1:
-                print(
-                    "Epoch: %5d/%5d, Fit loss = %7.3f, KL loss = %8.3f"
-                    % (
-                        epoch + 1,
-                        n_epoch,
-                        fit_loss_epoch,
-                        kl_loss_epoch,
-                    )
-                )
-
-    def predict(self, X, n_samples=100):
-        samples, noises = [], []
+    def _train_step(self, x, y, n_samples, n_batches, **kwargs):
+        fit_loss_step = 0
+        kl_loss_step = 0
         for i in range(n_samples):
-            preds = self(X)[0]
-            if self.type == "hete":
-                samples.append(preds[:, :1])
-                noises.append(preds[:, 1:])
-            else:
-                samples.append(preds)
-        mean = torch.mean(torch.concat(samples, dim=-1), dim=-1)
-        epistemic_var = torch.var(torch.concat(samples, dim=-1), dim=-1, unbiased=False)
-        if self.type == "hete":
-            stds = torch.exp(torch.concat(noises, dim=-1))
-        else:
-            stds = torch.zeros(X.shape[0], n_samples, device=X.device)
-        aleatoric_var = torch.mean(_safe_pow(stds, 2), dim=-1)
-        var = epistemic_var + aleatoric_var
-        return mean, var
+            output, kl_loss = self(x)
+            fit_loss_sample, kl_loss_sample = self.get_sample_loss(
+                output,
+                y,
+                kl_loss,
+                batch_size=x.shape[0],
+                n_batches=n_batches,
+                n_samples=n_samples,
+            )
+            fit_loss_step = fit_loss_step + fit_loss_sample
+            kl_loss_step = kl_loss_step + kl_loss_sample
+        total_loss = fit_loss_step + self.kl_weight * kl_loss_step
+        self.fit_loss_epoch += fit_loss_step.item() * x.shape[0]
+        self.kl_loss_epoch += kl_loss_step.item() * x.shape[0]
+        return total_loss
+
+    def on_train_epoch_start(self, X, y):
+        self.fit_loss_epoch = 0
+        self.kl_loss_epoch = 0
+
+    def on_train_epoch_end(self, X, y, i_epoch, n_epoch):
+        self.fit_loss_epoch /= X.shape[0]
+        self.kl_loss_epoch /= X.shape[0]
+        if i_epoch % 100 == 0 or i_epoch == n_epoch - 1:
+            print(
+                "Epoch: %5d/%5d, Fit loss = %7.3f, KL loss = %8.3f"
+                % (
+                    i_epoch + 1,
+                    n_epoch,
+                    self.fit_loss_epoch,
+                    self.kl_loss_epoch,
+                )
+            )
 
 
 if __name__ == "__main__":
@@ -328,7 +375,7 @@ if __name__ == "__main__":
     torch.manual_seed(0)
     start = time.time()
     net = BayesByBackprop(
-        n_inputs=1, n_outputs=1, n_layers=4, n_hidden=50, on_cpu=False, type="homo"
+        n_inputs=1, n_outputs=1, n_layers=2, n_hidden=20, on_cpu=False, type="homo"
     )
     X = X.to(device)
     y = y.to(device)
@@ -339,19 +386,19 @@ if __name__ == "__main__":
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
     plot_mu_var_1d(X, y, grid, mu, var)
 
-    X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(
-        100, grid_low_x=-3, grid_high_x=3, grid_low_y=-3, grid_high_y=3, noise=0.2
-    )
-    torch.manual_seed(0)
-    start = time.time()
-    net = BayesByBackprop(
-        n_inputs=2, n_outputs=1, n_layers=4, n_hidden=50, on_cpu=False, type="homo"
-    )
-    X = X.to(device)
-    y = y.to(device)
-    net.to(device)
-    net.fit(X, y, n_epoch=2000, n_samples=10, batch_size=None)
-    train_end = time.time()
-    mu, var = net.predict(grid.to(device), n_samples=100)
-    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
-    plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
+    # X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(
+    #     100, grid_low_x=-3, grid_high_x=3, grid_low_y=-3, grid_high_y=3, noise=0.2
+    # )
+    # torch.manual_seed(0)
+    # start = time.time()
+    # net = BayesByBackprop(
+    #     n_inputs=2, n_outputs=1, n_layers=4, n_hidden=50, on_cpu=False, type="homo"
+    # )
+    # X = X.to(device)
+    # y = y.to(device)
+    # net.to(device)
+    # net.fit(X, y, n_epoch=2000, n_samples=10, batch_size=None)
+    # train_end = time.time()
+    # mu, var = net.predict(grid.to(device), n_samples=100)
+    # print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    # plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
