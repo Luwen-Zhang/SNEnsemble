@@ -224,7 +224,7 @@ class AbstractBNN(nn.Module):
     def predict(self, X, n_samples=100):
         samples, noises = [], []
         for i in range(n_samples):
-            preds = self(X)[0]
+            preds = self._predict_step(X)
             if self.type == "hete":
                 samples.append(preds[:, :1])
                 noises.append(preds[:, 1:])
@@ -259,6 +259,9 @@ class AbstractBNN(nn.Module):
         return fit_loss / n_samples
 
     def _train_step(self, x, y, n_samples, n_batches, **kwargs):
+        raise NotImplementedError
+
+    def _predict_step(self, X):
         raise NotImplementedError
 
     def on_train_epoch_start(self, X, y):
@@ -346,6 +349,9 @@ class BayesByBackprop(AbstractBNN):
         self.kl_loss_epoch += kl_loss_step.item() * x.shape[0]
         return total_loss
 
+    def _predict_step(self, X):
+        return self(X)[0]
+
     def on_train_epoch_start(self, X, y):
         self.fit_loss_epoch = 0
         self.kl_loss_epoch = 0
@@ -361,6 +367,69 @@ class BayesByBackprop(AbstractBNN):
                     n_epoch,
                     self.fit_loss_epoch,
                     self.kl_loss_epoch,
+                )
+            )
+
+
+class MCDropout(AbstractBNN):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        on_cpu=False,
+        task="regression",
+        type="hete",
+        eps=1e-6,
+        **kwargs,
+    ):
+        super(MCDropout, self).__init__(
+            n_inputs, n_outputs, on_cpu, task, type, eps, **kwargs
+        )
+        from src.model.base import get_sequential
+
+        # network with two hidden and one output layer
+        self.layers = get_sequential(
+            layers=layers,
+            n_inputs=n_inputs,
+            n_outputs=2 * n_outputs if self.type == "hete" else n_outputs,
+            use_norm=False,
+            dropout=0.2,
+            act_func=nn.ReLU,
+            dropout_keep_training=True,
+        )
+
+    def forward(self, x):
+        device, x = self.to_cpu(x)
+        x = x.view(-1, self.n_inputs)
+        x = self.layers(x)
+        x = self.to_device(x, device)
+        return x
+
+    def _train_step(self, x, y, n_samples, n_batches, **kwargs):
+        fit_loss_step = 0
+        for i in range(n_samples):
+            output = self(x)
+            fit_loss_sample = self.get_sample_fitness_loss(output, y, n_samples)
+            fit_loss_step = fit_loss_step + fit_loss_sample
+        self.fit_loss_epoch += fit_loss_step * x.shape[0]
+        return fit_loss_step
+
+    def _predict_step(self, X):
+        return self(X)
+
+    def on_train_epoch_start(self, X, y):
+        self.fit_loss_epoch = 0
+
+    def on_train_epoch_end(self, X, y, i_epoch, n_epoch):
+        self.fit_loss_epoch /= X.shape[0]
+        if i_epoch % 100 == 0 or i_epoch == n_epoch - 1:
+            print(
+                "Epoch: %5d/%5d, Fit loss = %7.3f"
+                % (
+                    i_epoch + 1,
+                    n_epoch,
+                    self.fit_loss_epoch,
                 )
             )
 
