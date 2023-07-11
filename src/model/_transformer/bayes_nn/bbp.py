@@ -169,7 +169,6 @@ class AbstractBNN(nn.Module):
         self.eps = eps
         self.optimizer = None
         self.kwargs = kwargs
-        self.activation = nn.ReLU(inplace=True)
         if self.type == "hete":
             self.loss_func = _isotropic_gauss_log_likelihood
         elif self.type == "homo":
@@ -242,8 +241,22 @@ class AbstractBNN(nn.Module):
         var = epistemic_var + aleatoric_var
         return mean, var
 
-    def get_sample_loss(self, *args, **kwargs):
-        raise NotImplementedError
+    def get_sample_kl_loss(self, kl_loss, batch_size, n_batches, n_samples):
+        return kl_loss / batch_size / n_batches / n_samples
+
+    def get_sample_fitness_loss(self, output, y_hat, n_samples):
+        if self.loss_func == _isotropic_gauss_log_likelihood:
+            if self.type == "hete":
+                fit_loss = -self.loss_func(
+                    output[:, :1], y_hat, _safe_exp(output[:, 1:]), eps=self.eps
+                ).mean()
+            else:
+                fit_loss = -self.loss_func(
+                    output, y_hat, _safe_exp(self.log_noise), eps=self.eps
+                ).mean()
+        else:
+            fit_loss = self.loss_func(output, y_hat)
+        return fit_loss / n_samples
 
     def _train_step(self, x, y, n_samples, n_batches, **kwargs):
         raise NotImplementedError
@@ -273,7 +286,7 @@ class BayesByBackprop(AbstractBNN):
         super(BayesByBackprop, self).__init__(
             n_inputs, n_outputs, on_cpu, task, type, eps, **kwargs
         )
-        # network with two hidden and one output layer
+        self.activation = nn.ReLU(inplace=True)
         self.layers = nn.ModuleList([])
         for i in range(n_layers):
             if i == 0:
@@ -281,7 +294,7 @@ class BayesByBackprop(AbstractBNN):
                 n_out = n_hidden
             elif i == n_layers - 1:
                 n_in = n_hidden
-                n_out = 2 * n_outputs if type == "hete" else n_outputs
+                n_out = 2 * n_outputs if self.type == "hete" else n_outputs
             else:
                 n_in = n_out = n_hidden
 
@@ -290,7 +303,6 @@ class BayesByBackprop(AbstractBNN):
                     n_in, n_out, Gaussian(0, 1), eps=eps, local_reparam=local_reparam
                 )
             )
-        self.type = type
         self.kl_weight = kl_weight
         self.local_reparam = local_reparam
 
@@ -310,18 +322,9 @@ class BayesByBackprop(AbstractBNN):
         return x, kl_loss_total
 
     def get_sample_loss(self, output, y_hat, kl_loss, batch_size, n_batches, n_samples):
-        if self.loss_func == _isotropic_gauss_log_likelihood:
-            if self.type == "hete":
-                fit_loss = -self.loss_func(
-                    output[:, :1], y_hat, _safe_exp(output[:, 1:]), eps=self.eps
-                ).mean()
-            else:
-                fit_loss = -self.loss_func(
-                    output, y_hat, _safe_exp(self.log_noise), eps=self.eps
-                ).mean()
-        else:
-            fit_loss = self.loss_func(output, y_hat)
-        return fit_loss / n_samples, kl_loss / batch_size / n_batches / n_samples
+        return self.get_sample_fitness_loss(
+            output, y_hat, n_samples
+        ), self.get_sample_kl_loss(kl_loss, batch_size, n_batches, n_samples)
 
     def _train_step(self, x, y, n_samples, n_batches, **kwargs):
         fit_loss_step = 0
