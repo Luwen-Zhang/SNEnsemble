@@ -11,6 +11,7 @@ from torch.autograd import Variable
 import torch
 import torch.nn.functional as F
 import torch.utils.data as Data
+import warnings
 
 
 def _isotropic_gauss_log_likelihood(x, mu, sigma, eps=1e-8):
@@ -158,6 +159,7 @@ class AbstractBNN(nn.Module):
         type="hete",
         eps=1e-6,
         init_log_noise=0.0,
+        ignore_aleatoric=False,
         **kwargs,
     ):
         super(AbstractBNN, self).__init__()
@@ -168,20 +170,32 @@ class AbstractBNN(nn.Module):
         self.type = type
         self.eps = eps
         self.optimizer = None
+        self.ignore_aleatoric = ignore_aleatoric
         self.kwargs = kwargs
-        if self.type == "hete":
-            self.loss_func = _isotropic_gauss_log_likelihood
-        elif self.type == "homo":
+        self.loss_func = None
+        if ignore_aleatoric:
+            if self.type == "hete":
+                warnings.warn(f"ignore_aleatoric=True, so Homoscedastic model is used.")
+                self.type = "homo"
             if self.task == "regression":
-                self.log_noise = nn.Parameter(torch.tensor([init_log_noise]))
-                self.loss_func = _isotropic_gauss_log_likelihood
+                self.loss_func = nn.MSELoss()
             elif self.task == "classification":
                 self.loss_func = nn.CrossEntropyLoss()
         else:
-            raise Exception(
-                f"Type {self.type} for {task} tasks is not implemented. "
-                f"Select from hete+regression or homo/hete+classification."
-            )
+            if self.task == "regression":
+                self.loss_func = _isotropic_gauss_log_likelihood
+                if self.type == "homo":
+                    self.log_noise = nn.Parameter(torch.tensor([init_log_noise]))
+            elif self.task == "classification":
+                warnings.warn(
+                    f"For classification tasks, the aleatoric variance will be ignored."
+                )
+                self.type = "homo"
+                self.ignore_aleatoric = True
+                self.loss_func = nn.CrossEntropyLoss()
+
+        if self.loss_func is None:
+            raise Exception(f"Type {self.type} for {task} tasks is not implemented. ")
 
     def to_cpu(self, x: torch.Tensor):
         if self.on_cpu:
@@ -236,8 +250,11 @@ class AbstractBNN(nn.Module):
             stds = torch.exp(torch.concat(noises, dim=-1))
             aleatoric_var = torch.mean(_safe_pow(stds, 2), dim=-1)
         else:
-            stds = _safe_exp(self.log_noise)
-            aleatoric_var = torch.ones_like(epistemic_var) * stds
+            if not self.ignore_aleatoric:
+                stds = _safe_exp(self.log_noise)
+                aleatoric_var = torch.ones_like(epistemic_var, device=X.device) * stds
+            else:
+                aleatoric_var = torch.zeros_like(epistemic_var, device=X.device)
         var = epistemic_var + aleatoric_var
         return mean, var
 
@@ -281,13 +298,21 @@ class BayesByBackprop(AbstractBNN):
         on_cpu=False,
         task="regression",
         type="hete",
+        ignore_aleatoric=False,
         eps=1e-6,
         kl_weight=1.0,
         local_reparam=False,
         **kwargs,
     ):
         super(BayesByBackprop, self).__init__(
-            n_inputs, n_outputs, on_cpu, task, type, eps, **kwargs
+            n_inputs=n_inputs,
+            n_outputs=n_outputs,
+            on_cpu=on_cpu,
+            task=task,
+            type=type,
+            eps=eps,
+            ignore_aleatoric=ignore_aleatoric,
+            **kwargs,
         )
         self.activation = nn.ReLU(inplace=True)
         self.layers = nn.ModuleList([])
@@ -407,11 +432,8 @@ class MCDropout(AbstractBNN):
         return x
 
     def _train_step(self, x, y, n_samples, n_batches, **kwargs):
-        fit_loss_step = 0
-        for i in range(n_samples):
-            output = self(x)
-            fit_loss_sample = self.get_sample_fitness_loss(output, y, n_samples)
-            fit_loss_step = fit_loss_step + fit_loss_sample
+        output = self(x)
+        fit_loss_step = self.get_sample_fitness_loss(output, y, n_samples=1)
         self.fit_loss_epoch += fit_loss_step * x.shape[0]
         return fit_loss_step
 
