@@ -1844,6 +1844,15 @@ def init_weights(m, nonlinearity="leaky_relu"):
         torch.nn.init.kaiming_normal_(m.weight, nonlinearity=nonlinearity)
 
 
+class TrainingDropout(nn.Module):
+    def __init__(self, p):
+        super(TrainingDropout, self).__init__()
+        self.p = p
+
+    def forward(self, x):
+        return nn.functional.dropout(x, p=self.p, training=True)
+
+
 def get_sequential(
     layers,
     n_inputs,
@@ -1854,6 +1863,7 @@ def get_sequential(
     norm_type="batch",
     out_activate=False,
     out_norm_dropout=False,
+    dropout_keep_training=False,
 ):
     net = nn.Sequential()
     if norm_type == "batch":
@@ -1868,6 +1878,10 @@ def get_sequential(
         nonlinearity = "leaky_relu"
     else:
         nonlinearity = "leaky_relu"
+    if dropout_keep_training:
+        dp = TrainingDropout
+    else:
+        dp = nn.Dropout
     if len(layers) > 0:
         if use_norm:
             net.add_module(f"norm_0", norm(n_inputs))
@@ -1876,7 +1890,7 @@ def get_sequential(
         )
         net.add_module("activate_0", act_func())
         if dropout != 0:
-            net.add_module(f"dropout_0", nn.Dropout(dropout))
+            net.add_module(f"dropout_0", dp(dropout))
         for idx in range(1, len(layers)):
             if use_norm:
                 net.add_module(f"norm_{idx}", norm(layers[idx - 1]))
@@ -1886,7 +1900,7 @@ def get_sequential(
             )
             net.add_module(f"activate_{idx}", act_func())
             if dropout != 0:
-                net.add_module(f"dropout_{idx}", nn.Dropout(dropout))
+                net.add_module(f"dropout_{idx}", dp(dropout))
         if out_norm_dropout and use_norm:
             net.add_module(f"norm_out", norm(layers[-1]))
         net.add_module(
@@ -1895,14 +1909,14 @@ def get_sequential(
         if out_activate:
             net.add_module("activate_out", act_func())
         if out_norm_dropout and dropout != 0:
-            net.add_module(f"dropout_out", nn.Dropout(dropout))
+            net.add_module(f"dropout_out", dp(dropout))
     else:
         if use_norm:
             net.add_module("norm", norm(n_inputs))
         net.add_module("single_layer", nn.Linear(n_inputs, n_outputs))
         net.add_module("activate", act_func())
         if dropout != 0:
-            net.add_module("dropout", nn.Dropout(dropout))
+            net.add_module("dropout", dp(dropout))
 
     net.apply(partial(init_weights, nonlinearity=nonlinearity))
     return net
