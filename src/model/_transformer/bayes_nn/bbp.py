@@ -480,19 +480,63 @@ if __name__ == "__main__":
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
     plot_mu_var_1d(X, y, grid, mu, var)
 
-    # X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(
-    #     100, grid_low_x=-3, grid_high_x=3, grid_low_y=-3, grid_high_y=3, noise=0.2
-    # )
-    # torch.manual_seed(0)
-    # start = time.time()
-    # net = BayesByBackprop(
-    #     n_inputs=2, n_outputs=1, n_layers=4, n_hidden=50, on_cpu=False, type="homo"
-    # )
-    # X = X.to(device)
-    # y = y.to(device)
-    # net.to(device)
-    # net.fit(X, y, n_epoch=2000, n_samples=10, batch_size=None)
-    # train_end = time.time()
-    # mu, var = net.predict(grid.to(device), n_samples=100)
-    # print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
-    # plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
+    X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(
+        100, grid_low_x=-3, grid_high_x=3, grid_low_y=-3, grid_high_y=3, noise=0.2
+    )
+    torch.manual_seed(0)
+    start = time.time()
+    net = BayesByBackprop(
+        n_inputs=2, n_outputs=1, n_layers=4, n_hidden=50, on_cpu=False, type="homo"
+    )
+    X = X.to(device)
+    y = y.to(device)
+    net.to(device)
+    net.fit(X, y, n_epoch=2000, n_samples=10, batch_size=None)
+    train_end = time.time()
+    mu, var = net.predict(grid.to(device), n_samples=100)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
+
+    X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3, noise=0.2)
+    torch.manual_seed(0)
+    start = time.time()
+    net = MCDropout(
+        n_inputs=1,
+        n_outputs=1,
+        layers=[128, 64, 32],
+        on_cpu=False,
+        type="hete",
+        ignore_aleatoric=False,
+        lr=0.01,
+    )
+    X = X.to(device)
+    y = y.to(device)
+    net.to(device)
+    net.fit(X, y, n_epoch=5000, batch_size=None)
+    train_end = time.time()
+    mu, var = net.predict(grid.to(device), n_samples=1000)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    plot_mu_var_1d(X, y, grid, mu, var)
+
+    X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(
+        100, grid_low_x=-3, grid_high_x=3, grid_low_y=-3, grid_high_y=3, noise=0.2
+    )
+    torch.manual_seed(0)
+    start = time.time()
+    net = MCDropout(
+        n_inputs=2,
+        n_outputs=1,
+        layers=[128, 64, 32],
+        on_cpu=False,
+        type="hete",
+        ignore_aleatoric=False,
+        lr=0.01,
+    )
+    X = X.to(device)
+    y = y.to(device)
+    net.to(device)
+    net.fit(X, y, n_epoch=5000, batch_size=None)
+    train_end = time.time()
+    mu, var = net.predict(grid.to(device), n_samples=1000)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
