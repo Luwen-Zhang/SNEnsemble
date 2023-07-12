@@ -366,7 +366,8 @@ class WideDeep(AbstractModel):
             X_df = self.tab_preprocessor.transform(df)
         return X_df
 
-    def _get_model_names(self):
+    @staticmethod
+    def _get_model_names():
         return [
             "TabMlp",
             "TabResnet",

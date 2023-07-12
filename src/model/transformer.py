@@ -11,7 +11,8 @@ class Transformer(TorchModel):
     def _get_program_name(self):
         return "Transformer"
 
-    def _get_model_names(self):
+    @staticmethod
+    def _get_model_names():
         return [
             "FTTransformer",
             "TransformerLSTM",

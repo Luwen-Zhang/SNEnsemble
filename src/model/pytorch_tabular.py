@@ -187,7 +187,8 @@ class PytorchTabular(AbstractModel):
             res = np.concatenate(preds, axis=1)
         return res
 
-    def _get_model_names(self):
+    @staticmethod
+    def _get_model_names():
         return [
             "Category Embedding",
             "NODE",

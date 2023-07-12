@@ -127,7 +127,8 @@ class AutoGluon(AbstractModel):
         else:
             return model[1].predict(X_test).values.reshape(-1, 1)
 
-    def _get_model_names(self):
+    @staticmethod
+    def _get_model_names():
         return [
             "LightGBM",
             "CatBoost",

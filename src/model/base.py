@@ -825,7 +825,8 @@ class AbstractModel:
         res = [x for x in res if self._conditional_validity(x)]
         return res
 
-    def _get_model_names(self) -> List[str]:
+    @staticmethod
+    def _get_model_names() -> List[str]:
         """
         Get all available models implemented in the modelbase.
 

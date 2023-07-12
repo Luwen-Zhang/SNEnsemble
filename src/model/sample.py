@@ -8,7 +8,8 @@ class CatEmbed(TorchModel):
     def _get_program_name(self):
         return "CatEmbed"
 
-    def _get_model_names(self):
+    @staticmethod
+    def _get_model_names():
         return ["Category Embedding"]
 
     def _new_model(self, model_name, verbose, **kwargs):
