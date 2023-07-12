@@ -10,6 +10,7 @@ from .mlp import MLP
 from .util_model import RFE
 from .transformer import Transformer
 from .util_model import ModelAssembly
+from .sample import CatEmbed
 
 __all__ = [
     "AbstractModel",
@@ -23,4 +24,5 @@ __all__ = [
     "RFE",
     "Transformer",
     "ModelAssembly",
+    "CatEmbed",
 ]

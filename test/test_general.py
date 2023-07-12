@@ -188,10 +188,10 @@ class TestGeneral(unittest.TestCase):
             PytorchTabular(trainer, model_subset=["Category Embedding"]),
             WideDeep(trainer, model_subset=["TabMlp"]),
             AutoGluon(trainer, model_subset=["Linear Regression"]),
-            Transformer(
+            CatEmbed(
                 trainer,
                 model_subset=[
-                    "CategoryEmbedding",
+                    "Category Embedding",
                 ],
             ),
         ]
@@ -221,20 +221,20 @@ class TestGeneral(unittest.TestCase):
 
         print(f"\n-- Detach modelbase --\n")
         model_trainer = trainer.detach_model(
-            program="Transformer", model_name="CategoryEmbedding"
+            program="CatEmbed", model_name="Category Embedding"
         )
         model_trainer.train()
-        direct_pred = trainer.get_modelbase("Transformer")._predict(
+        direct_pred = trainer.get_modelbase("CatEmbed")._predict(
             trainer.datamodule.X_test,
             derived_data=trainer.datamodule.D_test,
-            model_name="CategoryEmbedding",
+            model_name="Category Embedding",
         )
         detached_pred = model_trainer.get_modelbase(
-            "Transformer_CategoryEmbedding"
+            "CatEmbed_Category Embedding"
         )._predict(
             model_trainer.datamodule.X_test,
             derived_data=model_trainer.datamodule.D_test,
-            model_name="CategoryEmbedding",
+            model_name="Category Embedding",
         )
         assert np.allclose(
             detached_pred, direct_pred
@@ -322,10 +322,10 @@ class TestGeneral(unittest.TestCase):
         models = [
             # PytorchTabular(trainer, model_subset=["Category Embedding"]),
             # AutoGluon(trainer, model_subset=["Linear Regression"]),
-            Transformer(
+            CatEmbed(
                 trainer,
                 model_subset=[
-                    "CategoryEmbedding",
+                    "Category Embedding",
                 ],
             ),
         ]
@@ -355,20 +355,20 @@ class TestGeneral(unittest.TestCase):
 
         print(f"\n-- Detach modelbase --\n")
         model_trainer = trainer.detach_model(
-            program="Transformer", model_name="CategoryEmbedding"
+            program="CatEmbed", model_name="Category Embedding"
         )
         model_trainer.train()
-        direct_pred = trainer.get_modelbase("Transformer")._predict(
+        direct_pred = trainer.get_modelbase("CatEmbed")._predict(
             trainer.datamodule.X_test,
             derived_data=trainer.datamodule.D_test,
-            model_name="CategoryEmbedding",
+            model_name="Category Embedding",
         )
         detached_pred = model_trainer.get_modelbase(
-            "Transformer_CategoryEmbedding"
+            "CatEmbed_Category Embedding"
         )._predict(
             model_trainer.datamodule.X_test,
             derived_data=model_trainer.datamodule.D_test,
-            model_name="CategoryEmbedding",
+            model_name="Category Embedding",
         )
         assert np.allclose(
             detached_pred, direct_pred
