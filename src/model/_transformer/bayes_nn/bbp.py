@@ -18,6 +18,7 @@ import torch
 import torch.nn.functional as F
 import torch.utils.data as Data
 import warnings
+from src.model.base import KeepDropout
 
 
 def _isotropic_gauss_log_likelihood(x, mu, sigma, eps=1e-8):
@@ -232,6 +233,7 @@ class AbstractBNN(nn.Module):
         return torch.optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
     def fit(self, X, y, batch_size=None, n_epoch=100, n_samples=10):
+        self.train()
         if self.optimizer is None:
             self.optimizer = self._get_optimizer(**self.kwargs)
         if batch_size is None:
@@ -254,6 +256,7 @@ class AbstractBNN(nn.Module):
             self.on_train_epoch_end(X, y, epoch, n_epoch)
 
     def predict(self, X, n_samples=100):
+        self.eval()
         with torch.no_grad():
             preds = self._predict_step(X, n_samples).to(X.device)
             if self.type == "hete":
@@ -476,7 +479,9 @@ class MCDropout(AbstractBNN):
 
     def _predict_step(self, X, n_samples):
         sample_x = X.unsqueeze(0).repeat(n_samples, 1, 1)
-        return self(sample_x)
+        with KeepDropout():
+            res = self(sample_x)
+        return res
 
     def on_train_epoch_start(self, X, y):
         if self.verbose:

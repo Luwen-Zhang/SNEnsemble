@@ -1845,12 +1845,29 @@ def init_weights(m, nonlinearity="leaky_relu"):
 
 
 class TrainingDropout(nn.Module):
+    keep_dropout = False
+
     def __init__(self, p):
         super(TrainingDropout, self).__init__()
         self.p = p
 
     def forward(self, x):
-        return nn.functional.dropout(x, p=self.p, training=True)
+        return nn.functional.dropout(
+            x, p=self.p, training=self.training or TrainingDropout.keep_dropout
+        )
+
+    @classmethod
+    def set(cls, state: bool):
+        cls.keep_dropout = state
+
+
+class KeepDropout:
+    def __enter__(self):
+        self.state = TrainingDropout.keep_dropout
+        TrainingDropout.set(True)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        TrainingDropout.set(self.state)
 
 
 def get_sequential(
