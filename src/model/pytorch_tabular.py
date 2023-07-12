@@ -377,16 +377,11 @@ class PytorchTabular(AbstractModel):
         return params_dict[model_name]
 
 
-def pytorch_tabular_forward(self, x: Dict) -> Dict[str, Any]:
-    """The forward pass of the model.
-
-    Args:
-        x (Dict): The input of the model with 'continuous' and 'categorical' keys
-    """
-    x = self.embed_input(x)
-    x = self.compute_backbone(x)
-    setattr(self, "_hidden_representation", x)
-    return self.compute_head(x)
+def pytorch_tabular_forward(self, backbone_features: torch.Tensor) -> Dict[str, Any]:
+    setattr(self, "_hidden_representation", backbone_features)
+    y_hat = self.head(backbone_features)
+    y_hat = self.apply_output_sigmoid_scaling(y_hat)
+    return self.pack_output(y_hat, backbone_features)
 
 
 class PytorchTabularWrapper(AbstractWrapper):
@@ -397,13 +392,13 @@ class PytorchTabularWrapper(AbstractWrapper):
         from pytorch_tabular.models.base_model import BaseModel
 
         component = self.wrapped_model.model[self.model_name].model
-        self.original_forward = component.forward
-        component.forward = pytorch_tabular_forward.__get__(component, BaseModel)
+        self.original_forward = component.compute_head
+        component.compute_head = pytorch_tabular_forward.__get__(component, BaseModel)
 
     def reset_forward(self):
         if self.original_forward is not None:
             component = self.wrapped_model.model[self.model_name].model
-            component.forward = self.original_forward
+            component.compute_head = self.original_forward
 
     @property
     def hidden_rep_dim(self):
