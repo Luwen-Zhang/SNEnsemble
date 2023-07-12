@@ -5,6 +5,7 @@ from src.model import TorchModel
 from ._transformer.models_clustering import *
 from ._transformer.models_with_seq import *
 from ._transformer.models_basic import *
+from itertools import product
 
 
 class Transformer(TorchModel):
@@ -13,71 +14,41 @@ class Transformer(TorchModel):
 
     @staticmethod
     def _get_model_names():
-        return [
-            "FTTransformer",
-            "TransformerLSTM",
-            "TransformerSeq",
-            "SNTransformerLRKMeans",
-            "CategoryEmbedding",
-            "CatEmbedSeq",
-            "SNCatEmbedLRKMeansSeq",
-            "SNCatEmbedLRGMM",
-            "SNCatEmbedLRPCAGMM",
-            "SNCatEmbedLR2LGMM",
-            "SNCatEmbedLR2LPCAGMM",
-            "SNCatEmbedLRBMM",
-            "SNCatEmbedLRPCABMM",
-            "SNCatEmbedLR2LBMM",
-            "SNCatEmbedLR2LPCABMM",
-            "SNCatEmbedLRKMeans",
-            "SNCatEmbedLRPCAKMeans",
-            "SNCatEmbedLR2LKMeans",
-            "SNCatEmbedLR2LPCAKMeans",
-            "SNCategoryEmbedLR2LPCAKMeans",
-            "SNCategoryEmbedLR2LPCAGMM",
-            "SNCategoryEmbedLR2LPCABMM",
-            "SNFTTransLR2LPCAKMeans",
-            "SNFTTransLR2LPCAGMM",
-            "SNFTTransLR2LPCABMM",
-            "SNPyFTTransLRPCAKMeans",
-            "SNPyFTTransLRPCAGMM",
-            "SNPyFTTransLRPCABMM",
-            "SNPyFTTransWrapLRPCAKMeans",
-            "SNPyFTTransWrapLRPCAGMM",
-            "SNPyFTTransWrapLRPCABMM",
-            "SNPyFTTransLR2LPCAKMeans",
-            "SNPyFTTransLR2LPCAGMM",
-            "SNPyFTTransLR2LPCABMM",
-            "SNPyFTTransWrapLR2LPCAKMeans",
-            "SNPyFTTransWrapLR2LPCAGMM",
-            "SNPyFTTransWrapLR2LPCABMM",
-            "SNCategoryEmbedLRPCAKMeans",
-            "SNCategoryEmbedLRPCAGMM",
-            "SNCategoryEmbedLRPCABMM",
-            "SNCategoryEmbedWrapLRPCAKMeans",
-            "SNCategoryEmbedWrapLRPCAGMM",
-            "SNCategoryEmbedWrapLRPCABMM",
-            "SNCategoryEmbedWrapLR2LPCAKMeans",
-            "SNCategoryEmbedWrapLR2LPCAGMM",
-            "SNCategoryEmbedWrapLR2LPCABMM",
-            "SNFTTransWrapLR2LPCAKMeans",
-            "SNFTTransWrapLR2LPCAGMM",
-            "SNFTTransWrapLR2LPCABMM",
-            "SNTabTransLR2LPCAKMeans",
-            "SNTabTransLR2LPCAGMM",
-            "SNTabTransLR2LPCABMM",
-            "SNTabTransWrapLR2LPCAKMeans",
-            "SNTabTransWrapLR2LPCAGMM",
-            "SNTabTransWrapLR2LPCABMM",
-            "SNAutoIntLRPCAKMeans",
-            "SNAutoIntLRPCAGMM",
-            "SNAutoIntLRPCABMM",
-            "SNAutoIntWrapLRPCAKMeans",
-            "SNAutoIntWrapLRPCAGMM",
-            "SNAutoIntWrapLRPCABMM",
-        ]
+        available_names = []
+        try:
+            from .autogluon import AutoGluon
 
-    def _new_model(self, model_name, verbose, **kwargs):
+            available_names += [f"AutoGluon_{x}" for x in AutoGluon._get_model_names()]
+        except:
+            pass
+        try:
+            from .widedeep import WideDeep
+
+            available_names += [f"WideDeep_{x}" for x in WideDeep._get_model_names()]
+        except:
+            pass
+        try:
+            from .pytorch_tabular import PytorchTabular
+
+            available_names += [
+                f"PytorchTabular_{x}" for x in PytorchTabular._get_model_names()
+            ]
+        except:
+            pass
+
+        all_names = [
+            "_".join(x)
+            for x in product(
+                available_names,
+                ["Wrap", "NoWrap"],
+                ["1L", "2L"],
+                ["PCA"],
+                ["KMeans"],
+            )
+        ]
+        return all_names
+
+    def _new_model(self, model_name, verbose, required_models=None, **kwargs):
         fix_kwargs = dict(
             n_inputs=len(self.datamodule.cont_feature_names),
             n_outputs=len(self.datamodule.label_name),
@@ -85,110 +56,35 @@ class Transformer(TorchModel):
             cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
             datamodule=self.datamodule,
         )
-        if model_name == "TransformerLSTM":
-            return TransformerLSTMNN(
-                **fix_kwargs,
-                attn_ff_dim=256,
-                **kwargs,
-            )
-        elif model_name in [
-            "FTTransformer",
-        ]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
-            return cls(
-                **fix_kwargs,
-                **kwargs,
-            )
-        elif model_name in [
-            "TransformerSeq",
-        ]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
-            return cls(
-                **fix_kwargs,
-                attn_ff_dim=256,
-                **kwargs,
-            )
-        elif model_name in ["CategoryEmbedding"]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
-            return cls(
-                **fix_kwargs,
-                embedding_dim=3,
-                **kwargs,
-            )
-        elif model_name in ["CatEmbedSeq"]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
-            return cls(
-                **fix_kwargs,
-                embedding_dim=3,
-                attn_ff_dim=256,
-                **kwargs,
-            )
-        elif model_name in [
-            "SNCatEmbedLRKMeans",
-            "SNCatEmbedLRGMM",
-            "SNCatEmbedLRBMM",
-            "SNCatEmbedLR2LKMeans",
-            "SNCatEmbedLR2LGMM",
-            "SNCatEmbedLR2LBMM",
-        ]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
-            return cls(
-                **fix_kwargs,
-                embedding_dim=3,
-                **kwargs,
-            )
-        elif model_name in [
-            "SNCatEmbedLRPCAKMeans",
-            "SNCatEmbedLRPCAGMM",
-            "SNCatEmbedLRPCABMM",
-            "SNCatEmbedLR2LPCAKMeans",
-            "SNCatEmbedLR2LPCAGMM",
-            "SNCatEmbedLR2LPCABMM",
-            "SNCategoryEmbedLR2LPCAKMeans",
-            "SNCategoryEmbedLR2LPCAGMM",
-            "SNCategoryEmbedLR2LPCABMM",
-            "SNFTTransLR2LPCAKMeans",
-            "SNFTTransLR2LPCAGMM",
-            "SNFTTransLR2LPCABMM",
-            "SNPyFTTransLRPCAKMeans",
-            "SNPyFTTransLRPCAGMM",
-            "SNPyFTTransLRPCABMM",
-            "SNPyFTTransWrapLRPCAKMeans",
-            "SNPyFTTransWrapLRPCAGMM",
-            "SNPyFTTransWrapLRPCABMM",
-            "SNPyFTTransLR2LPCAKMeans",
-            "SNPyFTTransLR2LPCAGMM",
-            "SNPyFTTransLR2LPCABMM",
-            "SNPyFTTransWrapLR2LPCAKMeans",
-            "SNPyFTTransWrapLR2LPCAGMM",
-            "SNPyFTTransWrapLR2LPCABMM",
-            "SNCategoryEmbedLRPCAKMeans",
-            "SNCategoryEmbedLRPCAGMM",
-            "SNCategoryEmbedLRPCABMM",
-            "SNCategoryEmbedWrapLRPCAKMeans",
-            "SNCategoryEmbedWrapLRPCAGMM",
-            "SNCategoryEmbedWrapLRPCABMM",
-            "SNCategoryEmbedWrapLR2LPCAKMeans",
-            "SNCategoryEmbedWrapLR2LPCAGMM",
-            "SNCategoryEmbedWrapLR2LPCABMM",
-            "SNFTTransWrapLR2LPCAKMeans",
-            "SNFTTransWrapLR2LPCAGMM",
-            "SNFTTransWrapLR2LPCABMM",
-            "SNTabTransLR2LPCAKMeans",
-            "SNTabTransLR2LPCAGMM",
-            "SNTabTransLR2LPCABMM",
-            "SNTabTransWrapLR2LPCAKMeans",
-            "SNTabTransWrapLR2LPCAGMM",
-            "SNTabTransWrapLR2LPCABMM",
-            "SNAutoIntLRPCAKMeans",
-            "SNAutoIntLRPCAGMM",
-            "SNAutoIntLRPCABMM",
-            "SNAutoIntWrapLRPCAKMeans",
-            "SNAutoIntWrapLRPCAGMM",
-            "SNAutoIntWrapLRPCABMM",
-        ]:
-            cls = getattr(sys.modules[__name__], f"{model_name.replace('PCA', '')}NN")
-            if "2L" not in model_name:
+        components = model_name.split("_")
+        if "Wrap" in components:
+            cont_cat_model = required_models[
+                f"EXTERN_{components[0]}_{components[1]}_WRAP"
+            ]
+        else:
+            cont_cat_model = required_models[f"EXTERN_{components[0]}_{components[1]}"]
+        if "1L" in components:
+            cls = Abstract1LClusteringModel
+            if "KMeans" in components:
+                sn_class = KMeansSN
+            elif "GMM" in components:
+                sn_class = GMMSN
+            elif "BMM" in components:
+                sn_class = BMMSN
+            else:
+                raise Exception(f"Clustering algorithm not found.")
+        else:
+            cls = Abstract2LClusteringModel
+            if "KMeans" in components:
+                sn_class = TwolayerKMeansSN
+            elif "GMM" in components:
+                sn_class = TwolayerGMMSN
+            elif "BMM" in components:
+                sn_class = TwolayerBMMSN
+            else:
+                raise Exception(f"Clustering algorithm not found.")
+        if "PCA" in components:
+            if "1L" in components:
                 feature_idx = cls.basic_clustering_features_idx(self.datamodule)
             else:
                 feature_idx = cls.top_clustering_features_idx(self.datamodule)
@@ -199,168 +95,26 @@ class Transformer(TorchModel):
                 )
             else:
                 n_pca_dim = len(feature_idx)
-            return cls(
-                **fix_kwargs,
-                embedding_dim=3,
-                n_pca_dim=n_pca_dim,
-                **kwargs,
-            )
-        elif model_name in ["SNCatEmbedLRKMeansSeq"]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
-            return cls(
-                **fix_kwargs,
-                attn_ff_dim=256,
-                **kwargs,
-            )
-        elif model_name in [
-            "SNTransformerLRKMeans",
-        ]:
-            cls = getattr(sys.modules[__name__], f"{model_name}NN")
-            return cls(
-                **fix_kwargs,
-                **kwargs,
-            )
+        else:
+            n_pca_dim = None
+
+        return cls(
+            sn_class=sn_class,
+            **fix_kwargs,
+            embedding_dim=3,
+            n_pca_dim=n_pca_dim,
+            cont_cat_model=cont_cat_model,
+            **kwargs,
+        )
 
     def _space(self, model_name):
-        if model_name == "TransformerLSTM":
+        components = model_name.split("_")
+        if "1L" in components:
             return [
-                Categorical(categories=[2, 4, 8, 16, 32], name="seq_embedding_dim"),
-                Categorical(categories=[8, 16, 32], name="embedding_dim"),
-                Integer(low=1, high=30, prior="uniform", name="n_hidden", dtype=int),
-                Integer(low=1, high=10, prior="uniform", name="lstm_layers", dtype=int),
-                Integer(low=2, high=6, prior="uniform", name="attn_layers", dtype=int),
-                Categorical(categories=[2, 4, 8], name="attn_heads"),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
-            ] + self.trainer.SPACE
-        elif model_name in [
-            "FTTransformer",
-        ]:
-            return [
-                Categorical(categories=[8, 16, 32], name="embedding_dim"),
-                Integer(low=2, high=6, prior="uniform", name="attn_layers", dtype=int),
-                Categorical(categories=[2, 4, 8], name="attn_heads"),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
-            ] + self.trainer.SPACE
-        elif model_name in [
-            "SNTransformerLRKMeans",
-        ]:
-            return [
-                Categorical(categories=[8, 16, 32], name="embedding_dim"),
-                Integer(low=2, high=16, prior="uniform", name="n_clusters", dtype=int),
-                Integer(low=2, high=6, prior="uniform", name="attn_layers", dtype=int),
-                Categorical(categories=[2, 4, 8], name="attn_heads"),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
-            ] + self.trainer.SPACE
-        elif model_name in [
-            "TransformerSeq",
-        ]:
-            return [
-                # ``seq_embedding_dim`` should be able to divided by ``attn_heads``.
-                Categorical(categories=[8, 16, 32], name="seq_embedding_dim"),
-                Categorical(categories=[8, 16, 32], name="embedding_dim"),
-                Integer(low=2, high=6, prior="uniform", name="attn_layers", dtype=int),
-                Categorical(categories=[2, 4, 8], name="attn_heads"),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
-                Integer(
-                    low=2, high=4, prior="uniform", name="seq_attn_layers", dtype=int
-                ),
-                Categorical(categories=[2, 4, 8], name="seq_attn_heads"),
-                Real(low=0.0, high=0.3, prior="uniform", name="seq_attn_dropout"),
-            ] + self.trainer.SPACE
-        elif model_name in ["CategoryEmbedding"]:
-            return [
-                # Integer(
-                #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
-                # ),
-                Real(low=0.0, high=0.5, prior="uniform", name="mlp_dropout"),
-                Real(low=0.0, high=0.5, prior="uniform", name="embed_dropout"),
-            ] + self.trainer.SPACE
-        elif model_name in ["CatEmbedSeq"]:
-            return [
-                # Integer(
-                #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
-                # ),
-                Real(low=0.0, high=0.5, prior="uniform", name="embed_dropout"),
-                Real(low=0.0, high=0.5, prior="uniform", name="mlp_dropout"),
-                Categorical(categories=[16, 32, 64], name="seq_embedding_dim"),
-                Integer(
-                    low=2, high=16, prior="uniform", name="seq_attn_layers", dtype=int
-                ),
-                Categorical(categories=[2, 4, 8, 16], name="seq_attn_heads"),
-                Real(low=0.0, high=0.3, prior="uniform", name="seq_attn_dropout"),
-            ] + self.trainer.SPACE
-        elif model_name in [
-            "SNCatEmbedLRKMeans",
-            "SNCatEmbedLRGMM",
-            "SNCatEmbedLRBMM",
-            "SNCatEmbedLRPCAKMeans",
-            "SNCatEmbedLRPCAGMM",
-            "SNCatEmbedLRPCABMM",
-            "SNPyFTTransLRPCAKMeans",
-            "SNPyFTTransLRPCAGMM",
-            "SNPyFTTransLRPCABMM",
-            "SNPyFTTransWrapLRPCAKMeans",
-            "SNPyFTTransWrapLRPCAGMM",
-            "SNPyFTTransWrapLRPCABMM",
-            "SNAutoIntLRPCAKMeans",
-            "SNAutoIntLRPCAGMM",
-            "SNAutoIntLRPCABMM",
-            "SNAutoIntWrapLRPCAKMeans",
-            "SNAutoIntWrapLRPCAGMM",
-            "SNAutoIntWrapLRPCABMM",
-        ]:
-            return [
-                # Integer(
-                #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
-                # ),
                 Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
             ] + self.trainer.SPACE
-        elif model_name in [
-            "SNCatEmbedLR2LKMeans",
-            "SNCatEmbedLR2LGMM",
-            "SNCatEmbedLR2LBMM",
-            "SNCatEmbedLR2LPCAKMeans",
-            "SNCatEmbedLR2LPCAGMM",
-            "SNCatEmbedLR2LPCABMM",
-            "SNCategoryEmbedLRPCAKMeans",
-            "SNCategoryEmbedLRPCAGMM",
-            "SNCategoryEmbedLRPCABMM",
-            "SNCategoryEmbedWrapLRPCAKMeans",
-            "SNCategoryEmbedWrapLRPCAGMM",
-            "SNCategoryEmbedWrapLRPCABMM",
-            "SNCategoryEmbedLR2LPCAKMeans",
-            "SNCategoryEmbedLR2LPCAGMM",
-            "SNCategoryEmbedLR2LPCABMM",
-            "SNPyFTTransLR2LPCAKMeans",
-            "SNPyFTTransLR2LPCAGMM",
-            "SNPyFTTransLR2LPCABMM",
-            "SNPyFTTransWrapLR2LPCAKMeans",
-            "SNPyFTTransWrapLR2LPCAGMM",
-            "SNPyFTTransWrapLR2LPCABMM",
-            "SNFTTransLR2LPCAKMeans",
-            "SNFTTransLR2LPCAGMM",
-            "SNFTTransLR2LPCABMM",
-            "SNCategoryEmbedWrapLR2LPCAKMeans",
-            "SNCategoryEmbedWrapLR2LPCAGMM",
-            "SNCategoryEmbedWrapLR2LPCABMM",
-            "SNFTTransWrapLR2LPCAKMeans",
-            "SNFTTransWrapLR2LPCAGMM",
-            "SNFTTransWrapLR2LPCABMM",
-            "SNTabTransLR2LPCAKMeans",
-            "SNTabTransLR2LPCAGMM",
-            "SNTabTransLR2LPCABMM",
-            "SNTabTransWrapLR2LPCAKMeans",
-            "SNTabTransWrapLR2LPCAGMM",
-            "SNTabTransWrapLR2LPCABMM",
-        ]:
+        elif "2L" in components:
             return [
-                # Integer(
-                #     low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
-                # ),
                 Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
                 Integer(
                     low=1,
@@ -370,199 +124,43 @@ class Transformer(TorchModel):
                     dtype=int,
                 ),
             ] + self.trainer.SPACE
-        elif model_name in ["SNCatEmbedLRKMeansSeq"]:
-            return [
-                Integer(
-                    low=2, high=32, prior="uniform", name="embedding_dim", dtype=int
-                ),
-                Real(low=0.0, high=0.3, prior="uniform", name="embed_dropout"),
-                Integer(low=1, high=16, prior="uniform", name="n_clusters", dtype=int),
-                Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
-                Categorical(categories=[16, 32, 64], name="seq_embedding_dim"),
-                Integer(
-                    low=2, high=16, prior="uniform", name="seq_attn_layers", dtype=int
-                ),
-                Categorical(categories=[2, 4, 8, 16], name="seq_attn_heads"),
-                Real(low=0.0, high=0.3, prior="uniform", name="seq_attn_dropout"),
-            ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
+        components = model_name.split("_")
         res = {}
-        if model_name == "TransformerLSTM":
-            res = {
-                "seq_embedding_dim": 16,
-                "embedding_dim": 32,
-                "n_hidden": 10,
-                "lstm_layers": 1,
-                "attn_layers": 6,
-                "attn_heads": 8,
-                "embed_dropout": 0.1,
-                "attn_dropout": 0.1,
-            }
-        elif model_name in [
-            "FTTransformer",
-        ]:
-            res = {
-                "embedding_dim": 32,
-                "attn_layers": 6,
-                "attn_heads": 8,
-                "embed_dropout": 0.1,
-                "attn_dropout": 0.1,
-            }
-        elif model_name in [
-            "SNTransformerLRKMeans",
-        ]:
-            res = {
-                "embedding_dim": 32,
-                "n_clusters": 5,
-                "attn_layers": 6,
-                "attn_heads": 8,
-                "embed_dropout": 0.1,
-                "attn_dropout": 0.1,
-            }
-        elif model_name in [
-            "TransformerSeq",
-        ]:
-            res = {
-                "seq_embedding_dim": 16,
-                "embedding_dim": 32,
-                "attn_layers": 6,
-                "attn_heads": 8,
-                "embed_dropout": 0.1,
-                "attn_dropout": 0.1,
-                "seq_attn_layers": 4,
-                "seq_attn_heads": 8,
-                "seq_attn_dropout": 0.1,
-            }
-        elif model_name in [
-            "CategoryEmbedding",
-        ]:
-            res = {
-                # "embedding_dim": 3,
-                "mlp_dropout": 0.0,
-                "embed_dropout": 0.1,
-            }
-        elif model_name in [
-            "CatEmbedSeq",
-        ]:
-            res = {
-                # "embedding_dim": 3,
-                "embed_dropout": 0.1,
-                "mlp_dropout": 0.0,
-                "seq_embedding_dim": 16,
-                "seq_attn_layers": 6,
-                "seq_attn_heads": 8,
-                "seq_attn_dropout": 0.1,
-            }
-        elif model_name in [
-            "SNCatEmbedLRKMeans",
-            "SNCatEmbedLRGMM",
-            "SNCatEmbedLRBMM",
-            "SNCatEmbedLRPCAKMeans",
-            "SNCatEmbedLRPCAGMM",
-            "SNCatEmbedLRPCABMM",
-            "SNPyFTTransLRPCAKMeans",
-            "SNPyFTTransLRPCAGMM",
-            "SNPyFTTransLRPCABMM",
-            "SNPyFTTransWrapLRPCAKMeans",
-            "SNPyFTTransWrapLRPCAGMM",
-            "SNPyFTTransWrapLRPCABMM",
-            "SNAutoIntLRPCAKMeans",
-            "SNAutoIntLRPCAGMM",
-            "SNAutoIntLRPCABMM",
-            "SNAutoIntWrapLRPCAKMeans",
-            "SNAutoIntWrapLRPCAGMM",
-            "SNAutoIntWrapLRPCABMM",
-        ]:
-            res = {
-                # "embedding_dim": 3,
-                "n_clusters": 16,
-            }
-        elif model_name in [
-            "SNCatEmbedLR2LKMeans",
-            "SNCatEmbedLR2LGMM",
-            "SNCatEmbedLR2LBMM",
-            "SNCatEmbedLR2LPCAKMeans",
-            "SNCatEmbedLR2LPCAGMM",
-            "SNCatEmbedLR2LPCABMM",
-            "SNCategoryEmbedLR2LPCAKMeans",
-            "SNCategoryEmbedLR2LPCAGMM",
-            "SNCategoryEmbedLR2LPCABMM",
-            "SNFTTransLR2LPCAKMeans",
-            "SNFTTransLR2LPCAGMM",
-            "SNFTTransLR2LPCABMM",
-            "SNPyFTTransLR2LPCAKMeans",
-            "SNPyFTTransLR2LPCAGMM",
-            "SNPyFTTransLR2LPCABMM",
-            "SNPyFTTransWrapLR2LPCAKMeans",
-            "SNPyFTTransWrapLR2LPCAGMM",
-            "SNPyFTTransWrapLR2LPCABMM",
-            "SNCategoryEmbedLRPCAKMeans",
-            "SNCategoryEmbedLRPCAGMM",
-            "SNCategoryEmbedLRPCABMM",
-            "SNCategoryEmbedWrapLRPCAKMeans",
-            "SNCategoryEmbedWrapLRPCAGMM",
-            "SNCategoryEmbedWrapLRPCABMM",
-            "SNCategoryEmbedWrapLR2LPCAKMeans",
-            "SNCategoryEmbedWrapLR2LPCAGMM",
-            "SNCategoryEmbedWrapLR2LPCABMM",
-            "SNFTTransWrapLR2LPCAKMeans",
-            "SNFTTransWrapLR2LPCAGMM",
-            "SNFTTransWrapLR2LPCABMM",
-            "SNTabTransLR2LPCAKMeans",
-            "SNTabTransLR2LPCAGMM",
-            "SNTabTransLR2LPCABMM",
-            "SNTabTransWrapLR2LPCAKMeans",
-            "SNTabTransWrapLR2LPCAGMM",
-            "SNTabTransWrapLR2LPCABMM",
-        ]:
-            res = {
-                # "embedding_dim": 3,
-                "n_clusters": 16,
-                "n_clusters_per_cluster": 8,
-            }
-        elif model_name in [
-            "SNCatEmbedLRKMeansSeq",
-        ]:
-            res = {
-                "embedding_dim": 3,
-                "embed_dropout": 0.1,
-                "n_clusters": 5,
-                "mlp_dropout": 0.0,
-                "seq_embedding_dim": 16,
-                "seq_attn_layers": 6,
-                "seq_attn_heads": 8,
-                "seq_attn_dropout": 0.1,
-            }
+        if "1L" in components:
+            res = {"n_clusters": 16}
+        elif "2L" in components:
+            res = {"n_clusters": 16, "n_clusters_per_cluster": 8}
         res.update(self.trainer.chosen_params)
         return res
 
     def _conditional_validity(self, model_name: str) -> bool:
+        components = model_name.split("_")
+        if "Wrap" in components and any([model in components for model in ["TabNet"]]):
+            return False
+        if "Wrap" in components and "AutoGluon" in components:
+            return False
+        if "Wrap" in components and "PytorchTabular_NODE" in model_name:
+            return False
         if (
-            model_name in ["SNTransformerLRKMeans"]
-            and "Relative Mean Stress" not in self.datamodule.cont_feature_names
+            "2L" in components
+            and len(
+                AbstractClusteringModel.top_clustering_features_idx(
+                    self.trainer.datamodule
+                )
+            )
+            == 0
         ):
             return False
         return True
 
     def required_models(self, model_name: str) -> Union[List[str], None]:
-        if "SNCatEmbed" in model_name and "Seq" not in model_name:
-            models = ["CategoryEmbedding"]
-        elif "SNCategoryEmbed" in model_name:
-            models = ["EXTERN_PytorchTabular_Category Embedding"]
-        elif "SNFTTrans" in model_name:
-            models = ["EXTERN_WideDeep_FTTransformer"]
-        elif "SNTabTrans" in model_name:
-            models = ["EXTERN_WideDeep_TabTransformer"]
-        elif "SNAutoInt" in model_name:
-            models = ["EXTERN_PytorchTabular_AutoInt"]
-        elif "SNPyFTTrans" in model_name:
-            models = ["EXTERN_PytorchTabular_FTTransformer"]
+        components = model_name.split("_")
+        if "Wrap" in components:
+            models = [f"EXTERN_{components[0]}_{components[1]}_WRAP"]
         else:
-            models = None
-        if models is not None:
-            if "Wrap" in model_name:
-                models = [x + "_WRAP" for x in models]
+            models = [f"EXTERN_{components[0]}_{components[1]}"]
         return models
 
     def _prepare_custom_datamodule(self, model_name):
