@@ -377,10 +377,12 @@ class AbstractGPyTorch(AbstractGP):
         self.likelihood.train(requires_grad)
 
     def _train(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        if isinstance(self.gp, ExactGP):
-            self.gp.set_train_data(X, y.flatten(), strict=False)
+        X = self._before_forward(X, y)
         output = self.gp(X)
         return -self.loss_func(output, y.flatten())
+
+    def _before_forward(self, X, y):
+        return X
 
     def _predict(self, X: torch.Tensor, x: torch.Tensor):
         with torch.no_grad():

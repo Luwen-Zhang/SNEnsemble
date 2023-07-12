@@ -47,6 +47,10 @@ class ExactGPModel(AbstractGPyTorch):
             < 1e-5
         )
 
+    def _before_forward(self, X, y):
+        self.gp.set_train_data(X, y.flatten(), strict=False)
+        return X
+
 
 def train_exact_gp(
     model, likelihood, loss_func, optimizer, X, y, training_iter=50, verbose=True
