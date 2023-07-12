@@ -553,7 +553,8 @@ class AbstractModel:
             data = self._train_data_preprocess(model_name)
             tmp_params = self._get_params(model_name, verbose=verbose)
             space = self._space(model_name=model_name)
-            if self.trainer.args["bayes_opt"] and not warm_start and len(space) > 0:
+            do_bayes_opt = self.trainer.args["bayes_opt"] and not warm_start
+            if do_bayes_opt and len(space) > 0:
                 min_calls = len(tmp_params)
                 callback = BayesCallback(
                     total=self.trainer.args["n_calls"]
@@ -673,6 +674,10 @@ class AbstractModel:
                 tmp_params = self._get_params(
                     model_name=model_name, verbose=verbose
                 )  # to announce the optimized params.
+            elif do_bayes_opt and len(space) == 0:
+                warnings.warn(
+                    f"No hyperparameter space defined for model {model_name}."
+                )
 
             if not warm_start or (warm_start and not self._trained):
                 model = self.new_model(
@@ -776,6 +781,8 @@ class AbstractModel:
         for model_name in self.get_model_names():
             tmp_params = self._get_params(model_name, verbose=False)
             space = self._space(model_name=model_name)
+            if len(space) == 0:
+                continue
             for k, s in zip(tmp_params.keys(), space):
                 if k != s.name:
                     print(
