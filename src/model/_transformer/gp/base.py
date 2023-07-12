@@ -466,6 +466,27 @@ def get_test_case_2d(
     return X, y, grid, plot_grid_x, plot_grid_y
 
 
+def _convert_to_cls(y: torch.Tensor, binary: bool):
+    if binary:
+        y = (y > torch.mean(y)).long()
+    else:
+        y = torch.round(y).long()
+        y = y + torch.abs(torch.min(y))
+    return y
+
+
+def get_cls_test_case_1d(binary=True, *args, **kwargs):
+    X, y, grid = get_test_case_1d(*args, **kwargs)
+    y = _convert_to_cls(y, binary)
+    return X, y, grid
+
+
+def get_cls_test_case_2d(binary=True, *args, **kwargs):
+    X, y, grid, plot_grid_x, plot_grid_y = get_test_case_2d(*args, **kwargs)
+    y = _convert_to_cls(y, binary)
+    return X, y, grid, plot_grid_x, plot_grid_y
+
+
 def plot_mu_var_1d(X, y, grid, mu, var, markersize=2, alpha=0.3, limit_y=True):
     X = X.detach().cpu().numpy().flatten()
     y = y.detach().cpu().numpy().flatten()

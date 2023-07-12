@@ -6,8 +6,17 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch
 import time
-from src.model._transformer.gp.base import get_test_case_1d, get_test_case_2d
-from src.model._transformer.bayes_nn.bbp import BayesByBackprop
+from src.model._transformer.gp.base import (
+    get_test_case_1d,
+    get_test_case_2d,
+    get_cls_test_case_1d,
+    get_cls_test_case_2d,
+)
+from src.model._transformer.bayes_nn.bbp import (
+    BayesByBackprop,
+    MCDropout,
+    _isotropic_gauss_log_likelihood,
+)
 
 
 def to_variable(var=(), cuda=True, volatile=False):
@@ -271,9 +280,158 @@ def bbp(X, y, grid):
     assert torch.allclose(var1, var2), f"Variances are not consistent"
 
 
+def mc_dropout(X, y, grid, type, task):
+    device = "cpu"
+    torch.manual_seed(0)
+    start = time.time()
+    if task == "regression":
+        n_outputs = 1 if len(y.shape) == 1 else y.shape[-1]
+    else:
+        n_outputs = torch.max(y).item() + 1
+    net = MCDropout(
+        n_inputs=1 if len(X.shape) == 1 else X.shape[-1],
+        n_outputs=n_outputs,
+        layers=[64, 32],
+        on_cpu=False,
+        type=type,
+        task=task,
+        lr=0.01,
+    )
+    X = X.to(device)
+    y = y.to(device)
+    net.to(device)
+    net.fit(X, y, n_epoch=5, batch_size=None)
+    train_end = time.time()
+    mu, var = net.predict(grid.to(device), n_samples=10)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    return net, mu, var
+
+
 class TestBBP(unittest.TestCase):
     def test_bbp(self):
         X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3)
         bbp(X, y, grid)
         X, y, grid, _, _ = get_test_case_2d(10)
         bbp(X, y, grid)
+
+    def test_mcdropout_1d_regression(self):
+        X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3, noise=0.2)
+        net_hete, mu_hete, var_hete = mc_dropout(
+            X, y, grid, type="hete", task="regression"
+        )
+        net_homo, mu_homo, var_homo = mc_dropout(
+            X, y, grid, type="homo", task="regression"
+        )
+
+        assert net_hete.type == "hete"
+        assert net_hete.loss_func == _isotropic_gauss_log_likelihood
+        assert isinstance(net_hete.output_act, nn.Identity)
+        assert net_homo.type == "homo"
+        assert net_hete.loss_func == _isotropic_gauss_log_likelihood
+        assert isinstance(net_hete.output_act, nn.Identity)
+
+        assert not torch.allclose(mu_hete, mu_homo)
+        assert not torch.allclose(var_hete, var_homo)
+
+    def test_mcdropout_2d_regression(self):
+        X, y, grid, _, _ = get_test_case_2d(10)
+        net_hete, mu_hete, var_hete = mc_dropout(
+            X, y, grid, type="hete", task="regression"
+        )
+        net_homo, mu_homo, var_homo = mc_dropout(
+            X, y, grid, type="homo", task="regression"
+        )
+
+        assert net_hete.type == "hete"
+        assert net_hete.loss_func == _isotropic_gauss_log_likelihood
+        assert isinstance(net_hete.output_act, nn.Identity)
+        assert net_homo.type == "homo"
+        assert net_hete.loss_func == _isotropic_gauss_log_likelihood
+        assert isinstance(net_hete.output_act, nn.Identity)
+
+        assert not torch.allclose(mu_hete, mu_homo)
+        assert not torch.allclose(var_hete, var_homo)
+
+    def test_mcdropout_1d_classification(self):
+        print("Testing binary")
+        X, y, grid = get_cls_test_case_1d(
+            binary=True, n_samples=100, grid_low=-3, grid_high=3, noise=0.2
+        )
+        net_hete, mu_hete, var_hete = mc_dropout(
+            X, y, grid, type="hete", task="classification"
+        )
+        net_homo, mu_homo, var_homo = mc_dropout(
+            X, y, grid, type="homo", task="classification"
+        )
+
+        assert net_hete.type == "homo"
+        assert isinstance(net_hete.loss_func, nn.BCELoss)
+        assert isinstance(net_hete.output_act, nn.Sigmoid)
+        assert net_hete.n_outputs == 1
+        assert net_homo.type == "homo"
+        assert isinstance(net_homo.loss_func, nn.BCELoss)
+        assert isinstance(net_homo.output_act, nn.Sigmoid)
+        assert net_homo.n_outputs == 1
+
+        assert torch.allclose(mu_hete, mu_homo)
+        assert torch.allclose(var_hete, var_homo)
+
+        print("Testing multi-class")
+        X, y, grid = get_cls_test_case_1d(
+            binary=False, n_samples=100, grid_low=-3, grid_high=3, noise=0.2
+        )
+        net_hete, mu_hete, var_hete = mc_dropout(
+            X, y, grid, type="hete", task="classification"
+        )
+        net_homo, mu_homo, var_homo = mc_dropout(
+            X, y, grid, type="homo", task="classification"
+        )
+
+        assert net_hete.type == "homo"
+        assert isinstance(net_hete.loss_func, nn.NLLLoss)
+        assert isinstance(net_hete.output_act, nn.LogSoftmax)
+        assert net_homo.type == "homo"
+        assert isinstance(net_homo.loss_func, nn.NLLLoss)
+        assert isinstance(net_homo.output_act, nn.LogSoftmax)
+
+        assert torch.allclose(mu_hete, mu_homo)
+        assert torch.allclose(var_hete, var_homo)
+
+    def test_mcdropout_2d_classification(self):
+        print("Testing binary")
+        X, y, grid, _, _ = get_cls_test_case_2d(binary=True, n_samples=10)
+        net_hete, mu_hete, var_hete = mc_dropout(
+            X, y, grid, type="hete", task="classification"
+        )
+        net_homo, mu_homo, var_homo = mc_dropout(
+            X, y, grid, type="homo", task="classification"
+        )
+
+        assert net_hete.type == "homo"
+        assert isinstance(net_hete.loss_func, nn.BCELoss)
+        assert isinstance(net_hete.output_act, nn.Sigmoid)
+        assert net_homo.type == "homo"
+        assert isinstance(net_homo.loss_func, nn.BCELoss)
+        assert isinstance(net_homo.output_act, nn.Sigmoid)
+
+        assert torch.allclose(mu_hete, mu_homo)
+        assert torch.allclose(var_hete, var_homo)
+
+        print("Testing multi-class")
+        X, y, grid, _, _ = get_cls_test_case_2d(binary=False, n_samples=10)
+        net_hete, mu_hete, var_hete = mc_dropout(
+            X, y, grid, type="hete", task="classification"
+        )
+        net_homo, mu_homo, var_homo = mc_dropout(
+            X, y, grid, type="homo", task="classification"
+        )
+
+        assert net_hete.type == "homo"
+        assert isinstance(net_hete.loss_func, nn.NLLLoss)
+        assert isinstance(net_hete.output_act, nn.LogSoftmax)
+        assert net_homo.type == "homo"
+        assert isinstance(net_homo.loss_func, nn.NLLLoss)
+        assert isinstance(net_homo.output_act, nn.LogSoftmax)
+
+        assert torch.allclose(mu_hete, mu_homo)
+        assert torch.allclose(var_hete, var_homo)

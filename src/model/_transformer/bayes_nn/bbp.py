@@ -159,7 +159,6 @@ class AbstractBNN(nn.Module):
         type="hete",
         eps=1e-6,
         init_log_noise=0.0,
-        ignore_aleatoric=False,
         verbose=True,
         **kwargs,
     ):
@@ -172,32 +171,39 @@ class AbstractBNN(nn.Module):
         self.eps = eps
         self.verbose = verbose
         self.optimizer = None
-        self.ignore_aleatoric = ignore_aleatoric
         self.kwargs = kwargs
         self.loss_func = None
-        if ignore_aleatoric:
-            if self.type == "hete":
-                warnings.warn(f"ignore_aleatoric=True, so Homoscedastic model is used.")
-                self.type = "homo"
-            if self.task == "regression":
-                self.loss_func = nn.MSELoss()
-            elif self.task == "classification":
-                self.loss_func = nn.CrossEntropyLoss()
+        self.output_act = nn.Identity()
+        if self.task == "classification":
+            self._force_homo(f"For classification tasks")
+            if self.n_outputs <= 2:
+                # Binary classification is reduced to one-dimensional, and the output is passed through sigmoid.
+                self.n_outputs = 1
+                self.output_act = nn.Sigmoid()
+                self.loss_func = nn.BCELoss()
+            else:
+                self.output_act = nn.LogSoftmax(dim=-1)
+                self.loss_func = nn.NLLLoss()
         else:
-            if self.task == "regression":
+            if self.n_outputs > 1:
+                self._force_homo(f"For multi-output regression tasks")
+                self.loss_func = nn.MSELoss()
+            else:
                 self.loss_func = _isotropic_gauss_log_likelihood
-                if self.type == "homo":
-                    self.log_noise = nn.Parameter(torch.tensor([init_log_noise]))
-            elif self.task == "classification":
-                warnings.warn(
-                    f"For classification tasks, the aleatoric variance will be ignored."
-                )
-                self.type = "homo"
-                self.ignore_aleatoric = True
-                self.loss_func = nn.CrossEntropyLoss()
-
+            if self.type == "homo":
+                self.log_noise = nn.Parameter(torch.tensor([init_log_noise]))
+        if self.n_outputs > 1:
+            warnings.warn(
+                f"Multi-output tasks are not verified because it is not the case for our paper, so I will not take "
+                f"responsibility for the results if you use it in your research."
+            )
         if self.loss_func is None:
             raise Exception(f"Type {self.type} for {task} tasks is not implemented. ")
+
+    def _force_homo(self, msg):
+        if self.type == "hete":
+            warnings.warn(f"{msg}, homoscedastic model is used.")
+        self.type = "homo"
 
     def to_cpu(self, x: torch.Tensor):
         if self.on_cpu:
@@ -246,19 +252,45 @@ class AbstractBNN(nn.Module):
                     samples.append(preds[:, :1])
                     noises.append(preds[:, 1:])
                 else:
-                    samples.append(preds)
-        mean = torch.mean(torch.concat(samples, dim=-1), dim=-1)
-        epistemic_var = torch.var(torch.concat(samples, dim=-1), dim=-1, unbiased=False)
-        if self.type == "hete":
-            stds = torch.exp(torch.concat(noises, dim=-1))
-            aleatoric_var = torch.mean(_safe_pow(stds, 2), dim=-1)
+                    if self.n_outputs > 1:
+                        samples.append(preds.unsqueeze(-1))
+                    else:
+                        samples.append(preds)
+
+        if self.task == "classification" and self.n_outputs > 1:
+            exp_samples = torch.exp(torch.concat(samples, dim=-1))
+            mean = torch.argmax(torch.mean(exp_samples, dim=-1), dim=-1)
+            epistemic_var = torch.var(exp_samples, dim=-1, unbiased=False)[
+                torch.arange(mean.shape[0]), mean
+            ]
         else:
-            if not self.ignore_aleatoric:
+            mean = torch.mean(torch.concat(samples, dim=-1), dim=-1)
+            epistemic_var = torch.var(
+                torch.concat(samples, dim=-1), dim=-1, unbiased=False
+            )
+        if self.task == "classification":
+            # Paper: Uncertainty quantification using Bayesian neural networks in classification: Application to biomedical image segmentation
+            # Paper (same authors): Uncertainty quantification using Bayesian neural networks in classification: Application to ischemic stroke lesion segmentation
+            # See https://github.com/ykwon0407/UQ_BNN/tree/master
+            # For epistemic_var, the described np.mean(p_hat**2, axis=0) - np.mean(p_hat, axis=0)**2 is
+            # consistent with the above torch.var line.
+            if self.n_outputs == 1:
+                p_hat = torch.concat(samples, dim=-1)
+                aleatoric_var = torch.mean(p_hat * (1 - p_hat), dim=-1)
+            else:
+                p_hat = torch.exp(torch.concat(samples, dim=-1))
+                aleatoric_var = torch.mean(p_hat * (1 - p_hat), dim=-1)[
+                    torch.arange(mean.shape[0]), mean
+                ]
+        else:
+            if self.type == "homo":
                 stds = _safe_exp(self.log_noise)
                 aleatoric_var = torch.ones_like(epistemic_var, device=X.device) * stds
             else:
-                aleatoric_var = torch.zeros_like(epistemic_var, device=X.device)
+                stds = torch.exp(torch.concat(noises, dim=-1))
+                aleatoric_var = torch.mean(_safe_pow(stds, 2), dim=-1)
         var = epistemic_var + aleatoric_var
+        mean = mean.float()
         return mean, var
 
     def get_sample_kl_loss(self, kl_loss, batch_size, n_batches, n_samples):
@@ -275,7 +307,22 @@ class AbstractBNN(nn.Module):
                     output, y_hat, _safe_exp(self.log_noise), eps=self.eps
                 ).mean()
         else:
-            fit_loss = self.loss_func(output, y_hat)
+            if isinstance(self.loss_func, nn.NLLLoss):
+                if len(output.shape) == 1 or output.shape[-1] == 1:
+                    raise Exception(
+                        f"Using CrossEntropyLoss, but the output from forward() is a single "
+                        f"column with shape {output.shape}."
+                    )
+                fit_loss = self.loss_func(output, y_hat.flatten().long())
+            elif isinstance(self.loss_func, nn.BCELoss):
+                if len(output.shape) != 1 and output.shape[-1] > 1:
+                    raise Exception(
+                        f"Using BCELoss, but the output from forward() is multi-column "
+                        f"with shape {output.shape}."
+                    )
+                fit_loss = self.loss_func(output.flatten(), y_hat.flatten().float())
+            else:
+                fit_loss = self.loss_func(output, y_hat)
         return fit_loss / n_samples
 
     def _train_step(self, x, y, n_samples, n_batches, **kwargs):
@@ -329,13 +376,16 @@ class BayesByBackprop(AbstractBNN):
     def forward(self, x):
         device, x = self.to_cpu(x)
         kl_loss_total = 0
-        x = x.view(-1, self.n_inputs)
+        if self.n_inputs == 1:
+            x = x.view(-1, self.n_inputs)
 
         for idx, layer in enumerate(self.layers):
             x, kl_loss = layer(x)
             kl_loss_total = kl_loss_total + kl_loss
             if idx != len(self.layers) - 1:
                 x = self.activation(x)
+            else:
+                x = self.output_act(x)
 
         x = self.to_device(x, device)
         kl_loss_total = self.to_device(kl_loss_total, device)
@@ -402,7 +452,7 @@ class MCDropout(AbstractBNN):
         self.layers = get_sequential(
             layers=layers,
             n_inputs=n_inputs,
-            n_outputs=2 * n_outputs if self.type == "hete" else n_outputs,
+            n_outputs=2 * self.n_outputs if self.type == "hete" else self.n_outputs,
             use_norm=False,
             dropout=dropout,
             act_func=nn.ReLU,
@@ -411,8 +461,10 @@ class MCDropout(AbstractBNN):
 
     def forward(self, x):
         device, x = self.to_cpu(x)
-        x = x.view(-1, self.n_inputs)
+        if self.n_inputs == 1:
+            x = x.view(-1, self.n_inputs)
         x = self.layers(x)
+        x = self.output_act(x)
         x = self.to_device(x, device)
         return x
 
@@ -450,9 +502,11 @@ if __name__ == "__main__":
         plot_mu_var_1d,
         get_test_case_2d,
         plot_mu_var_2d,
+        get_cls_test_case_1d,
+        get_cls_test_case_2d,
     )
 
-    device = "cuda"
+    device = "cpu"
     X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3, noise=0.2)
     torch.manual_seed(0)
     start = time.time()
@@ -494,7 +548,6 @@ if __name__ == "__main__":
         layers=[128, 64, 32],
         on_cpu=False,
         type="hete",
-        ignore_aleatoric=False,
         lr=0.01,
     )
     X = X.to(device)
@@ -517,7 +570,112 @@ if __name__ == "__main__":
         layers=[128, 64, 32],
         on_cpu=False,
         type="hete",
-        ignore_aleatoric=False,
+        lr=0.01,
+    )
+    X = X.to(device)
+    y = y.to(device)
+    net.to(device)
+    net.fit(X, y, n_epoch=5000, batch_size=None)
+    train_end = time.time()
+    mu, var = net.predict(grid.to(device), n_samples=1000)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
+
+    X, y, grid = get_cls_test_case_1d(
+        binary=True, n_samples=1000, grid_low=-5, grid_high=10, noise=0.1
+    )
+    torch.manual_seed(0)
+    start = time.time()
+    net = MCDropout(
+        n_inputs=1,
+        n_outputs=torch.max(y).item() + 1,
+        layers=[128, 64, 32],
+        on_cpu=False,
+        type="hete",
+        task="classification",
+        dropout=0.5,
+        lr=0.01,
+    )
+    X = X.to(device)
+    y = y.to(device)
+    net.to(device)
+    net.fit(X, y, n_epoch=5000, batch_size=None)
+    train_end = time.time()
+    mu, var = net.predict(grid.to(device), n_samples=1000)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    plot_mu_var_1d(X, y, grid, mu, var)
+
+    X, y, grid, plot_grid_x, plot_grid_y = get_cls_test_case_2d(
+        binary=True,
+        n_samples=100,
+        grid_low_x=-3,
+        grid_high_x=3,
+        grid_low_y=-3,
+        grid_high_y=3,
+        noise=0.2,
+    )
+    torch.manual_seed(0)
+    start = time.time()
+    net = MCDropout(
+        n_inputs=2,
+        n_outputs=torch.max(y).item() + 1,
+        layers=[128, 64, 32],
+        on_cpu=False,
+        type="hete",
+        task="classification",
+        lr=0.01,
+    )
+    X = X.to(device)
+    y = y.to(device)
+    net.to(device)
+    net.fit(X, y, n_epoch=5000, batch_size=None)
+    train_end = time.time()
+    mu, var = net.predict(grid.to(device), n_samples=1000)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
+
+    X, y, grid = get_cls_test_case_1d(
+        binary=False, n_samples=1000, grid_low=-5, grid_high=10, noise=0.1
+    )
+    torch.manual_seed(0)
+    start = time.time()
+    net = MCDropout(
+        n_inputs=1,
+        n_outputs=torch.max(y).item() + 1,
+        layers=[128, 64, 32],
+        on_cpu=False,
+        type="hete",
+        task="classification",
+        dropout=0.5,
+        lr=0.01,
+    )
+    X = X.to(device)
+    y = y.to(device)
+    net.to(device)
+    net.fit(X, y, n_epoch=5000, batch_size=None)
+    train_end = time.time()
+    mu, var = net.predict(grid.to(device), n_samples=1000)
+    print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
+    plot_mu_var_1d(X, y, grid, mu, var)
+
+    X, y, grid, plot_grid_x, plot_grid_y = get_cls_test_case_2d(
+        binary=False,
+        n_samples=100,
+        grid_low_x=-3,
+        grid_high_x=3,
+        grid_low_y=-3,
+        grid_high_y=3,
+        noise=0.2,
+    )
+    torch.manual_seed(0)
+    start = time.time()
+    net = MCDropout(
+        n_inputs=2,
+        n_outputs=torch.max(y).item() + 1,
+        layers=[128, 64, 32],
+        on_cpu=False,
+        type="hete",
+        task="classification",
         lr=0.01,
     )
     X = X.to(device)
