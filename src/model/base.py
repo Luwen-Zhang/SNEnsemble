@@ -1844,16 +1844,19 @@ def init_weights(m, nonlinearity="leaky_relu"):
         torch.nn.init.kaiming_normal_(m.weight, nonlinearity=nonlinearity)
 
 
-class TrainingDropout(nn.Module):
+class AdaptiveDropout(nn.Module):
     keep_dropout = False
+    global_p = None
 
     def __init__(self, p):
-        super(TrainingDropout, self).__init__()
+        super(AdaptiveDropout, self).__init__()
         self.p = p
 
     def forward(self, x):
         return nn.functional.dropout(
-            x, p=self.p, training=self.training or TrainingDropout.keep_dropout
+            x,
+            p=self.p if AdaptiveDropout.global_p is None else AdaptiveDropout.global_p,
+            training=self.training or AdaptiveDropout.keep_dropout,
         )
 
     @classmethod
@@ -1862,12 +1865,18 @@ class TrainingDropout(nn.Module):
 
 
 class KeepDropout:
+    def __init__(self, p=None):
+        self.p = p
+
     def __enter__(self):
-        self.state = TrainingDropout.keep_dropout
-        TrainingDropout.set(True)
+        self.state = AdaptiveDropout.keep_dropout
+        AdaptiveDropout.set(True)
+        if self.p is not None:
+            AdaptiveDropout.global_p = self.p
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        TrainingDropout.set(self.state)
+        AdaptiveDropout.set(self.state)
+        AdaptiveDropout.global_p = None
 
 
 def get_sequential(
@@ -1880,7 +1889,7 @@ def get_sequential(
     norm_type="batch",
     out_activate=False,
     out_norm_dropout=False,
-    dropout_keep_training=False,
+    adaptive_dropout=False,
 ):
     net = nn.Sequential()
     if norm_type == "batch":
@@ -1895,8 +1904,8 @@ def get_sequential(
         nonlinearity = "leaky_relu"
     else:
         nonlinearity = "leaky_relu"
-    if dropout_keep_training:
-        dp = TrainingDropout
+    if adaptive_dropout:
+        dp = AdaptiveDropout
     else:
         dp = nn.Dropout
     if len(layers) > 0:

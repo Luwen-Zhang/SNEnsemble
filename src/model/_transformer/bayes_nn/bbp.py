@@ -255,7 +255,7 @@ class AbstractBNN(nn.Module):
                 self.optimizer.step()
             self.on_train_epoch_end(X, y, epoch, n_epoch)
 
-    def predict(self, X, n_samples=100):
+    def predict(self, X, n_samples=100, return_separate_var=False):
         self.eval()
         with torch.no_grad():
             preds = self._predict_step(X, n_samples).to(X.device)
@@ -295,7 +295,10 @@ class AbstractBNN(nn.Module):
                 aleatoric_var = torch.mean(_safe_pow(stds, 2), dim=0)
         var = epistemic_var + aleatoric_var
         mean = mean.float()
-        return mean.squeeze(), var.squeeze()
+        if return_separate_var:
+            return mean.squeeze(), aleatoric_var.squeeze(), epistemic_var.squeeze()
+        else:
+            return mean.squeeze(), var.squeeze()
 
     def get_sample_kl_loss(self, kl_loss, batch_size, n_batches):
         return kl_loss / batch_size / n_batches
@@ -444,21 +447,32 @@ class BayesByBackprop(AbstractBNN):
 
 
 class MCDropout(AbstractBNN):
-    def __init__(self, n_inputs, n_outputs, layers, dropout=0.2, **kwargs):
+    def __init__(
+        self,
+        n_inputs,
+        n_outputs,
+        layers,
+        train_dropout=1e-9,
+        sample_dropout=0.1,
+        **kwargs,
+    ):
         super(MCDropout, self).__init__(
             n_inputs=n_inputs, n_outputs=n_outputs, **kwargs
         )
         from src.model.base import get_sequential
 
+        self.sample_dropout = sample_dropout
         # network with two hidden and one output layer
+        if train_dropout == 0.0:
+            train_dropout = 1e-9
         self.layers = get_sequential(
             layers=layers,
             n_inputs=n_inputs,
             n_outputs=2 * self.n_outputs if self.type == "hete" else self.n_outputs,
             use_norm=False,
-            dropout=dropout,
+            dropout=train_dropout,
             act_func=nn.ReLU,
-            dropout_keep_training=True,
+            adaptive_dropout=True,
         )
 
     def forward(self, x):
@@ -479,7 +493,7 @@ class MCDropout(AbstractBNN):
 
     def _predict_step(self, X, n_samples):
         sample_x = X.unsqueeze(0).repeat(n_samples, 1, 1)
-        with KeepDropout():
+        with KeepDropout(self.sample_dropout):
             res = self(sample_x)
         return res
 
@@ -544,7 +558,7 @@ if __name__ == "__main__":
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
     plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
 
-    X, y, grid = get_test_case_1d(100, grid_low=-5, grid_high=5, noise=0.0)
+    X, y, grid = get_test_case_1d(100, grid_low=-20, grid_high=20, noise=0.0)
     torch.manual_seed(0)
     start = time.time()
     net = MCDropout(
@@ -553,13 +567,14 @@ if __name__ == "__main__":
         layers=[128, 64, 32],
         on_cpu=False,
         type="homo",
-        dropout=0.5,
+        train_dropout=0.0,
+        sample_dropout=0.1,
         lr=0.01,
     )
     X = X.to(device)
     y = y.to(device)
     net.to(device)
-    net.fit(X, y, n_epoch=1000, batch_size=None)
+    net.fit(X, y, n_epoch=5000, batch_size=None)
     train_end = time.time()
     mu, var = net.predict(grid.to(device), n_samples=1000)
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
@@ -599,7 +614,8 @@ if __name__ == "__main__":
         on_cpu=False,
         type="hete",
         task="classification",
-        dropout=0.5,
+        train_dropout=0.0,
+        sample_dropout=0.1,
         lr=0.01,
     )
     X = X.to(device)
@@ -652,7 +668,8 @@ if __name__ == "__main__":
         on_cpu=False,
         type="hete",
         task="classification",
-        dropout=0.5,
+        train_dropout=0.0,
+        sample_dropout=0.1,
         lr=0.01,
     )
     X = X.to(device)
