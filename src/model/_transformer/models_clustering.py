@@ -5,6 +5,7 @@ import numpy as np
 from .clustering.singlelayer import KMeansSN, GMMSN, BMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN, TwolayerBMMSN
 from .gp.exact_gp import ExactGPModel
+from .bayes_nn.bbp import MCDropout
 import torch
 from torch import nn
 from ..widedeep import WideDeepWrapper
@@ -23,7 +24,7 @@ class AbstractClusteringModel(AbstractNN):
         cont_cat_model,
         layers,
         ridge_penalty: float = 0.0,
-        use_gp: bool = True,
+        uncertainty: str = "gp",
         **kwargs,
     ):
         super(AbstractClusteringModel, self).__init__(datamodule, **kwargs)
@@ -35,29 +36,38 @@ class AbstractClusteringModel(AbstractNN):
         self.use_hidden_rep, hidden_rep_dim = self._test_required_model(
             n_inputs, self.cont_cat_model
         )
-        if use_gp:
+        self.uncertainty = uncertainty
+        if uncertainty == "gp":
             self.gp = ExactGPModel(dynamic_input=True)
             import gpytorch
 
             gpytorch.settings.debug._set_state(src.setting["debug_mode"])
         else:
             self.gp = None
-        if not self.use_hidden_rep:
-            self.cls_head = get_sequential(
-                [128, 64, 32],
+        if uncertainty == "bnn":
+            self.cls_head = MCDropout(
+                layers=[128, 64, 32],
                 n_inputs=hidden_rep_dim,
-                n_outputs=n_outputs,
-                act_func=nn.ReLU,
-                dropout=0,
-                use_norm=False,
+                n_outputs=2,
+                train_dropout=0.1,
+                sample_dropout=0.1,
+                type="homo",
+                task="classification",
             )
         else:
-            self.cls_head = get_linear(
-                n_inputs=hidden_rep_dim, n_outputs=n_outputs, nonlinearity="relu"
+            self.cls_head = nn.Sequential(
+                get_sequential(
+                    [128, 64, 32],
+                    n_inputs=hidden_rep_dim,
+                    n_outputs=1,
+                    act_func=nn.ReLU,
+                    dropout=0,
+                    use_norm=False,
+                ),
+                nn.Sigmoid(),
             )
         self.ridge_penalty = ridge_penalty
-        self.cls_head_normalize = nn.Sigmoid()
-        self.cls_head_loss = nn.CrossEntropyLoss()
+        self.cls_head_loss = nn.BCELoss()
         if isinstance(self.cont_cat_model, nn.Module):
             self.set_requires_grad(self.cont_cat_model, requires_grad=False)
 
@@ -88,18 +98,21 @@ class AbstractClusteringModel(AbstractNN):
             x, self.clustering_features, derived_tensors
         )
         # Projection from hidden output to deep learning weights
-        dl_weight = self.cls_head_normalize(self.cls_head(hidden))
-        if self.gp is not None:
-            mu, var = self.gp(hidden, dl_weight)
+        dl_weight = self.cls_head(hidden)
+        if self.uncertainty is not None:
+            if self.uncertainty == "gp":
+                mu, var = self.gp(hidden, dl_weight)
+            else:
+                mu, al_var, var = self.cls_head.predict(
+                    hidden, n_samples=100, return_separate_var=True
+                )
             std = torch.sqrt(var)
             uncertain_dl_weight = torch.clamp(dl_weight - std.view(-1, 1), min=1e-8)
             self.uncertain_dl_weight = uncertain_dl_weight
             self.mu = mu
             self.std = std
-            out = phy_pred + torch.mul(uncertain_dl_weight, dl_pred - phy_pred)
-        else:
-            # Weighted sum of prediction
-            out = phy_pred + torch.mul(dl_weight, dl_pred - phy_pred)
+            # out = phy_pred + torch.mul(uncertain_dl_weight, dl_pred - phy_pred)
+        out = phy_pred + torch.mul(dl_weight, dl_pred - phy_pred)
         self.dl_pred = dl_pred
         self.phy_pred = phy_pred
         self.dl_weight = dl_weight
@@ -110,17 +123,11 @@ class AbstractClusteringModel(AbstractNN):
         self.dl_loss = self.default_loss_fn(self.dl_pred, y_true)
         # Train the classification head
         # If the error of dl predictions is lower, cls_label is 0
-        cls_label = (
-            torch.heaviside(
-                torch.abs(self.dl_pred - y_true) - torch.abs(self.phy_pred - y_true),
-                torch.tensor([0.0], device=y_true.device),
-            )
-            .flatten()
-            .long()
+        cls_label = torch.heaviside(
+            torch.abs(self.dl_pred - y_true) - torch.abs(self.phy_pred - y_true),
+            torch.tensor([0.0], device=y_true.device),
         )
-        self.cls_loss = self.cls_head_loss(
-            torch.concat([self.dl_weight, 1 - self.dl_weight], dim=1), cls_label
-        )
+        self.cls_loss = self.cls_head_loss(self.dl_weight, 1 - cls_label)
         self.output_loss = self.default_loss_fn(y_pred, y_true)
         # Train Least Square
         sum_weight = self.clustering_sn_model.nk[self.clustering_sn_model.x_cluster]
@@ -148,7 +155,7 @@ class AbstractClusteringModel(AbstractNN):
         return self.output_loss
 
     def configure_optimizers(self):
-        all_optimizer = torch.optim.Adam(
+        cls_optimizer = torch.optim.Adam(
             list(self.cls_head.parameters()),
             lr=self.hparams.lr,
             weight_decay=self.hparams.weight_decay,
@@ -161,19 +168,19 @@ class AbstractClusteringModel(AbstractNN):
         lstsq_optimizer = [sn.get_optimizer() for sn in self.clustering_sn_model.sns]
         if self.gp is not None:
             gp_optimizer = self.gp._get_optimizer(**self.gp.kwargs)
-            return [all_optimizer, ridge_optimizer, gp_optimizer] + lstsq_optimizer
+            return [cls_optimizer, ridge_optimizer, gp_optimizer] + lstsq_optimizer
         else:
-            return [all_optimizer, ridge_optimizer] + lstsq_optimizer
+            return [cls_optimizer, ridge_optimizer] + lstsq_optimizer
 
     def cal_backward_step(self, loss):
         optimizers = self.optimizers()
         if self.gp is not None:
-            all_optimizer = optimizers[0]
+            cls_optimizer = optimizers[0]
             ridge_optimizer = optimizers[1]
             gp_optimizer = optimizers[2]
             lstsq_optimizers = optimizers[3:]
         else:
-            all_optimizer = optimizers[0]
+            cls_optimizer = optimizers[0]
             ridge_optimizer = optimizers[1]
             lstsq_optimizers = optimizers[2:]
             gp_optimizer = None
@@ -219,7 +226,7 @@ class AbstractClusteringModel(AbstractNN):
         # 4th back-propagation: for deep learning backbones.
         # self.manual_backward(self.dl_loss)
 
-        all_optimizer.step()
+        cls_optimizer.step()
         for optimizer in lstsq_optimizers:
             optimizer.step()
         ridge_optimizer.step()
