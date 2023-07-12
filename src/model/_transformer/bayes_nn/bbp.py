@@ -2,6 +2,12 @@
 This is a modification of https://github.com/JavierAntoran/Bayesian-Neural-Networks/blob/master/notebooks/regression/bbp_hetero.ipynb
 improved by comparing https://github.com/JavierAntoran/Bayesian-Neural-Networks/blob/master/src/Bayes_By_Backprop/model.py (for stability and classification tasks)
 and further improved by https://github.com/JavierAntoran/Bayesian-Neural-Networks/blob/master/src/Bayes_By_Backprop_Local_Reparametrization/model.py (for local reparameterization)
+The MC Dropout model is implemented under the consistent framework. https://github.com/JavierAntoran/Bayesian-Neural-Networks/blob/master/notebooks/regression/mc_dropout_hetero.ipynb
+For classification tasks, the uncertainty is accessed by the approach proposed by two papers written by Y Kwon et al.:
+    1. Uncertainty quantification using Bayesian neural networks in classification: Application to biomedical image segmentation
+    2. Uncertainty quantification using Bayesian neural networks in classification: Application to ischemic stroke lesion segmentation
+Parallel MC sampling is also implemented.
+WARNING: Multi-output regression/classification tasks are not well tested because it is not the case for our paper.
 """
 
 import time
@@ -102,10 +108,10 @@ class BayesLinearLayer(nn.Module):
                 F.softplus(self.bias_rhos, beta=1, threshold=20), eps=self.eps
             )
             if self.local_reparam:
-                act_weight_mus = torch.mm(x, self.weight_mus)
+                act_weight_mus = torch.matmul(x, self.weight_mus)
                 act_weight_stds = torch.sqrt(
                     _safe_positive(
-                        torch.mm(_safe_pow(x, 2), _safe_pow(weight_stds, 2)),
+                        torch.matmul(_safe_pow(x, 2), _safe_pow(weight_stds, 2)),
                         eps=self.eps,
                     )
                 )
@@ -113,13 +119,17 @@ class BayesLinearLayer(nn.Module):
                 out_weight_sample = act_weight_mus + act_weight_stds * weight_epsilons
             else:
                 # sample Gaussian noise for each weight and each bias
-                weight_epsilons = torch.randn_like(self.weight_mus, device=x.device)
+                weight_epsilons = torch.randn(
+                    *list(x.shape[:-2] + self.weight_mus.shape), device=x.device
+                )
                 # calculate samples from the posterior from the sampled noise and mus/stds
                 weight_sample = self.weight_mus + weight_epsilons * weight_stds
-                out_weight_sample = torch.mm(x, weight_sample)
-            bias_epsilons = torch.randn_like(self.bias_mus, device=x.device)
+                out_weight_sample = torch.matmul(x, weight_sample)
+            bias_epsilons = torch.randn(
+                *list(x.shape[:-2] + self.bias_mus.shape), device=x.device
+            )
             bias_sample = self.bias_mus + bias_epsilons * bias_stds
-            output = out_weight_sample + bias_sample
+            output = out_weight_sample + bias_sample.unsqueeze(1)
 
             # computing the KL loss term
             weight_kl = _gauss_kl(
@@ -145,7 +155,7 @@ class BayesLinearLayer(nn.Module):
             """
             return output, weight_kl.sum() + bias_kl.sum()
         else:
-            output = torch.mm(x, self.weight_mus) + self.bias_mus
+            output = torch.matmul(x, self.weight_mus) + self.bias_mus
             return output, None
 
 
@@ -244,42 +254,33 @@ class AbstractBNN(nn.Module):
             self.on_train_epoch_end(X, y, epoch, n_epoch)
 
     def predict(self, X, n_samples=100):
-        samples, noises = [], []
         with torch.no_grad():
-            for i in range(n_samples):
-                preds = self._predict_step(X).to(X.device)
-                if self.type == "hete":
-                    samples.append(preds[:, :1])
-                    noises.append(preds[:, 1:])
-                else:
-                    if self.n_outputs > 1:
-                        samples.append(preds.unsqueeze(-1))
-                    else:
-                        samples.append(preds)
+            preds = self._predict_step(X, n_samples).to(X.device)
+            if self.type == "hete":
+                samples = preds[:, :, :1]
+                noises = preds[:, :, 1:]
+            else:
+                samples = preds
 
         if self.task == "classification" and self.n_outputs > 1:
-            exp_samples = torch.exp(torch.concat(samples, dim=-1))
-            mean = torch.argmax(torch.mean(exp_samples, dim=-1), dim=-1)
-            epistemic_var = torch.var(exp_samples, dim=-1, unbiased=False)[
+            exp_samples = torch.exp(samples)
+            mean = torch.argmax(torch.mean(exp_samples, dim=0), dim=-1)
+            epistemic_var = torch.var(exp_samples, dim=0, unbiased=False)[
                 torch.arange(mean.shape[0]), mean
             ]
         else:
-            mean = torch.mean(torch.concat(samples, dim=-1), dim=-1)
-            epistemic_var = torch.var(
-                torch.concat(samples, dim=-1), dim=-1, unbiased=False
-            )
+            mean = torch.mean(samples, dim=0)
+            epistemic_var = torch.var(samples, dim=0, unbiased=False)
         if self.task == "classification":
-            # Paper: Uncertainty quantification using Bayesian neural networks in classification: Application to biomedical image segmentation
-            # Paper (same authors): Uncertainty quantification using Bayesian neural networks in classification: Application to ischemic stroke lesion segmentation
             # See https://github.com/ykwon0407/UQ_BNN/tree/master
             # For epistemic_var, the described np.mean(p_hat**2, axis=0) - np.mean(p_hat, axis=0)**2 is
             # consistent with the above torch.var line.
             if self.n_outputs == 1:
-                p_hat = torch.concat(samples, dim=-1)
-                aleatoric_var = torch.mean(p_hat * (1 - p_hat), dim=-1)
+                p_hat = samples
+                aleatoric_var = torch.mean(p_hat * (1 - p_hat), dim=0)
             else:
-                p_hat = torch.exp(torch.concat(samples, dim=-1))
-                aleatoric_var = torch.mean(p_hat * (1 - p_hat), dim=-1)[
+                p_hat = torch.exp(samples)
+                aleatoric_var = torch.mean(p_hat * (1 - p_hat), dim=0)[
                     torch.arange(mean.shape[0]), mean
                 ]
         else:
@@ -287,48 +288,50 @@ class AbstractBNN(nn.Module):
                 stds = _safe_exp(self.log_noise)
                 aleatoric_var = torch.ones_like(epistemic_var, device=X.device) * stds
             else:
-                stds = torch.exp(torch.concat(noises, dim=-1))
-                aleatoric_var = torch.mean(_safe_pow(stds, 2), dim=-1)
+                stds = torch.exp(noises)
+                aleatoric_var = torch.mean(_safe_pow(stds, 2), dim=0)
         var = epistemic_var + aleatoric_var
         mean = mean.float()
-        return mean, var
+        return mean.squeeze(), var.squeeze()
 
-    def get_sample_kl_loss(self, kl_loss, batch_size, n_batches, n_samples):
-        return kl_loss / batch_size / n_batches / n_samples
+    def get_sample_kl_loss(self, kl_loss, batch_size, n_batches):
+        return kl_loss / batch_size / n_batches
 
-    def get_sample_fitness_loss(self, output, y_hat, n_samples):
+    def get_sample_fitness_loss(self, output, y_hat):
         if self.loss_func == _isotropic_gauss_log_likelihood:
+            # _isotropic_gauss_log_likelihood is compatible with batched output.
             if self.type == "hete":
                 fit_loss = -self.loss_func(
-                    output[:, :1], y_hat, _safe_exp(output[:, 1:]), eps=self.eps
+                    output[:, :, :1],
+                    y_hat.unsqueeze(0),
+                    _safe_exp(output[:, :, 1:]),
+                    eps=self.eps,
                 ).mean()
             else:
                 fit_loss = -self.loss_func(
-                    output, y_hat, _safe_exp(self.log_noise), eps=self.eps
+                    output, y_hat.unsqueeze(0), _safe_exp(self.log_noise), eps=self.eps
                 ).mean()
         else:
-            if isinstance(self.loss_func, nn.NLLLoss):
-                if len(output.shape) == 1 or output.shape[-1] == 1:
-                    raise Exception(
-                        f"Using CrossEntropyLoss, but the output from forward() is a single "
-                        f"column with shape {output.shape}."
+            fit_loss = 0
+            for i_batch in range(output.shape[0]):
+                if isinstance(self.loss_func, nn.NLLLoss):
+                    batch_fit_loss = self.loss_func(
+                        output[i_batch], y_hat.flatten().long()
                     )
-                fit_loss = self.loss_func(output, y_hat.flatten().long())
-            elif isinstance(self.loss_func, nn.BCELoss):
-                if len(output.shape) != 1 and output.shape[-1] > 1:
-                    raise Exception(
-                        f"Using BCELoss, but the output from forward() is multi-column "
-                        f"with shape {output.shape}."
+                elif isinstance(self.loss_func, nn.BCELoss):
+                    batch_fit_loss = self.loss_func(
+                        output[i_batch].flatten(), y_hat.flatten().float()
                     )
-                fit_loss = self.loss_func(output.flatten(), y_hat.flatten().float())
-            else:
-                fit_loss = self.loss_func(output, y_hat)
-        return fit_loss / n_samples
+                else:
+                    batch_fit_loss = self.loss_func(output[i_batch], y_hat)
+                fit_loss = fit_loss + batch_fit_loss
+            fit_loss = fit_loss / output.shape[0]
+        return fit_loss
 
     def _train_step(self, x, y, n_samples, n_batches, **kwargs):
         raise NotImplementedError
 
-    def _predict_step(self, X):
+    def _predict_step(self, X, n_samples):
         raise NotImplementedError
 
     def on_train_epoch_start(self, X, y):
@@ -376,8 +379,8 @@ class BayesByBackprop(AbstractBNN):
     def forward(self, x):
         device, x = self.to_cpu(x)
         kl_loss_total = 0
-        if self.n_inputs == 1:
-            x = x.view(-1, self.n_inputs)
+        if self.n_inputs == 1 and x.shape[-1] != self.n_inputs:
+            x = x.unsqueeze(-1)
 
         for idx, layer in enumerate(self.layers):
             x, kl_loss = layer(x)
@@ -391,34 +394,30 @@ class BayesByBackprop(AbstractBNN):
         kl_loss_total = self.to_device(kl_loss_total, device)
         return x, kl_loss_total
 
-    def get_sample_loss(self, output, y_hat, kl_loss, batch_size, n_batches, n_samples):
-        return self.get_sample_fitness_loss(
-            output, y_hat, n_samples
-        ), self.get_sample_kl_loss(kl_loss, batch_size, n_batches, n_samples)
+    def get_sample_loss(self, output, y_hat, kl_loss, batch_size, n_batches):
+        return self.get_sample_fitness_loss(output, y_hat), self.get_sample_kl_loss(
+            kl_loss, batch_size, n_batches
+        )
 
     def _train_step(self, x, y, n_samples, n_batches, **kwargs):
-        fit_loss_step = 0
-        kl_loss_step = 0
-        for i in range(n_samples):
-            output, kl_loss = self(x)
-            fit_loss_sample, kl_loss_sample = self.get_sample_loss(
-                output,
-                y,
-                kl_loss,
-                batch_size=x.shape[0],
-                n_batches=n_batches,
-                n_samples=n_samples,
-            )
-            fit_loss_step = fit_loss_step + fit_loss_sample
-            kl_loss_step = kl_loss_step + kl_loss_sample
+        sample_x = x.unsqueeze(0).repeat(n_samples, 1, 1)
+        output, kl_loss = self(sample_x)
+        fit_loss_step, kl_loss_step = self.get_sample_loss(
+            output,
+            y,
+            kl_loss,
+            batch_size=x.shape[0],
+            n_batches=n_batches,
+        )
         total_loss = fit_loss_step + self.kl_weight * kl_loss_step
         if self.verbose:
             self.fit_loss_epoch += fit_loss_step.item() * x.shape[0]
             self.kl_loss_epoch += kl_loss_step.item() * x.shape[0]
         return total_loss
 
-    def _predict_step(self, X):
-        return self(X)[0]
+    def _predict_step(self, X, n_samples):
+        sample_x = X.unsqueeze(0).repeat(n_samples, 1, 1)
+        return self(sample_x)[0]
 
     def on_train_epoch_start(self, X, y):
         if self.verbose:
@@ -461,8 +460,8 @@ class MCDropout(AbstractBNN):
 
     def forward(self, x):
         device, x = self.to_cpu(x)
-        if self.n_inputs == 1:
-            x = x.view(-1, self.n_inputs)
+        if self.n_inputs == 1 and x.shape[-1] != self.n_inputs:
+            x = x.unsqueeze(-1)
         x = self.layers(x)
         x = self.output_act(x)
         x = self.to_device(x, device)
@@ -470,13 +469,14 @@ class MCDropout(AbstractBNN):
 
     def _train_step(self, x, y, **kwargs):
         output = self(x)
-        fit_loss_step = self.get_sample_fitness_loss(output, y, n_samples=1)
+        fit_loss_step = self.get_sample_fitness_loss(output.unsqueeze(0), y)
         if self.verbose:
             self.fit_loss_epoch += fit_loss_step * x.shape[0]
         return fit_loss_step
 
-    def _predict_step(self, X):
-        return self(X)
+    def _predict_step(self, X, n_samples):
+        sample_x = X.unsqueeze(0).repeat(n_samples, 1, 1)
+        return self(sample_x)
 
     def on_train_epoch_start(self, X, y):
         if self.verbose:
@@ -516,7 +516,7 @@ if __name__ == "__main__":
     X = X.to(device)
     y = y.to(device)
     net.to(device)
-    net.fit(X, y, n_epoch=2000, n_samples=10, batch_size=None)
+    net.fit(X, y, n_epoch=1000, n_samples=10, batch_size=None)
     train_end = time.time()
     mu, var = net.predict(grid.to(device), n_samples=100)
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
@@ -539,7 +539,7 @@ if __name__ == "__main__":
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
     plot_mu_var_2d(X, y, grid, mu, var, plot_grid_x, plot_grid_y)
 
-    X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3, noise=0.2)
+    X, y, grid = get_test_case_1d(100, grid_low=-5, grid_high=5, noise=0.0)
     torch.manual_seed(0)
     start = time.time()
     net = MCDropout(
@@ -547,13 +547,14 @@ if __name__ == "__main__":
         n_outputs=1,
         layers=[128, 64, 32],
         on_cpu=False,
-        type="hete",
+        type="homo",
+        dropout=0.5,
         lr=0.01,
     )
     X = X.to(device)
     y = y.to(device)
     net.to(device)
-    net.fit(X, y, n_epoch=5000, batch_size=None)
+    net.fit(X, y, n_epoch=1000, batch_size=None)
     train_end = time.time()
     mu, var = net.predict(grid.to(device), n_samples=1000)
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")

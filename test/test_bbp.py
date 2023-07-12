@@ -235,7 +235,7 @@ def bbp(X, y, grid):
     total_loss = np.zeros(num_epochs)
 
     for i in range(num_epochs):
-        fit_loss, KL_loss = net.fit(X, y, no_samples=10)
+        fit_loss, KL_loss = net.fit(X, y, no_samples=1)
         fit_loss_train[i] += fit_loss.cpu().data.numpy()
         KL_loss_train[i] += KL_loss.cpu().data.numpy()
 
@@ -249,7 +249,7 @@ def bbp(X, y, grid):
     train_end = time.time()
     net.network.eval()
     samples, noises = [], []
-    for i in range(5):
+    for i in range(1):
         preds = net.network.forward(grid)[0]
         samples.append(preds[:, 0].cpu().data.numpy())
         noises.append(preds[:, 1].exp().cpu().data.numpy())
@@ -271,9 +271,9 @@ def bbp(X, y, grid):
     net2 = BayesByBackprop(
         n_inputs=X.shape[1], n_outputs=1, n_hidden=10, on_cpu=True, eps=0.0
     )
-    net2.fit(X, y, n_epoch=5, n_samples=10, batch_size=None)
+    net2.fit(X, y, n_epoch=5, n_samples=1, batch_size=None)
     train_end = time.time()
-    mu2, var2 = net2.predict(grid, n_samples=5)
+    mu2, var2 = net2.predict(grid, n_samples=1)
     print(f"Train {train_end - start} s, Predict {time.time() - train_end} s")
 
     assert torch.allclose(mu1, mu2), f"Means are not consistent"
