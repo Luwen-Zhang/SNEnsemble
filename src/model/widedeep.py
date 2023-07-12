@@ -397,6 +397,8 @@ def widedeep_forward(self, input):
 class WideDeepWrapper(AbstractWrapper):
     def __init__(self, model: WideDeep):
         super(WideDeepWrapper, self).__init__(model=model)
+        if self.model_name == "TabNet":
+            raise Exception(f"Wrapping TabNet is not supported.")
 
     def wrap_forward(self):
         component = self.wrapped_model.model[self.model_name].model.deeptabular

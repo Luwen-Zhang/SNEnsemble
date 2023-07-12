@@ -387,6 +387,8 @@ def pytorch_tabular_forward(self, backbone_features: torch.Tensor) -> Dict[str, 
 class PytorchTabularWrapper(AbstractWrapper):
     def __init__(self, model: PytorchTabular):
         super(PytorchTabularWrapper, self).__init__(model=model)
+        if self.model_name == "TabNet":
+            raise Exception(f"Wrapping TabNet is not supported.")
 
     def wrap_forward(self):
         from pytorch_tabular.models.base_model import BaseModel
