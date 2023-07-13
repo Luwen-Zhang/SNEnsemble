@@ -170,6 +170,21 @@ def plot_importance(ax, features, attr, pal, clr_map, **kwargs):
     legend.get_frame().set_facecolor([1, 1, 1, 0.4])
 
 
+def get_figsize(n, max_col, width_per_item, height_per_item, max_width):
+    if n > max_col:
+        width = max_col
+        if n % max_col == 0:
+            height = n // max_col
+        else:
+            height = n // max_col + 1
+        figsize = (max_width, height_per_item * height)
+    else:
+        figsize = (width_per_item * n, height_per_item)
+        width = n
+        height = 1
+    return figsize, width, height
+
+
 def plot_pdp(
     feature_names,
     cat_feature_names,
@@ -183,19 +198,13 @@ def plot_pdp(
     lower_lim=2,
     upper_lim=7,
 ):
-    max_col = 4
-    if len(feature_names) > max_col:
-        width = max_col
-        if len(feature_names) % max_col == 0:
-            height = len(feature_names) // max_col
-        else:
-            height = len(feature_names) // max_col + 1
-        figsize = (14, 3 * height)
-    else:
-        figsize = (3 * len(feature_names), 2.5)
-        width = len(feature_names)
-        height = 1
-    # print(figsize, width, height)
+    figsize, width, height = get_figsize(
+        n=len(feature_names),
+        max_col=4,
+        width_per_item=3,
+        height_per_item=3,
+        max_width=14,
+    )
 
     fig = plt.figure(figsize=figsize)
 
@@ -299,19 +308,13 @@ def plot_partial_err(
     feature_data, cat_feature_names, cat_feature_mapping, truth, pred, thres=0.8
 ):
     feature_names = list(feature_data.columns)
-    max_col = 4
-    if len(feature_names) > max_col:
-        width = max_col
-        if len(feature_names) % max_col == 0:
-            height = len(feature_names) // max_col
-        else:
-            height = len(feature_names) // max_col + 1
-        figsize = (14, 3 * height)
-    else:
-        figsize = (3 * len(feature_names), 2.5)
-        width = len(feature_names)
-        height = 1
-    # print(figsize, width, height)
+    figsize, width, height = get_figsize(
+        n=len(feature_names),
+        max_col=4,
+        width_per_item=3,
+        height_per_item=3,
+        max_width=14,
+    )
 
     fig = plt.figure(figsize=figsize)
 
