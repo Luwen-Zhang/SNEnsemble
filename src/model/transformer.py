@@ -1,11 +1,10 @@
-import warnings
 from src.utils import *
-from skopt.space import Integer, Categorical, Real
 from src.model import TorchModel
 from ._transformer.models_clustering import *
 from ._transformer.models_with_seq import *
 from ._transformer.models_basic import *
 from itertools import product
+from scipy import stats
 
 
 class Transformer(TorchModel):
@@ -195,6 +194,177 @@ class Transformer(TorchModel):
         derived_data.update(my_derived_data)
         derived_data = self.datamodule.sort_derived_data(derived_data)
         return df, derived_data, self.datamodule
+
+    def improvement(self, leaderboard: pd.DataFrame, cv_path=None):
+        base = leaderboard[leaderboard["Program"] != self.program].reset_index(
+            drop=True
+        )
+        improved = leaderboard[leaderboard["Program"] == self.program].reset_index(
+            drop=True
+        )
+        improved_measure = improved[["Program", "Model"]].copy()
+        if cv_path is not None:
+            ttest_res = self.improvement_cv_ttest(
+                model_names=list(improved["Model"]),
+                metrics=list(base.columns[2:]),
+                cv_path=cv_path,
+            )
+        else:
+            ttest_res = None
+        for idx, model in enumerate(improved["Model"]):
+            components = model.split("_")
+            modelbase = components[0]
+            base_model = components[1]
+            base_metrics = base[
+                (base["Program"] == modelbase) & (base["Model"] == base_model)
+            ]
+            if len(base_metrics) > 1:
+                raise Exception(
+                    f"Conflict model {base_model} in model base {modelbase}."
+                )
+            improved_metrics = improved[improved["Model"] == model]
+            if len(improved_metrics) > 1:
+                raise Exception(f"Conflict model {model} in model base {self.program}.")
+            for metric in base_metrics.columns[2:]:
+                improved_metric = improved_metrics.loc[idx, metric]
+                base_metric = base_metrics.squeeze()[metric]
+                higher_better = 1 if any([m in metric for m in ["R2"]]) else -1
+                improved_measure.loc[idx, f"{metric} Improvement"] = higher_better * (
+                    improved_metric - base_metric
+                )
+                improved_measure.loc[idx, f"{metric} % Improvement"] = (
+                    higher_better * (improved_metric - base_metric) / base_metric
+                ) * 100
+                if ttest_res is not None:
+                    improved_measure.loc[
+                        idx, f"{metric} Improvement p-value"
+                    ] = ttest_res[model][metric]["p-value"]
+        if ttest_res is not None:
+            return improved_measure, ttest_res
+        else:
+            return improved_measure
+
+    def plot_improvement(
+        self, leaderboard, improved_measure, ttest_res, metric, save_to=None
+    ):
+        leaderboard = leaderboard[leaderboard["Program"] != self.program]
+        model_names = improved_measure["Model"]
+        figsize, width, height = get_figsize(
+            n=len(leaderboard),
+            max_col=5,
+            width_per_item=1.6,
+            height_per_item=1.6,
+            max_width=5,
+        )
+        dfs = []
+        title_dict = {row: {} for row in range(height)}
+        for idx, (program, model) in enumerate(
+            zip(leaderboard["Program"], leaderboard["Model"])
+        ):
+            improve_models = [m for m in model_names if f"{program}_{model}" in m]
+            base_metrics = {
+                "Base model": ttest_res[improve_models[0]][metric]["base"],
+            }
+            improved_metrics = {
+                "-".join(m.split("_")[2:]): ttest_res[m][metric]["improved"]
+                for m in improve_models
+            }
+            improved_metrics = {
+                key: improved_metrics[key] for key in sorted(improved_metrics.keys())
+            }
+            base_metrics.update(improved_metrics)
+            df = pd.DataFrame(base_metrics).melt()
+            col = idx % width
+            row = idx // width
+            df["col"] = col
+            df["row"] = row
+            title_dict[row][col] = f"{program}\n{model}"
+            dfs.append(df)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action="ignore", category=DeprecationWarning)
+            g = sns.catplot(
+                kind="box",
+                data=pd.concat(dfs, ignore_index=True),
+                col="col",
+                row="row",
+                x="variable",
+                y="value",
+                hue="variable",
+                legend_out=True,
+                sharex=False,
+                sharey=False,
+                palette=sns.color_palette(
+                    ["#FF3E41", "#00B2CA", "#FEB95F", "#3B3561", "#679436"]
+                ),
+                flierprops={"marker": "o"},
+                dodge=False,
+                height=figsize[1] / height,
+                aspect=0.4,
+            )
+        g.add_legend(bbox_to_anchor=(0.85, 0.008), ncol=3)
+        for (row_key, col_key), ax in g.axes_dict.items():
+            ax.set_title(title_dict[row_key][col_key], fontsize=10)
+        plt.setp(g.axes, xticks=[], xlabel="", ylabel="")
+        g.legend.set_in_layout(True)
+        plt.tight_layout()
+        if save_to is not None:
+            plt.savefig(save_to, dpi=500)
+        plt.show()
+        plt.close()
+
+    def improvement_cv_ttest(
+        self,
+        model_names: Union[List[str], str],
+        metrics: Union[List[str], str],
+        cv_path,
+    ):
+        if type(model_names) == str:
+            model_names = [model_names]
+        if type(metrics) == str:
+            metrics = [metrics]
+        cv_names = [path for path in os.listdir(cv_path) if path.endswith(".csv")]
+        res = {
+            name: {
+                metric: {
+                    "base": np.array([]),
+                    "improved": np.array([]),
+                    "p-value": None,
+                }
+                for metric in metrics
+            }
+            for name in model_names
+        }
+        for cv_name in cv_names:
+            df = pd.read_csv(os.path.join(cv_path, cv_name), index_col=0)
+            for model_name in model_names:
+                components = model_name.split("_")
+                modelbase = components[0]
+                base_model = components[1]
+                base_metrics = df[
+                    (df["Program"] == modelbase) & (df["Model"] == base_model)
+                ].squeeze()
+                improved_metrics = df[
+                    (df["Program"] == self.program) & (df["Model"] == model_name)
+                ].squeeze()
+                for metric in metrics:
+                    base_metric = base_metrics[metric]
+                    improved_metric = improved_metrics[metric]
+                    res[model_name][metric]["base"] = np.append(
+                        res[model_name][metric]["base"], base_metric
+                    )
+                    res[model_name][metric]["improved"] = np.append(
+                        res[model_name][metric]["improved"], improved_metric
+                    )
+        for model_name in model_names:
+            for metric in metrics:
+                res[model_name][metric]["p-value"] = getattr(
+                    stats.ttest_ind(
+                        res[model_name][metric]["base"],
+                        res[model_name][metric]["improved"],
+                    ),
+                    "pvalue",
+                )
+        return res
 
     def inspect_weighted_predictions(self, model_name, **kwargs):
         model = self.model[model_name]
