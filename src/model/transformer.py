@@ -196,8 +196,7 @@ class Transformer(TorchModel):
         derived_data = self.datamodule.sort_derived_data(derived_data)
         return df, derived_data, self.datamodule
 
-    def inspect_attr(self, model_name):
-        data = self.trainer.datamodule
+    def inspect_weighted_predictions(self, model_name, **kwargs):
         model = self.model[model_name]
         target_attr = ["dl_weight", "dl_pred", "phy_pred"]
         if not hasattr(model, "dl_weight"):
@@ -206,15 +205,15 @@ class Transformer(TorchModel):
             )
         if hasattr(model, "uncertain_dl_weight"):
             target_attr += ["uncertain_dl_weight", "mu", "std"]
-        inspect_dict = {part: {} for part in ["train", "val", "test"]}
-        for X, D, part in [
-            (data.X_train, data.D_train, "train"),
-            (data.X_val, data.D_val, "val"),
-            (data.X_test, data.D_test, "test"),
-        ]:
-            self._predict(X, derived_data=D, model_name=model_name, model=model)
-            for attr in target_attr:
-                inspect_dict[part][attr] = getattr(model, attr).detach().cpu().numpy()
+        inspect_dict = self.inspect_attr(
+            model_name=model_name, attributes=target_attr, **kwargs
+        )
+        inspect_dict = {
+            key: val
+            if not isinstance(val, torch.Tensor)
+            else val.detach().cpu().numpy()
+            for key, val in inspect_dict.items()
+        }
         return inspect_dict
 
     def plot_uncertain_dl_weight(self, inspect_dict, save_to=None):

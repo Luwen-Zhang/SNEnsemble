@@ -299,6 +299,71 @@ class TestGeneral(unittest.TestCase):
 
         shutil.rmtree(os.path.join(src.setting["default_output_path"]))
 
+    def test_inspect(self):
+        print(f"\n-- Loading trainer --\n")
+        configfile = "composite_test"
+        src.setting["debug_mode"] = True
+        trainer = Trainer(device="cpu")
+        trainer.load_config(
+            configfile,
+            manual_config={
+                "data_splitter": "CycleSplitter",
+            },
+        )
+        trainer.load_data()
+
+        print(f"\n-- Initialize model --\n")
+        model = CatEmbed(
+            trainer,
+            model_subset=[
+                "Category Embedding",
+            ],
+        )
+        trainer.add_modelbases([model])
+
+        print(f"\n-- Train model --\n")
+        trainer.train()
+
+        print(f"\n-- Inspect model --\n")
+        direct_inspect = model.inspect_attr(
+            "Category Embedding", ["hidden_representation"]
+        )
+        train_inspect = model.inspect_attr(
+            "Category Embedding",
+            ["hidden_representation"],
+            trainer.df.loc[trainer.train_indices, :],
+        )
+        train_inspect_with_derived = model.inspect_attr(
+            "Category Embedding",
+            ["hidden_representation"],
+            df=trainer.df.loc[trainer.train_indices, :],
+            derived_data=trainer.datamodule.get_derived_data_slice(
+                trainer.derived_data, trainer.train_indices
+            ),
+        )
+
+        assert np.allclose(
+            direct_inspect["train"]["prediction"], train_inspect["prediction"]
+        )
+        assert np.allclose(
+            direct_inspect["train"]["prediction"],
+            train_inspect_with_derived["prediction"],
+        )
+        assert np.allclose(
+            direct_inspect["train"]["hidden_representation"],
+            train_inspect["hidden_representation"],
+        )
+        assert np.allclose(
+            direct_inspect["train"]["hidden_representation"],
+            train_inspect_with_derived["hidden_representation"],
+        )
+        assert not direct_inspect["train"]["hidden_representation"].shape[
+            0
+        ] == direct_inspect["val"]["hidden_representation"].shape[0] or np.allclose(
+            direct_inspect["train"]["hidden_representation"],
+            direct_inspect["val"]["hidden_representation"],
+        )
+
     def test_trainer_multitarget(self):
         print(f"\n-- Loading trainer --\n")
         configfile = "composite_test"

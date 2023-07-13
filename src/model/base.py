@@ -178,6 +178,7 @@ class AbstractModel:
         self,
         df: pd.DataFrame,
         model_name: str,
+        model: Any = None,
         derived_data: dict = None,
         ignore_absence: bool = False,
         **kwargs,
@@ -191,6 +192,8 @@ class AbstractModel:
             A new tabular dataset.
         model_name:
             A selected name of a model, which is already trained.
+        model:
+            The `model_name` model. If None, the model will be loaded from self.model.
         derived_data:
             Data derived from :func:``DataModule.derive_unstacked``. If not None, unstacked data will be re-derived.
         ignore_absence:
@@ -217,6 +220,7 @@ class AbstractModel:
             df,
             model_name,
             derived_data,
+            model=model,
             **kwargs,
         )
 
@@ -412,6 +416,56 @@ class AbstractModel:
         if the required model is in another model base, the AbstractModel is passed.
         """
         return None
+
+    def inspect_attr(
+        self, model_name: str, attributes: List[str], df=None, derived_data=None
+    ) -> Dict[str, Any]:
+        """
+        Get attributes of the model after evaluating the model on training, validation, and testing respectively.
+        If ``df`` is given, values after evaluating on the given set is returned.
+
+        Parameters
+        ----------
+        model_name
+            The name of the inspected model.
+        attributes
+            The requested attributes. If not hasattr, None is returned.
+        df
+            The tabular dataset.
+        derived_data:
+            Data derived from :func:``DataModule.derive_unstacked``. If not None, unstacked data will be re-derived.
+
+        Returns
+        -------
+        inspect_dict
+            A dict with keys `train`, `val`, and `test` if ``df`` is not given, and each of the values contains the
+            attributes requested. If ``df`` is given, it directly contains the attributes. The prediction is also
+            included with the key `prediction`.
+        """
+        data = self.trainer.datamodule
+        model = self.model[model_name]
+        if df is None:
+            inspect_dict = {part: {} for part in ["train", "val", "test"]}
+            for X, D, part in [
+                (data.X_train, data.D_train, "train"),
+                (data.X_val, data.D_val, "val"),
+                (data.X_test, data.D_test, "test"),
+            ]:
+                prediction = self._predict(
+                    X, derived_data=D, model_name=model_name, model=model
+                )
+                for attr in attributes:
+                    inspect_dict[part][attr] = getattr(model, attr, None)
+                inspect_dict[part]["prediction"] = prediction
+        else:
+            inspect_dict = {}
+            prediction = self.predict(
+                df, model_name=model_name, derived_data=derived_data, model=model
+            )
+            for attr in attributes:
+                inspect_dict[attr] = getattr(model, attr, None)
+            inspect_dict["prediction"] = prediction
+        return inspect_dict
 
     def _predict_all(
         self, verbose: bool = True, test_data_only: bool = False
