@@ -386,6 +386,43 @@ class Transformer(TorchModel):
         }
         return inspect_dict
 
+    def inspect_phy_models(self, model_name, **kwargs):
+        target_attr = ["clustering_sn_model"]
+        inspect_dict = self.inspect_attr(
+            model_name=model_name, attributes=target_attr, **kwargs
+        )
+        sns = inspect_dict["train"]["clustering_sn_model"].sns.cpu()
+        sn_weight = (
+            inspect_dict["train"]["clustering_sn_model"]
+            .running_sn_weight.data.detach()
+            .cpu()
+        )
+        norm_sn_weight = nn.functional.normalize(torch.abs(sn_weight), p=1).numpy()
+        return sns, norm_sn_weight
+
+    def plot_phy_weights(self, model_name, save_to=None, **kwargs):
+        import matplotlib.pyplot as plt
+        from matplotlib.gridspec import GridSpec
+
+        sns, sn_weight = self.inspect_phy_models(model_name=model_name, **kwargs)
+        names = [sn.__class__.__name__ for sn in sns]
+        fig = plt.figure(figsize=(8, 3))
+        gs = GridSpec(100, 100, figure=fig)
+        ax = fig.add_subplot(gs[:97, 10:97])
+        im = ax.imshow(sn_weight.T, cmap="Blues")
+        ax.set_yticklabels(names)
+        ax.set_yticks(np.arange(sn_weight.shape[1]))
+        ax.set_xticks(np.arange(sn_weight.shape[0]))
+        ax.set_xlabel("ID of clusters")
+        ax.set_title("Weights of physical models")
+        cax = fig.add_subplot(gs[50:96, 98:])
+        plt.colorbar(mappable=im, cax=cax)
+        plt.tight_layout()
+        if save_to is not None:
+            plt.savefig(save_to, dpi=500)
+        plt.show()
+        plt.close()
+
     def plot_uncertain_dl_weight(self, inspect_dict, save_to=None):
         import matplotlib.ticker as ticker
 
