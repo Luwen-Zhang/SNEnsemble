@@ -39,7 +39,7 @@ class Transformer(TorchModel):
             "_".join(x)
             for x in product(
                 available_names,
-                ["Wrap", "NoWrap"],
+                ["NoWrap"],
                 ["1L", "2L"],
                 ["PCA"],
                 ["KMeans"],
@@ -107,30 +107,15 @@ class Transformer(TorchModel):
         )
 
     def _space(self, model_name):
-        components = model_name.split("_")
-        if "1L" in components:
-            return [
-                Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
-            ] + self.trainer.SPACE
-        elif "2L" in components:
-            return [
-                Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
-                Integer(
-                    low=1,
-                    high=32,
-                    prior="uniform",
-                    name="n_clusters_per_cluster",
-                    dtype=int,
-                ),
-            ] + self.trainer.SPACE
+        return []
 
     def _initial_values(self, model_name):
         components = model_name.split("_")
         res = {}
         if "1L" in components:
-            res = {"n_clusters": 16}
+            res = {"n_clusters": 32}
         elif "2L" in components:
-            res = {"n_clusters": 16, "n_clusters_per_cluster": 8}
+            res = {"n_clusters": 32, "n_clusters_per_cluster": 8}
         res.update(self.trainer.chosen_params)
         return res
 
@@ -142,16 +127,13 @@ class Transformer(TorchModel):
             return False
         if "Wrap" in components and "PytorchTabular_NODE" in model_name:
             return False
-        if (
-            "2L" in components
-            and len(
-                AbstractClusteringModel.top_clustering_features_idx(
-                    self.trainer.datamodule
-                )
+        if "2L" in components:
+            datamodule = getattr(self, "datamodule", self.trainer.datamodule)
+            top_level_clustering_features = (
+                AbstractClusteringModel.top_clustering_features_idx(datamodule)
             )
-            == 0
-        ):
-            return False
+            if len(top_level_clustering_features) == 0:
+                return False
         return True
 
     def required_models(self, model_name: str) -> Union[List[str], None]:
