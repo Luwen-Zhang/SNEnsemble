@@ -472,7 +472,7 @@ class AbstractModel:
                     X, derived_data=D, model_name=model_name, model=model
                 )
                 for attr in attributes:
-                    inspect_dict[part][attr] = to_cpu(getattr(model, attr, None))
+                    inspect_dict[part][attr] = to_cpu(cp(getattr(model, attr, None)))
                 inspect_dict[part]["prediction"] = prediction
         else:
             inspect_dict = {"USER_INPUT": {}}
@@ -480,7 +480,9 @@ class AbstractModel:
                 df, model_name=model_name, derived_data=derived_data, model=model
             )
             for attr in attributes:
-                inspect_dict["USER_INPUT"][attr] = to_cpu(getattr(model, attr, None))
+                inspect_dict["USER_INPUT"][attr] = to_cpu(
+                    cp(getattr(model, attr, None))
+                )
             inspect_dict["USER_INPUT"]["prediction"] = prediction
         return inspect_dict
 

@@ -394,6 +394,37 @@ class Transformer(TorchModel):
         norm_sn_weight = nn.functional.normalize(torch.abs(sn_weight), p=1).numpy()
         return sns, norm_sn_weight
 
+    def inspect_clusters(self, model_name, **kwargs):
+        target_attr = ["clustering_sn_model"]
+        inspect_dict = self.inspect_attr(
+            model_name=model_name, attributes=target_attr, **kwargs
+        )
+        to_cpu = lambda x: x.detach().cpu().numpy()
+        if "USER_INPUT" in inspect_dict.keys():
+            return to_cpu(inspect_dict["USER_INPUT"]["clustering_sn_model"].x_cluster)
+        else:
+            cluster_train = to_cpu(
+                inspect_dict["train"]["clustering_sn_model"].x_cluster
+            )
+            cluster_val = to_cpu(inspect_dict["val"]["clustering_sn_model"].x_cluster)
+            cluster_test = to_cpu(inspect_dict["test"]["clustering_sn_model"].x_cluster)
+            return cluster_train, cluster_val, cluster_test
+
+    def df_with_cluster(self, model_name, save_to: str = None, **kwargs):
+        res = self.inspect_clusters(
+            model_name,
+            df=self.trainer.df,
+            derived_data=self.trainer.derived_data,
+            **kwargs,
+        )
+        df = self.trainer.df.copy()
+        df["cluster"] = res
+        if save_to is not None:
+            if not save_to.endswith(".csv"):
+                raise Exception(f"Can only save to a csv file.")
+            df.to_csv(save_to, index=False)
+        return df
+
     def plot_phy_weights(self, model_name, save_to=None, **kwargs):
         import matplotlib.pyplot as plt
         from matplotlib.gridspec import GridSpec
