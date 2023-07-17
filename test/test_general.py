@@ -343,19 +343,20 @@ class TestGeneral(unittest.TestCase):
         )
 
         assert np.allclose(
-            direct_inspect["train"]["prediction"], train_inspect["prediction"]
+            direct_inspect["train"]["prediction"],
+            train_inspect["USER_INPUT"]["prediction"],
         )
         assert np.allclose(
             direct_inspect["train"]["prediction"],
-            train_inspect_with_derived["prediction"],
+            train_inspect_with_derived["USER_INPUT"]["prediction"],
         )
         assert np.allclose(
             direct_inspect["train"]["hidden_representation"],
-            train_inspect["hidden_representation"],
+            train_inspect["USER_INPUT"]["hidden_representation"],
         )
         assert np.allclose(
             direct_inspect["train"]["hidden_representation"],
-            train_inspect_with_derived["hidden_representation"],
+            train_inspect_with_derived["USER_INPUT"]["hidden_representation"],
         )
         assert not direct_inspect["train"]["hidden_representation"].shape[
             0
