@@ -29,6 +29,7 @@ cfg = {
         },
     },
     "data_splitter": "CycleSplitter",
+    "split_ratio": [0.6, 0.2, 0.2],
     "data_imputer": "MissForestImputer",
     "data_processors": [
         ("CategoricalOrdinalEncoder", {}),

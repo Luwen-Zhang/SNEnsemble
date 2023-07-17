@@ -1,4 +1,5 @@
 import os.path
+import numpy as np
 import src
 from src.utils import *
 from src.config import UserConfig
@@ -21,7 +22,11 @@ class DataModule:
     ):
         self.args = config
         if initialize:
-            self.set_data_splitter(self.args["data_splitter"], verbose=verbose)
+            self.set_data_splitter(
+                self.args["data_splitter"],
+                ratio=self.args["split_ratio"],
+                verbose=verbose,
+            )
             self.set_data_imputer(name=self.args["data_imputer"], verbose=verbose)
             self.set_data_processors(self.args["data_processors"], verbose=verbose)
             self.set_data_derivers(self.args["data_derivers"], verbose=verbose)
@@ -40,7 +45,12 @@ class DataModule:
         """
         self.training = training
 
-    def set_data_splitter(self, config: Union[str, Tuple[str, Dict]], verbose=True):
+    def set_data_splitter(
+        self,
+        config: Union[str, Tuple[str, Dict]],
+        ratio: Union[List[float], np.ndarray] = None,
+        verbose=True,
+    ):
         """
         Set the data splitter. The specified splitter should be implemented in ``data/datasplitter.py``. Also, data
         splitter can be set directly using ``datamodule.datasplitter = YourSplitter()``
@@ -50,6 +60,8 @@ class DataModule:
         config
             The name of a data splitter implemented in ``data/datasplitter.py`` or a tuple providing the name and kwargs
             of the data splitter
+        ratio
+            The ratio of training, validation, and testing sets. For example, [0.6, 0.2, 0.2].
         verbose
             Ignored.
         """
@@ -58,7 +70,10 @@ class DataModule:
         if type(config) in [tuple, list]:
             self.datasplitter = get_data_splitter(config[0])(**dict(config[1]))
         else:
-            self.datasplitter = get_data_splitter(config)()
+            if ratio is None:
+                self.datasplitter = get_data_splitter(config)()
+            else:
+                self.datasplitter = get_data_splitter(config)(train_val_test=ratio)
 
     def set_data_imputer(self, name, verbose=True):
         """
