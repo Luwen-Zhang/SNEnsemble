@@ -245,7 +245,14 @@ class Trainer:
                             f"--{key}", type=type(base_config[key]), required=False
                         )
                     elif type(base_config[key]) == list:
-                        parser.add_argument(f"--{key}", nargs="+", required=False)
+                        parser.add_argument(
+                            f"--{key}",
+                            nargs="+",
+                            type=type(base_config[key][0])
+                            if len(base_config[key]) > 0
+                            else None,
+                            required=False,
+                        )
                     elif type(base_config[key]) == bool:
                         parser.add_argument(f"--{key}", dest=key, action="store_true")
                         parser.add_argument(

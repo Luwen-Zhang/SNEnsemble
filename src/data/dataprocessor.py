@@ -429,7 +429,7 @@ class CategoricalOrdinalEncoder(AbstractTransformer):
         self.record_feature_mapping = None
 
     def _fit_transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
-        oe = OrdinalEncoder()
+        oe = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=np.nan)
         data.loc[:, datamodule.cat_feature_names] = oe.fit_transform(
             data.loc[:, datamodule.cat_feature_names]
         ).astype(int)
@@ -442,10 +442,16 @@ class CategoricalOrdinalEncoder(AbstractTransformer):
     def _transform(self, data: pd.DataFrame, datamodule: DataModule, **kwargs):
         datamodule.cat_feature_mapping = cp(self.record_feature_mapping)
         try:
-            data.loc[:, datamodule.cat_feature_names] = self.transformer.transform(
-                data.loc[:, datamodule.cat_feature_names]
-            ).astype(int)
-        except:
+            res = self.transformer.transform(data.loc[:, datamodule.cat_feature_names])
+            for idx, cat_feature in enumerate(datamodule.cat_feature_names):
+                res[:, idx] = np.nan_to_num(
+                    res[:, idx],
+                    nan=list(self.record_feature_mapping[cat_feature]).index("UNK")
+                    if "UNK" in self.record_feature_mapping.keys()
+                    else len(self.record_feature_mapping),
+                )
+            data.loc[:, datamodule.cat_feature_names] = res.astype(int)
+        except Exception as e:
             try:
                 # Categorical features are already transformed.
                 self.transformer.inverse_transform(
