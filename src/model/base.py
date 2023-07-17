@@ -418,7 +418,12 @@ class AbstractModel:
         return None
 
     def inspect_attr(
-        self, model_name: str, attributes: List[str], df=None, derived_data=None
+        self,
+        model_name: str,
+        attributes: List[str],
+        df=None,
+        derived_data=None,
+        to_numpy=True,
     ) -> Dict[str, Any]:
         """
         Get attributes of the model after evaluating the model on training, validation, and testing respectively.
@@ -434,14 +439,26 @@ class AbstractModel:
             The tabular dataset.
         derived_data:
             Data derived from :func:``DataModule.derive_unstacked``. If not None, unstacked data will be re-derived.
+        to_numpy
+            If True, call numpy() if the attribute is a torch.Tensor.
 
         Returns
         -------
         inspect_dict
             A dict with keys `train`, `val`, and `test` if ``df`` is not given, and each of the values contains the
-            attributes requested. If ``df`` is given, it directly contains the attributes. The prediction is also
-            included with the key `prediction`.
+            attributes requested. If ``df`` is given, a dict with a single key `USER_INPUT` and the corresponding value
+            contains the attributes. The prediction is also included with the key `prediction`.
         """
+
+        def to_cpu(attr):
+            if isinstance(attr, nn.Module):
+                attr = attr.to("cpu")
+            elif isinstance(attr, torch.Tensor):
+                attr = attr.detach().cpu()
+                if to_numpy:
+                    attr = attr.numpy()
+            return attr
+
         data = self.trainer.datamodule
         model = self.model[model_name]
         if df is None:
@@ -455,16 +472,16 @@ class AbstractModel:
                     X, derived_data=D, model_name=model_name, model=model
                 )
                 for attr in attributes:
-                    inspect_dict[part][attr] = getattr(model, attr, None)
+                    inspect_dict[part][attr] = to_cpu(getattr(model, attr, None))
                 inspect_dict[part]["prediction"] = prediction
         else:
-            inspect_dict = {}
+            inspect_dict = {"USER_INPUT": {}}
             prediction = self.predict(
                 df, model_name=model_name, derived_data=derived_data, model=model
             )
             for attr in attributes:
-                inspect_dict[attr] = getattr(model, attr, None)
-            inspect_dict["prediction"] = prediction
+                inspect_dict["USER_INPUT"][attr] = to_cpu(getattr(model, attr, None))
+            inspect_dict["USER_INPUT"]["prediction"] = prediction
         return inspect_dict
 
     def _predict_all(

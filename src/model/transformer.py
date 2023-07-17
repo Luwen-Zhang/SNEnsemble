@@ -378,20 +378,14 @@ class Transformer(TorchModel):
         inspect_dict = self.inspect_attr(
             model_name=model_name, attributes=target_attr, **kwargs
         )
-        inspect_dict = {
-            key: val
-            if not isinstance(val, torch.Tensor)
-            else val.detach().cpu().numpy()
-            for key, val in inspect_dict.items()
-        }
         return inspect_dict
 
     def inspect_phy_models(self, model_name, **kwargs):
         target_attr = ["clustering_sn_model"]
         inspect_dict = self.inspect_attr(
-            model_name=model_name, attributes=target_attr, **kwargs
+            model_name=model_name, attributes=target_attr, to_numpy=False, **kwargs
         )
-        sns = inspect_dict["train"]["clustering_sn_model"].sns.cpu()
+        sns = inspect_dict["train"]["clustering_sn_model"].sns
         sn_weight = (
             inspect_dict["train"]["clustering_sn_model"]
             .running_sn_weight.data.detach()
@@ -460,22 +454,27 @@ class Transformer(TorchModel):
             )
             plot_once(dl_weight, mu, std, title, ax)
 
-        fig = plt.figure(figsize=(12, 4))
-        ax = plt.subplot(131)
-        plot_part(inspect_dict["train"], "Training set", ax)
-        ax = plt.subplot(132)
-        plot_part(inspect_dict["val"], "Validation set", ax)
-        ax = plt.subplot(133)
-        plot_part(inspect_dict["test"], "Testing set", ax)
-        ax = fig.add_subplot(111, frameon=False)
-        plt.tick_params(
-            labelcolor="none",
-            which="both",
-            top=False,
-            bottom=False,
-            left=False,
-            right=False,
-        )
+        if "USER_INPUT" in inspect_dict.keys():
+            fig = plt.figure(figsize=(4, 4))
+            ax = plt.subplot(111)
+            plot_part(inspect_dict["USER_INPUT"], "Investigated set", ax)
+        else:
+            fig = plt.figure(figsize=(12, 4))
+            ax = plt.subplot(131)
+            plot_part(inspect_dict["train"], "Training set", ax)
+            ax = plt.subplot(132)
+            plot_part(inspect_dict["val"], "Validation set", ax)
+            ax = plt.subplot(133)
+            plot_part(inspect_dict["test"], "Testing set", ax)
+            ax = fig.add_subplot(111, frameon=False)
+            plt.tick_params(
+                labelcolor="none",
+                which="both",
+                top=False,
+                bottom=False,
+                left=False,
+                right=False,
+            )
         ax.set_ylabel("Deep learning weight")
         ax.set_xlabel("Indices of data points (sorted by the target value)")
         plt.tight_layout()
