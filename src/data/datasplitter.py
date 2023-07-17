@@ -321,7 +321,7 @@ class StrictCycleSplitter(CycleSplitter):
                 fr_cycle[fr_test_val_indices]
                 > np.percentile(
                     fr_cycle[fr_test_val_indices],
-                    train_val_test[-1] / np.sum(train_val_test[1:]) * 100,
+                    train_val_test[1] / np.sum(train_val_test[1:]) * 100,
                 )
             ]
             fr_val_indices = np.setdiff1d(fr_test_val_indices, fr_test_indices)
