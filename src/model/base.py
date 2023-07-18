@@ -298,6 +298,27 @@ class AbstractModel:
         """
         set_random_seed(src.setting["random_seed"])
         required_models = self._get_required_models(model_name=model_name)
+        if required_models is not None:
+            kwargs["required_models"] = required_models
+        return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
+
+    def _check_params(self, model_name, **kwargs):
+        """
+        Check the validity of hyperparameters. This is implemented originally for batch_size because TabNet crashes
+        when batch_size is small under certain situations.
+
+        Parameters
+        ----------
+        model_name
+            The name of a selected model.
+        kwargs
+            Parameters to generate the model. It should contain all arguments in :func:``_initial_values``.
+
+        Returns
+        -------
+        kwargs
+            The checked kwargs.
+        """
         if "batch_size" in kwargs.keys():
             batch_size = kwargs["batch_size"]
             kwargs["original_batch_size"] = batch_size
@@ -345,9 +366,7 @@ class AbstractModel:
                 )
                 new_batch_size = _new_batch_size
             kwargs["batch_size"] = new_batch_size
-        if required_models is not None:
-            kwargs["required_models"] = required_models
-        return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
+        return kwargs
 
     def _get_required_models(self, model_name):
         required_model_names = self.required_models(model_name)
@@ -653,6 +672,7 @@ class AbstractModel:
 
                 @skopt.utils.use_named_args(space)
                 def _bayes_objective(**params):
+                    params = self._check_params(model_name, **params)
                     try:
                         with HiddenPrints():
                             model = self.new_model(
@@ -753,6 +773,7 @@ class AbstractModel:
                 params = {}
                 for key, value in zip(tmp_params.keys(), result.x):
                     params[key] = value
+                params = self._check_params(model_name, **params)
                 self.model_params[model_name] = cp(params)
                 callback.close()
                 skopt.dump(
@@ -767,6 +788,7 @@ class AbstractModel:
                     f"No hyperparameter space defined for model {model_name}."
                 )
 
+            tmp_params = self._check_params(model_name, **tmp_params)
             if not warm_start or (warm_start and not self._trained):
                 model = self.new_model(
                     model_name=model_name, verbose=verbose, **tmp_params
