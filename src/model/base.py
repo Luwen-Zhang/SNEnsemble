@@ -685,6 +685,10 @@ class AbstractModel:
                         joint_trackback = "".join(
                             traceback.format_exception(e.__class__, e, e.__traceback__)
                         )
+                        print(f"An exception occurs when evaluating a bayes call:")
+                        print(joint_trackback)
+                        print("with the following parameters:")
+                        print(params)
                         if (
                             model_name == "TabNet"
                             and "CUDA error: device-side assert triggered"
@@ -710,10 +714,6 @@ class AbstractModel:
                                 "just re-raised because currently there is no way to restart the GPU session and\n"
                                 "continue the HPO process. Please tell me if there is a solution."
                             )
-                        print(f"An exception occurs when evaluating a bayes call:")
-                        print(joint_trackback)
-                        print("with the following parameters:")
-                        print(params)
                         print(f"Returning a large value instead.")
                         res = 100
                     # If a result from one bayes opt iteration is very large (over 10000) caused by instability of the
