@@ -320,16 +320,31 @@ class AbstractModel:
                     f"limit_batch_size={limit_batch_size} is illegal. Use limit_batch_size=2 instead."
                 )
                 limit_batch_size = 2
-            if n_train % batch_size < limit_batch_size or batch_size < limit_batch_size:
-                if n_train % batch_size < limit_batch_size:
-                    new_batch_size = int(math.ceil(n_train / (n_train // batch_size)))
+            new_batch_size = batch_size
+            if model_name == "TabNet":
+                _new_batch_size = 64
+                if new_batch_size < _new_batch_size:
+                    warnings.warn(
+                        f"For TabNet, using small batch_size ({new_batch_size}) may trigger CUDA device-side assert. "
+                        f"Using batch_size={_new_batch_size} instead."
+                    )
+                    new_batch_size = _new_batch_size
+            if (
+                n_train % new_batch_size < limit_batch_size
+                or new_batch_size < limit_batch_size
+            ):
+                if n_train % new_batch_size < limit_batch_size:
+                    _new_batch_size = int(
+                        math.ceil(n_train / (n_train // new_batch_size))
+                    )
                 else:
-                    new_batch_size = n_train
+                    _new_batch_size = n_train
                 warnings.warn(
-                    f"Using batch_size={batch_size} and len(training set)={n_train}, which will make the mini batch "
-                    f"smaller than limit_batch_size={limit_batch_size}. Using batch_size={new_batch_size} instead."
+                    f"Using batch_size={new_batch_size} and len(training set)={n_train}, which will make the mini batch "
+                    f"smaller than limit_batch_size={limit_batch_size}. Using batch_size={_new_batch_size} instead."
                 )
-                kwargs["batch_size"] = new_batch_size
+                new_batch_size = _new_batch_size
+            kwargs["batch_size"] = new_batch_size
         if required_models is not None:
             kwargs["required_models"] = required_models
         return self._new_model(model_name=model_name, verbose=verbose, **kwargs)
