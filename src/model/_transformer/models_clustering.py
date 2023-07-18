@@ -239,16 +239,18 @@ class AbstractClusteringModel(AbstractNN):
         return np.concatenate(
             (
                 datamodule.get_feature_idx_by_type(typ="Material"),
-                [
-                    datamodule.cont_feature_names.index(x)
-                    for x in ["Frequency", "R-value"]
-                ],
+                list(AbstractClusteringModel.top_clustering_features_idx(datamodule)),
             )
         ).astype(int)
 
     @staticmethod
     def top_clustering_features_idx(datamodule):
-        return AbstractClusteringModel.basic_clustering_features_idx(datamodule)[:-2]
+        top_clustering_features = [
+            x for x in ["Frequency", "R-value"] if x in datamodule.cont_feature_names
+        ]
+        return np.array(
+            [datamodule.cont_feature_names.index(x) for x in top_clustering_features]
+        )
 
 
 class Abstract1LClusteringModel(AbstractClusteringModel):
