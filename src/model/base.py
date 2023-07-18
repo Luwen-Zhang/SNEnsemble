@@ -691,7 +691,7 @@ class AbstractModel:
                             raise ValueError(
                                 "A CUDA device-side assert is triggered. Unfortunately, CUDA device-side assert will\n"
                                 "make the entire GPU session not accessible, the whole hyperparameter optimization\n"
-                                "process is invalid, and the final model training raises an exception. The error is\n"
+                                "process invalid, and the final model training raising an exception. The error is\n"
                                 "just re-raised because currently there is no way to restart the GPU session and\n"
                                 "continue the HPO process. Please tell me if there is a solution."
                             )
