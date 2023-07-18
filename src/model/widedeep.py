@@ -63,9 +63,9 @@ class WideDeep(AbstractModel):
             "SAINT": [
                 Real(low=0.0, high=0.3, prior="uniform", name="cat_embed_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
-                Categorical(categories=[8, 16, 32], name="input_dim"),
-                Categorical(categories=[2, 4, 8], name="n_heads"),
-                Integer(low=2, high=4, prior="uniform", name="n_blocks", dtype=int),
+                Categorical(categories=[4, 8, 16], name="input_dim"),
+                Categorical(categories=[1, 2, 4], name="n_heads"),
+                Integer(low=1, high=4, prior="uniform", name="n_blocks", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
             ]
@@ -160,8 +160,8 @@ class WideDeep(AbstractModel):
             "SAINT": {
                 "cat_embed_dropout": 0.1,
                 "mlp_dropout": 0.1,
-                "input_dim": 32,
-                "n_heads": 8,
+                "input_dim": 16,
+                "n_heads": 4,
                 "n_blocks": 2,
                 "attn_dropout": 0.2,
                 "ff_dropout": 0.1,
