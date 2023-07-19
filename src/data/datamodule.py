@@ -195,6 +195,24 @@ class DataModule:
         )
         label_name = self.args["label_name"]
 
+        detected_cat_feature_names = self.df.dtypes.index[self.df.dtypes == np.object_]
+        illegal_cont_features = list(
+            np.intersect1d(detected_cat_feature_names, cont_feature_names)
+        )
+        for feature in illegal_cont_features:
+            try:
+                self.df.loc[:, feature] = self.df.loc[:, feature].values.astype(
+                    np.float64
+                )
+                illegal_cont_features.remove(feature)
+            except:
+                pass
+        if len(illegal_cont_features) > 0:
+            raise Exception(
+                f"{illegal_cont_features} are np.object_, but are included in continuous features. Please remove them "
+                f"or add them to `categorical_feature_names` in the configuration file."
+            )
+
         self.set_data(self.df, cont_feature_names, cat_feature_names, label_name)
         print(
             "Dataset size:",
