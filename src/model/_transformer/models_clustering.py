@@ -264,6 +264,7 @@ class Abstract1LClusteringModel(AbstractClusteringModel):
         sn_class,
         cont_cat_model,
         n_pca_dim: int = None,
+        sn_category: str = None,
         **kwargs,
     ):
         clustering_features = self.basic_clustering_features_idx(datamodule)
@@ -272,6 +273,7 @@ class Abstract1LClusteringModel(AbstractClusteringModel):
             n_input=len(clustering_features),
             n_pca_dim=n_pca_dim,
             datamodule=datamodule,
+            sn_category=sn_category,
         )
         super(Abstract1LClusteringModel, self).__init__(
             n_inputs=n_inputs,
@@ -297,6 +299,7 @@ class Abstract2LClusteringModel(AbstractClusteringModel):
         sn_class,
         cont_cat_model,
         n_pca_dim: int = None,
+        sn_category: str = None,
         **kwargs,
     ):
         clustering_features = list(self.basic_clustering_features_idx(datamodule))
@@ -316,6 +319,7 @@ class Abstract2LClusteringModel(AbstractClusteringModel):
             n_clusters_per_cluster=n_clusters_per_cluster,
             n_pca_dim=n_pca_dim,
             datamodule=datamodule,
+            sn_category=sn_category,
         )
         super(Abstract2LClusteringModel, self).__init__(
             n_inputs=n_inputs,

@@ -48,12 +48,24 @@ class Transformer(TorchModel):
         return all_names
 
     def _new_model(self, model_name, verbose, required_models=None, **kwargs):
+        database = self.trainer.args["database"]
+        if "composite" in database:
+            sn_category = "composite"
+        elif "alloy" in database:
+            sn_category = "alloy"
+        else:
+            warnings.warn(
+                f"Neither `composite` nor `alloy` is in the name of the database `{database}`. "
+                f"Only parts of the SN models are used."
+            )
+            sn_category = None
         fix_kwargs = dict(
             n_inputs=len(self.datamodule.cont_feature_names),
             n_outputs=len(self.datamodule.label_name),
             layers=self.datamodule.args["layers"],
             cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
             datamodule=self.datamodule,
+            sn_category=sn_category,
         )
         components = model_name.split("_")
         if "Wrap" in components:

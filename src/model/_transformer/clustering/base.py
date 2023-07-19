@@ -80,7 +80,19 @@ class AbstractSN(nn.Module):
         )
 
 
-class LinLog(AbstractSN):
+class ForComposite:
+    ...
+
+
+class ForAlloy:
+    ...
+
+
+class ForAny:
+    ...
+
+
+class LinLog(AbstractSN, ForComposite, ForAlloy):
     def forward(
         self,
         required_cols: Dict[str, torch.Tensor],
@@ -91,7 +103,7 @@ class LinLog(AbstractSN):
         return self._linear(s, x_cluster)
 
 
-class LogLog(AbstractSN):
+class LogLog(AbstractSN, ForComposite, ForAlloy):
     def forward(
         self,
         required_cols: Dict[str, torch.Tensor],
@@ -121,7 +133,7 @@ class LogLog(AbstractSN):
 #         return True
 
 
-class Sendeckyj(AbstractSN):
+class Sendeckyj(AbstractSN, ForComposite):
     # Sendeckyj, G.P. Fitting models to composite materials fatigue data. In Test Methods and Design Allowables for
     # Fibrous Composites; ASTM STP 734; Chamis, C.C., Ed.; ASTM International: West Conshohocken, PA, USA, 1981; pp.
     # 245–260.
@@ -173,7 +185,7 @@ class Sendeckyj(AbstractSN):
         )
 
 
-class Hwang(AbstractSN):
+class Hwang(AbstractSN, ForComposite):
     # Hwang, W.; Han, K.S. Fatigue of Composites—Fatigue Modulus Concept and Life Prediction. J. Compos. Mater. 1986,
     # 20, 154–165.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -213,7 +225,7 @@ class Hwang(AbstractSN):
         )
 
 
-class Kohout(AbstractSN):
+class Kohout(AbstractSN, ForComposite, ForAlloy):
     # Kohout, J.; Vechet, S. A new function for fatigue curves characterization and its multiple merits. Int. J. Fatigue
     # 2001, 23, 175–183.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -260,7 +272,7 @@ class Kohout(AbstractSN):
         )
 
 
-class KimZhang(AbstractSN):
+class KimZhang(AbstractSN, ForComposite):
     # Kim, H.S.; Zhang, J. Fatigue Damage and Life Prediction of Glass/Vinyl Ester Composites. J. Reinf. Plast. Compos.
     # 2001, 20, 834–848.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -318,7 +330,7 @@ class KimZhang(AbstractSN):
         )
 
 
-class KawaiKoizumi(AbstractSN):
+class KawaiKoizumi(AbstractSN, ForComposite):
     # Kawai, M.; Koizumi, M. Nonlinear constant fatigue life diagrams for carbon/epoxy laminates at room temperature.
     # Compos. Part A Appl. Sci. Manuf. 2007, 38, 2342–2353.
     # The paper uses data at the critical stress ratio (UCS/UTS) to fit the proposed model, and predict data at other
@@ -370,7 +382,7 @@ class KawaiKoizumi(AbstractSN):
         )
 
 
-class Poursatip(AbstractSN):
+class Poursatip(AbstractSN, ForComposite):
     # Poursartip, A.; Ashby, M.F.; Beaumont, P.W.R. The fatigue damage mechanics of carbon fibre composite laminate:
     # I—Development of the model. Compos. Sci. Technol. 1986, 25, 193–218.
     def forward(
@@ -450,7 +462,7 @@ class Poursatip(AbstractSN):
         self.e = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
 
 
-class PoursatipSimplified(AbstractSN):
+class PoursatipSimplified(AbstractSN, ForComposite):
     # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
     # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
     def forward(
@@ -483,7 +495,7 @@ class PoursatipSimplified(AbstractSN):
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
 
 
-class DAmore(AbstractSN):
+class DAmore(AbstractSN, ForComposite):
     # A. D’Amore, G. Caprino, P. Stupak, J. Zhou, and L. Nicolais. “Effect of Stress Ratio on the Flexural Fatigue
     # Behaviour of Continuous Strand Mat Reinforced Plastics.” Science and Engineering of Composite Materials 5, no. 1
     # (March 1, 1996): 1–8.
@@ -542,7 +554,7 @@ class DAmore(AbstractSN):
         )
 
 
-class DAmoreSimplified(AbstractSN):
+class DAmoreSimplified(AbstractSN, ForComposite):
     # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
     # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -582,7 +594,7 @@ class DAmoreSimplified(AbstractSN):
         )
 
 
-class Epaarachchi(AbstractSN):
+class Epaarachchi(AbstractSN, ForComposite):
     # Epaarachchi, J.A.; Clausen, P.D. An empirical model for fatigue behavior prediction of glass fibre-reinforced
     # plastic composites for various stress ratios and test frequencies. Compos. Part A Appl. Sci. Manuf. 2003, 34,
     # 313–326.
@@ -658,7 +670,7 @@ class Epaarachchi(AbstractSN):
         )
 
 
-class EpaarachchiSimplified(AbstractSN):
+class EpaarachchiSimplified(AbstractSN, ForComposite):
     # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
     # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -727,18 +739,49 @@ for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
         available_sn.append(cls)
 
 
-def get_sns(**kwargs):
-    sns = nn.ModuleList([i(**kwargs) for i in available_sn])
+def get_sns(category: str = None, **kwargs):
+    defined_category = {
+        "composite": ForComposite,
+        "alloy": ForAlloy,
+    }
+    if category is None:
+        sns = nn.ModuleList(
+            [
+                cls(**kwargs)
+                for cls in available_sn
+                if issubclass(cls, ForAny) and issubclass(cls, AbstractSN)
+            ]
+        )
+        if len(sns) == 0:
+            raise Exception(f"No AbstractSN is defined as the subclass of ForAny.")
+    else:
+        cat_cls = defined_category.get(category)
+        if category in defined_category.keys():
+            sns = nn.ModuleList(
+                [
+                    cls(**kwargs)
+                    for cls in available_sn
+                    if issubclass(cls, cat_cls) or issubclass(cls, ForAny)
+                ]
+            )
+        else:
+            raise Exception(f"Unrecognized SN category `{category}`.")
+        if len(sns) == 0:
+            raise Exception(
+                f"No AbstractSN is defined as the subclass of ForAny or {cat_cls.__name__}."
+            )
     return sns
 
 
 class AbstractSNClustering(nn.Module):
-    def __init__(self, clustering: AbstractClustering, datamodule, **kwargs):
+    def __init__(
+        self, clustering: AbstractClustering, datamodule, sn_category=None, **kwargs
+    ):
         super(AbstractSNClustering, self).__init__()
         self.clustering = clustering
         self.n_clusters = self.clustering.n_total_clusters
-        self.sns = get_sns(n_clusters=self.n_clusters)
-
+        self.sns = get_sns(category=sn_category, n_clusters=self.n_clusters)
+        self.sn_category = sn_category
         required_cols = []
         for sn in self.sns:
             required_cols += sn.required_cols()
