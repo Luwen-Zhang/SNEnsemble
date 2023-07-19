@@ -184,7 +184,7 @@ class WideDeep(AbstractModel):
                 "mlp_dropout": 0.1,
                 "input_dim": 32,
                 "n_heads": 8,
-                "n_blocks": 6,
+                "n_blocks": 4,
                 "attn_dropout": 0.1,
                 "ff_dropout": 0.1,
                 "kv_compression_factor": 0.5,

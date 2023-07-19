@@ -353,7 +353,7 @@ class PytorchTabular(AbstractModel):
                 "input_embed_dim": 32,
                 "embedding_dropout": 0.1,
                 "num_heads": 8,
-                "num_attn_blocks": 6,
+                "num_attn_blocks": 4,
                 "attn_dropout": 0.1,
                 "add_norm_dropout": 0.1,
                 "ff_dropout": 0.1,
