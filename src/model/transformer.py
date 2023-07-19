@@ -5,6 +5,7 @@ from ._transformer.models_with_seq import *
 from ._transformer.models_basic import *
 from itertools import product
 from scipy import stats
+from skopt.space import Integer
 
 
 class Transformer(TorchModel):
@@ -119,7 +120,25 @@ class Transformer(TorchModel):
         )
 
     def _space(self, model_name):
-        return []
+        components = model_name.split("_")
+        if "1L" in components:
+            return [
+                Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
+            ] + self.trainer.SPACE
+        elif "2L" in components:
+            return [
+                Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
+                Integer(
+                    low=1,
+                    high=32,
+                    prior="uniform",
+                    name="n_clusters_per_cluster",
+                    dtype=int,
+                ),
+            ] + self.trainer.SPACE
+
+    def _custom_training_params(self, model_name) -> Dict:
+        return dict(epoch=50, bayes_calls=20, bayes_epoch=5)
 
     def _initial_values(self, model_name):
         components = model_name.split("_")

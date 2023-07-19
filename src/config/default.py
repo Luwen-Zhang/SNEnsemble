@@ -25,7 +25,7 @@ cfg = {
         },
         "batch_size": {
             "type": "Categorical",
-            "categories": [32, 64, 128, 256, 512, 1024, 2048],
+            "categories": [64, 128, 256, 512, 1024, 2048],
         },
     },
     "data_splitter": "CycleSplitter",
