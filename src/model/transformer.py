@@ -285,6 +285,14 @@ class Transformer(TorchModel):
                 key: improved_metrics[key] for key in sorted(improved_metrics.keys())
             }
             base_metrics.update(improved_metrics)
+            # Remove outliers that are too far away (greater than Q3+3IQR) for better plotting.
+            for key in base_metrics.keys():
+                vals = base_metrics[key]
+                q1 = np.quantile(vals, 0.25)
+                q3 = np.quantile(vals, 0.75)
+                iqr = q3 - q1
+                vals[vals > q3 + 3 * iqr] = np.nan
+                base_metrics[key] = vals
             df = pd.DataFrame(base_metrics).melt()
             col = idx % width
             row = idx // width
