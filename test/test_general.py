@@ -257,7 +257,7 @@ class TestGeneral(unittest.TestCase):
 
         print(f"\n-- Bayes optimization --\n")
         model_trainer.args["bayes_opt"] = True
-        model_trainer.train()
+        model_trainer.get_leaderboard(cross_validation=2)
 
         print(f"\n-- Load local trainer --\n")
         root = trainer.project_root + "_rename_test"

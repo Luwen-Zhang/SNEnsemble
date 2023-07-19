@@ -662,7 +662,7 @@ class AbstractModel:
             space = self._space(model_name=model_name)
             do_bayes_opt = self.trainer.args["bayes_opt"] and not warm_start
             if do_bayes_opt and len(space) > 0:
-                min_calls = len(tmp_params)
+                min_calls = len(space)
                 callback = BayesCallback(
                     total=self.trainer.args["n_calls"]
                     if not src.setting["debug_mode"]
@@ -761,18 +761,18 @@ class AbstractModel:
                     )
                     result = gp_minimize(
                         _bayes_objective,
-                        self._space(model_name=model_name),
+                        space,
                         n_calls=self.trainer.args["n_calls"]
                         if not src.setting["debug_mode"]
                         else min_calls,
                         n_initial_points=10 if not src.setting["debug_mode"] else 0,
                         callback=callback.call,
                         random_state=0,
-                        x0=list(tmp_params.values()),
+                        x0=[tmp_params[s.name] for s in space],
                     )
-                params = {}
-                for key, value in zip(tmp_params.keys(), result.x):
-                    params[key] = value
+                opt_params = {s.name: val for s, val in zip(space, result.x)}
+                params = tmp_params.copy()
+                params.update(opt_params)
                 params = self._check_params(model_name, **params)
                 self.model_params[model_name] = cp(params)
                 callback.close()
@@ -893,16 +893,15 @@ class AbstractModel:
             space = self._space(model_name=model_name)
             if len(space) == 0:
                 continue
-            for k, s in zip(tmp_params.keys(), space):
-                if k != s.name:
-                    print(
-                        f"Keys of {self.program} - {model_name} in _initial_values and _space does not match.\n"
-                        f"_initial_values: {list(tmp_params.keys())}\n"
-                        f"_space: {[s.name for s in space]}"
-                    )
-                    any_mismatch = True
+            not_exist = [s.name for s in space if s.name not in tmp_params.keys()]
+            if len(not_exist) > 0:
+                print(
+                    f"{not_exist} are defined for {self.program} - {model_name} in _space but are not defined in "
+                    f"_initial_values."
+                )
+                any_mismatch = True
         if any_mismatch:
-            raise Exception(f"Defined space and initial values do not match.")
+            raise Exception(f"Defined spaces and initial values do not match.")
 
     def _mkdir(self):
         """
@@ -1121,7 +1120,7 @@ class AbstractModel:
 
     def _initial_values(self, model_name: str) -> Dict[str, Union[int, float]]:
         """
-        Initial values of hyperparameters to be optimized. The order should be the same as those in :func:`_space`.
+        Initial values of hyperparameters to be optimized.
 
         Parameters
         ----------
