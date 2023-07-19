@@ -234,18 +234,40 @@ class Transformer(TorchModel):
         metric,
         save_to=None,
         palette=None,
+        figsize_kwargs=None,
+        catplot_kwargs=None,
+        legend_kwargs=None,
+        adjust_kwargs=None,
     ):
         leaderboard = leaderboard[leaderboard["Program"] != self.program]
         model_names = improved_measure["Model"]
         if palette is None:
             palette = sns.color_palette(global_palette)
-        figsize, width, height = get_figsize(
-            n=len(leaderboard),
-            max_col=5,
-            width_per_item=1.6,
-            height_per_item=1.6,
-            max_width=5,
+        _figsize_kwargs = dict(
+            max_col=5, width_per_item=1.6, height_per_item=1.6, max_width=5
         )
+        if figsize_kwargs is not None:
+            _figsize_kwargs.update(figsize_kwargs)
+        figsize, width, height = get_figsize(n=len(leaderboard), **_figsize_kwargs)
+        _legend_kwargs = dict(bbox_to_anchor=(0.85, 0.075), ncol=4)
+        if legend_kwargs is not None:
+            _legend_kwargs.update(legend_kwargs)
+        _adjust_kwargs = dict(bottom=0.15)
+        if adjust_kwargs is not None:
+            _adjust_kwargs.update(adjust_kwargs)
+        _catplot_kwargs = dict(
+            legend_out=True,
+            sharex=False,
+            sharey=False,
+            palette=palette,
+            flierprops={"marker": "o"},
+            fliersize=2,
+            dodge=False,
+            height=figsize[1] / height,
+            aspect=0.4,
+        )
+        if catplot_kwargs is not None:
+            _catplot_kwargs.update(catplot_kwargs)
         dfs = []
         title_dict = {row: {} for row in range(height)}
         for idx, (program, model) in enumerate(
@@ -280,21 +302,14 @@ class Transformer(TorchModel):
                 x="variable",
                 y="value",
                 hue="variable",
-                legend_out=True,
-                sharex=False,
-                sharey=False,
-                palette=palette,
-                flierprops={"marker": "o"},
-                dodge=False,
-                height=figsize[1] / height,
-                aspect=0.4,
+                **_catplot_kwargs,
             )
-        g.add_legend(bbox_to_anchor=(0.85, 0.008), ncol=3)
+        g.add_legend(**_legend_kwargs)
         for (row_key, col_key), ax in g.axes_dict.items():
             ax.set_title(title_dict[row_key][col_key], fontsize=10)
         plt.setp(g.axes, xticks=[], xlabel="", ylabel="")
-        g.legend.set_in_layout(True)
         plt.tight_layout()
+        plt.subplots_adjust(**_adjust_kwargs)
         if save_to is not None:
             plt.savefig(save_to, dpi=500)
         plt.show()
