@@ -39,10 +39,10 @@ class Transformer(TorchModel):
             "_".join(x)
             for x in product(
                 available_names,
-                ["NoWrap"],
+                ["NoWrap", "Wrap"],
                 ["1L", "2L"],
                 ["PCA"],
-                ["KMeans"],
+                ["KMeans", "GMM", "BMM"],
             )
         ]
         return all_names
