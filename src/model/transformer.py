@@ -221,10 +221,163 @@ class Transformer(TorchModel):
                     improved_measure.loc[
                         idx, f"{metric} Improvement p-value"
                     ] = ttest_res[model][metric]["p-value"]
+        improved_measure.sort_values(
+            by="Testing RMSE % Improvement",
+            ascending=False,
+            inplace=True,
+            ignore_index=True,
+        )
         if ttest_res is not None:
             return improved_measure, ttest_res
         else:
             return improved_measure
+
+    def method_ranking(self, improved_measure, leaderboard):
+        ranked_improvement = improved_measure.sort_values(
+            by="Testing RMSE % Improvement", ascending=False, ignore_index=True
+        )
+        ranked_improvement["Rank"] = np.arange(1, len(ranked_improvement) + 1)
+        imp_model_names = ranked_improvement["Model"].values.flatten()
+        imp_methods_per_model = [name.split("_")[2:] for name in imp_model_names]
+        leaderboard = leaderboard.copy()
+        leaderboard["Rank"] = np.arange(1, len(leaderboard) + 1)
+        lead_model_names = leaderboard["Model"].values.flatten()
+        lead_methods_per_model = [
+            name.split("_")[2:] if len(name.split("_")) > 2 else name
+            for name in lead_model_names
+        ]
+        unique_methods = [np.unique(x) for x in zip(*imp_methods_per_model)]
+        base_df = pd.DataFrame(
+            columns=[
+                "Method set",
+                "Avg. % improvement ranking",
+                "% improvement ranking p-value versus others",
+                "Avg. leaderboard ranking",
+                "leaderboard ranking p-value versus others",
+            ],
+            index=[],
+        )
+        dfs = []
+        detailed = {}
+        for method_set in unique_methods:
+            if len(method_set) == 1:
+                continue
+            df = base_df.copy()
+            for method in method_set:
+                df.loc[method] = np.nan
+            category = "/".join(method_set)
+            df["Category"] = category
+            detailed[category] = {}
+            imp_ranks_method_set = {}
+            lead_ranks_method_set = {}
+            for method in method_set:
+                imp_ranks = ranked_improvement["Rank"].values.flatten()[
+                    np.where([method in methods for methods in imp_methods_per_model])[
+                        0
+                    ]
+                ] / len(ranked_improvement)
+                lead_ranks = leaderboard["Rank"].values.flatten()[
+                    np.where([method in methods for methods in lead_methods_per_model])[
+                        0
+                    ]
+                ] / len(leaderboard)
+                imp_ranks_method_set[method] = imp_ranks
+                lead_ranks_method_set[method] = lead_ranks
+                df.loc[method, "Avg. % improvement ranking"] = np.mean(imp_ranks)
+                df.loc[method, "Avg. leaderboard ranking"] = np.mean(lead_ranks)
+            detailed[category]["imp"] = imp_ranks_method_set
+            detailed[category]["lead"] = lead_ranks_method_set
+            for method in method_set:
+                s_imp = ""
+                s_lead = ""
+                for other_method in np.setdiff1d(method_set, [method]):
+                    p_imp = getattr(
+                        stats.ttest_ind(
+                            imp_ranks_method_set[method],
+                            imp_ranks_method_set[other_method],
+                        ),
+                        "pvalue",
+                    )
+                    p_lead = getattr(
+                        stats.ttest_ind(
+                            lead_ranks_method_set[method],
+                            lead_ranks_method_set[other_method],
+                        ),
+                        "pvalue",
+                    )
+                    s_imp += f"{other_method}: {p_imp}; "
+                    s_lead += f"{other_method}: {p_lead}; "
+                df.loc[method, "% improvement ranking p-value versus others"] = s_imp
+                df.loc[method, "leaderboard ranking p-value versus others"] = s_lead
+            dfs.append(df)
+        method_ranking = pd.concat(dfs, axis=0)
+        return method_ranking, detailed
+
+    def plot_method_ranking(
+        self,
+        method_ranking,
+        save_to=None,
+        palette=None,
+        catplot_kwargs=None,
+    ):
+        _catplot_kwargs = dict(
+            legend_out=True,
+            sharex=False,
+            sharey=False,
+            palette=palette,
+            flierprops={"marker": "o"},
+            fliersize=2,
+            dodge=False,
+            height=2,
+            aspect=1,
+        )
+        if catplot_kwargs is not None:
+            _catplot_kwargs.update(catplot_kwargs)
+        dfs = []
+        title_dict = {"% Improvement ranking": {}, "Leaderboard ranking": {}}
+        for idx, category in enumerate(method_ranking.keys()):
+            df_dict = {"variable": [], "value": []}
+            for method, ranks in method_ranking[category]["imp"].items():
+                df_dict["variable"].extend([method] * len(ranks))
+                df_dict["value"].extend(list(ranks))
+            df_imp = pd.DataFrame(df_dict)
+            df_imp["col"] = category
+            df_imp["row"] = "% Improvement ranking"
+            dfs.append(df_imp)
+            title_dict["% Improvement ranking"][category] = category
+            df_dict = {"variable": [], "value": []}
+            for method, ranks in method_ranking[category]["lead"].items():
+                df_dict["variable"].extend([method] * len(ranks))
+                df_dict["value"].extend(list(ranks))
+            df_lead = pd.DataFrame(df_dict)
+            df_lead["col"] = category
+            df_lead["row"] = "Leaderboard ranking"
+            dfs.append(df_lead)
+            title_dict["Leaderboard ranking"][category] = ""
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action="ignore", category=DeprecationWarning)
+            g = sns.catplot(
+                kind="box",
+                data=pd.concat(dfs, ignore_index=True),
+                col="col",
+                row="row",
+                x="variable",
+                y="value",
+                hue="variable",
+                **_catplot_kwargs,
+            )
+        # g.add_legend(**_legend_kwargs)
+        # g.set_titles(row_template="{row_name}", col_template="{col_name}")
+        plt.setp(g.axes, xlabel="")
+        g.axes[0, 0].set_ylabel("\% Improvement ranking")
+        g.axes[1, 0].set_ylabel("Leaderboard ranking")
+        for (row_key, col_key), ax in g.axes_dict.items():
+            ax.set_title(title_dict[row_key][col_key], fontsize=10)
+        plt.tight_layout()
+        if save_to is not None:
+            plt.savefig(save_to, dpi=500)
+        plt.show()
+        plt.close()
 
     def plot_improvement(
         self,
