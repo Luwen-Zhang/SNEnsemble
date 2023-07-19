@@ -36,6 +36,21 @@ plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = "Times New Roman"
 plt.rcParams["figure.autolayout"] = True
 
+global_palette = [
+    "#FF3E41",
+    "#00B2CA",
+    "#FEB95F",
+    "#3B3561",
+    "#679436",
+    "#BF9ACA",
+    "#1F487E",
+    "#88AB75",
+    "#6457A6",
+    "#114B5F",
+    "#2B59C3",
+    "#B084CC",
+]
+
 
 def is_notebook() -> bool:
     try:

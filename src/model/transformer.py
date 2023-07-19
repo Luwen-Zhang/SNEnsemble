@@ -227,10 +227,18 @@ class Transformer(TorchModel):
             return improved_measure
 
     def plot_improvement(
-        self, leaderboard, improved_measure, ttest_res, metric, save_to=None
+        self,
+        leaderboard,
+        improved_measure,
+        ttest_res,
+        metric,
+        save_to=None,
+        palette=None,
     ):
         leaderboard = leaderboard[leaderboard["Program"] != self.program]
         model_names = improved_measure["Model"]
+        if palette is None:
+            palette = sns.color_palette(global_palette)
         figsize, width, height = get_figsize(
             n=len(leaderboard),
             max_col=5,
@@ -275,9 +283,7 @@ class Transformer(TorchModel):
                 legend_out=True,
                 sharex=False,
                 sharey=False,
-                palette=sns.color_palette(
-                    ["#FF3E41", "#00B2CA", "#FEB95F", "#3B3561", "#679436"]
-                ),
+                palette=palette,
                 flierprops={"marker": "o"},
                 dodge=False,
                 height=figsize[1] / height,
