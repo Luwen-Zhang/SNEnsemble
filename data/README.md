@@ -1,4 +1,6 @@
-## Copyright Notification
+# Copyright Notification
+
+## Composites
 
 We reformat and merge fatigue testing records from SNL/MSU/DOE, OptiMat, UPWIND, and FACT databases into a single database with careful considerations, including filtering invalid entries, rename variables, fix improper calculations in the records, to obtain clean and consistent data to fit machine 
 learning usages. We leave the original format ("2019_SNL_MSU_DOE_Composite-Materials-Database_Wind_29pt0.xlsx" and "Optidat UPWIND 28_3_2017.xls") in the folder. Any derived database should be directly based on the original files instead of our merged database. We are not responsible for the accuracy of the testing records.
@@ -51,3 +53,20 @@ Permission is granted to use this work in the following ways:
 Disclaimer:  The database is supplied without any warranty, stated or implied. In particular, no claim is made that it is accurate, complete, or suitable for any purpose.  Use it at your own risk.
 ```
 
+## Alloys
+
+The datasets of additively manufactured alloys and complex metallic alloys are extracted from papers of Zhang et al. These data points are extracted from numerous research papers collected by the authors. For the complex metallic alloys dataset, we also extract fractions of chemical elements as individual features. Any derived database should be directly based on the original files instead of our modified ones. We are not responsible for the accuracy of the testing records.
+
+* Zhang, Z., Tang, H. & Xu, Z. Fatigue database of complex metallic alloys. *Sci Data* **10**, 447 (2023). https://doi.org/10.1038/s41597-023-02354-1
+* Zhang, Z., Xu, Z. Fatigue database of additively manufactured alloys. *Sci Data* **10**, 249 (2023). https://doi.org/10.1038/s41597-023-02150-x
+
+We select parts of these data:
+
+* Not runout;
+* Stress-Life data (S-N);
+* Uniaxial loading;
+* Load ratio (R-value) is not empty.
+
+Note that if two values are recorded for a feature, the final value is the average of these two values.
+
+These datasets follow [CC BY 4.0 License](https://creativecommons.org/licenses/by/4.0/).
