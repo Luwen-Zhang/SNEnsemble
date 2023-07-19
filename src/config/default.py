@@ -2,7 +2,7 @@ cfg = {
     "database": "composite",
     "loss": "mse",
     "bayes_opt": False,
-    "n_calls": 50,
+    "bayes_calls": 50,
     "bayes_epoch": 30,
     "patience": 100,
     "epoch": 300,

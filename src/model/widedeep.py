@@ -336,7 +336,7 @@ class WideDeep(AbstractModel):
                     verbose=1 if verbose else 0,
                     restore_best_weights=True,
                 ),
-                WideDeepCallback(total_epoch=self.total_epoch, verbose=verbose),
+                WideDeepCallback(total_epoch=epoch, verbose=verbose),
             ],
             metrics=None,
         )

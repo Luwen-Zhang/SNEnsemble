@@ -617,6 +617,23 @@ class AbstractModel:
             verbose=False,
         )
 
+    def _custom_training_params(self, model_name) -> Dict:
+        """
+        Customized training settings to override settings in the configuration file. Functional keys are `epoch`,
+        `patience`, and `bayes_calls`.
+
+        Parameters
+        ----------
+        model_name
+            A name of a selected model
+
+        Returns
+        -------
+        params
+            A dict of training params.
+        """
+        return {}
+
     def _train(
         self,
         model_subset: List[str] = None,
@@ -644,9 +661,6 @@ class AbstractModel:
             Ignored.
         """
         self.trainer.set_status(training=True)
-        self.total_epoch = (
-            self.trainer.args["epoch"] if not src.setting["debug_mode"] else 2
-        )
         if self.model is None:
             if self.store_in_harddisk:
                 self.model = ModelDict(path=self.root)
@@ -660,14 +674,18 @@ class AbstractModel:
             data = self._train_data_preprocess(model_name)
             tmp_params = self._get_params(model_name, verbose=verbose)
             space = self._space(model_name=model_name)
-            do_bayes_opt = self.trainer.args["bayes_opt"] and not warm_start
+            args = self.trainer.args.copy()
+            args.update(self._custom_training_params(model_name))
+            do_bayes_opt = args["bayes_opt"] and not warm_start
+            total_epoch = args["epoch"] if not src.setting["debug_mode"] else 2
             if do_bayes_opt and len(space) > 0:
                 min_calls = len(space)
-                callback = BayesCallback(
-                    total=self.trainer.args["n_calls"]
+                bayes_calls = (
+                    max([args["bayes_calls"], min_calls])
                     if not src.setting["debug_mode"]
                     else min_calls
                 )
+                callback = BayesCallback(total=bayes_calls)
                 global _bayes_objective
 
                 @skopt.utils.use_named_args(space)
@@ -681,7 +699,7 @@ class AbstractModel:
 
                             self._train_single_model(
                                 model,
-                                epoch=self.trainer.args["bayes_epoch"]
+                                epoch=args["bayes_epoch"]
                                 if not src.setting["debug_mode"]
                                 else 1,
                                 X_train=data["X_train"],
@@ -762,9 +780,7 @@ class AbstractModel:
                     result = gp_minimize(
                         _bayes_objective,
                         space,
-                        n_calls=self.trainer.args["n_calls"]
-                        if not src.setting["debug_mode"]
-                        else min_calls,
+                        n_calls=bayes_calls,
                         n_initial_points=10 if not src.setting["debug_mode"] else 0,
                         callback=callback.call,
                         random_state=0,
@@ -798,7 +814,7 @@ class AbstractModel:
 
             self._train_single_model(
                 model,
-                epoch=self.total_epoch,
+                epoch=total_epoch,
                 X_train=data["X_train"],
                 y_train=data["y_train"],
                 X_val=data["X_val"],
