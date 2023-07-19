@@ -90,7 +90,7 @@ class WideDeep(AbstractModel):
                 Real(low=0.0, high=0.3, prior="uniform", name="mlp_dropout"),
                 Categorical(categories=[8, 16, 32], name="input_dim"),
                 Categorical(categories=[2, 4, 8], name="n_heads"),
-                Integer(low=4, high=8, prior="uniform", name="n_blocks", dtype=int),
+                Integer(low=2, high=4, prior="uniform", name="n_blocks", dtype=int),
                 Real(low=0.0, high=0.3, prior="uniform", name="attn_dropout"),
                 Real(low=0.0, high=0.3, prior="uniform", name="ff_dropout"),
                 Real(low=0.4, high=0.6, prior="uniform", name="kv_compression_factor"),

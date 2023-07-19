@@ -275,8 +275,8 @@ class PytorchTabular(AbstractModel):
                 Real(low=0, high=0.3, prior="uniform", name="embedding_dropout"),  # 0.1
                 Categorical([2, 4, 8], name="num_heads"),
                 Integer(
-                    low=4,
-                    high=8,
+                    low=2,
+                    high=4,
                     prior="uniform",
                     name="num_attn_blocks",
                     dtype=int,
