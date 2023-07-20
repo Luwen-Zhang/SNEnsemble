@@ -1787,7 +1787,9 @@ class AbstractNN(pl.LightningModule):
 
     def _early_stopping_eval(self, train_loss: float, val_loss: float) -> float:
         """
-        Calculate the loss value (criteria) for early stopping. The validation loss is returned directly.
+        Calculate the loss value (criteria) for early stopping. The validation loss is returned, but note that
+        ``0.0 * train_loss`` is added to the returned value so that NaNs in the training set can be detected by
+        ``EarlyStopping``.
 
         Parameters
         ----------
@@ -1801,7 +1803,7 @@ class AbstractNN(pl.LightningModule):
         result
             The early stopping evaluation.
         """
-        return val_loss
+        return val_loss + 0.0 * train_loss
 
     @staticmethod
     def _test_required_model(
