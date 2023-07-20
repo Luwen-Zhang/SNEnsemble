@@ -25,6 +25,9 @@ setting = dict(
     default_output_path="output",
     default_config_path="configs",
     default_data_path="data",
+    # If False, raise an Exception if calculating metrics for predictions containing NaNs. If True, the metric will
+    # be 100 instead.
+    warn_nan_metric=True,
 )
 
 if setting["debug_mode"]:

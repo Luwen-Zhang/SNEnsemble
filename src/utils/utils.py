@@ -25,6 +25,7 @@ import itertools
 from copy import deepcopy as cp
 from torch.autograd.grad_mode import _DecoratorContextManager
 from typing import Any
+import src
 from .collate import fix_collate_fn
 
 clr = sns.color_palette("deep")
@@ -114,6 +115,18 @@ def set_torch(seed=0):
 def metric_sklearn(y_true, y_pred, metric):
     y_true = np.array(y_true).flatten()
     y_pred = np.array(y_pred).flatten()
+    if not np.all(np.isfinite(y_pred)):
+        if src.setting["warn_nan_metric"]:
+            warnings.warn(
+                f"NaNs exist in the tested prediction. A large value (100) is returned instead."
+                f"To disable this and raise an Exception, turn the global setting `warn_nan_metric` to False."
+            )
+            return 100
+        else:
+            raise Exception(
+                f"NaNs exist in the tested prediction. To ignore this and return a large value (100) instead, turn "
+                f"the global setting `warn_nan_metric` to True"
+            )
     if metric == "mse":
         from sklearn.metrics import mean_squared_error
 
