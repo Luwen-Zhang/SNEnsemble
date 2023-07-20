@@ -208,7 +208,16 @@ class Transformer(TorchModel):
         derived_data = self.datamodule.sort_derived_data(derived_data)
         return df, derived_data, self.datamodule
 
-    def improvement(self, leaderboard: pd.DataFrame, cv_path=None):
+    def _df_exclude_model(self, df, exclude: List[str], key="Model"):
+        include_idx = np.where([all([y not in x for y in exclude]) for x in df[key]])
+        df = df.loc[df.index[include_idx], :].reset_index(drop=True)
+        return df
+
+    def improvement(
+        self, leaderboard: pd.DataFrame, cv_path=None, exclude: List[str] = None
+    ):
+        if exclude is not None:
+            leaderboard = self._df_exclude_model(leaderboard, exclude)
         base = leaderboard[leaderboard["Program"] != self.program].reset_index(
             drop=True
         )
@@ -263,7 +272,10 @@ class Transformer(TorchModel):
         else:
             return improved_measure
 
-    def method_ranking(self, improved_measure, leaderboard):
+    def method_ranking(self, improved_measure, leaderboard, exclude: List[str] = None):
+        if exclude is not None:
+            leaderboard = self._df_exclude_model(leaderboard, exclude)
+            improved_measure = self._df_exclude_model(improved_measure, exclude)
         ranked_improvement = improved_measure.sort_values(
             by="Testing RMSE % Improvement", ascending=False, ignore_index=True
         )
@@ -457,7 +469,12 @@ class Transformer(TorchModel):
         for idx, (program, model) in enumerate(
             zip(leaderboard["Program"], leaderboard["Model"])
         ):
+            col = idx % width
+            row = idx // width
+            title_dict[row][col] = f"{program}\n{model}"
             improve_models = [m for m in model_names if f"{program}_{model}" in m]
+            if len(improve_models) == 0:
+                continue
             base_metrics = {
                 "Base model": ttest_res[improve_models[0]][metric]["base"],
             }
@@ -478,11 +495,8 @@ class Transformer(TorchModel):
                 vals[vals > q3 + 3 * iqr] = np.nan
                 base_metrics[key] = vals
             df = pd.DataFrame(base_metrics).melt()
-            col = idx % width
-            row = idx // width
             df["col"] = col
             df["row"] = row
-            title_dict[row][col] = f"{program}\n{model}"
             dfs.append(df)
         with warnings.catch_warnings():
             warnings.filterwarnings(action="ignore", category=DeprecationWarning)
