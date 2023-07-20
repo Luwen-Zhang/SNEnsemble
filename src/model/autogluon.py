@@ -108,7 +108,7 @@ class AutoGluon(AbstractModel):
                 tuning_data=val_data,
                 presets="best_quality" if not in_bayes_opt else "medium_quality",
                 hyperparameter_tune_kwargs=None if len(kwargs) > 0 else "auto",
-                use_bag_holdout=True,
+                use_bag_holdout=True,  # Enable if tuning_data is specified
                 verbosity=2 if verbose else 0,
                 feature_generator=feature_generator,
                 hyperparameters={self._name_mapping[model[0]]: kwargs},
