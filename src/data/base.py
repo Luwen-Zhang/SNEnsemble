@@ -524,7 +524,7 @@ class AbstractAugmenter(AbstractProcessor):
     def _fit_transform(
         self, data: pd.DataFrame, datamodule: DataModule, **kwargs
     ) -> pd.DataFrame:
-        already_augmented = np.max(data.index) - len(datamodule.df) + 1
+        already_augmented = max([np.max(data.index) - len(datamodule.df) + 1, 0])
         ###############################
         # Here is the augmentation part
         augmented = self._get_augmented(data, datamodule, **kwargs)
@@ -764,7 +764,9 @@ class AbstractSplitter:
             )
             train_indices, test_indices = self.cv_generator.__next__()
         train_indices, val_indices = train_test_split(
-            train_indices, test_size=len(data) // cv, shuffle=True
+            train_indices,
+            test_size=len(data) // cv if cv > 2 else len(train_indices) // 2,
+            shuffle=True,
         )
         return train_indices, val_indices, test_indices
 

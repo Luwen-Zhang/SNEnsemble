@@ -27,6 +27,7 @@ class TestGeneral(unittest.TestCase):
                     ["NaNFeatureRemover", {}],
                     ["VarianceFeatureSelector", {"thres": 1}],
                     ["LackDataMaterialRemover", {}],
+                    ["IQRRemover", {}],
                     ["SampleDataAugmentor", {}],
                     ["StandardScaler", {}],
                 ],
