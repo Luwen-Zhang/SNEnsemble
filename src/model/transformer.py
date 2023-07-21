@@ -41,11 +41,24 @@ class Transformer(TorchModel):
             for x in product(
                 available_names,
                 ["NoWrap", "Wrap"],
-                ["1L", "2L"],
+                ["1L"],
                 ["PCA"],
-                ["KMeans", "GMM", "BMM"],
+                ["KMeans"],
             )
         ]
+        for name in all_names.copy():
+            components = name.split("_")
+            wrap_invalid = (
+                any([model in components for model in ["TabNet"]])
+                or "AutoGluon" in components
+                or "PytorchTabular_NODE" in name
+            )
+            if "PytorchTabular_TabTransformer" in name:
+                pass
+            if "Wrap" in components and wrap_invalid:
+                all_names.remove(name)
+            elif "NoWrap" in components and not wrap_invalid:
+                all_names.remove(name)
         return all_names
 
     def _new_model(self, model_name, verbose, required_models=None, **kwargs):
@@ -137,9 +150,6 @@ class Transformer(TorchModel):
                 ),
             ] + self.trainer.SPACE
 
-    def _custom_training_params(self, model_name) -> Dict:
-        return dict(epoch=50, bayes_calls=20, bayes_epoch=5)
-
     def _initial_values(self, model_name):
         components = model_name.split("_")
         res = {}
@@ -152,12 +162,6 @@ class Transformer(TorchModel):
 
     def _conditional_validity(self, model_name: str) -> bool:
         components = model_name.split("_")
-        if "Wrap" in components and any([model in components for model in ["TabNet"]]):
-            return False
-        if "Wrap" in components and "AutoGluon" in components:
-            return False
-        if "Wrap" in components and "PytorchTabular_NODE" in model_name:
-            return False
         if "2L" in components:
             datamodule = getattr(self, "datamodule", self.trainer.datamodule)
             top_level_clustering_features = (
