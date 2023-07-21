@@ -5,7 +5,7 @@ import einops
 from torch import Tensor
 import torch.nn.functional as F
 import numpy as np
-from src.model.base import get_sequential
+from tabensemb.model.base import get_sequential
 
 
 class ReGLU(nn.Module):

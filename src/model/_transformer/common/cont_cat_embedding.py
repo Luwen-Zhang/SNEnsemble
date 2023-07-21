@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import numpy as np
-from src.model.base import get_sequential
+from tabensemb.model.base import get_sequential
 
 
 class Embedding(nn.Module):

@@ -1,6 +1,6 @@
-import src
+import tabensemb
 from .models_with_seq import CatEmbedSeqNN
-from ..base import AbstractNN, get_linear, get_sequential, AbstractModel
+from tabensemb.model.base import AbstractNN, get_linear, get_sequential, AbstractModel
 import numpy as np
 from .clustering.singlelayer import KMeansSN, GMMSN, BMMSN
 from .clustering.multilayer import TwolayerKMeansSN, TwolayerGMMSN, TwolayerBMMSN
@@ -8,9 +8,9 @@ from .gp.exact_gp import ExactGPModel
 from .bayes_nn.bbp import MCDropout
 import torch
 from torch import nn
-from ..widedeep import WideDeepWrapper
-from ..pytorch_tabular import PytorchTabularWrapper
-from ..base import TorchModelWrapper
+from tabensemb.model.widedeep import WideDeepWrapper
+from tabensemb.model.pytorch_tabular import PytorchTabularWrapper
+from tabensemb.model.base import TorchModelWrapper
 
 
 class AbstractClusteringModel(AbstractNN):
@@ -41,7 +41,7 @@ class AbstractClusteringModel(AbstractNN):
             self.gp = ExactGPModel(dynamic_input=True)
             import gpytorch
 
-            gpytorch.settings.debug._set_state(src.setting["debug_mode"])
+            gpytorch.settings.debug._set_state(tabensemb.setting["debug_mode"])
         else:
             self.gp = None
         if uncertainty == "bnn":

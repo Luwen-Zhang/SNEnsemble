@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from src.utils import torch_with_grad
+from tabensemb.utils import torch_with_grad
 import torch.nn.functional as F
 
 

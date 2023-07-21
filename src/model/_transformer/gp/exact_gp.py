@@ -93,7 +93,7 @@ if __name__ == "__main__":
     import time
     from base import get_test_case_1d, plot_mu_var_1d, get_test_case_2d, plot_mu_var_2d
     import matplotlib.pyplot as plt
-    import src.utils
+    import tabensemb.utils
 
     X, y, grid = get_test_case_1d(100, grid_low=-10, grid_high=10, noise=1)
 

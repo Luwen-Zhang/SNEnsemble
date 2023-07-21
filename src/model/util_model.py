@@ -1,6 +1,6 @@
-from src.utils import *
-from src.model import AbstractModel, TorchModel
-from src.trainer import Trainer
+from tabensemb.utils import *
+from tabensemb.model import AbstractModel, TorchModel
+from tabensemb.trainer import Trainer
 from copy import deepcopy as cp
 
 
@@ -144,80 +144,3 @@ class RFE(TorchModel):
         if verbose:
             print(f"Selected features: {selected_features}")
             print(f"Eliminated features: {features_eliminated[:select_idx]}")
-
-
-class ModelAssembly(AbstractModel):
-    def __init__(self, trainer, models=None, program=None, model_subset=None, **kwargs):
-        self.program = "ModelAssembly" if program is None else program
-        super(ModelAssembly, self).__init__(
-            trainer=trainer, program=self.program, model_subset=model_subset, **kwargs
-        )
-        self.models = {}
-        if models is None:
-            if model_subset is None:
-                raise Exception(f"One of models and model_subset should be specified.")
-            else:
-                for model_name in model_subset:
-                    self.models[model_name] = getattr(
-                        sys.modules["src.model"], model_name
-                    )(trainer=trainer, model_subset=[model_name], **kwargs)
-        else:
-            for model in models:
-                if len(model.get_model_names()) > 1:
-                    raise Exception(
-                        f"ModelAssembly is designed for modelbases with a single model."
-                    )
-                self.models[model.get_model_names()[0]] = model
-
-    def _get_program_name(self):
-        return self.program
-
-    def fit(self, model_subset=None, **kwargs):
-        for model_name in self.models.keys() if model_subset is None else model_subset:
-            self.models[model_name].fit(**kwargs)
-
-    def predict(
-        self, df: pd.DataFrame, model_name, derived_data: dict = None, **kwargs
-    ):
-        return self.models[model_name].predict(
-            df=df, model_name=model_name, derived_data=derived_data, **kwargs
-        )
-
-    def train(
-        self,
-        *args,
-        **kwargs,
-    ):
-        print(f"\n-------------Run {self.program}-------------\n")
-        self._train(*args, **kwargs)
-        print(f"\n-------------{self.program} End-------------\n")
-
-    def _train(self, model_subset=None, *args, **kwargs):
-        for model_name in self.models.keys() if model_subset is None else model_subset:
-            self.models[model_name]._train(*args, **kwargs)
-
-    def _predict(self, df: pd.DataFrame, model_name, derived_data=None, **kwargs):
-        return self.models[model_name].predict(
-            df=df, model_name=model_name, derived_data=derived_data, **kwargs
-        )
-
-    def _predict_all(self, **kwargs):
-        self._check_train_status()
-        predictions = {}
-        for submodel in self.models.values():
-            sub_predictions = submodel._predict_all(**kwargs)
-            for key, value in sub_predictions.items():
-                predictions[key] = value
-        return predictions
-
-    def _get_model_names(self):
-        return list(self.models.keys())
-
-    def _check_train_status(self):
-        for submodel in self.models.values():
-            try:
-                submodel._check_train_status()
-            except:
-                raise Exception(
-                    f"{self.program} not trained, run {self.__class__.__name__}.train() first."
-                )

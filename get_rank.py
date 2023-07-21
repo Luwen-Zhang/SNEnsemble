@@ -1,4 +1,4 @@
-from src.utils.ranking import *
+from tabensemb.utils.ranking import *
 
 dfs = read_lbs(
     [

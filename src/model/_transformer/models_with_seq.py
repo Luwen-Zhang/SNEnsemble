@@ -1,11 +1,12 @@
-from ..base import get_sequential, get_linear
+from tabensemb.model.base import get_sequential, get_linear
 from typing import List, Union
-from .models_basic import CategoryEmbeddingNN, FTTransformerNN
+from tabensemb.model.sample import CategoryEmbeddingNN
+from .models_basic import FTTransformerNN
 from .common.lstm import LSTM
 from .common.seq_fttransformer import SeqFTTransformer
 import torch
 from torch import nn
-from ..base import AbstractNN
+from tabensemb.model.base import AbstractNN
 
 
 class AbstractSeqModel(AbstractNN):

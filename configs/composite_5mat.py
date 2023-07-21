@@ -1,5 +1,11 @@
 cfg = {
     "database": "composite_database_04212023_5_mat",
+    "categorical_feature_names": [
+        "Data source",
+        "Resin Type",
+        "Sequence",
+        "Material_Code",
+    ],
     "feature_names_type": {
         "Resin Type": 2,
         "Fibre Volume Fraction": 1,

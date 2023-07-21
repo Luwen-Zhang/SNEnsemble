@@ -1,14 +1,15 @@
 import torch
-from src.trainer import Trainer
+from src.trainer import FatigueTrainer
 from src.model import *
-from src.utils import Logging
+from tabensemb.model import *
+from tabensemb.utils import Logging
 import os
 
 log = Logging()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using {} device".format(device))
 
-trainer = Trainer(device=device)
+trainer = FatigueTrainer(device=device)
 trainer.load_config()
 log.enter(os.path.join(trainer.project_root, "log.txt"))
 trainer.summarize_setting()

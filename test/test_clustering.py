@@ -1,5 +1,5 @@
 import unittest
-from src.utils import set_random_seed
+from tabensemb.utils import set_random_seed
 import numpy as np
 import torch
 from src.model._transformer.clustering.common.gmm import GMM, Cluster, TwolayerGMM

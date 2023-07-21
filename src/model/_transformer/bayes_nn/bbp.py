@@ -18,7 +18,7 @@ import torch
 import torch.nn.functional as F
 import torch.utils.data as Data
 import warnings
-from src.model.base import KeepDropout
+from tabensemb.model.base import KeepDropout
 
 
 def _isotropic_gauss_log_likelihood(x, mu, sigma, eps=1e-8):
@@ -459,7 +459,7 @@ class MCDropout(AbstractBNN):
         super(MCDropout, self).__init__(
             n_inputs=n_inputs, n_outputs=n_outputs, **kwargs
         )
-        from src.model.base import get_sequential
+        from tabensemb.model.base import get_sequential
 
         self.sample_dropout = sample_dropout
         # network with two hidden and one output layer

@@ -1,5 +1,5 @@
-from src.utils import *
-from src.model import TorchModel
+from tabensemb.utils import *
+from tabensemb.model import TorchModel
 from ._transformer.models_clustering import *
 from ._transformer.models_with_seq import *
 from ._transformer.models_basic import *
@@ -16,19 +16,19 @@ class Transformer(TorchModel):
     def _get_model_names():
         available_names = []
         try:
-            from .autogluon import AutoGluon
+            from tabensemb.model.autogluon import AutoGluon
 
             available_names += [f"AutoGluon_{x}" for x in AutoGluon._get_model_names()]
         except:
             pass
         try:
-            from .widedeep import WideDeep
+            from tabensemb.model.widedeep import WideDeep
 
             available_names += [f"WideDeep_{x}" for x in WideDeep._get_model_names()]
         except:
             pass
         try:
-            from .pytorch_tabular import PytorchTabular
+            from tabensemb.model.pytorch_tabular import PytorchTabular
 
             available_names += [
                 f"PytorchTabular_{x}" for x in PytorchTabular._get_model_names()
@@ -180,7 +180,7 @@ class Transformer(TorchModel):
         return models
 
     def _prepare_custom_datamodule(self, model_name):
-        from src.data import DataModule
+        from tabensemb.data import DataModule
 
         base = self.trainer.datamodule
         datamodule = DataModule(config=self.trainer.datamodule.args, initialize=False)
