@@ -8,7 +8,22 @@ Bash scripts (e.g. `run.sh` and `run_thiswork.sh`) gives several examples to use
 
 ## Requirements
 
-This work is built on our developing open-source tabular prediction benchmark platform [`tabular_ensemble`](https://github.com/LuoXueling/tabular_ensemble). See the installation instruction there.
+This work is built on our developing open-source tabular prediction benchmark platform [`tabular_ensemble`](https://github.com/LuoXueling/tabular_ensemble). 
+
+Note that the requirements change from time to time in `tabular_ensemble`. To reproduce our dependencies:
+
+* Before installing  `tabular_ensemble` , install `torch==1.12.0` with CUDA 1.16 (if a Nvidia GPU is available)
+
+```shell
+pip install torch==1.12.0+cu116 torchvision --extra-index-url https://download.pytorch.org/whl/cu116 --no-cache-dir
+```
+
+* Install  `tabular_ensemble`. See the installation instruction there.
+* Downgrade requirements
+
+```shell
+pip install -r requirements.txt
+```
 
 ## Our environment
 
