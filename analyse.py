@@ -1,5 +1,5 @@
 import argparse
-from src.trainer import load_trainer
+from tabensemb.trainer import load_trainer
 import os
 
 parser = argparse.ArgumentParser()
