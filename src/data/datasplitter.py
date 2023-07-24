@@ -99,11 +99,11 @@ class MaterialCycleSplitter(AbstractSplitter):
         self._check_exist(df, "Material_Code", "Material_Code")
         mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
         mat_lay_set = list(sorted(set(mat_lay)))
-        if "log(Cycles to Failure)" not in label_name:
+        if "log" not in label_name and "Cycles to Failure" not in label_name:
             raise Exception(
-                f"{self.__class__.__name__} requires log(Cycles to Failure) being the target, but only {label_name} exist."
+                f"{self.__class__.__name__} requires log10(Cycles to Failure) being the target, but only {label_name} exist."
             )
-        cycle = df["log(Cycles to Failure)"].values.flatten()
+        cycle = df[label_name].values.flatten()
         freq = df["Frequency"].values.flatten() if "Frequency" in df.columns else None
         r_value = df["R-value"].values.flatten() if "R-value" in df.columns else None
 
@@ -155,11 +155,11 @@ class CycleSplitter(AbstractSplitter):
         self._check_exist(df, "Material_Code", "Material_Code")
         mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
         mat_lay_set = list(sorted(set(mat_lay)))
-        if "log(Cycles to Failure)" not in label_name:
+        if "log" not in label_name and "Cycles to Failure" not in label_name:
             raise Exception(
-                f"{self.__class__.__name__} requires log(Cycles to Failure) being the target, but only {label_name} exist."
+                f"{self.__class__.__name__} requires log10(Cycles to Failure) being the target, but only {label_name} exist."
             )
-        cycle = df["log(Cycles to Failure)"].values.flatten()
+        cycle = df[label_name].values.flatten()
         freq = df["Frequency"].values.flatten() if "Frequency" in df.columns else None
         r_value = df["R-value"].values.flatten() if "R-value" in df.columns else None
 
@@ -311,11 +311,11 @@ class StressCycleSplitter(StrictCycleSplitter):
         self._check_exist(df, "Material_Code", "Material_Code")
         mat_lay = np.array([str(x) for x in df["Material_Code"].copy()])
         mat_lay_set = list(sorted(set(mat_lay)))
-        if "log(Cycles to Failure)" not in label_name:
+        if "log" not in label_name and "Cycles to Failure" not in label_name:
             raise Exception(
-                f"{self.__class__.__name__} requires log(Cycles to Failure) being the target, but only {label_name} exist."
+                f"{self.__class__.__name__} requires log10(Cycles to Failure) being the target, but only {label_name} exist."
             )
-        cycle = df["log(Cycles to Failure)"].values.flatten()
+        cycle = df[label_name].values.flatten()
         max_stress = df["Maximum Stress"].values.flatten()
         freq = df["Frequency"].values.flatten() if "Frequency" in df.columns else None
         r_value = df["R-value"].values.flatten() if "R-value" in df.columns else None

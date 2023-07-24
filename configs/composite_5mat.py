@@ -109,5 +109,5 @@ cfg = {
         ["StandardScaler", {}],
     ],
     "feature_types": ["Fatigue loading", "Material", "Categorical", "Derived"],
-    "label_name": ["log(Cycles to Failure)"],
+    "label_name": ["log10(Cycles to Failure)"],
 }

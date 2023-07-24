@@ -78,5 +78,5 @@ cfg = {
         ["VarianceFeatureSelector", {"thres": 1}],
         ["StandardScaler", {}],
     ],
-    "label_name": ["log(Cycles to Failure)"],
+    "label_name": ["log10(Cycles to Failure)"],
 }
