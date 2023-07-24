@@ -315,7 +315,7 @@ class WalkerStressDeriver(AbstractDeriver):
 
 class SuppStressDeriver(AbstractDeriver):
     """
-    Calculate absolute values of maximum stress, stress amplitude (Peak-to-peak) and mean stress. Their corresponding
+    Calculate absolute values of maximum stress, stress range and mean stress. Their corresponding
     relative stresses (relative to static modulus) are also calculated. For the maximum stress, the larger one of
     tensile and compressive stresses is selected. Required arguments are:
 
@@ -348,13 +348,13 @@ class SuppStressDeriver(AbstractDeriver):
         if kwargs["absolute"]:
             names += [
                 "Absolute Maximum Stress",
-                "Absolute Peak-to-peak Stress",
+                "Absolute Stress Range",
                 "Absolute Mean Stress",
             ]
         if kwargs["relative"]:
             names += [
                 "Relative Maximum Stress",
-                "Relative Peak-to-peak Stress",
+                "Relative Stress Range",
                 "Relative Mean Stress",
             ]
         return names
@@ -391,7 +391,7 @@ class SuppStressDeriver(AbstractDeriver):
         where_g0 = df_tmp.index[np.where(df_tmp["Absolute Maximum Stress"] > 0)[0]]
         df_tmp["rt"] = np.abs(df_tmp[ucs_col])
         df_tmp.loc[where_g0, "rt"] = np.abs(df_tmp.loc[where_g0, uts_col])
-        df_tmp["Absolute Peak-to-peak Stress"] = np.abs(
+        df_tmp["Absolute Stress Range"] = np.abs(
             df_tmp[max_stress_col] - df_tmp[min_stress_col]
         )
         df_tmp["Absolute Mean Stress"] = (
@@ -400,8 +400,8 @@ class SuppStressDeriver(AbstractDeriver):
         df_tmp["Relative Maximum Stress"] = np.abs(
             df_tmp["Absolute Maximum Stress"] / df_tmp["rt"]
         )
-        df_tmp["Relative Peak-to-peak Stress"] = np.abs(
-            df_tmp["Absolute Peak-to-peak Stress"] / df_tmp["rt"]
+        df_tmp["Relative Stress Range"] = np.abs(
+            df_tmp["Absolute Stress Range"] / df_tmp["rt"]
         )
         df_tmp["Relative Mean Stress"] = np.abs(
             df_tmp["Absolute Mean Stress"] / df_tmp["rt"]
@@ -410,7 +410,7 @@ class SuppStressDeriver(AbstractDeriver):
             np.where(df_tmp["Relative Maximum Stress"] > 1.1)[0]
         ]
         df_tmp.loc[where_invalid, "Relative Maximum Stress"] = np.nan
-        df_tmp.loc[where_invalid, "Relative Peak-to-peak Stress"] = np.nan
+        df_tmp.loc[where_invalid, "Relative Stress Range"] = np.nan
         df_tmp.loc[where_invalid, "Relative Mean Stress"] = np.nan
 
         names = self._derived_names(**kwargs)

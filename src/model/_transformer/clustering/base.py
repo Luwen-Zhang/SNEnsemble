@@ -406,7 +406,7 @@ class Poursatip(AbstractSN, ForComposite):
             max=1 - 1e-5,
         )
         s_a = torch.clamp(
-            torch.abs(required_cols["Relative Peak-to-peak Stress_UNSCALED"]),
+            torch.abs(required_cols["Relative Stress Range_UNSCALED"]),
             min=1e-5,
             max=2 - 1e-5,
         )
@@ -451,7 +451,7 @@ class Poursatip(AbstractSN, ForComposite):
     @staticmethod
     def required_cols():
         return [
-            "Relative Peak-to-peak Stress_UNSCALED",
+            "Relative Stress Range_UNSCALED",
             "Relative Maximum Stress_UNSCALED",
             "R-value_UNSCALED",
         ]
