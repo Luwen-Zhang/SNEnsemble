@@ -6,7 +6,7 @@ from typing import Union
 from gpytorch.likelihoods import Likelihood
 from gpytorch.models import ExactGP, ApproximateGP
 import matplotlib.pyplot as plt
-from collections import Iterable
+from collections.abc import Iterable
 
 
 class AbstractGP(nn.Module):
