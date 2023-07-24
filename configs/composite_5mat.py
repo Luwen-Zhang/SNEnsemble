@@ -1,5 +1,5 @@
 cfg = {
-    "database": "composite_database_07242023_5_mat",
+    "database": "composite_database_07242023_5mat",
     "categorical_feature_names": [
         "Data source",
         "Resin Type",

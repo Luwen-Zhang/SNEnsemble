@@ -3,14 +3,57 @@ from tabensemb.utils import *
 from typing import List, Tuple
 import scipy.stats as st
 import src.data
+import pandas as pd
 
 
 class FatigueTrainer(Trainer):
-    def get_material_code(self, *args, **kwargs):
-        return self.datamodule.get_material_code(*args, **kwargs)
+    def get_material_code(
+        self, unique: bool = False, partition: str = "all"
+    ) -> pd.DataFrame:
+        """
+        Get Material_Code of the dataset.
+        Parameters
+        ----------
+        unique
+            If True, values in the Material_Code column will be counted.
+        partition
+            "train", "val", "test", or "all". See ``Trainer._get_indices``.
+        Returns
+        -------
+        m_code
+            If unique is True, the returned dataframe contains counts for each material code in the selected partition.
+            Otherwise, the original material codes in the selected partition are returned.
+        """
+        material_code = self.df[["Material_Code"]]
+        indices = self.datamodule._get_indices(partition=partition)
+        if unique:
+            unique_list = list(sorted(set(material_code.loc[indices, "Material_Code"])))
+            val_cnt = material_code.loc[indices, :].value_counts()
+            return pd.DataFrame(
+                {
+                    "Material_Code": unique_list,
+                    "Count": [val_cnt[x] for x in unique_list],
+                }
+            )
+        else:
+            return material_code.loc[indices, :]
 
-    def select_by_material_code(self, *args, **kwargs):
-        return self.datamodule.select_by_material_code(*args, **kwargs)
+    def select_by_material_code(self, m_code: str, partition: str = "all"):
+        """
+        Select samples with the specified material code.
+        Parameters
+        ----------
+        m_code
+            The selected material code.
+        partition
+            "train", "val", "test", or "all". See ``Trainer._get_indices``.
+        Returns
+        -------
+        indices
+            The pandas index where the material code exists.
+        """
+        code_df = self.get_material_code(unique=False, partition=partition)
+        return code_df.index[np.where(code_df["Material_Code"] == m_code)[0]]
 
     def cal_theoretical_pof50(
         self,
