@@ -64,22 +64,22 @@ class ThisWork(TorchModel):
     def _new_model(self, model_name, verbose, required_models=None, **kwargs):
         database = self.trainer.args["database"]
         if "composite" in database:
-            sn_category = "composite"
+            phy_category = "composite"
         elif "alloy" in database:
-            sn_category = "alloy"
+            phy_category = "alloy"
         else:
             warnings.warn(
                 f"Neither `composite` nor `alloy` is in the name of the database `{database}`. "
-                f"Only parts of the SN models are used."
+                f"Only parts of the Phy models are used."
             )
-            sn_category = None
+            phy_category = None
         fix_kwargs = dict(
             n_inputs=len(self.datamodule.cont_feature_names),
             n_outputs=len(self.datamodule.label_name),
             layers=self.datamodule.args["layers"],
             cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
             datamodule=self.datamodule,
-            sn_category=sn_category,
+            phy_category=phy_category,
         )
         components = model_name.split("_")
         if "Wrap" in components:
@@ -91,21 +91,21 @@ class ThisWork(TorchModel):
         if "1L" in components:
             cls = Abstract1LClusteringModel
             if "KMeans" in components:
-                sn_class = KMeansSN
+                phy_class = KMeansPhy
             elif "GMM" in components:
-                sn_class = GMMSN
+                phy_class = GMMPhy
             elif "BMM" in components:
-                sn_class = BMMSN
+                phy_class = BMMPhy
             else:
                 raise Exception(f"Clustering algorithm not found.")
         else:
             cls = Abstract2LClusteringModel
             if "KMeans" in components:
-                sn_class = TwolayerKMeansSN
+                phy_class = TwolayerKMeansPhy
             elif "GMM" in components:
-                sn_class = TwolayerGMMSN
+                phy_class = TwolayerGMMPhy
             elif "BMM" in components:
-                sn_class = TwolayerBMMSN
+                phy_class = TwolayerBMMPhy
             else:
                 raise Exception(f"Clustering algorithm not found.")
         if "PCA" in components:
@@ -124,7 +124,7 @@ class ThisWork(TorchModel):
             n_pca_dim = None
 
         return cls(
-            sn_class=sn_class,
+            phy_class=phy_class,
             **fix_kwargs,
             embedding_dim=3,
             n_pca_dim=n_pca_dim,
@@ -597,33 +597,35 @@ class ThisWork(TorchModel):
         return inspect_dict
 
     def inspect_phy_models(self, model_name, **kwargs):
-        target_attr = ["clustering_sn_model"]
+        target_attr = ["clustering_phy_model"]
         inspect_dict = self.inspect_attr(
             model_name=model_name, attributes=target_attr, to_numpy=False, **kwargs
         )
-        sns = inspect_dict["train"]["clustering_sn_model"].sns
-        sn_weight = (
-            inspect_dict["train"]["clustering_sn_model"]
-            .running_sn_weight.data.detach()
+        phys = inspect_dict["train"]["clustering_phy_model"].phys
+        phy_weight = (
+            inspect_dict["train"]["clustering_phy_model"]
+            .running_phy_weight.data.detach()
             .cpu()
         )
-        norm_sn_weight = nn.functional.normalize(torch.abs(sn_weight), p=1).numpy()
-        return sns, norm_sn_weight
+        norm_phy_weight = nn.functional.normalize(torch.abs(phy_weight), p=1).numpy()
+        return phys, norm_phy_weight
 
     def inspect_clusters(self, model_name, **kwargs):
-        target_attr = ["clustering_sn_model"]
+        target_attr = ["clustering_phy_model"]
         inspect_dict = self.inspect_attr(
             model_name=model_name, attributes=target_attr, **kwargs
         )
         to_cpu = lambda x: x.detach().cpu().numpy()
         if "USER_INPUT" in inspect_dict.keys():
-            return to_cpu(inspect_dict["USER_INPUT"]["clustering_sn_model"].x_cluster)
+            return to_cpu(inspect_dict["USER_INPUT"]["clustering_phy_model"].x_cluster)
         else:
             cluster_train = to_cpu(
-                inspect_dict["train"]["clustering_sn_model"].x_cluster
+                inspect_dict["train"]["clustering_phy_model"].x_cluster
             )
-            cluster_val = to_cpu(inspect_dict["val"]["clustering_sn_model"].x_cluster)
-            cluster_test = to_cpu(inspect_dict["test"]["clustering_sn_model"].x_cluster)
+            cluster_val = to_cpu(inspect_dict["val"]["clustering_phy_model"].x_cluster)
+            cluster_test = to_cpu(
+                inspect_dict["test"]["clustering_phy_model"].x_cluster
+            )
             return cluster_train, cluster_val, cluster_test
 
     def df_with_cluster(self, model_name, save_to: str = None, **kwargs):
@@ -645,15 +647,15 @@ class ThisWork(TorchModel):
         import matplotlib.pyplot as plt
         from matplotlib.gridspec import GridSpec
 
-        sns, sn_weight = self.inspect_phy_models(model_name=model_name, **kwargs)
-        names = [sn.__class__.__name__ for sn in sns]
+        phys, phy_weight = self.inspect_phy_models(model_name=model_name, **kwargs)
+        names = [phy.__class__.__name__ for phy in phys]
         fig = plt.figure(figsize=(8, 3))
         gs = GridSpec(100, 100, figure=fig)
         ax = fig.add_subplot(gs[:97, 10:97])
-        im = ax.imshow(sn_weight.T, cmap="Blues")
+        im = ax.imshow(phy_weight.T, cmap="Blues")
         ax.set_yticklabels(names)
-        ax.set_yticks(np.arange(sn_weight.shape[1]))
-        ax.set_xticks(np.arange(sn_weight.shape[0]))
+        ax.set_yticks(np.arange(phy_weight.shape[1]))
+        ax.set_xticks(np.arange(phy_weight.shape[0]))
         ax.set_xlabel("ID of clusters")
         ax.set_title("Weights of physical models")
         cax = fig.add_subplot(gs[50:96, 98:])

@@ -34,9 +34,9 @@ def _safe_positive(x, eps=1e-8):
     return torch.clamp(x, min=eps)
 
 
-class AbstractSN(nn.Module):
+class AbstractPhy(nn.Module):
     def __init__(self, **kwargs):
-        super(AbstractSN, self).__init__()
+        super(AbstractPhy, self).__init__()
         self.activ = torch.abs
         self._register_params(**kwargs)
         self.lstsq_input = None
@@ -69,7 +69,7 @@ class AbstractSN(nn.Module):
         if not self.use_fatigue_limit or not hasattr(self, "sw"):
             raise Exception(
                 f"Set the property `use_fatigue_limit` to True or register attributes `sw` and `min_s` "
-                f"(see AbstractSN._register_params)."
+                f"(see AbstractPhy._register_params)."
             )
         return torch.clamp(torch.sigmoid(self.sw), max=self.min_s)
 
@@ -111,35 +111,35 @@ class ForAny:
     ...
 
 
-class LinLog(AbstractSN, ForComposite, ForAlloy):
+class LinLog(AbstractPhy, ForComposite, ForAlloy):
     def forward(
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.abs(required_cols["Relative Maximum Stress"])
         return self._linear(s, x_cluster)
 
 
-class LogLog(AbstractSN, ForComposite, ForAlloy):
+class LogLog(AbstractPhy, ForComposite, ForAlloy):
     def forward(
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.abs(required_cols["Relative Maximum Stress"])
         log_s = _safe_log10(s)
         return self._linear(log_s, x_cluster)
 
 
-# class LogLogFatigueLimit(AbstractSN):
+# class LogLogFatigueLimit(AbstractPhy):
 #     def forward(
 #         self,
 #         required_cols: Dict[str, torch.Tensor],
 #         x_cluster: torch.Tensor,
-#         sns: nn.ModuleList,
+#         phys: nn.ModuleList,
 #     ):
 #         s = torch.clamp(torch.abs(required_cols["Relative Maximum Stress"]), min=1e-8)
 #         s_sw = torch.clamp(s - self.fatigue_limit[x_cluster], min=1e-8)
@@ -152,7 +152,7 @@ class LogLog(AbstractSN, ForComposite, ForAlloy):
 #         return True
 
 
-class Sendeckyj(AbstractSN, ForComposite):
+class Sendeckyj(AbstractPhy, ForComposite):
     # Sendeckyj, G.P. Fitting models to composite materials fatigue data. In Test Methods and Design Allowables for
     # Fibrous Composites; ASTM STP 734; Chamis, C.C., Ed.; ASTM International: West Conshohocken, PA, USA, 1981; pp.
     # 245–260.
@@ -166,7 +166,7 @@ class Sendeckyj(AbstractSN, ForComposite):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -198,7 +198,7 @@ class Sendeckyj(AbstractSN, ForComposite):
         )
 
 
-class Hwang(AbstractSN, ForComposite):
+class Hwang(AbstractPhy, ForComposite):
     # Hwang, W.; Han, K.S. Fatigue of Composites—Fatigue Modulus Concept and Life Prediction. J. Compos. Mater. 1986,
     # 20, 154–165.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -209,7 +209,7 @@ class Hwang(AbstractSN, ForComposite):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -238,7 +238,7 @@ class Hwang(AbstractSN, ForComposite):
         )
 
 
-class Kohout(AbstractSN, ForComposite, ForAlloy):
+class Kohout(AbstractPhy, ForComposite, ForAlloy):
     # Kohout, J.; Vechet, S. A new function for fatigue curves characterization and its multiple merits. Int. J. Fatigue
     # 2001, 23, 175–183.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -249,7 +249,7 @@ class Kohout(AbstractSN, ForComposite, ForAlloy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -281,7 +281,7 @@ class Kohout(AbstractSN, ForComposite, ForAlloy):
         )
 
 
-class KimZhang(AbstractSN, ForComposite):
+class KimZhang(AbstractPhy, ForComposite):
     # Kim, H.S.; Zhang, J. Fatigue Damage and Life Prediction of Glass/Vinyl Ester Composites. J. Reinf. Plast. Compos.
     # 2001, 20, 834–848.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -292,7 +292,7 @@ class KimZhang(AbstractSN, ForComposite):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -339,7 +339,7 @@ class KimZhang(AbstractSN, ForComposite):
         )
 
 
-class KawaiKoizumi(AbstractSN, ForComposite):
+class KawaiKoizumi(AbstractPhy, ForComposite):
     # Kawai, M.; Koizumi, M. Nonlinear constant fatigue life diagrams for carbon/epoxy laminates at room temperature.
     # Compos. Part A Appl. Sci. Manuf. 2007, 38, 2342–2353.
     # The paper uses data at the critical stress ratio (UCS/UTS) to fit the proposed model, and predict data at other
@@ -358,7 +358,7 @@ class KawaiKoizumi(AbstractSN, ForComposite):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         # Using relative maximum stress means that the reference strength (\sigma_B) is selected to be |UTS| if
         # |s_max|>|s_min| and |UCS| if |s_max|<|s_min|. This is definitely a simplification of the original formula for
@@ -391,14 +391,14 @@ class KawaiKoizumi(AbstractSN, ForComposite):
         )
 
 
-class Poursatip(AbstractSN, ForComposite):
+class Poursatip(AbstractPhy, ForComposite):
     # Poursartip, A.; Ashby, M.F.; Beaumont, P.W.R. The fatigue damage mechanics of carbon fibre composite laminate:
     # I—Development of the model. Compos. Sci. Technol. 1986, 25, 193–218.
     def forward(
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s_max = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -471,14 +471,14 @@ class Poursatip(AbstractSN, ForComposite):
         self.e = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
 
 
-class PoursatipSimplified(AbstractSN, ForComposite):
+class PoursatipSimplified(AbstractPhy, ForComposite):
     # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
     # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
     def forward(
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s_max = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -504,7 +504,7 @@ class PoursatipSimplified(AbstractSN, ForComposite):
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
 
 
-class DAmore(AbstractSN, ForComposite):
+class DAmore(AbstractPhy, ForComposite):
     # A. D’Amore, G. Caprino, P. Stupak, J. Zhou, and L. Nicolais. “Effect of Stress Ratio on the Flexural Fatigue
     # Behaviour of Continuous Strand Mat Reinforced Plastics.” Science and Engineering of Composite Materials 5, no. 1
     # (March 1, 1996): 1–8.
@@ -518,7 +518,7 @@ class DAmore(AbstractSN, ForComposite):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -563,7 +563,7 @@ class DAmore(AbstractSN, ForComposite):
         )
 
 
-class DAmoreSimplified(AbstractSN, ForComposite):
+class DAmoreSimplified(AbstractPhy, ForComposite):
     # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
     # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -574,7 +574,7 @@ class DAmoreSimplified(AbstractSN, ForComposite):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -603,7 +603,7 @@ class DAmoreSimplified(AbstractSN, ForComposite):
         )
 
 
-class Epaarachchi(AbstractSN, ForComposite):
+class Epaarachchi(AbstractPhy, ForComposite):
     # Epaarachchi, J.A.; Clausen, P.D. An empirical model for fatigue behavior prediction of glass fibre-reinforced
     # plastic composites for various stress ratios and test frequencies. Compos. Part A Appl. Sci. Manuf. 2003, 34,
     # 313–326.
@@ -617,7 +617,7 @@ class Epaarachchi(AbstractSN, ForComposite):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -679,7 +679,7 @@ class Epaarachchi(AbstractSN, ForComposite):
         )
 
 
-class EpaarachchiSimplified(AbstractSN, ForComposite):
+class EpaarachchiSimplified(AbstractPhy, ForComposite):
     # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
     # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -690,7 +690,7 @@ class EpaarachchiSimplified(AbstractSN, ForComposite):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        sns: nn.ModuleList,
+        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -742,58 +742,58 @@ class EpaarachchiSimplified(AbstractSN, ForComposite):
         )
 
 
-available_sn = []
+available_phy = []
 for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
-    if issubclass(cls, AbstractSN) and cls != AbstractSN:
-        available_sn.append(cls)
+    if issubclass(cls, AbstractPhy) and cls != AbstractPhy:
+        available_phy.append(cls)
 
 
-def get_sns(category: str = None, **kwargs):
+def get_phys(category: str = None, **kwargs):
     defined_category = {
         "composite": ForComposite,
         "alloy": ForAlloy,
     }
     if category is None:
-        sns = nn.ModuleList(
+        phys = nn.ModuleList(
             [
                 cls(**kwargs)
-                for cls in available_sn
-                if issubclass(cls, ForAny) and issubclass(cls, AbstractSN)
+                for cls in available_phy
+                if issubclass(cls, ForAny) and issubclass(cls, AbstractPhy)
             ]
         )
-        if len(sns) == 0:
-            raise Exception(f"No AbstractSN is defined as the subclass of ForAny.")
+        if len(phys) == 0:
+            raise Exception(f"No AbstractPhy is defined as the subclass of ForAny.")
     else:
         cat_cls = defined_category.get(category)
         if category in defined_category.keys():
-            sns = nn.ModuleList(
+            phys = nn.ModuleList(
                 [
                     cls(**kwargs)
-                    for cls in available_sn
+                    for cls in available_phy
                     if issubclass(cls, cat_cls) or issubclass(cls, ForAny)
                 ]
             )
         else:
-            raise Exception(f"Unrecognized SN category `{category}`.")
-        if len(sns) == 0:
+            raise Exception(f"Unrecognized Phy category `{category}`.")
+        if len(phys) == 0:
             raise Exception(
-                f"No AbstractSN is defined as the subclass of ForAny or {cat_cls.__name__}."
+                f"No AbstractPhy is defined as the subclass of ForAny or {cat_cls.__name__}."
             )
-    return sns
+    return phys
 
 
-class AbstractSNClustering(nn.Module):
+class AbstractPhyClustering(nn.Module):
     def __init__(
-        self, clustering: AbstractClustering, datamodule, sn_category=None, **kwargs
+        self, clustering: AbstractClustering, datamodule, phy_category=None, **kwargs
     ):
-        super(AbstractSNClustering, self).__init__()
+        super(AbstractPhyClustering, self).__init__()
         self.clustering = clustering
         self.n_clusters = self.clustering.n_total_clusters
-        self.sns = get_sns(category=sn_category, n_clusters=self.n_clusters)
-        self.sn_category = sn_category
+        self.phys = get_phys(category=phy_category, n_clusters=self.n_clusters)
+        self.phy_category = phy_category
         required_cols = []
-        for sn in self.sns:
-            required_cols += sn.required_cols()
+        for phy in self.phys:
+            required_cols += phy.required_cols()
         self.required_cols: List[str] = list(sorted(set(required_cols)))
         self.required_indices = [
             datamodule.cont_feature_names.index(col.split("_UNSCALED")[0])
@@ -820,8 +820,8 @@ class AbstractSNClustering(nn.Module):
         #     "running_tune_weight", torch.mul(torch.ones(self.n_clusters), self.weight)
         # )
         # Solved by logistic regression
-        self.running_sn_weight = nn.Parameter(
-            torch.mul(torch.ones((self.n_clusters, len(self.sns))), 1 / len(self.sns))
+        self.running_phy_weight = nn.Parameter(
+            torch.mul(torch.ones((self.n_clusters, len(self.phys))), 1 / len(self.phys))
         )
         self.ridge_input = None
         self.ridge_output = None
@@ -881,27 +881,30 @@ class AbstractSNClustering(nn.Module):
         self.resp = resp
         self.nk = nk
 
-        # Calculate SN results in each cluster in parallel through vectorization.
-        x_sn = torch.concat(
-            [sn(required_cols, x_cluster, self.sns).unsqueeze(-1) for sn in self.sns],
+        # Calculate phy results in each cluster in parallel through vectorization.
+        x_phy = torch.concat(
+            [
+                phy(required_cols, x_cluster, self.phys).unsqueeze(-1)
+                for phy in self.phys
+            ],
             dim=1,
         )
-        # Weighted sum of SN predictions
-        self.ridge_input = x_sn
-        x_sn = torch.mul(
-            x_sn,
+        # Weighted sum of phy predictions
+        self.ridge_input = x_phy
+        x_phy = torch.mul(
+            x_phy,
             nn.functional.normalize(
-                torch.abs(self.running_sn_weight[x_cluster, :]), p=1
+                torch.abs(self.running_phy_weight[x_cluster, :]), p=1
             ),
         )
-        x_sn = torch.sum(x_sn, dim=1).view(-1, 1)
-        self.ridge_output = x_sn.flatten()
+        x_phy = torch.sum(x_phy, dim=1).view(-1, 1)
+        self.ridge_output = x_phy.flatten()
 
         # Calculate mean prediction and tuning in each cluster
         # if self.training:
         #     with torch.no_grad():
         #         mean_pred_clusters = torch.flatten(
-        #             torch.matmul(resp.T, x_sn) / nk.unsqueeze(-1)
+        #             torch.matmul(resp.T, x_phy) / nk.unsqueeze(-1)
         #         )
         #         estimate_weight = torch.mul(mean_pred_clusters, self.weight)
         #         # Not updating if no data point in this cluster.
@@ -915,7 +918,7 @@ class AbstractSNClustering(nn.Module):
         #         ]
         # else:
         #     tune_weight = self.running_tune_weight[x_cluster]
-        return x_sn
+        return x_phy
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 from .common.gmm import PCAGMM
 from .common.kmeans import PCAKMeans
 from .common.bmm import PCABMM
-from .base import AbstractSNClustering
+from .base import AbstractPhyClustering
 
 
-class GMMSN(AbstractSNClustering):
+class GMMPhy(AbstractPhyClustering):
     def __init__(
         self,
         n_clusters: int,
@@ -16,10 +16,10 @@ class GMMSN(AbstractSNClustering):
         clustering = PCAGMM(
             n_clusters=n_clusters, n_input=n_input, n_pca_dim=n_pca_dim, on_cpu=on_cpu
         )
-        super(GMMSN, self).__init__(clustering=clustering, **kwargs)
+        super(GMMPhy, self).__init__(clustering=clustering, **kwargs)
 
 
-class BMMSN(AbstractSNClustering):
+class BMMPhy(AbstractPhyClustering):
     def __init__(
         self,
         n_clusters: int,
@@ -31,10 +31,10 @@ class BMMSN(AbstractSNClustering):
         clustering = PCABMM(
             n_clusters=n_clusters, n_input=n_input, n_pca_dim=n_pca_dim, on_cpu=on_cpu
         )
-        super(BMMSN, self).__init__(clustering=clustering, **kwargs)
+        super(BMMPhy, self).__init__(clustering=clustering, **kwargs)
 
 
-class KMeansSN(AbstractSNClustering):
+class KMeansPhy(AbstractPhyClustering):
     def __init__(
         self,
         n_clusters: int,
@@ -46,4 +46,4 @@ class KMeansSN(AbstractSNClustering):
         clustering = PCAKMeans(
             n_clusters=n_clusters, n_input=n_input, n_pca_dim=n_pca_dim, on_cpu=on_cpu
         )
-        super(KMeansSN, self).__init__(clustering=clustering, **kwargs)
+        super(KMeansPhy, self).__init__(clustering=clustering, **kwargs)

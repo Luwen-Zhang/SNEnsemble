@@ -1,11 +1,11 @@
 from .common.gmm import TwolayerGMM
 from .common.kmeans import TwolayerKMeans
 from .common.bmm import TwolayerBMM
-from .base import AbstractSNClustering
+from .base import AbstractPhyClustering
 from typing import List
 
 
-class TwolayerGMMSN(AbstractSNClustering):
+class TwolayerGMMPhy(AbstractPhyClustering):
     def __init__(
         self,
         n_clusters: int,
@@ -29,10 +29,10 @@ class TwolayerGMMSN(AbstractSNClustering):
             shared_second_layer_clusters=True,
             on_cpu=on_cpu,
         )
-        super(TwolayerGMMSN, self).__init__(clustering=clustering, **kwargs)
+        super(TwolayerGMMPhy, self).__init__(clustering=clustering, **kwargs)
 
 
-class TwolayerBMMSN(AbstractSNClustering):
+class TwolayerBMMPhy(AbstractPhyClustering):
     def __init__(
         self,
         n_clusters: int,
@@ -56,10 +56,10 @@ class TwolayerBMMSN(AbstractSNClustering):
             shared_second_layer_clusters=True,
             on_cpu=on_cpu,
         )
-        super(TwolayerBMMSN, self).__init__(clustering=clustering, **kwargs)
+        super(TwolayerBMMPhy, self).__init__(clustering=clustering, **kwargs)
 
 
-class TwolayerKMeansSN(AbstractSNClustering):
+class TwolayerKMeansPhy(AbstractPhyClustering):
     def __init__(
         self,
         n_clusters: int,
@@ -83,4 +83,4 @@ class TwolayerKMeansSN(AbstractSNClustering):
             shared_second_layer_clusters=True,
             on_cpu=on_cpu,
         )
-        super(TwolayerKMeansSN, self).__init__(clustering=clustering, **kwargs)
+        super(TwolayerKMeansPhy, self).__init__(clustering=clustering, **kwargs)
