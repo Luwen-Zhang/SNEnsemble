@@ -18,7 +18,7 @@ models = [
     PytorchTabular(trainer),
     WideDeep(trainer),
     AutoGluon(trainer),
-    Transformer(trainer),
+    ThisWork(trainer),
 ]
 trainer.add_modelbases(models)
 trainer.get_leaderboard(cross_validation=10, split_type="random")

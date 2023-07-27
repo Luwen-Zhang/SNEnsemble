@@ -10,7 +10,7 @@ import numpy as np
 from typing import List, Union
 import warnings
 from .base import AbstractClustering, AbstractCluster, AbstractMultilayerClustering
-from src.model._transformer.pca.incremental_pca import IncrementalPCA
+from src.model._thiswork.pca.incremental_pca import IncrementalPCA
 
 
 class Cluster(AbstractCluster):

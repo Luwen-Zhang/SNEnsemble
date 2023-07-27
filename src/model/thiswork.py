@@ -1,16 +1,16 @@
 from tabensemb.utils import *
 from tabensemb.model import TorchModel
-from ._transformer.models_clustering import *
-from ._transformer.models_with_seq import *
-from ._transformer.models_basic import *
+from ._thiswork.models_clustering import *
+from ._thiswork.models_with_seq import *
+from ._thiswork.models_basic import *
 from itertools import product
 from scipy import stats
 from skopt.space import Integer
 
 
-class Transformer(TorchModel):
+class ThisWork(TorchModel):
     def _get_program_name(self):
-        return "Transformer"
+        return "ThisWork"
 
     @staticmethod
     def _get_model_names():
@@ -159,6 +159,9 @@ class Transformer(TorchModel):
             res = {"n_clusters": 32, "n_clusters_per_cluster": 8}
         res.update(self.trainer.chosen_params)
         return res
+
+    def _custom_training_params(self, model_name) -> Dict:
+        return dict(epoch=50, bayes_calls=20, bayes_epoch=5)
 
     def _conditional_validity(self, model_name: str) -> bool:
         components = model_name.split("_")

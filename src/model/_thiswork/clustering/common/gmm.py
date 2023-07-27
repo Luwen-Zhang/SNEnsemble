@@ -8,7 +8,7 @@ from typing import List, Union
 import warnings
 from .kmeans import KMeans
 from .base import AbstractCluster, AbstractClustering, AbstractMultilayerClustering
-from src.model._transformer.pca.incremental_pca import IncrementalPCA
+from src.model._thiswork.pca.incremental_pca import IncrementalPCA
 
 
 class Cluster(AbstractCluster):

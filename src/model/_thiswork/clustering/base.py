@@ -3,7 +3,7 @@ import torch
 from torch import nn
 import numpy as np
 import inspect
-from src.model._transformer.clustering.common.base import AbstractClustering
+from src.model._thiswork.clustering.common.base import AbstractClustering
 from typing import Dict, List
 
 

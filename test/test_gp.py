@@ -1,13 +1,13 @@
 import unittest
 from import_utils import *
 import src
-from src.model._transformer.gp.exact_gp import (
+from src.model._thiswork.gp.exact_gp import (
     _ExactGPModel,
     ExactGPModel,
     train_exact_gp,
     predict_exact_gp,
 )
-from src.model._transformer.gp.stochastic_variational_gp import (
+from src.model._thiswork.gp.stochastic_variational_gp import (
     _StochasticVariationalModel,
     StochasticVariationalModel,
     train_approx_gp,
@@ -16,7 +16,7 @@ from src.model._transformer.gp.stochastic_variational_gp import (
 import time
 import torch
 import gpytorch
-from src.model._transformer.gp.base import get_test_case_1d, get_test_case_2d
+from src.model._thiswork.gp.base import get_test_case_1d, get_test_case_2d
 
 
 def exact_gp(X, y, grid):

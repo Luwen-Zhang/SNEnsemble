@@ -2,8 +2,8 @@ import unittest
 from tabensemb.utils import set_random_seed
 import numpy as np
 import torch
-from src.model._transformer.clustering.common.gmm import GMM, Cluster, TwolayerGMM
-from src.model._transformer.clustering.common.bmm import BMM
+from src.model._thiswork.clustering.common.gmm import GMM, Cluster, TwolayerGMM
+from src.model._thiswork.clustering.common.bmm import BMM
 
 
 def get_data(n_clusters, n_features, n_each_cluster, seed):

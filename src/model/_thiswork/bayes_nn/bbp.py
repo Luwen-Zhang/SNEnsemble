@@ -516,7 +516,7 @@ class MCDropout(AbstractBNN):
 
 
 if __name__ == "__main__":
-    from src.model._transformer.gp.base import (
+    from src.model._thiswork.gp.base import (
         get_test_case_1d,
         plot_mu_var_1d,
         get_test_case_2d,

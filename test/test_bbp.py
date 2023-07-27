@@ -6,13 +6,13 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch
 import time
-from src.model._transformer.gp.base import (
+from src.model._thiswork.gp.base import (
     get_test_case_1d,
     get_test_case_2d,
     get_cls_test_case_1d,
     get_cls_test_case_2d,
 )
-from src.model._transformer.bayes_nn.bbp import (
+from src.model._thiswork.bayes_nn.bbp import (
     BayesByBackprop,
     MCDropout,
     _isotropic_gauss_log_likelihood,

@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from src.model._transformer import manual_activate
+from src.model._thiswork import manual_activate
 
 
 class LSTM(nn.Module):

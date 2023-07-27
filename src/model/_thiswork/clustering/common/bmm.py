@@ -4,7 +4,7 @@ This is a modification of sklearn.mixture.BayesianGaussianMixture for pytorch.
 from .gmm import GMM, Cluster
 import torch
 import warnings
-from src.model._transformer.pca.incremental_pca import IncrementalPCA
+from src.model._thiswork.pca.incremental_pca import IncrementalPCA
 from .base import AbstractMultilayerClustering
 import numpy as np
 from typing import List, Union
