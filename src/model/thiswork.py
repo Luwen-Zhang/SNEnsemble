@@ -9,6 +9,10 @@ from skopt.space import Integer
 
 
 class ThisWork(TorchModel):
+    def __init__(self, *args, reduce_bayes_steps=False, **kwargs):
+        super(ThisWork, self).__init__(*args, **kwargs)
+        self.reduce_bayes_steps = reduce_bayes_steps
+
     def _get_program_name(self):
         return "ThisWork"
 
@@ -161,7 +165,10 @@ class ThisWork(TorchModel):
         return res
 
     def _custom_training_params(self, model_name) -> Dict:
-        return dict(epoch=50, bayes_calls=20, bayes_epoch=5)
+        if getattr(self, "reduce_bayes_steps", False):
+            return dict(epoch=50, bayes_calls=20, bayes_epoch=5)
+        else:
+            return super(ThisWork, self)._custom_training_params(model_name=model_name)
 
     def _conditional_validity(self, model_name: str) -> bool:
         components = model_name.split("_")
