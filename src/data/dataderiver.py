@@ -1,9 +1,7 @@
-import tabensemb.data.dataderiver
 from tabensemb.utils import *
 from tabensemb.data import AbstractDeriver
 from tabensemb.data.utils import get_corr_sets
 import inspect
-from typing import Type
 
 
 class DegLayerDeriver(AbstractDeriver):
@@ -14,25 +12,17 @@ class DegLayerDeriver(AbstractDeriver):
         The column of laminate sequence codes (for instance, "0/45/90/45/0").
     """
 
-    def __init__(self):
-        super(DegLayerDeriver, self).__init__()
-
-    def _required_cols(self, **kwargs):
+    def _required_cols(self):
         return ["sequence_column"]
 
-    def _required_params(self, **kwargs):
+    def _required_kwargs(self):
         return []
 
     def _defaults(self):
         return dict(stacked=True, intermediate=False)
 
-    def _derive(
-        self,
-        df,
-        datamodule,
-        **kwargs,
-    ):
-        sequence_column = kwargs["sequence_column"]
+    def _derive(self, df, datamodule):
+        sequence_column = self.kwargs["sequence_column"]
 
         sequence = [
             [int(y) if y != "nan" else np.nan for y in str(x).split("/")]
@@ -66,13 +56,8 @@ class NumLayersDeriver(DegLayerDeriver):
     def _defaults(self):
         return dict(stacked=False, intermediate=False)
 
-    def _derive(
-        self,
-        df,
-        datamodule,
-        **kwargs,
-    ):
-        sequence_column = kwargs["sequence_column"]
+    def _derive(self, df, datamodule):
+        sequence_column = self.kwargs["sequence_column"]
 
         sequence = [
             [int(y) if y != "nan" else 0 for y in str(x).split("/")]
@@ -98,13 +83,8 @@ class LayUpSequenceDeriver(DegLayerDeriver):
     def _defaults(self):
         return dict(stacked=False, intermediate=False)
 
-    def _derive(
-        self,
-        df,
-        datamodule,
-        **kwargs,
-    ):
-        sequence_column = kwargs["sequence_column"]
+    def _derive(self, df, datamodule):
+        sequence_column = self.kwargs["sequence_column"]
         pad_value = 100
 
         sequence = [
@@ -130,26 +110,18 @@ class MinStressDeriver(AbstractDeriver):
         The name of R-value
     """
 
-    def __init__(self):
-        super(MinStressDeriver, self).__init__()
-
-    def _required_cols(self, **kwargs):
+    def _required_cols(self):
         return ["max_stress_col", "r_value_col"]
 
-    def _required_params(self, **kwargs):
+    def _required_kwargs(self):
         return []
 
     def _defaults(self):
         return dict(stacked=True, intermediate=False)
 
-    def _derive(
-        self,
-        df,
-        datamodule,
-        **kwargs,
-    ):
-        max_stress_col = kwargs["max_stress_col"]
-        r_value_col = kwargs["r_value_col"]
+    def _derive(self, df, datamodule):
+        max_stress_col = self.kwargs["max_stress_col"]
+        r_value_col = self.kwargs["r_value_col"]
         value = (df[max_stress_col] * df[r_value_col]).values.reshape(-1, 1)
 
         return value
@@ -167,150 +139,24 @@ class WalkerStressDeriver(AbstractDeriver):
         The power index of the walker equivalent stress. If is 0.5, it coincides with SWT equivalent stress.
     """
 
-    def __init__(self):
-        super(WalkerStressDeriver, self).__init__()
-
-    def _required_cols(self, **kwargs):
+    def _required_cols(self):
         return ["max_stress_col", "r_value_col"]
 
-    def _required_params(self, **kwargs):
+    def _required_kwargs(self):
         return ["power_index"]
 
     def _defaults(self):
         return dict(stacked=True, intermediate=False)
 
-    def _derive(
-        self,
-        df,
-        datamodule,
-        **kwargs,
-    ):
-        max_stress_col = kwargs["max_stress_col"]
-        r_value_col = kwargs["r_value_col"]
-        power_index = kwargs["power_index"]
+    def _derive(self, df, datamodule):
+        max_stress_col = self.kwargs["max_stress_col"]
+        r_value_col = self.kwargs["r_value_col"]
+        power_index = self.kwargs["power_index"]
         value = (
             df[max_stress_col] * ((1 - df[r_value_col]) / 2) ** power_index
         ).values.reshape(-1, 1)
 
         return value
-
-
-# class DriveCoeffDeriver(AbstractDeriver):
-#     def __init__(self):
-#         super(DriveCoeffDeriver, self).__init__()
-#
-#     def _required_cols(self, **kwargs):
-#         return []
-#
-#     def _required_params(self, **kwargs):
-#         return []
-#
-#     def _defaults(self):
-#         return dict(stacked=False, intermediate=False)
-#
-#     def _derive(
-#         self,
-#         df,
-#         trainer,
-#         **kwargs,
-#     ):
-#         data = df.copy()
-#
-#         mlp_trainer = cp(trainer)
-#         mlp_trainer.dataderivers = [
-#             x for x in mlp_trainer.dataderivers if not isinstance(x[0], self.__class__)
-#         ]
-#         mlp_trainer.set_data_splitter(name="RandomSplitter")
-#         mlp_trainer.set_data(
-#             trainer.df,
-#             cont_feature_names=trainer.cont_feature_names,
-#             cat_feature_names=trainer.cat_feature_names,
-#             label_name=trainer.label_name,
-#             verbose=False,
-#             warm_start=True
-#             if not kwargs["stacked"]
-#             else False,  # if is stacked, processors are not fit.
-#             all_training=True,
-#         )
-#
-#         from src.model import MLP
-#
-#         mlp = MLP(mlp_trainer)
-#         mlp_trainer.modelbases = []
-#         mlp_trainer.args["bayes_opt"] = False
-#         mlp_trainer.add_modelbases([mlp])
-#         mlp.train(verbose=False)
-#         with HiddenPrints():
-#             x_values_list, mean_pdp_list, _, _ = mlp_trainer.cal_partial_dependence(
-#                 model=mlp,
-#                 model_name="MLP",
-#                 df=mlp_trainer.df,
-#                 derived_data=mlp_trainer.derived_data,
-#                 n_bootstrap=1,
-#                 refit=False,
-#                 resample=False,
-#                 grid_size=5,
-#                 verbose=False,
-#                 rederive=True,
-#                 percentile=80,
-#             )
-#         self.avg_pred = mlp_trainer.label_data.values.mean()
-#
-#         interpolator = {}
-#         plt.figure(figsize=(10, 10))
-#         cmap = plt.cm.get_cmap("hsv", len(trainer.cont_feature_names))
-#         marker = itertools.cycle(("^", "<", ">", "+", "o", "*", "s"))
-#         ax = plt.subplot(111)
-#
-#         for i, (x_value, mean_pdp, feature_name) in enumerate(
-#             zip(x_values_list, mean_pdp_list, trainer.cont_feature_names)
-#         ):
-#             # print(
-#             #     f"{feature_name}, diff_y:{mean_pdp[-1] - mean_pdp[1]:.5f}, diff_x:{x_value[-1] - x_value[0]}"
-#             # )
-#             interpolator[feature_name] = (
-#                 CubicSpline(x_value, mean_pdp, bc_type="natural")
-#                 if np.sum(np.abs(x_value)) != 0
-#                 else None
-#             )
-#             m = next(marker)
-#             ax.plot(
-#                 np.linspace(0, 4, 100),
-#                 interpolator[feature_name](np.linspace(x_value[0], x_value[-1], 100))
-#                 if interpolator[feature_name] is not None
-#                 else np.repeat(self.avg_pred, 100),
-#                 linestyle="-",
-#                 c=cmap(i),
-#                 marker=m,
-#                 label=feature_name,
-#                 markevery=1000,
-#             )
-#             ax.scatter(
-#                 np.arange(len(x_value)),
-#                 mean_pdp
-#                 if interpolator[feature_name] is not None
-#                 else np.repeat(self.avg_pred, 5),
-#                 c=[cmap(i) for x in x_value],
-#                 marker=m,
-#             )
-#         ax.set_xticks([0, 1, 2, 3, 4])
-#         plt.legend(fontsize="small")
-#         plt.savefig(os.path.join(trainer.project_root, "trend.pdf"))
-#         plt.close()
-#         self.interpolator = interpolator
-#         drive_coeff = self._cal_drive_coeff(df)
-#         return drive_coeff
-#
-#     def _cal_drive_coeff(self, df):
-#         drive_coeff = np.zeros((len(df), len(self.interpolator)))
-#         for idx, (feature_name, interpolator) in enumerate(self.interpolator.items()):
-#             drive_coeff[:, idx] = (
-#                 (interpolator(df[feature_name].values).flatten() / self.avg_pred)
-#                 if interpolator is not None
-#                 else np.repeat(1, len(df))
-#             )
-#
-#         return drive_coeff
 
 
 class SuppStressDeriver(AbstractDeriver):
@@ -331,27 +177,24 @@ class SuppStressDeriver(AbstractDeriver):
         Whether to calculate relative stresses.
     """
 
-    def __init__(self):
-        super(SuppStressDeriver, self).__init__()
-
-    def _required_cols(self, **kwargs):
+    def _required_cols(self):
         return ["max_stress_col", "min_stress_col", "ucs_col", "uts_col"]
 
-    def _required_params(self, **kwargs):
+    def _required_kwargs(self):
         return ["relative", "absolute"]
 
     def _defaults(self):
         return dict(stacked=True, intermediate=False, relative=False, absolute=True)
 
-    def _derived_names(self, **kwargs):
+    def _derived_names(self):
         names = []
-        if kwargs["absolute"]:
+        if self.kwargs["absolute"]:
             names += [
                 "Absolute Maximum Stress",
                 "Absolute Stress Range",
                 "Absolute Mean Stress",
             ]
-        if kwargs["relative"]:
+        if self.kwargs["relative"]:
             names += [
                 "Relative Maximum Stress",
                 "Relative Stress Range",
@@ -359,16 +202,11 @@ class SuppStressDeriver(AbstractDeriver):
             ]
         return names
 
-    def _derive(
-        self,
-        df,
-        datamodule,
-        **kwargs,
-    ):
-        max_stress_col = kwargs["max_stress_col"]
-        min_stress_col = kwargs["min_stress_col"]
-        ucs_col = kwargs["ucs_col"]
-        uts_col = kwargs["uts_col"]
+    def _derive(self, df, datamodule):
+        max_stress_col = self.kwargs["max_stress_col"]
+        min_stress_col = self.kwargs["min_stress_col"]
+        ucs_col = self.kwargs["ucs_col"]
+        uts_col = self.kwargs["uts_col"]
 
         df_tmp = df.copy()
 
@@ -413,24 +251,19 @@ class SuppStressDeriver(AbstractDeriver):
         df_tmp.loc[where_invalid, "Relative Stress Range"] = np.nan
         df_tmp.loc[where_invalid, "Relative Mean Stress"] = np.nan
 
-        names = self._derived_names(**kwargs)
+        names = self._derived_names()
         stresses = df_tmp[names].values
         return stresses
 
 
 class TheoreticalFiftyPofDeriver(AbstractDeriver):
-    def _derive(
-        self,
-        df: pd.DataFrame,
-        datamodule,
-        **kwargs,
-    ) -> np.ndarray:
+    def _derive(self, df: pd.DataFrame, datamodule) -> np.ndarray:
         from sklearn.preprocessing import MinMaxScaler
         from scipy import stats
 
         measure_features = datamodule.cont_feature_names
         target = datamodule.label_name
-        distrib = kwargs["distribution"]
+        distrib = self.kwargs["distribution"]
         distrib_estimator = {
             "gaussian": stats.norm,
             "weibull": stats.exponweib,
@@ -499,13 +332,13 @@ class TheoreticalFiftyPofDeriver(AbstractDeriver):
     def _defaults(self):
         return dict(stacked=True, intermediate=True, distribution="gaussian")
 
-    def _derived_names(self, **kwargs):
+    def _derived_names(self):
         return ["TheoreticalFiftyPof"]
 
-    def _required_cols(self, **kwargs):
+    def _required_cols(self):
         return []
 
-    def _required_params(self, **kwargs):
+    def _required_kwargs(self):
         return []
 
 
