@@ -18,12 +18,13 @@ Note that the requirements change from time to time in `tabular_ensemble`. To re
 pip install torch==1.12.0+cu116 torchvision --extra-index-url https://download.pytorch.org/whl/cu116 --no-cache-dir
 ```
 
-* Install  `tabular_ensemble`. See the installation instruction there.
-* Downgrade requirements
+* Install requirements
 
 ```shell
 pip install -r requirements.txt
 ```
+
+* Install  `tabular_ensemble`. See the installation instruction there.
 
 ## Our environment
 
