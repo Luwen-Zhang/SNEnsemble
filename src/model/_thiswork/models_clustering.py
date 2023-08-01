@@ -118,7 +118,7 @@ class AbstractClusteringModel(AbstractNN):
         self.dl_weight = dl_weight
         return out
 
-    def loss_fn(self, y_true, y_pred, *data, **kwargs):
+    def loss_fn(self, y_pred, y_true, *data, **kwargs):
         # Train the regression head
         self.dl_loss = self.default_loss_fn(self.dl_pred, y_true)
         # Train the classification head
