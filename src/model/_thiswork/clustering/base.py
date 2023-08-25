@@ -56,8 +56,8 @@ class AbstractPhy(nn.Module):
         )
         return self.lstsq_output
 
-    @staticmethod
-    def required_cols() -> List[str]:
+    @property
+    def required_cols_names(self) -> List[str]:
         return ["Relative Maximum Stress"]
 
     @property
@@ -186,8 +186,8 @@ class Sendeckyj(AbstractPhy, ForComposite):
             - log_alpha
         )
 
-    @staticmethod
-    def required_cols() -> List[str]:
+    @property
+    def required_cols_names(self) -> List[str]:
         return ["Relative Maximum Stress_UNSCALED"]
 
     def get_optimizer(self):
@@ -226,8 +226,8 @@ class Hwang(AbstractPhy, ForComposite):
     def formula(s, log_alpha, beta):
         return 1 / beta * (log_alpha + _safe_log10(1 - s))
 
-    @staticmethod
-    def required_cols() -> List[str]:
+    @property
+    def required_cols_names(self) -> List[str]:
         return ["Relative Maximum Stress_UNSCALED"]
 
     def get_optimizer(self):
@@ -269,8 +269,8 @@ class Kohout(AbstractPhy, ForComposite, ForAlloy):
             - _safe_pow(10, log_alpha)
         )
 
-    @staticmethod
-    def required_cols() -> List[str]:
+    @property
+    def required_cols_names(self) -> List[str]:
         return ["Relative Maximum Stress_UNSCALED"]
 
     def get_optimizer(self):
@@ -323,8 +323,8 @@ class KimZhang(AbstractPhy, ForComposite):
             + _safe_log10(_safe_pow(s, 1 - beta) - 1)
         )
 
-    @staticmethod
-    def required_cols():
+    @property
+    def required_cols_names(self):
         return [
             "Relative Maximum Stress_UNSCALED",
             "R-value_UNSCALED",
@@ -379,8 +379,8 @@ class KawaiKoizumi(AbstractPhy, ForComposite):
     def formula(s, log_alpha, beta, gamma):
         return -log_alpha + beta * _safe_log10(1 - s) - gamma * _safe_log10(s)
 
-    @staticmethod
-    def required_cols():
+    @property
+    def required_cols_names(self):
         return ["Relative Maximum Stress_UNSCALED"]
 
     def get_optimizer(self):
@@ -448,8 +448,8 @@ class Poursatip(AbstractPhy, ForComposite):
             + _safe_log10(1 - s_max)
         )
 
-    @staticmethod
-    def required_cols():
+    @property
+    def required_cols_names(self):
         return [
             "Relative Stress Range_UNSCALED",
             "Relative Maximum Stress_UNSCALED",
@@ -495,8 +495,8 @@ class PoursatipSimplified(AbstractPhy, ForComposite):
     def formula(s_max, log_alpha, beta):
         return log_alpha - beta * _safe_log10(s_max) + _safe_log10(1 - s_max)
 
-    @staticmethod
-    def required_cols():
+    @property
+    def required_cols_names(self):
         return ["Relative Maximum Stress_UNSCALED"]
 
     def _register_params(self, n_clusters=1, **kwargs):
@@ -551,8 +551,8 @@ class DAmore(AbstractPhy, ForComposite):
     def formula(s, r, alpha, beta):
         return _safe_log10(1 + (1 / s - 1) / alpha / (1 - r)) / beta
 
-    @staticmethod
-    def required_cols():
+    @property
+    def required_cols_names(self):
         return ["Relative Maximum Stress_UNSCALED", "R-value_UNSCALED"]
 
     def get_optimizer(self):
@@ -591,8 +591,8 @@ class DAmoreSimplified(AbstractPhy, ForComposite):
     def formula(s, alpha, beta):
         return 1 / beta * _safe_log10(1 + (1 / s - 1) / alpha)
 
-    @staticmethod
-    def required_cols():
+    @property
+    def required_cols_names(self):
         return ["Relative Maximum Stress_UNSCALED"]
 
     def get_optimizer(self):
@@ -663,8 +663,8 @@ class Epaarachchi(AbstractPhy, ForComposite):
             + beta * _safe_log10(f)
         ) / beta
 
-    @staticmethod
-    def required_cols():
+    @property
+    def required_cols_names(self):
         return [
             "Relative Maximum Stress_UNSCALED",
             "Frequency_UNSCALED",
@@ -726,8 +726,8 @@ class EpaarachchiSimplified(AbstractPhy, ForComposite):
             _safe_log10(_safe_positive(s_ut - s) / alpha / _safe_pow(s, 1.6) + 1) / beta
         )
 
-    @staticmethod
-    def required_cols():
+    @property
+    def required_cols_names(self):
         return [
             "Relative Maximum Stress_UNSCALED",
             "R-value_UNSCALED",
@@ -793,7 +793,7 @@ class AbstractPhyClustering(nn.Module):
         self.phy_category = phy_category
         required_cols = []
         for phy in self.phys:
-            required_cols += phy.required_cols()
+            required_cols += phy.required_cols_names
         self.required_cols: List[str] = list(sorted(set(required_cols)))
         self.required_indices = [
             datamodule.cont_feature_names.index(col.split("_UNSCALED")[0])
