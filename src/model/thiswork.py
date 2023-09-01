@@ -46,7 +46,7 @@ class ThisWork(TorchModel):
                 available_names,
                 ["NoWrap", "Wrap"],
                 ["1L"],
-                ["PCA"],
+                ["NoPCA"],
                 ["KMeans"],
             )
         ]
