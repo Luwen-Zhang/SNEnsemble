@@ -193,7 +193,7 @@ class AbstractClusteringModel(AbstractNN):
         self.manual_backward(
             self.cls_loss,
             retain_graph=True,
-            inputs=list(self.cls_head.parameters()),
+            inputs=[x for x in self.cls_head.parameters() if x.requires_grad],
         )
         # self.cont_cat_model.zero_grad()
         # self.clustering_phy_model.phys.zero_grad()
