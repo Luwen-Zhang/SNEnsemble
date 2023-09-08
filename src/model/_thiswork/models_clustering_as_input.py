@@ -24,7 +24,8 @@ class AbstractClusteringModel(AbstractNN):
         clustering_features,
         clustering_phy_model,
         layers,
-        ridge_penalty: float = 0.0,
+        l2_penalty: float = 0.0,
+        l1_penalty: float = 0.0,
         **kwargs,
     ):
         super(AbstractClusteringModel, self).__init__(datamodule, **kwargs)
@@ -43,13 +44,14 @@ class AbstractClusteringModel(AbstractNN):
             embed_extend_dim=False,
             **kwargs,
         )
-        self.ridge_penalty = ridge_penalty
+        self.l2_penalty = l2_penalty
+        self.l1_penalty = l1_penalty
         self.cls_head_loss = nn.MSELoss()
 
     def _forward(self, x, derived_tensors):
         # Prediction of physical models
         _ = self.clustering_phy_model(x, self.clustering_features, derived_tensors)
-        sns_preds = self.clustering_phy_model.ridge_input
+        sns_preds = self.clustering_phy_model.weight_input
         x = torch.concat([x, sns_preds], dim=-1)
         out = self.head(x, derived_tensors)
         return out
@@ -69,14 +71,16 @@ class AbstractClusteringModel(AbstractNN):
                 ]
             )
         )
-        # Train Ridge Regression
-        ridge_weight = self.clustering_phy_model.running_phy_weight
-        self.ridge_loss = torch.sum(
-            0.5
-            * (y_true.flatten() - self.clustering_phy_model.ridge_output) ** 2
-            / sum_weight
-        ) + torch.mul(
-            torch.sum(torch.mul(ridge_weight, ridge_weight)), self.ridge_penalty
+        # Train weighted summation
+        weight = self.clustering_phy_model.running_phy_weight
+        self.weight_loss = (
+            torch.sum(
+                0.5
+                * (y_true.flatten() - self.clustering_phy_model.weight_output) ** 2
+                / sum_weight
+            )
+            + torch.mul(torch.sum(torch.mul(weight, weight)), self.l2_penalty)
+            + torch.mul(torch.sum(torch.abs(weight)), self.l1_penalty)
         )
         return self.output_loss
 
@@ -86,7 +90,7 @@ class AbstractClusteringModel(AbstractNN):
             lr=self.hparams.lr,
             weight_decay=self.hparams.weight_decay,
         )
-        ridge_optimizer = torch.optim.Adam(
+        weight_optimizer = torch.optim.Adam(
             [self.clustering_phy_model.running_phy_weight],
             lr=0.8,
             weight_decay=0,
@@ -94,12 +98,12 @@ class AbstractClusteringModel(AbstractNN):
         lstsq_optimizer = [
             phy.get_optimizer() for phy in self.clustering_phy_model.phys
         ]
-        return [head_optimizer, ridge_optimizer] + lstsq_optimizer
+        return [head_optimizer, weight_optimizer] + lstsq_optimizer
 
     def cal_backward_step(self, loss):
         optimizers = self.optimizers()
         head_optimizer = optimizers[0]
-        ridge_optimizer = optimizers[1]
+        weight_optimizer = optimizers[1]
         lstsq_optimizers = optimizers[2:]
         # The following commented zero_grad() operations are not necessary because `inputs`s are specified and no other
         # gradient is calculated.
@@ -114,9 +118,9 @@ class AbstractClusteringModel(AbstractNN):
         # if self.clustering_phy_model.running_phy_weight.grad is not None:
         #     self.clustering_phy_model.running_phy_weight.grad.zero_()
 
-        # 2nd back-propagation: for Ridge regression.
+        # 2nd back-propagation: for weight.
         self.manual_backward(
-            self.ridge_loss,
+            self.weight_loss,
             retain_graph=True,
             inputs=self.clustering_phy_model.running_phy_weight,
         )
@@ -140,7 +144,7 @@ class AbstractClusteringModel(AbstractNN):
         head_optimizer.step()
         for optimizer in lstsq_optimizers:
             optimizer.step()
-        ridge_optimizer.step()
+        weight_optimizer.step()
 
     @staticmethod
     def basic_clustering_features_idx(datamodule) -> np.ndarray:

@@ -978,8 +978,8 @@ class AbstractPhyClustering(nn.Module):
         self.running_phy_weight = nn.Parameter(
             torch.mul(torch.ones((self.n_clusters, len(self.phys))), 1 / len(self.phys))
         )
-        self.ridge_input = None
-        self.ridge_output = None
+        self.weight_input = None
+        self.weight_output = None
         self.x_cluster = None
 
     # def _update(self, value, name):
@@ -1045,7 +1045,7 @@ class AbstractPhyClustering(nn.Module):
             dim=1,
         )
         # Weighted sum of phy predictions
-        self.ridge_input = x_phy
+        self.weight_input = x_phy
         x_phy = torch.mul(
             x_phy,
             nn.functional.normalize(
@@ -1053,7 +1053,7 @@ class AbstractPhyClustering(nn.Module):
             ),
         )
         x_phy = torch.sum(x_phy, dim=1).view(-1, 1)
-        self.ridge_output = x_phy.flatten()
+        self.weight_output = x_phy.flatten()
 
         # Calculate mean prediction and tuning in each cluster
         # if self.training:

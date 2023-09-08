@@ -23,7 +23,8 @@ class AbstractClusteringModel(AbstractNN):
         clustering_phy_model,
         cont_cat_model,
         layers,
-        ridge_penalty: float = 0.0,
+        l2_penalty: float = 0.0,
+        l1_penalty: float = 0.0,
         uncertainty: str = None,
         **kwargs,
     ):
@@ -66,7 +67,8 @@ class AbstractClusteringModel(AbstractNN):
                 ),
                 nn.Sigmoid(),
             )
-        self.ridge_penalty = ridge_penalty
+        self.l2_penalty = l2_penalty
+        self.l1_penalty = l1_penalty
         self.cls_head_loss = nn.BCELoss()
         if isinstance(self.cont_cat_model, nn.Module):
             self.set_requires_grad(self.cont_cat_model, requires_grad=False)
@@ -141,14 +143,16 @@ class AbstractClusteringModel(AbstractNN):
                 ]
             )
         )
-        # Train Ridge Regression
-        ridge_weight = self.clustering_phy_model.running_phy_weight
-        self.ridge_loss = torch.sum(
-            0.5
-            * (y_true.flatten() - self.clustering_phy_model.ridge_output) ** 2
-            / sum_weight
-        ) + torch.mul(
-            torch.sum(torch.mul(ridge_weight, ridge_weight)), self.ridge_penalty
+        # Train weighted summation
+        weight = self.clustering_phy_model.running_phy_weight
+        self.weight_loss = (
+            torch.sum(
+                0.5
+                * (y_true.flatten() - self.clustering_phy_model.weight_output) ** 2
+                / sum_weight
+            )
+            + torch.mul(torch.sum(torch.mul(weight, weight)), self.l2_penalty)
+            + torch.mul(torch.sum(torch.abs(weight)), self.l1_penalty)
         )
         if self.gp is not None:
             self.gp_loss = self.gp.loss
@@ -160,7 +164,7 @@ class AbstractClusteringModel(AbstractNN):
             lr=self.hparams.lr,
             weight_decay=self.hparams.weight_decay,
         )
-        ridge_optimizer = torch.optim.Adam(
+        weight_optimizer = torch.optim.Adam(
             [self.clustering_phy_model.running_phy_weight],
             lr=0.8,
             weight_decay=0,
@@ -170,20 +174,20 @@ class AbstractClusteringModel(AbstractNN):
         ]
         if self.gp is not None:
             gp_optimizer = self.gp._get_optimizer(**self.gp.kwargs)
-            return [cls_optimizer, ridge_optimizer, gp_optimizer] + lstsq_optimizer
+            return [cls_optimizer, weight_optimizer, gp_optimizer] + lstsq_optimizer
         else:
-            return [cls_optimizer, ridge_optimizer] + lstsq_optimizer
+            return [cls_optimizer, weight_optimizer] + lstsq_optimizer
 
     def cal_backward_step(self, loss):
         optimizers = self.optimizers()
         if self.gp is not None:
             cls_optimizer = optimizers[0]
-            ridge_optimizer = optimizers[1]
+            weight_optimizer = optimizers[1]
             gp_optimizer = optimizers[2]
             lstsq_optimizers = optimizers[3:]
         else:
             cls_optimizer = optimizers[0]
-            ridge_optimizer = optimizers[1]
+            weight_optimizer = optimizers[1]
             lstsq_optimizers = optimizers[2:]
             gp_optimizer = None
         # The following commented zero_grad() operations are not necessary because `inputs`s are specified and no other
@@ -200,9 +204,9 @@ class AbstractClusteringModel(AbstractNN):
         # if self.clustering_phy_model.running_phy_weight.grad is not None:
         #     self.clustering_phy_model.running_phy_weight.grad.zero_()
 
-        # 2nd back-propagation: for Ridge regression.
+        # 2nd back-propagation: for weight.
         self.manual_backward(
-            self.ridge_loss,
+            self.weight_loss,
             retain_graph=True,
             inputs=self.clustering_phy_model.running_phy_weight,
         )
@@ -231,7 +235,7 @@ class AbstractClusteringModel(AbstractNN):
         cls_optimizer.step()
         for optimizer in lstsq_optimizers:
             optimizer.step()
-        ridge_optimizer.step()
+        weight_optimizer.step()
         if self.gp is not None:
             if self.gp.optim_hp:
                 gp_optimizer.step()
