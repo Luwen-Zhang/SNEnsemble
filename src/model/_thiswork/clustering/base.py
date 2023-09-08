@@ -5,6 +5,7 @@ import numpy as np
 import inspect
 from src.model._thiswork.clustering.common.base import AbstractClustering
 from typing import Dict, List
+from src.data.dataderiver import TrendDeriver
 
 
 # The following _safe_xxx functions can limit both outputs and the gradients of inputs in a reasonable range and
@@ -742,13 +743,124 @@ class EpaarachchiSimplified(AbstractPhy, ForComposite):
         )
 
 
+class TrendLinearIncreasing(AbstractPhy):
+    def __init__(self, target_feature, **kwargs):
+        super(TrendLinearIncreasing, self).__init__(**kwargs)
+        self.target_feature = target_feature
+
+    def _register_params(self, n_clusters=1, a=0.1, b=0.1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), a))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), b))
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        phys: nn.ModuleList,
+    ):
+        x = required_cols[f"{self.target_feature}_UNSCALED"]
+        self.lstsq_input = x
+        self.lstsq_output = (
+            torch.mul(self.activ(self.a[x_cluster]), x) + self.b[x_cluster]
+        )
+        return self.lstsq_output
+
+    @property
+    def required_cols_names(self):
+        return [f"{self.target_feature}_UNSCALED"]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.005,
+            weight_decay=0,
+        )
+
+
+class TrendLinearDecreasing(TrendLinearIncreasing):
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        phys: nn.ModuleList,
+    ):
+        x = required_cols[f"{self.target_feature}_UNSCALED"]
+        self.lstsq_input = x
+        self.lstsq_output = (
+            torch.mul(-self.activ(self.a[x_cluster]), x) + self.b[x_cluster]
+        )
+        return self.lstsq_output
+
+
+class TrendQuadraticOpenUpward(AbstractPhy):
+    """
+    ax^2+bx+c where a>0. The word concave or convex might be misleading.
+    """
+
+    def __init__(self, target_feature, **kwargs):
+        super(TrendQuadraticOpenUpward, self).__init__(**kwargs)
+        self.target_feature = target_feature
+
+    def _register_params(self, n_clusters=1, a=0.1, b=0.1, c=0.1, **kwargs):
+        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), a))
+        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), b))
+        self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), c))
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        phys: nn.ModuleList,
+    ):
+        x = required_cols[f"{self.target_feature}_UNSCALED"]
+        self.lstsq_input = x
+        self.lstsq_output = (
+            torch.mul(self.activ(self.a[x_cluster]), _safe_pow(x, 2))
+            + torch.mul(self.b[x_cluster], x)
+            + self.c[x_cluster]
+        )
+        return self.lstsq_output
+
+    @property
+    def required_cols_names(self):
+        return [f"{self.target_feature}_UNSCALED"]
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=0.005,
+            weight_decay=0,
+        )
+
+
+class TrendQuadraticOpenDownward(TrendQuadraticOpenUpward):
+    """
+    ax^2+bx+c where a<0. The word concave or convex might be misleading.
+    """
+
+    def forward(
+        self,
+        required_cols: Dict[str, torch.Tensor],
+        x_cluster: torch.Tensor,
+        phys: nn.ModuleList,
+    ):
+        x = required_cols[f"{self.target_feature}_UNSCALED"]
+        self.lstsq_input = x
+        self.lstsq_output = (
+            torch.mul(-self.activ(self.a[x_cluster]), _safe_pow(x, 2))
+            + torch.mul(self.b[x_cluster], x)
+            + self.c[x_cluster]
+        )
+        return self.lstsq_output
+
+
 available_phy = []
 for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
     if issubclass(cls, AbstractPhy) and cls != AbstractPhy:
         available_phy.append(cls)
 
 
-def get_phys(category: str = None, **kwargs):
+def get_phys(category: str = None, trend_deriver: TrendDeriver = None, **kwargs):
     defined_category = {
         "composite": ForComposite,
         "alloy": ForAlloy,
@@ -763,6 +875,40 @@ def get_phys(category: str = None, **kwargs):
         )
         if len(phys) == 0:
             raise Exception(f"No AbstractPhy is defined as the subclass of ForAny.")
+    elif category == "trend":
+        phys = []
+        if trend_deriver is None:
+            raise Exception(
+                f"Using trends as physical models but no TrendDeriver is given."
+            )
+        for key, poly in trend_deriver.interpolator.items():
+            if len(poly.coef) == 3:
+                a, b, c = poly.coef[::-1]
+                if a > 0:
+                    phys.append(
+                        TrendQuadraticOpenUpward(
+                            a=a, b=b, c=c, target_feature=key, **kwargs
+                        )
+                    )
+                else:
+                    phys.append(
+                        TrendQuadraticOpenDownward(
+                            a=-a, b=b, c=c, target_feature=key, **kwargs
+                        )
+                    )
+            elif len(poly.coef) == 2:
+                a, b = poly.coef[::-1]
+                if a > 0:
+                    phys.append(
+                        TrendLinearIncreasing(a=a, b=b, target_feature=key, **kwargs)
+                    )
+                else:
+                    phys.append(
+                        TrendLinearDecreasing(a=a, b=b, target_feature=key, **kwargs)
+                    )
+            else:
+                raise Exception(f"Using a polynomial with the order higher than 2.")
+        phys = nn.ModuleList(phys)
     else:
         cat_cls = defined_category.get(category)
         if category in defined_category.keys():
@@ -789,7 +935,16 @@ class AbstractPhyClustering(nn.Module):
         super(AbstractPhyClustering, self).__init__()
         self.clustering = clustering
         self.n_clusters = self.clustering.n_total_clusters
-        self.phys = get_phys(category=phy_category, n_clusters=self.n_clusters)
+        trend_deriver = None
+        for deriver in datamodule.dataderivers:
+            if isinstance(deriver, TrendDeriver):
+                trend_deriver = deriver
+                break
+        self.phys = get_phys(
+            category=phy_category,
+            n_clusters=self.n_clusters,
+            trend_deriver=trend_deriver,
+        )
         self.phy_category = phy_category
         required_cols = []
         for phy in self.phys:

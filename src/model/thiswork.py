@@ -3,6 +3,7 @@ from tabensemb.model import TorchModel
 from ._thiswork.models_clustering import *
 from ._thiswork.models_with_seq import *
 from ._thiswork.models_basic import *
+from src.data.dataderiver import TrendDeriver
 from itertools import product
 from scipy import stats
 from skopt.space import Integer
@@ -63,20 +64,29 @@ class ThisWork(TorchModel):
                 all_names.remove(name)
             elif "NoWrap" in components and not wrap_invalid:
                 all_names.remove(name)
+        # all_names += ["CatEmbed_Category Embedding_Wrap_1L_NoPCA_KMeans"]
         return all_names
 
     def _new_model(self, model_name, verbose, required_models=None, **kwargs):
         database = self.trainer.args["database"]
-        if "composite" in database:
-            phy_category = "composite"
-        elif "alloy" in database:
-            phy_category = "alloy"
+        if any(
+            [
+                isinstance(deriver, TrendDeriver)
+                for deriver in self.datamodule.dataderivers
+            ]
+        ):
+            phy_category = "trend"
         else:
-            warnings.warn(
-                f"Neither `composite` nor `alloy` is in the name of the database `{database}`. "
-                f"Only parts of the Phy models are used."
-            )
-            phy_category = None
+            if "composite" in database:
+                phy_category = "composite"
+            elif "alloy" in database:
+                phy_category = "alloy"
+            else:
+                warnings.warn(
+                    f"Neither `composite` nor `alloy` is in the name of the database `{database}`. "
+                    f"Only parts of the Phy models are used."
+                )
+                phy_category = None
         fix_kwargs = dict(
             n_inputs=len(self.datamodule.cont_feature_names),
             n_outputs=len(self.datamodule.label_name),
@@ -196,7 +206,13 @@ class ThisWork(TorchModel):
         datamodule = DataModule(config=self.trainer.datamodule.args, initialize=False)
         datamodule.set_data_imputer("MeanImputer")
         datamodule.set_data_derivers(
-            [("UnscaledDataDeriver", {"derived_name": "Unscaled"})]
+            [
+                ("UnscaledDataDeriver", {"derived_name": "Unscaled"}),
+                # (
+                #     "TrendDeriver",
+                #     {"stacked": False, "derived_name": "pdp", "plot": True},
+                # ),
+            ],
         )
         datamodule.set_data_processors([("StandardScaler", {})])
         datamodule.set_data(
