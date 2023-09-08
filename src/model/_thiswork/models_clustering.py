@@ -144,7 +144,7 @@ class AbstractClusteringModel(AbstractNN):
             )
         )
         # Train weighted summation
-        weight = self.clustering_phy_model.running_phy_weight
+        weight = self.clustering_phy_model.weight
         self.weight_loss = (
             torch.sum(
                 0.5

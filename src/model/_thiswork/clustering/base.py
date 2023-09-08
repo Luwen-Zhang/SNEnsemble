@@ -1046,12 +1046,8 @@ class AbstractPhyClustering(nn.Module):
         )
         # Weighted sum of phy predictions
         self.weight_input = x_phy
-        x_phy = torch.mul(
-            x_phy,
-            nn.functional.normalize(
-                torch.abs(self.running_phy_weight[x_cluster, :]), p=1
-            ),
-        )
+        self.weight = nn.functional.normalize(torch.abs(self.running_phy_weight), p=1)
+        x_phy = torch.mul(x_phy, self.weight[x_cluster, :])
         x_phy = torch.sum(x_phy, dim=1).view(-1, 1)
         self.weight_output = x_phy.flatten()
 
