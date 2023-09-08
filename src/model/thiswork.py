@@ -672,7 +672,7 @@ class ThisWork(TorchModel):
 
         phys, phy_weight = self.inspect_phy_models(model_name=model_name, **kwargs)
         names = [phy.__class__.__name__ for phy in phys]
-        fig = plt.figure(figsize=(8, 3))
+        fig = plt.figure(figsize=(10, 4))
         gs = GridSpec(100, 100, figure=fig)
         ax = fig.add_subplot(gs[:97, 10:97])
         im = ax.imshow(phy_weight.T, cmap="Blues")
@@ -681,7 +681,7 @@ class ThisWork(TorchModel):
         ax.set_xticks(np.arange(phy_weight.shape[0]))
         ax.set_xlabel("ID of clusters")
         ax.set_title("Weights of physical models")
-        cax = fig.add_subplot(gs[50:96, 98:])
+        cax = fig.add_subplot(gs[50:78, 98:])
         plt.colorbar(mappable=im, cax=cax)
         plt.tight_layout()
         if save_to is not None:
