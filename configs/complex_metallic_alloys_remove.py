@@ -1,5 +1,5 @@
 cfg = {
-    "database": "data/alloy/alloy_CMA2022",
+    "database": "data/alloy/alloy_CMA2022_remove",
     "continuous_feature_names": [
         "Frequency",
         "R-value",

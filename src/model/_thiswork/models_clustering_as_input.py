@@ -150,7 +150,9 @@ class AbstractClusteringModel(AbstractNN):
     def basic_clustering_features_idx(datamodule) -> np.ndarray:
         return np.concatenate(
             (
-                datamodule.get_feature_idx_by_type(typ="Material"),
+                datamodule.get_feature_idx_by_type(
+                    typ="Material", var_type="continuous"
+                ),
                 list(AbstractClusteringModel.top_clustering_features_idx(datamodule)),
             )
         ).astype(int)
