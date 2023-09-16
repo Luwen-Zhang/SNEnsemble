@@ -64,18 +64,14 @@ class FatigueTrainer(Trainer):
     ):
         from ..data.dataderiver import TheoreticalFiftyPofDeriver
 
-        deriver = TheoreticalFiftyPofDeriver()
-        pof50, _, _ = deriver.derive(
-            self.df,
-            self.datamodule,
+        deriver = TheoreticalFiftyPofDeriver(
             derived_name="_",
-            **dict(
-                max_stress_col=max_stress_col,
-                r_value_col=r_value_col,
-                freq_col=freq_col,
-                distribution=distribution,
-            ),
+            max_stress_col=max_stress_col,
+            r_value_col=r_value_col,
+            freq_col=freq_col,
+            distribution=distribution,
         )
+        pof50, _, _ = deriver.derive(self.df, self.datamodule)
         deriver.describe_acc(
             self.df[self.label_name].values, pof50, self.datamodule, distribution
         )
