@@ -151,7 +151,7 @@ class AbstractClusteringModel(AbstractNN):
         return np.concatenate(
             (
                 datamodule.get_feature_idx_by_type(
-                    typ="Material", var_type="continuous"
+                    typ="Material/Specimen", var_type="continuous"
                 ),
                 list(AbstractClusteringModel.top_clustering_features_idx(datamodule)),
             )
