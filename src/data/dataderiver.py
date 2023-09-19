@@ -24,7 +24,7 @@ class DegLayerDeriver(AbstractDeriver):
         return []
 
     def _defaults(self):
-        return dict(stacked=True, intermediate=False)
+        return dict(stacked=True, intermediate=False, is_continuous=True)
 
     def _derive(self, df, datamodule):
         sequence_column = self.kwargs["sequence_column"]
@@ -59,7 +59,7 @@ class NumLayersDeriver(DegLayerDeriver):
     """
 
     def _defaults(self):
-        return dict(stacked=False, intermediate=False)
+        return dict(stacked=False, intermediate=False, is_continuous=True)
 
     def _derive(self, df, datamodule):
         sequence_column = self.kwargs["sequence_column"]
@@ -86,7 +86,7 @@ class LayUpSequenceDeriver(DegLayerDeriver):
     """
 
     def _defaults(self):
-        return dict(stacked=False, intermediate=False)
+        return dict(stacked=False, intermediate=False, is_continuous=True)
 
     def _derive(self, df, datamodule):
         sequence_column = self.kwargs["sequence_column"]
@@ -122,7 +122,7 @@ class MinStressDeriver(AbstractDeriver):
         return []
 
     def _defaults(self):
-        return dict(stacked=True, intermediate=False)
+        return dict(stacked=True, intermediate=False, is_continuous=True)
 
     def _derive(self, df, datamodule):
         max_stress_col = self.kwargs["max_stress_col"]
@@ -151,7 +151,7 @@ class WalkerStressDeriver(AbstractDeriver):
         return ["power_index"]
 
     def _defaults(self):
-        return dict(stacked=True, intermediate=False)
+        return dict(stacked=True, intermediate=False, is_continuous=True)
 
     def _derive(self, df, datamodule):
         max_stress_col = self.kwargs["max_stress_col"]
@@ -189,7 +189,13 @@ class SuppStressDeriver(AbstractDeriver):
         return ["relative", "absolute"]
 
     def _defaults(self):
-        return dict(stacked=True, intermediate=False, relative=False, absolute=True)
+        return dict(
+            stacked=True,
+            intermediate=False,
+            relative=False,
+            absolute=True,
+            is_continuous=True,
+        )
 
     def _derived_names(self):
         names = []
@@ -335,7 +341,9 @@ class TheoreticalFiftyPofDeriver(AbstractDeriver):
         )
 
     def _defaults(self):
-        return dict(stacked=True, intermediate=True, distribution="gaussian")
+        return dict(
+            stacked=True, intermediate=True, distribution="gaussian", is_continuous=True
+        )
 
     def _derived_names(self):
         return ["TheoreticalFiftyPof"]
@@ -355,7 +363,7 @@ class TrendDeriver(AbstractDeriver):
         return []
 
     def _defaults(self):
-        return dict(stacked=False, intermediate=False, plot=False)
+        return dict(stacked=False, intermediate=False, plot=False, is_continuous=True)
 
     def _derive(self, df: pd.DataFrame, datamodule) -> np.ndarray:
         try:
