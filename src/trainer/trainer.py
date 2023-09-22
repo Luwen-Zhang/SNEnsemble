@@ -330,11 +330,11 @@ class FatigueTrainer(Trainer):
         model_name
             The selected model in the database.
         refit
-            Whether to refit models on bootstrapped datasets. See Trainer._bootstrap.
+            Whether to refit models on bootstrapped datasets. See Trainer._bootstrap_fit.
         log_stress
             Whether to plot the stress in log scale.
         **kwargs
-            Other arguments for ``Trainer._bootstrap``
+            Other arguments for ``Trainer._bootstrap_fit``
         """
         # Check whether columns exist.
         if s_col not in self.df.columns:
@@ -461,7 +461,7 @@ class FatigueTrainer(Trainer):
             if len(m_train_indices) != 0
             else np.append(m_val_indices, m_test_indices)
         )
-        x_value, mean_pred, ci_left, ci_right = self._bootstrap(
+        x_value, mean_pred, ci_left, ci_right = self._bootstrap_fit(
             program=program,
             df=processed_df.loc[chosen_indices, :],
             derived_data=self.datamodule.get_derived_data_slice(
