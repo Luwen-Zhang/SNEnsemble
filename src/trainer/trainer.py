@@ -71,7 +71,7 @@ class FatigueTrainer(Trainer):
             freq_col=freq_col,
             distribution=distribution,
         )
-        pof50, _, _ = deriver.derive(self.df, self.datamodule)
+        pof50, _ = deriver.derive(self.df, self.datamodule)
         deriver.describe_acc(
             self.df[self.label_name].values, pof50, self.datamodule, distribution
         )
@@ -590,9 +590,9 @@ class FatigueTrainer(Trainer):
             new_ax = False
 
         # Plot datasets.
-        scatter_plot_func(n_train, s_train, clr[0], "Training")
-        scatter_plot_func(n_val, s_val, clr[1], "Validation")
-        scatter_plot_func(n_test, s_test, clr[2], "Testing")
+        scatter_plot_func(n_train, s_train, global_palette[0], "Training")
+        scatter_plot_func(n_val, s_val, global_palette[1], "Validation")
+        scatter_plot_func(n_test, s_test, global_palette[2], "Testing")
 
         # Plot predictions and intervals.
         if len(m_train_indices) > 3:
@@ -603,19 +603,23 @@ class FatigueTrainer(Trainer):
                 n_pred_vals=mean_pred,
             )
 
-            interval_plot_func(mean_pred, ci_left, ci_right, clr[1], f"{model_name} CI")
-            psn_plot_func(psn_pred, color=clr[1], name=f"{model_name} 5\% PoF")
+            interval_plot_func(
+                mean_pred, ci_left, ci_right, global_palette[1], f"{model_name} CI"
+            )
+            psn_plot_func(
+                psn_pred, color=global_palette[1], name=f"{model_name} 5\% PoF"
+            )
         else:
             if not (np.isnan(ci_left).any() or np.isnan(ci_right).any()):
                 interval_plot_func(
                     mean_pred,
                     ci_left,
                     ci_right,
-                    clr[1],
+                    global_palette[1],
                     f"Bootstrap {model_name} CI {CI*100:.1f}\%",
                 )
             else:
-                ax.plot(mean_pred, x_value, color=clr[1], zorder=10)
+                ax.plot(mean_pred, x_value, color=global_palette[1], zorder=10)
 
         # Get predictions, intervals and psn for lin-log and log-log SN.
         # lin_pred, lin_ci_left, lin_ci_right, lin_psn_pred = get_interval_psn(
@@ -626,12 +630,12 @@ class FatigueTrainer(Trainer):
         # )
 
         # Plot predictions, intervals and psn.
-        # interval_plot_func(lin_pred, lin_ci_left, lin_ci_right, clr[0], f"Lin-log CI")
+        # interval_plot_func(lin_pred, lin_ci_left, lin_ci_right, global_palette[0], f"Lin-log CI")
 
-        # interval_plot_func(log_pred, log_ci_left, log_ci_right, clr[2], f"Log-log CI")
+        # interval_plot_func(log_pred, log_ci_left, log_ci_right, global_palette[2], f"Log-log CI")
 
-        # psn_plot_func(lin_psn_pred, color=clr[0], name=f"Lin-log 5\% PoF")
-        # psn_plot_func(log_psn_pred, color=clr[2], name=f"Log-log 5\% PoF")
+        # psn_plot_func(lin_psn_pred, color=global_palette[0], name=f"Lin-log 5\% PoF")
+        # psn_plot_func(log_psn_pred, color=global_palette[2], name=f"Log-log 5\% PoF")
 
         ax.legend(
             loc="upper right",
