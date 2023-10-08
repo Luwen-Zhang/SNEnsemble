@@ -1,5 +1,5 @@
 cfg = {
-    "database": "composite_database_07242023_5mat",
+    "database": "composite_database_10082023_5mat",
     "continuous_feature_names": [
         "Fibre Volume Fraction",
         "Fibre Weight Fraction",
