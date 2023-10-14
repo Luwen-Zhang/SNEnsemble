@@ -7,32 +7,25 @@ from torch import nn
 
 
 class FTTransformerNN(AbstractNN):
-    def __init__(
-        self,
-        n_inputs,
-        n_outputs,
-        datamodule,
-        cat_num_unique: List[int] = None,
-        **kwargs,
-    ):
+    def __init__(self, datamodule, **kwargs):
         super(FTTransformerNN, self).__init__(datamodule, **kwargs)
 
         self.embed = Embedding(
             self.hparams.embedding_dim,
-            n_inputs,
+            self.n_inputs,
             self.hparams.embed_dropout,
-            cat_num_unique,
+            self.cat_num_unique,
             run_cat="categorical" in self.derived_feature_names,
         )
         self.embed_transformer = FTTransformer(
-            n_inputs=int(self.embed.run_cat) * self.n_cat + n_inputs,
+            n_inputs=int(self.embed.run_cat) * self.n_cat + self.n_inputs,
             attn_heads=self.hparams.attn_heads,
             attn_layers=self.hparams.attn_layers,
             embedding_dim=self.hparams.embedding_dim,
             ff_dim=self.hparams.embedding_dim * 4,
             ff_layers=[],
             dropout=self.hparams.attn_dropout,
-            n_outputs=n_outputs,
+            n_outputs=self.n_outputs,
         )
         self.hidden_rep_dim = self.embed_transformer.hidden_rep_dim
         self.hidden_representation = None

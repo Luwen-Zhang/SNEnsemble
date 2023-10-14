@@ -12,7 +12,6 @@ from tabensemb.model.base import AbstractNN
 class AbstractSeqModel(AbstractNN):
     def __init__(
         self,
-        n_outputs,
         layers,
         datamodule,
         cont_cat_model: AbstractNN,
@@ -45,19 +44,13 @@ class AbstractSeqModel(AbstractNN):
 class TransformerLSTMNN(AbstractSeqModel):
     def __init__(
         self,
-        n_inputs,
-        n_outputs,
         layers,
         datamodule,
-        cat_num_unique: List[int] = None,
         **kwargs,
     ):
         AbstractNN.__init__(self, datamodule, **kwargs)
         transformer = FTTransformerNN(
-            n_inputs=n_inputs,
-            n_outputs=n_outputs,
             datamodule=datamodule,
-            cat_num_unique=cat_num_unique,
             embedding_dim=self.hparams.embedding_dim,
             embed_dropout=self.hparams.embed_dropout,
             attn_layers=self.hparams.attn_layers,
@@ -73,7 +66,6 @@ class TransformerLSTMNN(AbstractSeqModel):
             run="Number of Layers" in self.derived_feature_names,
         )
         super(TransformerLSTMNN, self).__init__(
-            n_outputs=n_outputs,
             layers=layers,
             datamodule=datamodule,
             cont_cat_model=transformer,
@@ -84,19 +76,13 @@ class TransformerLSTMNN(AbstractSeqModel):
 class TransformerSeqNN(AbstractSeqModel):
     def __init__(
         self,
-        n_inputs,
-        n_outputs,
         layers,
         datamodule,
-        cat_num_unique: List[int] = None,
         **kwargs,
     ):
         AbstractNN.__init__(self, datamodule, **kwargs)
         transformer = FTTransformerNN(
-            n_inputs=n_inputs,
-            n_outputs=n_outputs,
             datamodule=datamodule,
-            cat_num_unique=cat_num_unique,
             embedding_dim=self.hparams.embedding_dim,
             embed_dropout=self.hparams.embed_dropout,
             attn_layers=self.hparams.attn_layers,
@@ -113,7 +99,7 @@ class TransformerSeqNN(AbstractSeqModel):
             ff_dim=self.hparams.attn_ff_dim,
             ff_layers=layers,
             dropout=self.hparams.seq_attn_dropout,
-            n_outputs=n_outputs,
+            n_outputs=self.n_outputs,
             run="Lay-up Sequence" in self.derived_feature_names
             and "Number of Layers" in self.derived_feature_names,
             use_torch_transformer=True,
@@ -122,7 +108,6 @@ class TransformerSeqNN(AbstractSeqModel):
         )
 
         super(TransformerSeqNN, self).__init__(
-            n_outputs=n_outputs,
             layers=layers,
             datamodule=datamodule,
             cont_cat_model=transformer,
@@ -133,19 +118,13 @@ class TransformerSeqNN(AbstractSeqModel):
 class CatEmbedSeqNN(AbstractSeqModel):
     def __init__(
         self,
-        n_inputs,
-        n_outputs,
         layers,
         datamodule,
-        cat_num_unique: List[int] = None,
         **kwargs,
     ):
         AbstractNN.__init__(self, datamodule, **kwargs)
         catembed = CategoryEmbeddingNN(
-            n_inputs=n_inputs,
-            n_outputs=n_outputs,
             datamodule=datamodule,
-            cat_num_unique=cat_num_unique,
             embedding_dim=self.hparams.embedding_dim,
             embed_dropout=self.hparams.embed_dropout,
             mlp_dropout=self.hparams.mlp_dropout,
@@ -158,7 +137,7 @@ class CatEmbedSeqNN(AbstractSeqModel):
             ff_dim=self.hparams.attn_ff_dim,
             ff_layers=layers,
             dropout=self.hparams.seq_attn_dropout,
-            n_outputs=n_outputs,
+            n_outputs=self.n_outputs,
             run="Lay-up Sequence" in self.derived_feature_names
             and "Number of Layers" in self.derived_feature_names,
             use_torch_transformer=True,
@@ -166,7 +145,7 @@ class CatEmbedSeqNN(AbstractSeqModel):
             force_mean=True,
         )
         super(CatEmbedSeqNN, self).__init__(
-            n_outputs=n_outputs,
+            n_outputs=self.n_outputs,
             layers=layers,
             datamodule=datamodule,
             cont_cat_model=catembed,
