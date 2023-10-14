@@ -192,6 +192,12 @@ class ThisWork(TorchModel):
             )
             if len(top_level_clustering_features) == 0:
                 return False
+        if (
+            components[0] not in self.trainer.modelbases_names
+            or components[1]
+            not in self.trainer.get_modelbase(program=components[0]).get_model_names()
+        ):
+            return False
         return True
 
     def required_models(self, model_name: str) -> Union[List[str], None]:
