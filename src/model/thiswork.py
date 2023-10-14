@@ -10,9 +10,10 @@ from skopt.space import Integer
 
 
 class ThisWork(TorchModel):
-    def __init__(self, *args, reduce_bayes_steps=False, **kwargs):
+    def __init__(self, *args, reduce_bayes_steps=False, n_pca_dim=None, **kwargs):
         super(ThisWork, self).__init__(*args, **kwargs)
         self.reduce_bayes_steps = reduce_bayes_steps
+        self.n_pca_dim = n_pca_dim
 
     def _get_program_name(self):
         return "ThisWork"
@@ -130,7 +131,9 @@ class ThisWork(TorchModel):
             if len(feature_idx) > 2:
                 pca = self.datamodule.pca(feature_idx=feature_idx)
                 n_pca_dim = (
-                    np.where(pca.explained_variance_ratio_.cumsum() < 0.9)[0][-1] + 1
+                    (np.where(pca.explained_variance_ratio_.cumsum() < 0.9)[0][-1] + 1)
+                    if self.n_pca_dim is None
+                    else self.n_pca_dim
                 )
             else:
                 n_pca_dim = len(feature_idx)
