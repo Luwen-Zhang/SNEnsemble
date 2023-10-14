@@ -551,7 +551,11 @@ class ThisWork(TorchModel):
             )
         g.add_legend(**_legend_kwargs)
         for (row_key, col_key), ax in g.axes_dict.items():
-            ax.set_title(title_dict[row_key][col_key], fontsize=10)
+            if row_key in title_dict.keys() and col_key in title_dict[row_key].keys():
+                ax.set_title(title_dict[row_key][col_key], fontsize=10)
+            else:
+                ax.set_title(None)
+                ax.set_axis_off()
         plt.setp(g.axes, xticks=[], xlabel="", ylabel="")
         plt.tight_layout()
         plt.subplots_adjust(**_adjust_kwargs)
