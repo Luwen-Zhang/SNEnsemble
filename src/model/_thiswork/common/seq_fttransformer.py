@@ -29,6 +29,7 @@ class SeqFTTransformer(FTTransformer):
             self.run = True
         else:
             super(FTTransformer, self).__init__()
+            self.hidden_rep_dim = 0
             self.run = False
 
     def forward(self, x, derived_tensors):
