@@ -1,14 +1,7 @@
-import tabensemb
-from .models_with_seq import CatEmbedSeqNN
-from tabensemb.model.base import AbstractNN, get_linear, get_sequential, AbstractModel
+from tabensemb.model.base import AbstractNN, get_sequential
 import numpy as np
-from .clustering.singlelayer import KMeansPhy, GMMPhy, BMMPhy
-from .clustering.multilayer import TwolayerKMeansPhy, TwolayerGMMPhy, TwolayerBMMPhy
 import torch
 from torch import nn
-from tabensemb.model.widedeep import WideDeepWrapper
-from tabensemb.model.pytorch_tabular import PytorchTabularWrapper
-from tabensemb.model.base import TorchModelWrapper
 
 
 class AbstractClusteringModel(AbstractNN):
@@ -211,52 +204,6 @@ class Abstract1LClusteringModel(AbstractClusteringModel):
             datamodule=datamodule,
         )
         super(Abstract1LClusteringModel, self).__init__(
-            n_inputs=n_inputs,
-            n_outputs=n_outputs,
-            datamodule=datamodule,
-            clustering_features=clustering_features,
-            clustering_phy_model=phy,
-            cont_cat_model=cont_cat_model,
-            layers=layers,
-            **kwargs,
-        )
-
-
-class Abstract2LClusteringModel(AbstractClusteringModel):
-    def __init__(
-        self,
-        n_inputs,
-        n_outputs,
-        layers,
-        datamodule,
-        n_clusters,
-        n_clusters_per_cluster: int,
-        phy_class,
-        cont_cat_model,
-        n_pca_dim: int = None,
-        phy_category: str = None,
-        **kwargs,
-    ):
-        clustering_features = list(self.basic_clustering_features_idx(datamodule))
-        top_level_clustering_features = self.top_clustering_features_idx(datamodule)
-        input_1_idx = [
-            list(clustering_features).index(x) for x in top_level_clustering_features
-        ]
-        input_2_idx = list(
-            np.setdiff1d(np.arange(len(clustering_features)), input_1_idx)
-        )
-        phy = phy_class(
-            n_clusters=n_clusters,
-            n_input_1=len(input_1_idx),
-            n_input_2=len(input_2_idx),
-            input_1_idx=input_1_idx,
-            input_2_idx=input_2_idx,
-            n_clusters_per_cluster=n_clusters_per_cluster,
-            n_pca_dim=n_pca_dim,
-            datamodule=datamodule,
-            phy_category=phy_category,
-        )
-        super(Abstract2LClusteringModel, self).__init__(
             n_inputs=n_inputs,
             n_outputs=n_outputs,
             datamodule=datamodule,

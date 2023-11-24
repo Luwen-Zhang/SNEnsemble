@@ -6,6 +6,8 @@ from ._thiswork.models_basic import *
 from itertools import product
 from scipy import stats
 from skopt.space import Integer
+from typing import Union, List
+from ._thiswork.clustering.singlelayer import KMeansPhy
 
 
 class ThisWork(TorchModel):
@@ -82,31 +84,11 @@ class ThisWork(TorchModel):
             ]
         else:
             cont_cat_model = required_models[f"EXTERN_{components[0]}_{components[1]}"]
-        if "1L" in components:
-            cls = Abstract1LClusteringModel
-            if "KMeans" in components:
-                phy_class = KMeansPhy
-            elif "GMM" in components:
-                phy_class = GMMPhy
-            elif "BMM" in components:
-                phy_class = BMMPhy
-            else:
-                raise Exception(f"Clustering algorithm not found.")
-        else:
-            cls = Abstract2LClusteringModel
-            if "KMeans" in components:
-                phy_class = TwolayerKMeansPhy
-            elif "GMM" in components:
-                phy_class = TwolayerGMMPhy
-            elif "BMM" in components:
-                phy_class = TwolayerBMMPhy
-            else:
-                raise Exception(f"Clustering algorithm not found.")
+        cls = Abstract1LClusteringModel
+        phy_class = KMeansPhy
+
         if "PCA" in components:
-            if "1L" in components:
-                feature_idx = cls.basic_clustering_features_idx(self.datamodule)
-            else:
-                feature_idx = cls.top_clustering_features_idx(self.datamodule)
+            feature_idx = cls.basic_clustering_features_idx(self.datamodule)
             if len(feature_idx) > 2:
                 pca = self.datamodule.pca(feature_idx=feature_idx)
                 n_pca_dim = (
@@ -129,30 +111,12 @@ class ThisWork(TorchModel):
         )
 
     def _space(self, model_name):
-        components = model_name.split("_")
-        if "1L" in components:
-            return [
-                Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
-            ] + self.trainer.SPACE
-        elif "2L" in components:
-            return [
-                Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
-                Integer(
-                    low=1,
-                    high=32,
-                    prior="uniform",
-                    name="n_clusters_per_cluster",
-                    dtype=int,
-                ),
-            ] + self.trainer.SPACE
+        return [
+            Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
+        ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
-        components = model_name.split("_")
-        res = {}
-        if "1L" in components:
-            res = {"n_clusters": 32}
-        elif "2L" in components:
-            res = {"n_clusters": 32, "n_clusters_per_cluster": 8}
+        res = {"n_clusters": 32}
         res.update(self.trainer.chosen_params)
         return res
 
@@ -164,13 +128,6 @@ class ThisWork(TorchModel):
 
     def _conditional_validity(self, model_name: str) -> bool:
         components = model_name.split("_")
-        if "2L" in components:
-            datamodule = getattr(self, "datamodule", self.trainer.datamodule)
-            top_level_clustering_features = (
-                AbstractClusteringModel.top_clustering_features_idx(datamodule)
-            )
-            if len(top_level_clustering_features) == 0:
-                return False
         if (
             components[0] not in self.trainer.modelbases_names
             or components[1]
