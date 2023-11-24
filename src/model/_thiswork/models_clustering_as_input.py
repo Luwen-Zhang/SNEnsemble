@@ -4,8 +4,6 @@ from tabensemb.model.base import AbstractNN, get_linear, get_sequential, Abstrac
 import numpy as np
 from .clustering.singlelayer import KMeansPhy, GMMPhy, BMMPhy
 from .clustering.multilayer import TwolayerKMeansPhy, TwolayerGMMPhy, TwolayerBMMPhy
-from .gp.exact_gp import ExactGPModel
-from .bayes_nn.bbp import MCDropout
 import torch
 from torch import nn
 from tabensemb.model.sample import CategoryEmbeddingNN
