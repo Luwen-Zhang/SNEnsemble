@@ -25,7 +25,12 @@ class AbstractSeqModel(AbstractNN):
             self.cont_cat_model.hidden_rep_dim
             + int(self.seq_model.run) * self.seq_model.hidden_rep_dim
         )
-        self.w = get_linear(self.hidden_rep_dim, n_outputs, "relu")
+        self.w = get_sequential(
+            layers=layers,
+            n_inputs=self.hidden_rep_dim,
+            n_outputs=self.n_outputs,
+            act_func=nn.ReLU,
+        )
 
     def _forward(self, x, derived_tensors):
         x_contcat = self.cont_cat_model(x, derived_tensors)
@@ -37,7 +42,7 @@ class AbstractSeqModel(AbstractNN):
 
         output = torch.concat(all_res, dim=1)
         self.hidden_representation = output
-        output = self.w(output)
+        output = self.w(output) + x_contcat
         return output
 
 
