@@ -65,16 +65,6 @@ cfg = {
                 "r_value_col": "R-value",
             },
         ],
-        # [
-        #     "WalkerStressDeriver",
-        #     {
-        #         "derived_name": "Walker Eq Stress",
-        #         "stacked": True,
-        #         "max_stress_col": "Maximum Stress",
-        #         "r_value_col": "R-value",
-        #         "power_index": 0.5,
-        #     },
-        # ],
         [
             "SuppStressDeriver",
             {
@@ -88,37 +78,6 @@ cfg = {
                 "absolute": False,
             },
         ],
-        # [
-        #     "DegLayerDeriver",
-        #     {
-        #         "sequence_column": "Sequence",
-        #         "derived_name": "deg_layers",
-        #         "col_names": [
-        #             "0-deg layers",
-        #             "45-deg layers",
-        #             "90-deg layers",
-        #             "Other-deg layers",
-        #         ],
-        #         "stacked": True,
-        #     },
-        # ],
-        [
-            "LayUpSequenceDeriver",
-            {
-                "sequence_column": "Sequence",
-                "derived_name": "Lay-up Sequence",
-                "stacked": False,
-            },
-        ],
-        [
-            "NumLayersDeriver",
-            {
-                "sequence_column": "Sequence",
-                "derived_name": "Number of Layers",
-                "stacked": False,
-            },
-        ],
-        # ["SampleWeightDeriver", {"derived_name": "Sample Weight", "stacked": False}],
     ],
     "data_processors": [
         ["CategoricalOrdinalEncoder", {}],
