@@ -5,7 +5,6 @@ import numpy as np
 import inspect
 from src.model._thiswork.clustering.common.base import AbstractClustering
 from typing import Dict, List
-from src.data.dataderiver import TrendDeriver
 
 
 # The following _safe_xxx functions can limit both outputs and the gradients of inputs in a reasonable range and
@@ -100,19 +99,7 @@ class AbstractPhy(nn.Module):
         )
 
 
-class ForComposite:
-    ...
-
-
-class ForAlloy:
-    ...
-
-
-class ForAny:
-    ...
-
-
-class LinLog(AbstractPhy, ForComposite, ForAlloy):
+class LinLog(AbstractPhy):
     def forward(
         self,
         required_cols: Dict[str, torch.Tensor],
@@ -123,7 +110,7 @@ class LinLog(AbstractPhy, ForComposite, ForAlloy):
         return self._linear(s, x_cluster)
 
 
-class LogLog(AbstractPhy, ForComposite, ForAlloy):
+class LogLog(AbstractPhy):
     def forward(
         self,
         required_cols: Dict[str, torch.Tensor],
@@ -153,7 +140,7 @@ class LogLog(AbstractPhy, ForComposite, ForAlloy):
 #         return True
 
 
-class Sendeckyj(AbstractPhy, ForComposite):
+class Sendeckyj(AbstractPhy):
     # Sendeckyj, G.P. Fitting models to composite materials fatigue data. In Test Methods and Design Allowables for
     # Fibrous Composites; ASTM STP 734; Chamis, C.C., Ed.; ASTM International: West Conshohocken, PA, USA, 1981; pp.
     # 245–260.
@@ -199,7 +186,7 @@ class Sendeckyj(AbstractPhy, ForComposite):
         )
 
 
-class Hwang(AbstractPhy, ForComposite):
+class Hwang(AbstractPhy):
     # Hwang, W.; Han, K.S. Fatigue of Composites—Fatigue Modulus Concept and Life Prediction. J. Compos. Mater. 1986,
     # 20, 154–165.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -239,7 +226,7 @@ class Hwang(AbstractPhy, ForComposite):
         )
 
 
-class Kohout(AbstractPhy, ForComposite, ForAlloy):
+class Kohout(AbstractPhy):
     # Kohout, J.; Vechet, S. A new function for fatigue curves characterization and its multiple merits. Int. J. Fatigue
     # 2001, 23, 175–183.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -282,7 +269,7 @@ class Kohout(AbstractPhy, ForComposite, ForAlloy):
         )
 
 
-class KimZhang(AbstractPhy, ForComposite):
+class KimZhang(AbstractPhy):
     # Kim, H.S.; Zhang, J. Fatigue Damage and Life Prediction of Glass/Vinyl Ester Composites. J. Reinf. Plast. Compos.
     # 2001, 20, 834–848.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -340,7 +327,7 @@ class KimZhang(AbstractPhy, ForComposite):
         )
 
 
-class KawaiKoizumi(AbstractPhy, ForComposite):
+class KawaiKoizumi(AbstractPhy):
     # Kawai, M.; Koizumi, M. Nonlinear constant fatigue life diagrams for carbon/epoxy laminates at room temperature.
     # Compos. Part A Appl. Sci. Manuf. 2007, 38, 2342–2353.
     # The paper uses data at the critical stress ratio (UCS/UTS) to fit the proposed model, and predict data at other
@@ -392,7 +379,7 @@ class KawaiKoizumi(AbstractPhy, ForComposite):
         )
 
 
-class Poursatip(AbstractPhy, ForComposite):
+class Poursatip(AbstractPhy):
     # Poursartip, A.; Ashby, M.F.; Beaumont, P.W.R. The fatigue damage mechanics of carbon fibre composite laminate:
     # I—Development of the model. Compos. Sci. Technol. 1986, 25, 193–218.
     def forward(
@@ -472,7 +459,7 @@ class Poursatip(AbstractPhy, ForComposite):
         self.e = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
 
 
-class PoursatipSimplified(AbstractPhy, ForComposite):
+class PoursatipSimplified(AbstractPhy):
     # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
     # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
     def forward(
@@ -505,7 +492,7 @@ class PoursatipSimplified(AbstractPhy, ForComposite):
         self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), 6.393))
 
 
-class DAmore(AbstractPhy, ForComposite):
+class DAmore(AbstractPhy):
     # A. D’Amore, G. Caprino, P. Stupak, J. Zhou, and L. Nicolais. “Effect of Stress Ratio on the Flexural Fatigue
     # Behaviour of Continuous Strand Mat Reinforced Plastics.” Science and Engineering of Composite Materials 5, no. 1
     # (March 1, 1996): 1–8.
@@ -564,7 +551,7 @@ class DAmore(AbstractPhy, ForComposite):
         )
 
 
-class DAmoreSimplified(AbstractPhy, ForComposite):
+class DAmoreSimplified(AbstractPhy):
     # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
     # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -604,7 +591,7 @@ class DAmoreSimplified(AbstractPhy, ForComposite):
         )
 
 
-class Epaarachchi(AbstractPhy, ForComposite):
+class Epaarachchi(AbstractPhy):
     # Epaarachchi, J.A.; Clausen, P.D. An empirical model for fatigue behavior prediction of glass fibre-reinforced
     # plastic composites for various stress ratios and test frequencies. Compos. Part A Appl. Sci. Manuf. 2003, 34,
     # 313–326.
@@ -680,7 +667,7 @@ class Epaarachchi(AbstractPhy, ForComposite):
         )
 
 
-class EpaarachchiSimplified(AbstractPhy, ForComposite):
+class EpaarachchiSimplified(AbstractPhy):
     # Burhan, Ibrahim, and Ho Kim. “S-N Curve Models for Composite Materials Characterisation: An Evaluative Review.”
     # Journal of Composites Science 2, no. 3 (July 2, 2018): 38.
     def _register_params(self, n_clusters=1, **kwargs):
@@ -743,209 +730,27 @@ class EpaarachchiSimplified(AbstractPhy, ForComposite):
         )
 
 
-class TrendLinearIncreasing(AbstractPhy):
-    def __init__(self, target_feature, **kwargs):
-        super(TrendLinearIncreasing, self).__init__(**kwargs)
-        self.target_feature = target_feature
-
-    def _register_params(self, n_clusters=1, a=0.1, b=0.1, **kwargs):
-        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), a))
-        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), b))
-
-    def forward(
-        self,
-        required_cols: Dict[str, torch.Tensor],
-        x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
-    ):
-        x = required_cols[f"{self.target_feature}_UNSCALED"]
-        self.lstsq_input = x
-        self.lstsq_output = (
-            torch.mul(self.activ(self.a[x_cluster]), x) + self.b[x_cluster]
-        )
-        return self.lstsq_output
-
-    @property
-    def required_cols_names(self):
-        return [f"{self.target_feature}_UNSCALED"]
-
-    def get_optimizer(self):
-        return torch.optim.Adam(
-            self.parameters(),
-            lr=0.005,
-            weight_decay=0,
-        )
-
-
-class TrendLinearDecreasing(TrendLinearIncreasing):
-    def forward(
-        self,
-        required_cols: Dict[str, torch.Tensor],
-        x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
-    ):
-        x = required_cols[f"{self.target_feature}_UNSCALED"]
-        self.lstsq_input = x
-        self.lstsq_output = (
-            torch.mul(-self.activ(self.a[x_cluster]), x) + self.b[x_cluster]
-        )
-        return self.lstsq_output
-
-
-class TrendQuadraticOpenUpward(AbstractPhy):
-    """
-    ax^2+bx+c where a>0. The word concave or convex might be misleading.
-    """
-
-    def __init__(self, target_feature, **kwargs):
-        super(TrendQuadraticOpenUpward, self).__init__(**kwargs)
-        self.target_feature = target_feature
-
-    def _register_params(self, n_clusters=1, a=0.1, b=0.1, c=0.1, **kwargs):
-        self.a = nn.Parameter(torch.mul(torch.ones(n_clusters), a))
-        self.b = nn.Parameter(torch.mul(torch.ones(n_clusters), b))
-        self.c = nn.Parameter(torch.mul(torch.ones(n_clusters), c))
-
-    def forward(
-        self,
-        required_cols: Dict[str, torch.Tensor],
-        x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
-    ):
-        x = required_cols[f"{self.target_feature}_UNSCALED"]
-        self.lstsq_input = x
-        self.lstsq_output = (
-            torch.mul(self.activ(self.a[x_cluster]), _safe_pow(x, 2))
-            + torch.mul(self.b[x_cluster], x)
-            + self.c[x_cluster]
-        )
-        return self.lstsq_output
-
-    @property
-    def required_cols_names(self):
-        return [f"{self.target_feature}_UNSCALED"]
-
-    def get_optimizer(self):
-        return torch.optim.Adam(
-            self.parameters(),
-            lr=0.005,
-            weight_decay=0,
-        )
-
-
-class TrendQuadraticOpenDownward(TrendQuadraticOpenUpward):
-    """
-    ax^2+bx+c where a<0. The word concave or convex might be misleading.
-    """
-
-    def forward(
-        self,
-        required_cols: Dict[str, torch.Tensor],
-        x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
-    ):
-        x = required_cols[f"{self.target_feature}_UNSCALED"]
-        self.lstsq_input = x
-        self.lstsq_output = (
-            torch.mul(-self.activ(self.a[x_cluster]), _safe_pow(x, 2))
-            + torch.mul(self.b[x_cluster], x)
-            + self.c[x_cluster]
-        )
-        return self.lstsq_output
-
-
 available_phy = []
 for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
     if issubclass(cls, AbstractPhy) and cls != AbstractPhy:
         available_phy.append(cls)
 
 
-def get_phys(category: str = None, trend_deriver: TrendDeriver = None, **kwargs):
-    defined_category = {
-        "composite": ForComposite,
-        "alloy": ForAlloy,
-    }
-    if category is None:
-        phys = nn.ModuleList(
-            [
-                cls(**kwargs)
-                for cls in available_phy
-                if issubclass(cls, ForAny) and issubclass(cls, AbstractPhy)
-            ]
-        )
-        if len(phys) == 0:
-            raise Exception(f"No AbstractPhy is defined as the subclass of ForAny.")
-    elif category == "trend":
-        phys = []
-        if trend_deriver is None:
-            raise Exception(
-                f"Using trends as physical models but no TrendDeriver is given."
-            )
-        for key, poly in trend_deriver.interpolator.items():
-            if len(poly.coef) == 3:
-                a, b, c = poly.coef[::-1]
-                if a > 0:
-                    phys.append(
-                        TrendQuadraticOpenUpward(
-                            a=a, b=b, c=c, target_feature=key, **kwargs
-                        )
-                    )
-                else:
-                    phys.append(
-                        TrendQuadraticOpenDownward(
-                            a=-a, b=b, c=c, target_feature=key, **kwargs
-                        )
-                    )
-            elif len(poly.coef) == 2:
-                a, b = poly.coef[::-1]
-                if a > 0:
-                    phys.append(
-                        TrendLinearIncreasing(a=a, b=b, target_feature=key, **kwargs)
-                    )
-                else:
-                    phys.append(
-                        TrendLinearDecreasing(a=a, b=b, target_feature=key, **kwargs)
-                    )
-            else:
-                raise Exception(f"Using a polynomial with the order higher than 2.")
-        phys = nn.ModuleList(phys)
-    else:
-        cat_cls = defined_category.get(category)
-        if category in defined_category.keys():
-            phys = nn.ModuleList(
-                [
-                    cls(**kwargs)
-                    for cls in available_phy
-                    if issubclass(cls, cat_cls) or issubclass(cls, ForAny)
-                ]
-            )
-        else:
-            raise Exception(f"Unrecognized Phy category `{category}`.")
-        if len(phys) == 0:
-            raise Exception(
-                f"No AbstractPhy is defined as the subclass of ForAny or {cat_cls.__name__}."
-            )
+def get_phys(**kwargs):
+    phys = nn.ModuleList(
+        [cls(**kwargs) for cls in available_phy if issubclass(cls, AbstractPhy)]
+    )
+    if len(phys) == 0:
+        raise Exception(f"No AbstractPhy is defined as the subclass of ForAny.")
     return phys
 
 
 class AbstractPhyClustering(nn.Module):
-    def __init__(
-        self, clustering: AbstractClustering, datamodule, phy_category=None, **kwargs
-    ):
+    def __init__(self, clustering: AbstractClustering, datamodule, **kwargs):
         super(AbstractPhyClustering, self).__init__()
         self.clustering = clustering
         self.n_clusters = self.clustering.n_total_clusters
-        trend_deriver = None
-        for deriver in datamodule.dataderivers:
-            if isinstance(deriver, TrendDeriver):
-                trend_deriver = deriver
-                break
-        self.phys = get_phys(
-            category=phy_category,
-            n_clusters=self.n_clusters,
-            trend_deriver=trend_deriver,
-        )
-        self.phy_category = phy_category
+        self.phys = get_phys(n_clusters=self.n_clusters)
         required_cols = []
         for phy in self.phys:
             required_cols += phy.required_cols_names

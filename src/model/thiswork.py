@@ -3,7 +3,6 @@ from tabensemb.model import TorchModel
 from ._thiswork.models_clustering import *
 from ._thiswork.models_with_seq import *
 from ._thiswork.models_basic import *
-from src.data.dataderiver import TrendDeriver
 from itertools import product
 from scipy import stats
 from skopt.space import Integer
@@ -69,32 +68,12 @@ class ThisWork(TorchModel):
         return all_names
 
     def _new_model(self, model_name, verbose, required_models=None, **kwargs):
-        database = self.trainer.args["database"]
-        if any(
-            [
-                isinstance(deriver, TrendDeriver)
-                for deriver in self.datamodule.dataderivers
-            ]
-        ):
-            phy_category = "trend"
-        else:
-            if "composite" in database:
-                phy_category = "composite"
-            elif "alloy" in database:
-                phy_category = "alloy"
-            else:
-                warnings.warn(
-                    f"Neither `composite` nor `alloy` is in the name of the database `{database}`. "
-                    f"Only parts of the Phy models are used."
-                )
-                phy_category = None
         fix_kwargs = dict(
             n_inputs=len(self.datamodule.cont_feature_names),
             n_outputs=len(self.datamodule.label_name),
             layers=self.datamodule.args["layers"],
             cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
             datamodule=self.datamodule,
-            phy_category=phy_category,
         )
         components = model_name.split("_")
         if "Wrap" in components:
