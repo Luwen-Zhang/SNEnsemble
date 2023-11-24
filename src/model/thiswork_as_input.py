@@ -1,10 +1,6 @@
 from tabensemb.utils import *
 from tabensemb.model import TorchModel
 from ._thiswork.models_clustering_as_input import *
-from ._thiswork.models_with_seq import *
-from ._thiswork.models_basic import *
-from itertools import product
-from scipy import stats
 from ._thiswork.clustering.singlelayer import KMeansPhy
 from skopt.space import Integer, Real
 

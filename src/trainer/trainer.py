@@ -2,7 +2,6 @@ from tabensemb.trainer import Trainer
 from tabensemb.utils import *
 from typing import List, Tuple
 import scipy.stats as st
-import src.data
 import pandas as pd
 
 
