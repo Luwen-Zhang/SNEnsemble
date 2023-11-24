@@ -604,8 +604,6 @@ class ThisWork(TorchModel):
             raise Exception(
                 f"The model does not have the attribute `dl_weight`. Is it trained?"
             )
-        if hasattr(model, "uncertain_dl_weight"):
-            target_attr += ["uncertain_dl_weight", "mu", "std"]
         inspect_dict = self.inspect_attr(
             model_name=model_name, attributes=target_attr, **kwargs
         )
@@ -675,72 +673,6 @@ class ThisWork(TorchModel):
         ax.set_title("Weights of physical models")
         cax = fig.add_subplot(gs[50:78, 98:])
         plt.colorbar(mappable=im, cax=cax)
-        plt.tight_layout()
-        if save_to is not None:
-            plt.savefig(save_to, dpi=500)
-        plt.show()
-        plt.close()
-
-    def plot_uncertain_dl_weight(self, inspect_dict, save_to=None):
-        import matplotlib.ticker as ticker
-
-        def plot_once(dl_weight, mu, std, title, ax):
-            sorted_idx = np.argsort(dl_weight.flatten())
-            x = np.arange(1, len(dl_weight) + 1)
-            ax.scatter(
-                x,
-                dl_weight[sorted_idx],
-                c="#D81159",
-                label="Truth",
-            )
-            ax.errorbar(
-                x,
-                mu[sorted_idx],
-                yerr=std[sorted_idx],
-                fmt="co",
-                mfc="#0496FF",
-                mec="#0496FF",
-                ecolor="#0496FF",
-                # capsize=5,
-                label="GPR prediction (±std)",
-            )
-            ax.legend(fontsize="x-small", loc="upper left")
-            ax.set_title(title)
-            ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
-            ax.set_xlim([0.5, len(dl_weight) + 1.5])
-            ax.set_ylim([0, 1])
-
-        def plot_part(part_dict, title, ax):
-            dl_weight, mu, std = (
-                part_dict["dl_weight"],
-                part_dict["mu"],
-                part_dict["std"],
-            )
-            plot_once(dl_weight, mu, std, title, ax)
-
-        if "USER_INPUT" in inspect_dict.keys():
-            fig = plt.figure(figsize=(4, 4))
-            ax = plt.subplot(111)
-            plot_part(inspect_dict["USER_INPUT"], "Investigated set", ax)
-        else:
-            fig = plt.figure(figsize=(12, 4))
-            ax = plt.subplot(131)
-            plot_part(inspect_dict["train"], "Training set", ax)
-            ax = plt.subplot(132)
-            plot_part(inspect_dict["val"], "Validation set", ax)
-            ax = plt.subplot(133)
-            plot_part(inspect_dict["test"], "Testing set", ax)
-            ax = fig.add_subplot(111, frameon=False)
-            plt.tick_params(
-                labelcolor="none",
-                which="both",
-                top=False,
-                bottom=False,
-                left=False,
-                right=False,
-            )
-        ax.set_ylabel("Deep learning weight")
-        ax.set_xlabel("Indices of data points (sorted by the target value)")
         plt.tight_layout()
         if save_to is not None:
             plt.savefig(save_to, dpi=500)
