@@ -196,9 +196,15 @@ class StressCycleSplitter(StrictCycleSplitter):
         peak_stress = np.max(
             np.abs(np.vstack([max_stress, min_stress]).T), axis=1
         ).flatten()
-        peak_stress = np.nan_to_num(peak_stress, nan=float(np.nanmax(peak_stress)))
+        log_peak_stress = np.log10(
+            np.nan_to_num(peak_stress, nan=float(np.nanmax(peak_stress)))
+        )
+        norm_cycle = (cycle - np.max(cycle)) / (np.max(cycle) - np.min(cycle))
+        norm_log_peak_stress = (log_peak_stress - np.max(log_peak_stress)) / (
+            np.max(log_peak_stress) - np.min(log_peak_stress)
+        )
         cycle_stress = np.linalg.norm(
-            np.vstack([cycle, np.log10(peak_stress)]).T - np.array([10, 0]),
+            np.vstack([norm_cycle, norm_log_peak_stress]).T - np.array([1, 0]),
             axis=1,
         )
         inv_cycle_stress = np.max(cycle_stress) - cycle_stress
