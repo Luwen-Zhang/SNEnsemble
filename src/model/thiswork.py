@@ -5,7 +5,7 @@ from itertools import product
 from scipy import stats
 from skopt.space import Integer
 from typing import Union, List
-from ._thiswork.clustering.singlelayer import KMeansPhy
+from ._thiswork.clustering.singlelayer import GMMPhy, BMMPhy, KMeansPhy
 
 
 class ThisWork(TorchModel):
@@ -82,8 +82,16 @@ class ThisWork(TorchModel):
             ]
         else:
             cont_cat_model = required_models[f"EXTERN_{components[0]}_{components[1]}"]
+
         cls = Abstract1LClusteringModel
-        phy_class = KMeansPhy
+        if "KMeans" in components:
+            phy_class = KMeansPhy
+        elif "GMM" in components:
+            phy_class = GMMPhy
+        elif "BMM" in components:
+            phy_class = BMMPhy
+        else:
+            raise Exception(f"Clustering algorithm not found.")
 
         if "PCA" in components:
             feature_idx = cls.basic_clustering_features_idx(self.datamodule)
