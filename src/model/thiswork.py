@@ -9,10 +9,20 @@ from ._thiswork.clustering.singlelayer import GMMPhy, BMMPhy, KMeansPhy
 
 
 class ThisWork(TorchModel):
-    def __init__(self, *args, reduce_bayes_steps=False, n_pca_dim=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        reduce_bayes_steps=False,
+        n_pca_dim=None,
+        pca=False,
+        clustering="KMeans",
+        **kwargs,
+    ):
         super(ThisWork, self).__init__(*args, **kwargs)
         self.reduce_bayes_steps = reduce_bayes_steps
         self.n_pca_dim = n_pca_dim
+        self.pca = pca
+        self.clustering = clustering
 
     def _get_program_name(self):
         return "ThisWork"
@@ -47,8 +57,8 @@ class ThisWork(TorchModel):
                 available_names,
                 ["NoWrap", "Wrap"],
                 ["1L"],
-                ["NoPCA"],
-                ["KMeans"],
+                ["NoPCA", "PCA"],
+                ["KMeans", "GMM", "BMM"],
             )
         ]
         for name in all_names.copy():
@@ -133,6 +143,17 @@ class ThisWork(TorchModel):
             return super(ThisWork, self)._custom_training_params(model_name=model_name)
 
     def _conditional_validity(self, model_name: str) -> bool:
+        # Use getattr to ensure backward compatibility
+        if getattr(self, "pca", False) and "NoPCA" in model_name:
+            return False
+        if (
+            not getattr(self, "pca", False)
+            and "NoPCA" not in model_name
+            and "PCA" in model_name
+        ):
+            return False
+        if getattr(self, "clustering", "KMeans") not in model_name:
+            return False
         components = model_name.split("_")
         if (
             components[0] not in self.trainer.modelbases_names
