@@ -365,19 +365,20 @@ class ThisWork(TorchModel):
         palette=None,
         catplot_kwargs=None,
     ):
-        _catplot_kwargs = dict(
-            legend_out=True,
-            sharex=False,
-            sharey=False,
-            palette=palette,
-            flierprops={"marker": "o"},
-            fliersize=2,
-            dodge=False,
-            height=2,
-            aspect=1,
+        _catplot_kwargs = update_defaults_by_kwargs(
+            dict(
+                legend_out=True,
+                sharex=False,
+                sharey=False,
+                palette=palette,
+                flierprops={"marker": "o"},
+                fliersize=2,
+                dodge=False,
+                height=2,
+                aspect=1,
+            ),
+            catplot_kwargs,
         )
-        if catplot_kwargs is not None:
-            _catplot_kwargs.update(catplot_kwargs)
         dfs = []
         title_dict = {"% Improvement ranking": {}, "Leaderboard ranking": {}}
         for idx, category in enumerate(method_ranking.keys()):
@@ -441,31 +442,29 @@ class ThisWork(TorchModel):
         model_names = improved_measure["Model"]
         if palette is None:
             palette = sns.color_palette(global_palette)
-        _figsize_kwargs = dict(
-            max_col=5, width_per_item=1.6, height_per_item=1.6, max_width=5
+        _figsize_kwargs = update_defaults_by_kwargs(
+            dict(max_col=5, width_per_item=1.6, height_per_item=1.6, max_width=5),
+            figsize_kwargs,
         )
-        if figsize_kwargs is not None:
-            _figsize_kwargs.update(figsize_kwargs)
         figsize, width, height = get_figsize(n=len(leaderboard), **_figsize_kwargs)
-        _legend_kwargs = dict(bbox_to_anchor=(0.85, 0.075), ncol=4)
-        if legend_kwargs is not None:
-            _legend_kwargs.update(legend_kwargs)
-        _adjust_kwargs = dict(bottom=0.15)
-        if adjust_kwargs is not None:
-            _adjust_kwargs.update(adjust_kwargs)
-        _catplot_kwargs = dict(
-            legend_out=True,
-            sharex=False,
-            sharey=False,
-            palette=palette,
-            flierprops={"marker": "o"},
-            fliersize=2,
-            dodge=False,
-            height=figsize[1] / height,
-            aspect=0.4,
+        _legend_kwargs = update_defaults_by_kwargs(
+            dict(bbox_to_anchor=(0.85, 0.075), ncol=4), legend_kwargs
         )
-        if catplot_kwargs is not None:
-            _catplot_kwargs.update(catplot_kwargs)
+        _adjust_kwargs = update_defaults_by_kwargs(dict(bottom=0.15), adjust_kwargs)
+        _catplot_kwargs = update_defaults_by_kwargs(
+            dict(
+                legend_out=True,
+                sharex=False,
+                sharey=False,
+                palette=palette,
+                flierprops={"marker": "o"},
+                fliersize=2,
+                dodge=False,
+                height=figsize[1] / height,
+                aspect=0.4,
+            ),
+            catplot_kwargs,
+        )
         dfs = []
         title_dict = {row: {} for row in range(height)}
         for idx, (program, model) in enumerate(
