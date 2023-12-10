@@ -425,7 +425,7 @@ class ThisWork(TorchModel):
         plt.show()
         plt.close()
 
-    def plot_improvement(
+    def plot_compare(
         self,
         leaderboard,
         improved_measure,
@@ -433,46 +433,30 @@ class ThisWork(TorchModel):
         metric,
         save_to=None,
         palette=None,
-        figsize_kwargs=None,
         catplot_kwargs=None,
         legend_kwargs=None,
-        adjust_kwargs=None,
     ):
         leaderboard = leaderboard[leaderboard["Program"] != self.program]
         model_names = improved_measure["Model"]
         if palette is None:
             palette = sns.color_palette(global_palette)
-        _figsize_kwargs = update_defaults_by_kwargs(
-            dict(max_col=5, width_per_item=1.6, height_per_item=1.6, max_width=5),
-            figsize_kwargs,
-        )
-        figsize, width, height = get_figsize(n=len(leaderboard), **_figsize_kwargs)
-        _legend_kwargs = update_defaults_by_kwargs(
-            dict(bbox_to_anchor=(0.85, 0.075), ncol=4), legend_kwargs
-        )
-        _adjust_kwargs = update_defaults_by_kwargs(dict(bottom=0.15), adjust_kwargs)
+        _legend_kwargs = update_defaults_by_kwargs(dict(title=None), legend_kwargs)
         _catplot_kwargs = update_defaults_by_kwargs(
             dict(
+                kind="box",
                 legend_out=True,
-                sharex=False,
-                sharey=False,
                 palette=palette,
                 flierprops={"marker": "o"},
                 fliersize=2,
-                dodge=False,
-                height=figsize[1] / height,
-                aspect=0.4,
+                height=10,
+                aspect=0.5,
             ),
             catplot_kwargs,
         )
         dfs = []
-        title_dict = {row: {} for row in range(height)}
         for idx, (program, model) in enumerate(
             zip(leaderboard["Program"], leaderboard["Model"])
         ):
-            col = idx % width
-            row = idx // width
-            title_dict[row][col] = f"{program}\n{model}"
             improve_models = [m for m in model_names if f"{program}_{model}" in m]
             if len(improve_models) == 0:
                 continue
@@ -487,40 +471,91 @@ class ThisWork(TorchModel):
                 key: improved_metrics[key] for key in sorted(improved_metrics.keys())
             }
             base_metrics.update(improved_metrics)
-            # Remove outliers that are too far away (greater than Q3+3IQR) for better plotting.
-            for key in base_metrics.keys():
-                vals = base_metrics[key]
-                q1 = np.quantile(vals, 0.25)
-                q3 = np.quantile(vals, 0.75)
-                iqr = q3 - q1
-                vals[vals > q3 + 3 * iqr] = np.nan
-                base_metrics[key] = vals
             df = pd.DataFrame(base_metrics).melt()
-            df["col"] = col
-            df["row"] = row
+            df["class"] = f"{program}\n{model}"
+            df["hue"] = [x if x == "Base model" else "Proposed" for x in df["variable"]]
             dfs.append(df)
         with warnings.catch_warnings():
             warnings.filterwarnings(action="ignore", category=DeprecationWarning)
             g = sns.catplot(
-                kind="box",
                 data=pd.concat(dfs, ignore_index=True),
-                col="col",
-                row="row",
-                x="variable",
-                y="value",
-                hue="variable",
+                x="value",
+                y="class",
+                hue="hue",  # "variable"
+                orient="h",
                 **_catplot_kwargs,
             )
-        g.add_legend(**_legend_kwargs)
-        for (row_key, col_key), ax in g.axes_dict.items():
-            if row_key in title_dict.keys() and col_key in title_dict[row_key].keys():
-                ax.set_title(title_dict[row_key][col_key], fontsize=10)
-            else:
-                ax.set_title(None)
-                ax.set_axis_off()
-        plt.setp(g.axes, xticks=[], xlabel="", ylabel="")
+        g.legend.set(**_legend_kwargs)
+        g.ax.set_xlabel(metric)
+        g.ax.set_ylabel(None)
         plt.tight_layout()
-        plt.subplots_adjust(**_adjust_kwargs)
+        if save_to is not None:
+            plt.savefig(save_to, dpi=500)
+        plt.show()
+        plt.close()
+
+    def plot_improvement(
+        self,
+        leaderboard,
+        improved_measure,
+        ttest_res,
+        metric,
+        save_to=None,
+        palette=None,
+        catplot_kwargs=None,
+        legend_kwargs=None,
+    ):
+        leaderboard = leaderboard[leaderboard["Program"] != self.program]
+        model_names = improved_measure["Model"]
+        if palette is None:
+            palette = sns.color_palette(global_palette)
+        _legend_kwargs = update_defaults_by_kwargs(dict(title=None), legend_kwargs)
+        _catplot_kwargs = update_defaults_by_kwargs(
+            dict(
+                kind="bar",
+                legend_out=True,
+                palette=palette,
+                height=10,
+                aspect=0.5,
+            ),
+            catplot_kwargs,
+        )
+        dfs = []
+        for idx, (program, model) in enumerate(
+            zip(leaderboard["Program"], leaderboard["Model"])
+        ):
+            improve_models = [m for m in model_names if f"{program}_{model}" in m]
+            if len(improve_models) == 0:
+                continue
+            improved_metrics = {
+                "-".join(m.split("_")[2:]): (
+                    ttest_res[m][metric]["base"] - ttest_res[m][metric]["improved"]
+                )
+                / ttest_res[m][metric]["base"]
+                * 100
+                for m in improve_models
+            }
+            improved_metrics = {
+                key: improved_metrics[key] for key in sorted(improved_metrics.keys())
+            }
+            df = pd.DataFrame(improved_metrics).melt()
+            df["class"] = f"{program}\n{model}"
+            df["hue"] = [x if x == "Base model" else "Proposed" for x in df["variable"]]
+            dfs.append(df)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action="ignore", category=DeprecationWarning)
+            g = sns.catplot(
+                data=pd.concat(dfs, ignore_index=True),
+                x="value",
+                y="class",
+                hue="hue",
+                orient="h",
+                **_catplot_kwargs,
+            )
+        g.legend.set(**_legend_kwargs)
+        g.ax.set_xlabel(f"\% improvement of {metric}")
+        g.ax.set_ylabel(None)
+        plt.tight_layout()
         if save_to is not None:
             plt.savefig(save_to, dpi=500)
         plt.show()

@@ -26,12 +26,34 @@ method_ranking, detailed = trainer.get_modelbase("ThisWork").method_ranking(
 # trainer.get_modelbase("ThisWork").plot_method_ranking(
 #     detailed, save_to=os.path.join(trainer.project_root, "method_ranking.jpg")
 # )
+trainer.get_modelbase("ThisWork").plot_compare(
+    trainer.leaderboard,
+    improved_measure,
+    ttest_res,
+    metric="Testing RMSE",
+    save_to=os.path.join(trainer.project_root, "compare.jpg"),
+)
+
 trainer.get_modelbase("ThisWork").plot_improvement(
     trainer.leaderboard,
     improved_measure,
     ttest_res,
     metric="Testing RMSE",
-    save_to=os.path.join(trainer.project_root, "improvement.jpg"),
+    save_to=os.path.join(trainer.project_root, "test_improvement.jpg"),
+)
+trainer.get_modelbase("ThisWork").plot_improvement(
+    trainer.leaderboard,
+    improved_measure,
+    ttest_res,
+    metric="Validation RMSE",
+    save_to=os.path.join(trainer.project_root, "val_improvement.jpg"),
+)
+trainer.get_modelbase("ThisWork").plot_improvement(
+    trainer.leaderboard,
+    improved_measure,
+    ttest_res,
+    metric="Training RMSE",
+    save_to=os.path.join(trainer.project_root, "train_improvement.jpg"),
 )
 
 # improved_measure, ttest_res = trainer.get_modelbase("ThisWork").improvement(
