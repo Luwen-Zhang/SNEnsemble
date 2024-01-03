@@ -3,7 +3,7 @@ from tabensemb.model import TorchModel
 from ._thiswork.models_clustering import *
 from itertools import product
 from scipy import stats
-from skopt.space import Integer
+from skopt.space import Integer, Real
 from typing import Union, List
 from ._thiswork.clustering.singlelayer import GMMPhy, BMMPhy, KMeansPhy
 
@@ -18,11 +18,11 @@ class ThisWork(TorchModel):
         clustering="KMeans",
         **kwargs,
     ):
-        super(ThisWork, self).__init__(*args, **kwargs)
         self.reduce_bayes_steps = reduce_bayes_steps
         self.n_pca_dim = n_pca_dim
         self.pca = pca
         self.clustering = clustering
+        super(ThisWork, self).__init__(*args, **kwargs)
 
     def _get_program_name(self):
         return "ThisWork"
@@ -51,90 +51,117 @@ class ThisWork(TorchModel):
         except:
             pass
 
-        all_names = [
+        physics_names = [
+            "PHYSICS_" + "_".join(x)
+            for x in product(
+                ["NoPCA", "PCA"],
+                ["KMeans", "GMM", "BMM"],
+            )
+        ]
+        all_names = physics_names + [
             "_".join(x)
             for x in product(
                 available_names,
                 ["NoWrap", "Wrap"],
-                ["1L"],
                 ["NoPCA", "PCA"],
                 ["KMeans", "GMM", "BMM"],
             )
         ]
         for name in all_names.copy():
             components = name.split("_")
-            wrap_invalid = (
-                any([model in components for model in ["TabNet"]])
-                or "AutoGluon" in components
-                or "PytorchTabular_NODE" in name
-            )
-            if "PytorchTabular_TabTransformer" in name:
-                pass
-            if "Wrap" in components and wrap_invalid:
-                all_names.remove(name)
-            elif "NoWrap" in components and not wrap_invalid:
-                all_names.remove(name)
+            if "PHYSICS" not in components:
+                wrap_invalid = (
+                    any([model in components for model in ["TabNet"]])
+                    or "AutoGluon" in components
+                    or "PytorchTabular_NODE" in name
+                )
+                if "PytorchTabular_TabTransformer" in name:
+                    pass
+                if "Wrap" in components and wrap_invalid:
+                    all_names.remove(name)
+                elif "NoWrap" in components and not wrap_invalid:
+                    all_names.remove(name)
         # all_names += ["CatEmbed_Category Embedding_Wrap_1L_NoPCA_KMeans"]
         return all_names
 
     def _new_model(self, model_name, verbose, required_models=None, **kwargs):
-        fix_kwargs = dict(
-            n_inputs=len(self.datamodule.cont_feature_names),
-            n_outputs=len(self.datamodule.label_name),
-            layers=self.datamodule.args["layers"],
-            cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
-            datamodule=self.datamodule,
-        )
         components = model_name.split("_")
-        if "Wrap" in components:
-            cont_cat_model = required_models[
-                f"EXTERN_{components[0]}_{components[1]}_WRAP"
-            ]
-        else:
-            cont_cat_model = required_models[f"EXTERN_{components[0]}_{components[1]}"]
-
-        cls = Abstract1LClusteringModel
-        if "KMeans" in components:
-            phy_class = KMeansPhy
-        elif "GMM" in components:
-            phy_class = GMMPhy
-        elif "BMM" in components:
-            phy_class = BMMPhy
-        else:
-            raise Exception(f"Clustering algorithm not found.")
-
-        if "PCA" in components:
-            feature_idx = cls.basic_clustering_features_idx(self.datamodule)
-            if len(feature_idx) > 2:
-                pca = self.datamodule.pca(feature_idx=feature_idx)
-                n_pca_dim = (
-                    (np.where(pca.explained_variance_ratio_.cumsum() < 0.9)[0][-1] + 1)
-                    if self.n_pca_dim is None
-                    else self.n_pca_dim
-                )
+        if "PHYSICS" not in components:
+            cls = AbstractClusteringModel
+            if "Wrap" in components:
+                cont_cat_model = required_models[
+                    f"EXTERN_{components[0]}_{components[1]}_WRAP"
+                ]
             else:
-                n_pca_dim = len(feature_idx)
+                cont_cat_model = required_models[
+                    f"EXTERN_{components[0]}_{components[1]}"
+                ]
+            clustering_phy_model = required_models[
+                f"PHYSICS_{'_'.join(components[-2:])}"
+            ]
+            return cls(
+                datamodule=self.datamodule,
+                embedding_dim=3,
+                cont_cat_model=cont_cat_model,
+                clustering_phy_model=clustering_phy_model,
+                **kwargs,
+            )
         else:
-            n_pca_dim = None
+            if "KMeans" in components:
+                phy_class = KMeansPhy
+            elif "GMM" in components:
+                phy_class = GMMPhy
+            elif "BMM" in components:
+                phy_class = BMMPhy
+            else:
+                raise Exception(f"Clustering algorithm not found.")
 
-        return cls(
-            phy_class=phy_class,
-            **fix_kwargs,
-            embedding_dim=3,
-            n_pca_dim=n_pca_dim,
-            cont_cat_model=cont_cat_model,
-            **kwargs,
-        )
+            if "PCA" in components:
+                feature_idx = phy_class.basic_clustering_features_idx(self.datamodule)
+                if len(feature_idx) > 2:
+                    pca = self.datamodule.pca(feature_idx=feature_idx)
+                    n_pca_dim = (
+                        (
+                            np.where(pca.explained_variance_ratio_.cumsum() < 0.9)[0][
+                                -1
+                            ]
+                            + 1
+                        )
+                        if self.n_pca_dim is None
+                        else self.n_pca_dim
+                    )
+                else:
+                    n_pca_dim = len(feature_idx)
+            else:
+                n_pca_dim = None
+
+            return phy_class(n_pca_dim=n_pca_dim, datamodule=self.datamodule, **kwargs)
 
     def _space(self, model_name):
-        return [
-            Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
-        ] + self.trainer.SPACE
+        if "PHYSICS" in model_name:
+            return [
+                Integer(low=1, high=256, prior="uniform", name="n_clusters", dtype=int),
+                Real(low=1e-8, high=1e8, prior="log-uniform", name="l1_penalty"),
+                self.trainer.SPACE[
+                    list(self.trainer.chosen_params.keys()).index("batch_size")
+                ],
+            ]
+        else:
+            return [
+                Real(low=0, high=0.3, prior="uniform", name="dropout")
+            ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
-        res = {"n_clusters": 32}
-        res.update(self.trainer.chosen_params)
-        return res
+        if "PHYSICS" in model_name:
+            return {
+                "n_clusters": 32,
+                "l1_penalty": 1e-8,
+                "batch_size": self.trainer.chosen_params["batch_size"],
+            }
+        else:
+            res = {"dropout": 0.0}
+            res.update(self.trainer.chosen_params)
+            return res
 
     def _custom_training_params(self, model_name) -> Dict:
         if getattr(self, "reduce_bayes_steps", False):
@@ -143,33 +170,37 @@ class ThisWork(TorchModel):
             return super(ThisWork, self)._custom_training_params(model_name=model_name)
 
     def _conditional_validity(self, model_name: str) -> bool:
-        # Use getattr to ensure backward compatibility
-        if getattr(self, "pca", False) and "NoPCA" in model_name:
+        if self.pca and "NoPCA" in model_name:
             return False
-        if (
-            not getattr(self, "pca", False)
-            and "NoPCA" not in model_name
-            and "PCA" in model_name
-        ):
+        if not self.pca and "NoPCA" not in model_name and "PCA" in model_name:
             return False
-        if getattr(self, "clustering", "KMeans") not in model_name:
+        if self.clustering not in model_name:
             return False
-        components = model_name.split("_")
-        if (
-            components[0] not in self.trainer.modelbases_names
-            or components[1]
-            not in self.trainer.get_modelbase(program=components[0]).get_model_names()
-        ):
-            return False
-        return True
+        if "PHYSICS" not in model_name:
+            components = model_name.split("_")
+            if (
+                components[0] not in self.trainer.modelbases_names
+                or components[1]
+                not in self.trainer.get_modelbase(
+                    program=components[0]
+                ).get_model_names()
+            ):
+                return False
+            return True
+        else:
+            return True
 
     def required_models(self, model_name: str) -> Union[List[str], None]:
         components = model_name.split("_")
-        if "Wrap" in components:
-            models = [f"EXTERN_{components[0]}_{components[1]}_WRAP"]
+        if "PHYSICS" not in model_name:
+            if "Wrap" in components:
+                models = [f"EXTERN_{components[0]}_{components[1]}_WRAP"]
+            else:
+                models = [f"EXTERN_{components[0]}_{components[1]}"]
+            models += [f"PHYSICS_{'_'.join(components[-2:])}"]
+            return models
         else:
-            models = [f"EXTERN_{components[0]}_{components[1]}"]
-        return models
+            return None
 
     def _prepare_custom_datamodule(self, model_name):
         from tabensemb.data import DataModule

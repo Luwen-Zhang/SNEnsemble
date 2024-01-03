@@ -5,6 +5,7 @@ import numpy as np
 import inspect
 from src.model._thiswork.clustering.common.base import AbstractClustering
 from typing import Dict, List
+from tabensemb.model.base import AbstractNN
 
 
 # The following _safe_xxx functions can limit both outputs and the gradients of inputs in a reasonable range and
@@ -745,11 +746,19 @@ def get_phys(**kwargs):
     return phys
 
 
-class AbstractPhyClustering(nn.Module):
-    def __init__(self, clustering: AbstractClustering, datamodule, **kwargs):
-        super(AbstractPhyClustering, self).__init__()
+class AbstractPhyClustering(AbstractNN):
+    def __init__(
+        self,
+        clustering: AbstractClustering,
+        datamodule,
+        l2_penalty: float = 0.0,
+        l1_penalty: float = 0.0,
+        **kwargs,
+    ):
+        super(AbstractPhyClustering, self).__init__(datamodule, **kwargs)
         self.clustering = clustering
         self.n_clusters = self.clustering.n_total_clusters
+        self.clustering_features = self.basic_clustering_features_idx(datamodule)
         self.phys = get_phys(n_clusters=self.n_clusters)
         required_cols = []
         for phy in self.phys:
@@ -786,6 +795,8 @@ class AbstractPhyClustering(nn.Module):
         self.weight_input = None
         self.weight_output = None
         self.x_cluster = None
+        self.l2_penalty = l2_penalty
+        self.l1_penalty = l1_penalty
 
     # def _update(self, value, name):
     #     if self.training:
@@ -829,10 +840,10 @@ class AbstractPhyClustering(nn.Module):
                 col: val for col, val in zip(self.required_cols_ignore_unscaled, res)
             }
 
-    def forward(self, x, clustering_features, derived_tensors):
+    def _forward(self, x, derived_tensors):
         required_cols = self.extract_cols(x, derived_tensors)
         # Clustering
-        x = x[:, clustering_features]
+        x = x[:, self.clustering_features]
         x_cluster = self.clustering(x)
         resp = torch.zeros((x.shape[0], self.n_clusters), device=x.device)
         resp[torch.arange(x.shape[0]), x_cluster] = 1
@@ -875,6 +886,77 @@ class AbstractPhyClustering(nn.Module):
         # else:
         #     tune_weight = self.running_tune_weight[x_cluster]
         return x_phy
+
+    def loss_fn(self, y_pred, y_true, *data, **kwargs):
+        # Train Least Square
+        sum_weight = self.nk[self.x_cluster]
+        self.lstsq_loss = torch.sum(
+            torch.concat(
+                [
+                    torch.sum(
+                        0.5 * (y_true.flatten() - phy.lstsq_output) ** 2 / sum_weight
+                    ).unsqueeze(-1)
+                    for phy in self.phys
+                ]
+            )
+        )
+        # Train weighted summation
+        weight = self.weight
+        self.weight_loss = (
+            torch.sum(0.5 * (y_true.flatten() - self.weight_output) ** 2 / sum_weight)
+            + torch.mul(torch.sum(torch.mul(weight, weight)), self.l2_penalty)
+            + torch.mul(torch.sum(torch.abs(weight)), self.l1_penalty)
+        )
+        self.output_loss = self.default_loss_fn(y_pred, y_true)
+        return self.output_loss
+
+    def configure_optimizers(self):
+        weight_optimizer = torch.optim.Adam(
+            [self.running_phy_weight],
+            lr=0.8,
+            weight_decay=0,
+        )
+        lstsq_optimizer = [phy.get_optimizer() for phy in self.phys]
+        return [weight_optimizer] + lstsq_optimizer
+
+    def cal_backward_step(self, loss):
+        optimizers = self.optimizers()
+        weight_optimizer = optimizers[0]
+        lstsq_optimizers = optimizers[1:]
+        self.manual_backward(
+            self.weight_loss,
+            retain_graph=True,
+            inputs=self.running_phy_weight,
+        )
+        self.manual_backward(
+            self.lstsq_loss,
+            inputs=list(self.phys.parameters()),
+            retain_graph=True,
+        )
+
+        for optimizer in lstsq_optimizers:
+            optimizer.step()
+        weight_optimizer.step()
+
+    @staticmethod
+    def basic_clustering_features_idx(datamodule) -> np.ndarray:
+        return np.concatenate(
+            (
+                datamodule.get_feature_idx_by_type(
+                    typ="Material/Specimen", var_type="continuous"
+                ),
+                list(AbstractPhyClustering.top_clustering_features_idx(datamodule)),
+            )
+        ).astype(int)
+
+    @staticmethod
+    def top_clustering_features_idx(datamodule):
+        top_clustering_features = [
+            x for x in ["Frequency", "R-value"] if x in datamodule.cont_feature_names
+        ]
+        return np.array(
+            [datamodule.cont_feature_names.index(x) for x in top_clustering_features]
+        )
 
 
 if __name__ == "__main__":
