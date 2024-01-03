@@ -2,6 +2,9 @@ import argparse
 from tabensemb.trainer import load_trainer
 import os
 from tabensemb.utils import Logging
+import tabensemb
+
+tabensemb._stream_filters = ["DeprecationWarning"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("path", type=str)

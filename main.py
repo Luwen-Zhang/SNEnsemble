@@ -1,10 +1,13 @@
 import torch
 from src.trainer import FatigueTrainer
 from src.model import *
+import tabensemb
 from tabensemb.model import *
 from tabensemb.utils import Logging
 import os
 import argparse
+
+tabensemb._stream_filters = ["DeprecationWarning"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
