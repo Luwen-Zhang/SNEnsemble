@@ -40,12 +40,14 @@ class FatigueTrainer(Trainer):
     def select_by_material_code(self, m_code: str, partition: str = "all"):
         """
         Select samples with the specified material code.
+
         Parameters
         ----------
         m_code
             The selected material code.
         partition
             "train", "val", "test", or "all". See ``Trainer._get_indices``.
+
         Returns
         -------
         indices

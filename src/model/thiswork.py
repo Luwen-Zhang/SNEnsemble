@@ -531,6 +531,7 @@ class ThisWork(TorchModel):
         improved_measure,
         ttest_res,
         metric,
+        orient="h",
         save_to=None,
         palette=None,
         catplot_kwargs=None,
@@ -540,7 +541,9 @@ class ThisWork(TorchModel):
         model_names = improved_measure["Model"]
         if palette is None:
             palette = sns.color_palette(global_palette)
-        _legend_kwargs = update_defaults_by_kwargs(dict(title=None), legend_kwargs)
+        _legend_kwargs = update_defaults_by_kwargs(
+            dict(title=None, frameon=False), legend_kwargs
+        )
         _catplot_kwargs = update_defaults_by_kwargs(
             dict(
                 kind="bar",
@@ -552,40 +555,47 @@ class ThisWork(TorchModel):
             catplot_kwargs,
         )
         dfs = []
+        if type(metric) == str:
+            metric = [metric]
         for idx, (program, model) in enumerate(
             zip(leaderboard["Program"], leaderboard["Model"])
         ):
             improve_models = [m for m in model_names if f"{program}_{model}" in m]
             if len(improve_models) == 0:
                 continue
-            improved_metrics = {
-                "-".join(m.split("_")[2:]): (
-                    ttest_res[m][metric]["base"] - ttest_res[m][metric]["improved"]
-                )
-                / ttest_res[m][metric]["base"]
-                * 100
-                for m in improve_models
-            }
-            improved_metrics = {
-                key: improved_metrics[key] for key in sorted(improved_metrics.keys())
-            }
-            df = pd.DataFrame(improved_metrics).melt()
-            df["class"] = f"{program}\n{model}"
-            df["hue"] = [x if x == "Base model" else "Proposed" for x in df["variable"]]
-            dfs.append(df)
+            for met in metric:
+                improved_metrics = {
+                    "-".join(m.split("_")[2:]): (
+                        ttest_res[m][met]["base"] - ttest_res[m][met]["improved"]
+                    )
+                    / ttest_res[m][met]["base"]
+                    * 100
+                    for m in improve_models
+                }
+                improved_metrics = {
+                    key: improved_metrics[key]
+                    for key in sorted(improved_metrics.keys())
+                }
+                df = pd.DataFrame(improved_metrics).melt()
+                df["class"] = f"{program}\n{model}"
+                df["hue"] = [met] * len(df)
+                dfs.append(df)
         with warnings.catch_warnings():
             warnings.filterwarnings(action="ignore", category=DeprecationWarning)
             g = sns.catplot(
                 data=pd.concat(dfs, ignore_index=True),
-                x="value",
-                y="class",
-                hue="hue",
-                orient="h",
+                x="value" if orient == "h" else "class",
+                y="class" if orient == "h" else "value",
+                hue="hue" if len(metric) > 1 else None,
+                orient=orient,
                 **_catplot_kwargs,
             )
-        g.legend.set(**_legend_kwargs)
-        g.ax.set_xlabel(f"\% improvement of {metric}")
-        g.ax.set_ylabel(None)
+        g.legend.remove()
+        g.ax.legend(**_legend_kwargs)
+        (g.ax.set_xlabel if orient == "h" else g.ax.set_ylabel)(
+            f"Improvement of {metric[0] if len(metric) == 1 else 'metrics'} (Percentage)"
+        )
+        (g.ax.set_ylabel if orient == "h" else g.ax.set_xlabel)(None)
         plt.tight_layout()
         if save_to is not None:
             plt.savefig(save_to, dpi=500)
