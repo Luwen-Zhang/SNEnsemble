@@ -222,6 +222,66 @@ class TheoreticalFiftyPofDeriver(AbstractDeriver):
         return []
 
 
+class LayUpSequenceDeriver(AbstractDeriver):
+    """
+    Derive a padded array according to the laminate sequence code. For instance, if the length of the longest sequence
+    is 7, then "0/45/90/45/0" is derived as [0, 45, 90, 45, 0, 100, 100], where the last two "100" are the padding
+    value which should be ignored. Missing value is filled as 0 (degree).Required arguments are:
+    sequence_column: str
+        The column of laminate sequence codes (for instance, "0/45/90/45/0").
+    """
+
+    def _required_cols(self):
+        return ["sequence_column"]
+
+    def _required_kwargs(self):
+        return []
+
+    def _defaults(self):
+        return dict(stacked=False, intermediate=False, is_continuous=True)
+
+    def _derive(self, df, datamodule):
+        sequence_column = self.kwargs["sequence_column"]
+        pad_value = 100
+        sequence = [
+            [int(y) if y != "nan" else 0 for y in str(x).split("/")]
+            for x in df[sequence_column].values
+        ]
+        longest_dim = max([len(x) for x in sequence])
+        padded_sequence = [x + [pad_value] * (longest_dim - len(x)) for x in sequence]
+        seq = np.array(padded_sequence, dtype=int)
+        return seq
+
+
+class NumLayersDeriver(AbstractDeriver):
+    """
+    Derive the total number of layers according to the laminate sequence code.
+    Missing value will be filled as 1 (layer). Required arguments are:
+    sequence_column: str
+        The column of laminate sequence codes (for instance, "0/45/90/45/0").
+    """
+
+    def _required_cols(self):
+        return ["sequence_column"]
+
+    def _required_kwargs(self):
+        return []
+
+    def _defaults(self):
+        return dict(stacked=False, intermediate=False, is_continuous=True)
+
+    def _derive(self, df, datamodule):
+        sequence_column = self.kwargs["sequence_column"]
+        sequence = [
+            [int(y) if y != "nan" else 0 for y in str(x).split("/")]
+            for x in df[sequence_column].values
+        ]
+        n_layers = np.zeros((len(df), 1), dtype=int)
+        for idx, x in enumerate(sequence):
+            n_layers[idx, 0] = len(x)
+        return n_layers
+
+
 mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:

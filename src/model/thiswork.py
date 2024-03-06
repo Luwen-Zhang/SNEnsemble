@@ -28,7 +28,7 @@ class ThisWork(TorchModel):
         return "ThisWork"
 
     @staticmethod
-    def _get_model_names():
+    def _get_other_model_base_model_names():
         available_names = []
         try:
             from tabensemb.model.autogluon import AutoGluon
@@ -50,6 +50,11 @@ class ThisWork(TorchModel):
             ]
         except:
             pass
+        return available_names
+
+    @staticmethod
+    def _get_model_names():
+        available_names = ThisWork._get_other_model_base_model_names()
 
         physics_names = [
             "PHYSICS_" + "_".join(x)
