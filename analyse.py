@@ -15,19 +15,27 @@ if not os.path.isfile(path):
 
 trainer = load_trainer(path)
 
+leaderboard = trainer.leaderboard.copy()
+leaderboard = leaderboard.drop(
+    leaderboard[leaderboard["Model"].str.contains("PHYSICS")].index
+).reset_index(drop=True)
 improved_measure, ttest_res = trainer.get_modelbase("ThisWork").improvement(
-    trainer.leaderboard, cv_path=os.path.join(trainer.project_root, "cv")
+    leaderboard,
+    cv_path=os.path.join(trainer.project_root, "cv"),
+    exclude=[x for x in trainer.leaderboard["Model"] if "PHYSICS" in x],
 )
 improved_measure.to_csv(os.path.join(trainer.project_root, "improvement.csv"))
 method_ranking, detailed = trainer.get_modelbase("ThisWork").method_ranking(
-    improved_measure, trainer.leaderboard
+    improved_measure,
+    leaderboard,
+    exclude=[x for x in trainer.leaderboard["Model"] if "PHYSICS" in x],
 )
 # method_ranking.to_csv(os.path.join(trainer.project_root, "method_ranking.csv"))
 # trainer.get_modelbase("ThisWork").plot_method_ranking(
 #     detailed, save_to=os.path.join(trainer.project_root, "method_ranking.jpg")
 # )
 trainer.get_modelbase("ThisWork").plot_compare(
-    trainer.leaderboard,
+    leaderboard,
     improved_measure,
     ttest_res,
     metric="Testing RMSE",
@@ -35,26 +43,38 @@ trainer.get_modelbase("ThisWork").plot_compare(
 )
 
 trainer.get_modelbase("ThisWork").plot_improvement(
-    trainer.leaderboard,
+    leaderboard,
     improved_measure,
     ttest_res,
-    metric="Testing RMSE",
-    save_to=os.path.join(trainer.project_root, "test_improvement.jpg"),
+    metric=["Training RMSE", "Validation RMSE", "Testing RMSE"],
+    orient="v",
+    save_to=os.path.join(trainer.project_root, "improvement.jpg"),
+    legend_kwargs=dict(loc="upper left"),
+    catplot_kwargs=dict(height=2.5, aspect=15),
 )
-trainer.get_modelbase("ThisWork").plot_improvement(
-    trainer.leaderboard,
-    improved_measure,
-    ttest_res,
-    metric="Validation RMSE",
-    save_to=os.path.join(trainer.project_root, "val_improvement.jpg"),
-)
-trainer.get_modelbase("ThisWork").plot_improvement(
-    trainer.leaderboard,
-    improved_measure,
-    ttest_res,
-    metric="Training RMSE",
-    save_to=os.path.join(trainer.project_root, "train_improvement.jpg"),
-)
+
+
+# trainer.get_modelbase("ThisWork").plot_improvement(
+#     leaderboard,
+#     improved_measure,
+#     ttest_res,
+#     metric="Testing RMSE",
+#     save_to=os.path.join(trainer.project_root, "test_improvement.jpg"),
+# )
+# trainer.get_modelbase("ThisWork").plot_improvement(
+#     leaderboard,
+#     improved_measure,
+#     ttest_res,
+#     metric="Validation RMSE",
+#     save_to=os.path.join(trainer.project_root, "val_improvement.jpg"),
+# )
+# trainer.get_modelbase("ThisWork").plot_improvement(
+#     leaderboard,
+#     improved_measure,
+#     ttest_res,
+#     metric="Training RMSE",
+#     save_to=os.path.join(trainer.project_root, "train_improvement.jpg"),
+# )
 
 # improved_measure, ttest_res = trainer.get_modelbase("ThisWork").improvement(
 #     trainer.leaderboard,
