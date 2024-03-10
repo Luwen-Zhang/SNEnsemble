@@ -296,9 +296,9 @@ class ThisWork(TorchModel):
                     higher_better * (improved_metric - base_metric) / base_metric
                 ) * 100
                 if ttest_res is not None:
-                    improved_measure.loc[
-                        idx, f"{metric} Improvement p-value"
-                    ] = ttest_res[model][metric]["p-value"]
+                    improved_measure.loc[idx, f"{metric} Improvement p-value"] = (
+                        ttest_res[model][metric]["p-value"]
+                    )
         improved_measure.sort_values(
             by="Testing RMSE % Improvement",
             ascending=False,

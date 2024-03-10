@@ -1,6 +1,7 @@
 """
 This is a modification of sklearn.mixture.GaussianMixture for pytorch.
 """
+
 import torch
 from torch import nn
 import numpy as np

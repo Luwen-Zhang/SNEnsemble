@@ -1,6 +1,7 @@
 """
 This is a modification of sklearn.mixture.BayesianGaussianMixture for pytorch.
 """
+
 from .gmm import GMM, Cluster
 import torch
 import warnings
