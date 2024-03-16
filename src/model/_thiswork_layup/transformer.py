@@ -48,7 +48,7 @@ class AbstractLayupModel(AbstractNN):
 
         output = torch.concat([hidden, seq_hidden], dim=1)
         self.hidden_representation = output
-        output = self.w(output)
+        output = self.w(output) + x_contcat
         return output
 
 
