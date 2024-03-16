@@ -1,12 +1,12 @@
 cfg = {
     "database": "composite_database_layup_modulus",
     "continuous_feature_names": [
-        "Fibre Volume Fraction",
-        "Fibre Weight Fraction",
-        "Fibre Weight Fraction (0-deg)",
-        "Fibre Weight Fraction (45-deg)",
-        "Fibre Weight Fraction (90-deg)",
-        "Fibre Weight Fraction (Other Dir.)",
+        "Fiber Volume Fraction",
+        "Fiber Weight Fraction",
+        "Fiber Weight Fraction (0-deg)",
+        "Fiber Weight Fraction (45-deg)",
+        "Fiber Weight Fraction (90-deg)",
+        "Fiber Weight Fraction (Other Dir.)",
         "Ultimate Tensile Stress",
         "Ultimate Compressive Stress",
         "Ultimate Tensile Strain",

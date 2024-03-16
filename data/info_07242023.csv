@@ -1,10 +1,10 @@
 ,SNL/MSU/DOE,OptiMat,Upwind,FACT,Final
-Fibre Volume Fraction,0.00~70.90,0.00~56.66,,30.00~69.00,0.00~70.90
-Fibre Weight Fraction,,68.23~74.69,0.00~71.50,,0.00~74.69
-Fibre Weight Fraction (0-deg),0.00~100.00,,,,0.00~100.00
-Fibre Weight Fraction (45-deg),0.00~100.00,,,,0.00~100.00
-Fibre Weight Fraction (90-deg),0.00~100.00,,,,0.00~100.00
-Fibre Weight Fraction (Other Dir.),0.00~100.00,,,,0.00~100.00
+Fiber Volume Fraction,0.00~70.90,0.00~56.66,,30.00~69.00,0.00~70.90
+Fiber Weight Fraction,,68.23~74.69,0.00~71.50,,0.00~74.69
+Fiber Weight Fraction (0-deg),0.00~100.00,,,,0.00~100.00
+Fiber Weight Fraction (45-deg),0.00~100.00,,,,0.00~100.00
+Fiber Weight Fraction (90-deg),0.00~100.00,,,,0.00~100.00
+Fiber Weight Fraction (Other Dir.),0.00~100.00,,,,0.00~100.00
 Thickness,0.30~6.91,3.58~29.50,2.04~23.75,1.90~5.20,0.30~29.50
 Tab Thickness,,2.00~32.85,0.50~2.00,,0.50~32.85
 Width,4.00~50.00,23.00~139.90,9.96~100.59,12.00~80.00,4.00~139.90
