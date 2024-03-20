@@ -105,7 +105,6 @@ class LinLog(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.abs(required_cols["Relative Maximum Stress"])
         return self._linear(s, x_cluster)
@@ -116,7 +115,6 @@ class LogLog(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.abs(required_cols["Relative Maximum Stress"])
         log_s = _safe_log10(s)
@@ -128,7 +126,6 @@ class LogLog(AbstractPhy):
 #         self,
 #         required_cols: Dict[str, torch.Tensor],
 #         x_cluster: torch.Tensor,
-#         phys: nn.ModuleList,
 #     ):
 #         s = torch.clamp(torch.abs(required_cols["Relative Maximum Stress"]), min=1e-8)
 #         s_sw = torch.clamp(s - self.fatigue_limit[x_cluster], min=1e-8)
@@ -155,7 +152,6 @@ class Sendeckyj(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -198,7 +194,6 @@ class Hwang(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -238,7 +233,6 @@ class Kohout(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -281,7 +275,6 @@ class KimZhang(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -347,7 +340,6 @@ class KawaiKoizumi(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         # Using relative maximum stress means that the reference strength (\sigma_B) is selected to be |UTS| if
         # |s_max|>|s_min| and |UCS| if |s_max|<|s_min|. This is definitely a simplification of the original formula for
@@ -387,7 +379,6 @@ class Poursatip(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s_max = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -467,7 +458,6 @@ class PoursatipSimplified(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s_max = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -507,7 +497,6 @@ class DAmore(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -563,7 +552,6 @@ class DAmoreSimplified(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -606,7 +594,6 @@ class Epaarachchi(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -679,7 +666,6 @@ class EpaarachchiSimplified(AbstractPhy):
         self,
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
-        phys: nn.ModuleList,
     ):
         s = torch.clamp(
             torch.abs(required_cols["Relative Maximum Stress_UNSCALED"]),
@@ -854,10 +840,7 @@ class AbstractPhyClustering(AbstractNN):
 
         # Calculate phy results in each cluster in parallel through vectorization.
         x_phy = torch.concat(
-            [
-                phy(required_cols, x_cluster, self.phys).unsqueeze(-1)
-                for phy in self.phys
-            ],
+            [phy(required_cols, x_cluster).unsqueeze(-1) for phy in self.phys],
             dim=1,
         )
         # Weighted sum of phy predictions

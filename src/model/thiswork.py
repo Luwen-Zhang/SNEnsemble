@@ -6,6 +6,11 @@ from scipy import stats
 from skopt.space import Integer, Real
 from typing import Union, List
 from ._thiswork.clustering.singlelayer import GMMPhy, BMMPhy, KMeansPhy
+from ._thiswork.clustering.multilayer import (
+    TwolayerKMeansPhy,
+    TwolayerBMMPhy,
+    TwolayerGMMPhy,
+)
 
 
 class ThisWork(TorchModel):
@@ -16,12 +21,14 @@ class ThisWork(TorchModel):
         n_pca_dim=None,
         pca=False,
         clustering="KMeans",
+        clustering_layer="1L",
         **kwargs,
     ):
         self.reduce_bayes_steps = reduce_bayes_steps
         self.n_pca_dim = n_pca_dim
         self.pca = pca
         self.clustering = clustering
+        self.clustering_layer = clustering_layer
         super(ThisWork, self).__init__(*args, **kwargs)
 
     def _get_program_name(self):
@@ -60,6 +67,7 @@ class ThisWork(TorchModel):
             "PHYSICS_" + "_".join(x)
             for x in product(
                 ["NoPCA", "PCA"],
+                ["1L", "2L"],
                 ["KMeans", "GMM", "BMM"],
             )
         ]
@@ -69,6 +77,7 @@ class ThisWork(TorchModel):
                 available_names,
                 ["NoWrap", "Wrap"],
                 ["NoPCA", "PCA"],
+                ["1L", "2L"],
                 ["KMeans", "GMM", "BMM"],
             )
         ]
@@ -102,7 +111,7 @@ class ThisWork(TorchModel):
                     f"EXTERN_{components[0]}_{components[1]}"
                 ]
             clustering_phy_model = required_models[
-                f"PHYSICS_{'_'.join(components[-2:])}"
+                f"PHYSICS_{'_'.join(components[-3:])}"
             ]
             return cls(
                 datamodule=self.datamodule,
@@ -113,16 +122,23 @@ class ThisWork(TorchModel):
             )
         else:
             if "KMeans" in components:
-                phy_class = KMeansPhy
+                phy_class = KMeansPhy if "1L" in components else TwolayerKMeansPhy
             elif "GMM" in components:
-                phy_class = GMMPhy
+                phy_class = GMMPhy if "1L" in components else TwolayerGMMPhy
             elif "BMM" in components:
-                phy_class = BMMPhy
+                phy_class = BMMPhy if "1L" in components else TwolayerBMMPhy
             else:
                 raise Exception(f"Clustering algorithm not found.")
 
             if "PCA" in components:
-                feature_idx = phy_class.basic_clustering_features_idx(self.datamodule)
+                feature_idx = (
+                    phy_class.basic_clustering_features_idx(self.datamodule)
+                    if "1L" in components
+                    else np.setdiff1d(
+                        phy_class.basic_clustering_features_idx(self.datamodule),
+                        phy_class.top_clustering_features_idx(self.datamodule),
+                    )
+                )
                 if len(feature_idx) > 2:
                     pca = self.datamodule.pca(feature_idx=feature_idx)
                     n_pca_dim = (
@@ -140,17 +156,67 @@ class ThisWork(TorchModel):
             else:
                 n_pca_dim = None
 
-            return phy_class(n_pca_dim=n_pca_dim, datamodule=self.datamodule, **kwargs)
+            if "1L" in components:
+                return phy_class(
+                    n_pca_dim=n_pca_dim,
+                    datamodule=self.datamodule,
+                    on_cpu=True,
+                    **kwargs,
+                )
+            else:
+                clustering_features = list(
+                    phy_class.basic_clustering_features_idx(self.datamodule)
+                )
+                top_level_clustering_features = phy_class.top_clustering_features_idx(
+                    self.datamodule
+                )
+                input_2_idx = [
+                    list(clustering_features).index(x)
+                    for x in top_level_clustering_features
+                ]
+                input_1_idx = list(
+                    np.setdiff1d(np.arange(len(clustering_features)), input_2_idx)
+                )
+                return phy_class(
+                    n_pca_dim=n_pca_dim,
+                    datamodule=self.datamodule,
+                    n_input_1=len(input_1_idx),
+                    n_input_2=len(input_2_idx),
+                    input_1_idx=input_1_idx,
+                    input_2_idx=input_2_idx,
+                    on_cpu=True,
+                    **kwargs,
+                )
 
     def _space(self, model_name):
         if "PHYSICS" in model_name:
-            return [
-                Integer(low=1, high=256, prior="uniform", name="n_clusters", dtype=int),
-                Real(low=1e-8, high=1e8, prior="log-uniform", name="l1_penalty"),
-                self.trainer.SPACE[
-                    list(self.trainer.chosen_params.keys()).index("batch_size")
-                ],
-            ]
+            if "1L" in model_name:
+                return [
+                    Integer(
+                        low=1, high=256, prior="uniform", name="n_clusters", dtype=int
+                    ),
+                    Real(low=1e-8, high=1e8, prior="log-uniform", name="l1_penalty"),
+                    self.trainer.SPACE[
+                        list(self.trainer.chosen_params.keys()).index("batch_size")
+                    ],
+                ]
+            else:
+                return [
+                    Integer(
+                        low=1, high=256, prior="uniform", name="n_clusters", dtype=int
+                    ),
+                    Integer(
+                        low=1,
+                        high=32,
+                        prior="uniform",
+                        name="n_clusters_per_cluster",
+                        dtype=int,
+                    ),
+                    Real(low=1e-8, high=1e8, prior="log-uniform", name="l1_penalty"),
+                    self.trainer.SPACE[
+                        list(self.trainer.chosen_params.keys()).index("batch_size")
+                    ],
+                ]
         else:
             return [
                 Real(low=0, high=0.3, prior="uniform", name="dropout")
@@ -158,11 +224,19 @@ class ThisWork(TorchModel):
 
     def _initial_values(self, model_name):
         if "PHYSICS" in model_name:
-            return {
-                "n_clusters": 32,
-                "l1_penalty": 1e-8,
-                "batch_size": self.trainer.chosen_params["batch_size"],
-            }
+            if "1L" in model_name:
+                return {
+                    "n_clusters": 32,
+                    "l1_penalty": 1e-8,
+                    "batch_size": self.trainer.chosen_params["batch_size"],
+                }
+            else:
+                return {
+                    "n_clusters": 32,
+                    "n_clusters_per_cluster": 8,
+                    "l1_penalty": 1e-8,
+                    "batch_size": self.trainer.chosen_params["batch_size"],
+                }
         else:
             res = {"dropout": 0.0}
             res.update(self.trainer.chosen_params)
@@ -180,6 +254,8 @@ class ThisWork(TorchModel):
         if not self.pca and "NoPCA" not in model_name and "PCA" in model_name:
             return False
         if self.clustering not in model_name:
+            return False
+        if self.clustering_layer not in model_name:
             return False
         if "PHYSICS" not in model_name:
             components = model_name.split("_")
@@ -202,7 +278,7 @@ class ThisWork(TorchModel):
                 models = [f"EXTERN_{components[0]}_{components[1]}_WRAP"]
             else:
                 models = [f"EXTERN_{components[0]}_{components[1]}"]
-            models += [f"PHYSICS_{'_'.join(components[-2:])}"]
+            models += [f"PHYSICS_{'_'.join(components[-3:])}"]
             return models
         else:
             return None

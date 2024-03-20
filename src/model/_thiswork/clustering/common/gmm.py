@@ -9,6 +9,7 @@ from typing import List, Union
 import warnings
 from .kmeans import KMeans
 from .base import AbstractCluster, AbstractClustering
+from .base import AbstractCluster, AbstractClustering, AbstractMultilayerClustering
 from src.model._thiswork.pca.incremental_pca import IncrementalPCA
 
 
@@ -300,3 +301,28 @@ class PCAGMM(GMM):
         if hasattr(self, "pca"):
             x = self.pca(x)
         return super(PCAGMM, self).forward(x)
+
+
+class FirstGMMCluster(Cluster):
+    def __init__(
+        self,
+        n_input_outer: int,
+        n_input_inner: int,
+        exp_avg_factor: float = 1.0,
+        **kwargs,
+    ):
+        super(FirstGMMCluster, self).__init__(
+            n_input=n_input_outer, exp_avg_factor=exp_avg_factor
+        )
+        self.inner_layer = GMM(
+            exp_avg_factor=exp_avg_factor, n_input=n_input_inner, **kwargs
+        )
+
+
+class TwolayerGMM(AbstractMultilayerClustering):
+    def __init__(self, **kwargs):
+        super(TwolayerGMM, self).__init__(
+            algorithm_class=PCAGMM,
+            first_layer_cluster_class=FirstGMMCluster,
+            **kwargs,
+        )
