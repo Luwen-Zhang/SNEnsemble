@@ -386,7 +386,7 @@ class Poursatip(AbstractPhy):
             max=1 - 1e-5,
         )
         s_a = torch.clamp(
-            torch.abs(required_cols["Relative Stress Range_UNSCALED"]),
+            torch.abs(required_cols["Relative Stress Amplitude_UNSCALED"]) * 2,
             min=1e-5,
             max=2 - 1e-5,
         )
@@ -431,7 +431,7 @@ class Poursatip(AbstractPhy):
     @property
     def required_cols_names(self):
         return [
-            "Relative Stress Range_UNSCALED",
+            "Relative Stress Amplitude_UNSCALED",
             "Relative Maximum Stress_UNSCALED",
             "R-value_UNSCALED",
         ]
@@ -926,7 +926,13 @@ class AbstractPhyClustering(AbstractNN):
         return np.concatenate(
             (
                 datamodule.get_feature_idx_by_type(
-                    typ="Material/Specimen", var_type="continuous"
+                    typ="Material", var_type="continuous"
+                ),
+                datamodule.get_feature_idx_by_type(
+                    typ="Specimen", var_type="continuous"
+                ),
+                datamodule.get_feature_idx_by_type(
+                    typ="Property", var_type="continuous"
                 ),
                 list(AbstractPhyClustering.top_clustering_features_idx(datamodule)),
             )

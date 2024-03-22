@@ -69,13 +69,13 @@ class SuppStressDeriver(AbstractDeriver):
         if self.kwargs["absolute"]:
             names += [
                 "Absolute Maximum Stress",
-                "Absolute Stress Range",
+                "Absolute Stress Amplitude",
                 "Absolute Mean Stress",
             ]
         if self.kwargs["relative"]:
             names += [
                 "Relative Maximum Stress",
-                "Relative Stress Range",
+                "Relative Stress Amplitude",
                 "Relative Mean Stress",
             ]
         return names
@@ -87,7 +87,6 @@ class SuppStressDeriver(AbstractDeriver):
         uts_col = self.kwargs["uts_col"]
 
         df_tmp = df.copy()
-
         df_tmp["Absolute Maximum Stress"] = np.maximum(
             np.abs(df_tmp[max_stress_col]), np.abs(df_tmp[min_stress_col])
         )
@@ -107,8 +106,8 @@ class SuppStressDeriver(AbstractDeriver):
         where_g0 = df_tmp.index[np.where(df_tmp["Absolute Maximum Stress"] > 0)[0]]
         df_tmp["rt"] = np.abs(df_tmp[ucs_col])
         df_tmp.loc[where_g0, "rt"] = np.abs(df_tmp.loc[where_g0, uts_col])
-        df_tmp["Absolute Stress Range"] = np.abs(
-            df_tmp[max_stress_col] - df_tmp[min_stress_col]
+        df_tmp["Absolute Stress Amplitude"] = (
+            np.abs(df_tmp[max_stress_col] - df_tmp[min_stress_col]) / 2
         )
         df_tmp["Absolute Mean Stress"] = (
             df_tmp[max_stress_col] + df_tmp[min_stress_col]
@@ -116,17 +115,17 @@ class SuppStressDeriver(AbstractDeriver):
         df_tmp["Relative Maximum Stress"] = np.abs(
             df_tmp["Absolute Maximum Stress"] / df_tmp["rt"]
         )
-        df_tmp["Relative Stress Range"] = np.abs(
-            df_tmp["Absolute Stress Range"] / df_tmp["rt"]
+        df_tmp["Relative Stress Amplitude"] = np.abs(
+            df_tmp["Absolute Stress Amplitude"] / df_tmp["rt"]
         )
         df_tmp["Relative Mean Stress"] = np.abs(
             df_tmp["Absolute Mean Stress"] / df_tmp["rt"]
         )
         where_invalid = df_tmp.index[
-            np.where(df_tmp["Relative Maximum Stress"] > 1.1)[0]
+            np.where(df_tmp["Relative Maximum Stress"] > 1.0)[0]
         ]
         df_tmp.loc[where_invalid, "Relative Maximum Stress"] = np.nan
-        df_tmp.loc[where_invalid, "Relative Stress Range"] = np.nan
+        df_tmp.loc[where_invalid, "Relative Stress Amplitude"] = np.nan
         df_tmp.loc[where_invalid, "Relative Mean Stress"] = np.nan
 
         names = self._derived_names()
