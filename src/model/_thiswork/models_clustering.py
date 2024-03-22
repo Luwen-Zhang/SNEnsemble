@@ -10,6 +10,7 @@ class AbstractClusteringModel(AbstractNN):
         datamodule,
         clustering_phy_model,
         cont_cat_model,
+        phy_name,
         dropout=0.0,
         **kwargs,
     ):
@@ -21,6 +22,7 @@ class AbstractClusteringModel(AbstractNN):
         self.use_hidden_rep, hidden_rep_dim = self._test_required_model(
             self.n_inputs, self.cont_cat_model
         )
+        self.phy_name = phy_name
         self.cls_head = nn.Sequential(
             get_sequential(
                 [128, 64, 32],
@@ -47,12 +49,11 @@ class AbstractClusteringModel(AbstractNN):
         else:
             hidden = torch.concat([x, dl_pred], dim=1)
         # Prediction of physical models
-        phy_modelname = f"PHYSICS_{'NoPCA' if not hasattr(self.clustering_phy_model, 'pca') else 'PCA'}_{self.clustering_phy_model.clustering.__class__.__name__.split('PCA')[-1]}"
         phy_pred = self.call_required_model(
             self.clustering_phy_model,
             x,
             derived_tensors,
-            model_name=phy_modelname,
+            model_name=self.phy_name,
         )
         # Projection from hidden output to deep learning weights
         dl_weight = self.cls_head(hidden)

@@ -110,14 +110,14 @@ class ThisWork(TorchModel):
                 cont_cat_model = required_models[
                     f"EXTERN_{components[0]}_{components[1]}"
                 ]
-            clustering_phy_model = required_models[
-                f"PHYSICS_{'_'.join(components[-3:])}"
-            ]
+            phy_name = f"PHYSICS_{'_'.join(components[-3:])}"
+            clustering_phy_model = required_models[phy_name]
             return cls(
                 datamodule=self.datamodule,
                 embedding_dim=3,
                 cont_cat_model=cont_cat_model,
                 clustering_phy_model=clustering_phy_model,
+                phy_name=phy_name,
                 **kwargs,
             )
         else:
