@@ -283,22 +283,27 @@ class ThisWork(TorchModel):
         else:
             return None
 
-    def _prepare_custom_datamodule(self, model_name):
+    def _prepare_custom_datamodule(self, model_name, warm_start=False):
         from tabensemb.data import DataModule
 
         base = self.trainer.datamodule
-        datamodule = DataModule(config=self.trainer.datamodule.args, initialize=False)
-        datamodule.set_data_imputer("MeanImputer")
-        datamodule.set_data_derivers(
-            [
-                ("UnscaledDataDeriver", {"derived_name": "Unscaled"}),
-                # (
-                #     "TrendDeriver",
-                #     {"stacked": False, "derived_name": "pdp", "plot": True},
-                # ),
-            ],
-        )
-        datamodule.set_data_processors([("StandardScaler", {})])
+        if not warm_start or not hasattr(self, "datamodule"):
+            datamodule = DataModule(
+                config=self.trainer.datamodule.args, initialize=False
+            )
+            datamodule.set_data_imputer("MeanImputer")
+            datamodule.set_data_derivers(
+                [
+                    ("UnscaledDataDeriver", {"derived_name": "Unscaled"}),
+                    # (
+                    #     "TrendDeriver",
+                    #     {"stacked": False, "derived_name": "pdp", "plot": True},
+                    # ),
+                ],
+            )
+            datamodule.set_data_processors([("StandardScaler", {})])
+        else:
+            datamodule = self.datamodule
         datamodule.set_data(
             base.df,
             cont_feature_names=base.cont_feature_names,
@@ -308,6 +313,7 @@ class ThisWork(TorchModel):
             val_indices=base.val_indices,
             test_indices=base.test_indices,
             verbose=False,
+            warm_start=warm_start,
         )
         tmp_derived_data = base.derived_data.copy()
         tmp_derived_data.update(datamodule.derived_data)
