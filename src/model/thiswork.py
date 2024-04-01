@@ -302,6 +302,7 @@ class ThisWork(TorchModel):
                 ],
             )
             datamodule.set_data_processors([("StandardScaler", {})])
+            warm_start = False
         else:
             datamodule = self.datamodule
         datamodule.set_data(
