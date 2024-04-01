@@ -4,7 +4,7 @@ import os
 from tabensemb.utils import Logging
 import tabensemb
 
-tabensemb._stream_filters = ["DeprecationWarning"]
+tabensemb._stream_filters = ["DeprecationWarning", "Using batch_size="]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("path", type=str)

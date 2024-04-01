@@ -7,7 +7,18 @@ from tabensemb.utils import Logging
 import os
 import argparse
 
-tabensemb._stream_filters = ["DeprecationWarning", "PossibleUserWarning"]
+tabensemb._stream_filters = ["DeprecationWarning", "PossibleUserWarning", "Using batch_size="]
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--limit_batch_size",
+    type=int,
+    required=False,
+    default=None,
+)
+args = parser.parse_known_args()[0]
+limit_batch_size = args.limit_batch_size
+
 
 log = Logging()
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -86,6 +97,9 @@ models = [
         pca=True,
     ),
 ]
+if limit_batch_size is not None:
+    for model in models:
+        model.limit_batch_size = limit_batch_size
 trainer.add_modelbases(models)
 trainer.get_leaderboard(cross_validation=10, split_type="random")
 log.exit()
