@@ -138,7 +138,7 @@ class TheoreticalFiftyPofDeriver(AbstractDeriver):
         from sklearn.preprocessing import MinMaxScaler
         from scipy import stats
 
-        measure_features = datamodule.cont_feature_names
+        measure_features = ["Maximum Stress", "Minimum Stress", "R-value", "Frequency"]
         target = datamodule.label_name
         distrib = self.kwargs["distribution"]
         distrib_estimator = {
@@ -163,17 +163,20 @@ class TheoreticalFiftyPofDeriver(AbstractDeriver):
             dist = np.sqrt(
                 np.sum(np.power((values[:, None, :] - values[None, :, :]), 2), axis=-1)
             )
-            where_same = np.where(dist < 0.05)
+            where_same = np.where(dist < 1e-8)
             _, same_sets = get_corr_sets(where_same, list(np.arange(len(df_material))))
             for same_set in same_sets:
                 target_set = label_material[same_set]
-                unique_vals = len(set(target_set))
-                if unique_vals < 2:
+                if len(set(target_set)) < 2:
                     continue
-                warnings.filterwarnings("ignore", "invalid value encountered in add")
-                pof50[where_material[same_set]] = distrib_estimator.ppf(
-                    0.5, *distrib_estimator.fit(target_set)
-                )
+                    # pof50[where_material[same_set]] = target_set.reshape(-1, 1)
+                else:
+                    warnings.filterwarnings(
+                        "ignore", "invalid value encountered in add"
+                    )
+                    pof50[where_material[same_set]] = distrib_estimator.ppf(
+                        0.5, *distrib_estimator.fit(target_set)
+                    )
             if bar is not None:
                 bar.update(1)
         if bar is not None:
