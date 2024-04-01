@@ -1,5 +1,5 @@
 cfg = {
-    "database": "composite_database_layup_modulus",
+    "database": "composite_database_layup_modulus_03302024",
     "continuous_feature_names": [
         "Fiber Volume Fraction",
         "Fiber Weight Fraction",
@@ -14,6 +14,7 @@ cfg = {
     ],
     "categorical_feature_names": ["Resin Type"],
     "feature_types": {},
+    "layers": [512, 256, 128, 64],
     "data_derivers": [
         [
             "LayUpSequenceDeriver",
