@@ -104,13 +104,20 @@ class CycleSplitter(AbstractSplitter):
             val_indices += list(m_val_indices)
             test_indices += list(m_test_indices)
 
+        train_indices, val_indices, test_indices = cls._after_split(
+            train_indices, val_indices, test_indices, train_val_test
+        )
+        return np.array(train_indices), np.array(val_indices), np.array(test_indices)
+
+    @classmethod
+    def _after_split(cls, train_indices, val_indices, test_indices, train_val_test):
         train_val_indices = np.concatenate([train_indices, val_indices])
         train_indices, val_indices = train_test_split(
             train_val_indices,
             test_size=train_val_test[1] / np.sum(train_val_test[:2]),
             shuffle=True,
         )
-        return np.array(train_indices), np.array(val_indices), np.array(test_indices)
+        return train_indices, val_indices, test_indices
 
     @classmethod
     def _split_one_fr(cls, where_fr, fr_cycle, train_val_test):
