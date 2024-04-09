@@ -4,7 +4,7 @@ from ._thiswork.models_clustering import *
 from itertools import product
 from scipy import stats
 from skopt.space import Integer, Real
-from typing import Union, List
+from typing import Union, List, Iterable
 from ._thiswork.clustering.singlelayer import GMMPhy, BMMPhy, KMeansPhy
 from ._thiswork.clustering.multilayer import (
     TwolayerKMeansPhy,
@@ -347,13 +347,13 @@ class ThisWork(TorchModel):
         )
         improved_measure = improved[["Program", "Model"]].copy()
         if cv_path is not None:
-            ttest_res = self.improvement_cv_ttest(
+            test_res = self.improvement_cv_test(
                 model_names=list(improved["Model"]),
                 metrics=list(base.columns[2:]),
                 cv_path=cv_path,
             )
         else:
-            ttest_res = None
+            test_res = None
         for idx, model in enumerate(improved["Model"]):
             components = model.split("_")
             modelbase = components[0]
@@ -378,9 +378,9 @@ class ThisWork(TorchModel):
                 improved_measure.loc[idx, f"{metric} % Improvement"] = (
                     higher_better * (improved_metric - base_metric) / base_metric
                 ) * 100
-                if ttest_res is not None:
+                if test_res is not None:
                     improved_measure.loc[idx, f"{metric} Improvement p-value"] = (
-                        ttest_res[model][metric]["p-value"]
+                        test_res[model][metric]["p-value"]
                     )
         improved_measure.sort_values(
             by="Testing RMSE % Improvement",
@@ -388,8 +388,8 @@ class ThisWork(TorchModel):
             inplace=True,
             ignore_index=True,
         )
-        if ttest_res is not None:
-            return improved_measure, ttest_res
+        if test_res is not None:
+            return improved_measure, test_res
         else:
             return improved_measure
 
@@ -548,31 +548,45 @@ class ThisWork(TorchModel):
         self,
         leaderboard,
         improved_measure,
-        ttest_res,
+        test_res,
         metric,
-        save_to=None,
-        palette=None,
-        catplot_kwargs=None,
+        p_symbol_map_func,
+        clr=None,
+        ax=None,
+        p_cap_width=0.4,
+        p_cap_height=0.05,
+        p_pos_y=0.3,
+        p_text_up_pos_y=0.28,
+        p_text_kwargs=None,
+        save_show_close=True,
+        figure_kwargs=None,
+        boxplot_kwargs=None,
         legend_kwargs=None,
+        savefig_kwargs=None,
     ):
         leaderboard = leaderboard[leaderboard["Program"] != self.program]
         model_names = improved_measure["Model"]
-        if palette is None:
-            palette = sns.color_palette(global_palette)
-        _legend_kwargs = update_defaults_by_kwargs(dict(title=None), legend_kwargs)
-        _catplot_kwargs = update_defaults_by_kwargs(
-            dict(
-                kind="box",
-                legend_out=True,
-                palette=palette,
-                flierprops={"marker": "o"},
-                fliersize=2,
-                height=10,
-                aspect=0.5,
-            ),
-            catplot_kwargs,
+        clr = global_palette if clr is None else clr
+        legend_kwargs_ = update_defaults_by_kwargs(
+            dict(title=None, frameon=False), legend_kwargs
         )
+        figure_kwargs_ = update_defaults_by_kwargs(dict(), figure_kwargs)
+        boxplot_kwargs_ = update_defaults_by_kwargs(
+            dict(
+                orient="h",
+                linewidth=1,
+                fliersize=2,
+                flierprops={"marker": "o"},
+                palette=clr,
+                saturation=1,
+            ),
+            boxplot_kwargs,
+        )
+        p_text_kwargs_ = update_defaults_by_kwargs(dict(), p_text_kwargs)
+        ax, given_ax = self.trainer._plot_action_init_ax(ax, figure_kwargs_)
+        orient = boxplot_kwargs_["orient"]
         dfs = []
+        p_values = {}
         for idx, (program, model) in enumerate(
             zip(leaderboard["Program"], leaderboard["Model"])
         ):
@@ -580,68 +594,91 @@ class ThisWork(TorchModel):
             if len(improve_models) == 0:
                 continue
             base_metrics = {
-                "Base model": ttest_res[improve_models[0]][metric]["base"],
+                "Base model": test_res[improve_models[0]][metric]["base"],
             }
             improved_metrics = {
-                "-".join(m.split("_")[2:]): ttest_res[m][metric]["improved"]
+                "-".join(m.split("_")[2:]): test_res[m][metric]["improved"]
                 for m in improve_models
             }
+            if len(improve_models) == 1:
+                p_values[idx] = test_res[improve_models[0]][metric]["p-value"]
             improved_metrics = {
                 key: improved_metrics[key] for key in sorted(improved_metrics.keys())
             }
             base_metrics.update(improved_metrics)
             df = pd.DataFrame(base_metrics).melt()
-            df["class"] = f"{program}\n{model}"
+            df["class"] = f"{program}-{model}"
             df["hue"] = [x if x == "Base model" else "Proposed" for x in df["variable"]]
             dfs.append(df)
         with warnings.catch_warnings():
             warnings.filterwarnings(action="ignore", category=DeprecationWarning)
-            g = sns.catplot(
+            sns.boxplot(
                 data=pd.concat(dfs, ignore_index=True),
-                x="value",
-                y="class",
+                x="value" if orient == "h" else "class",
+                y="class" if orient == "h" else "value",
                 hue="hue",  # "variable"
-                orient="h",
-                **_catplot_kwargs,
+                ax=ax,
+                **boxplot_kwargs_,
             )
-        g.legend.set(**_legend_kwargs)
-        g.ax.set_xlabel(metric)
-        g.ax.set_ylabel(None)
-        plt.tight_layout()
-        if save_to is not None:
-            plt.savefig(save_to, dpi=500)
-        plt.show()
-        plt.close()
+        ax.get_legend().remove()
+        ax.legend(**legend_kwargs_)
+        for idx, p_val in p_values.items():
+            x1, x2 = idx - p_cap_width / 2, idx + p_cap_width / 2
+            y1, y2 = p_pos_y + p_cap_height, p_pos_y
+            ax.plot([x1, x1, x2, x2], [y1, y2, y2, y1], lw=0.5, c="k")
+            ax.text(
+                (x1 + x2) / 2,
+                p_text_up_pos_y,
+                p_symbol_map_func(p_val),
+                ha="center",
+                va="top",
+                **p_text_kwargs_,
+            )
+
+        return self.trainer._plot_action_after_plot(
+            fig_name=os.path.join(self.trainer.project_root, f"compare.pdf"),
+            disable=given_ax,
+            ax_or_fig=ax,
+            xlabel=metric if orient == "h" else None,
+            ylabel=metric if orient == "v" else None,
+            tight_layout=True,
+            save_show_close=save_show_close,
+            savefig_kwargs=savefig_kwargs,
+        )
 
     def plot_improvement(
         self,
         leaderboard,
         improved_measure,
-        ttest_res,
+        test_res,
         metric,
-        orient="h",
-        save_to=None,
-        palette=None,
-        catplot_kwargs=None,
+        clr=None,
+        save_show_close=True,
+        ax=None,
+        figure_kwargs=None,
+        barplot_kwargs=None,
         legend_kwargs=None,
+        savefig_kwargs=None,
     ):
         leaderboard = leaderboard[leaderboard["Program"] != self.program]
         model_names = improved_measure["Model"]
-        if palette is None:
-            palette = sns.color_palette(global_palette)
-        _legend_kwargs = update_defaults_by_kwargs(
+        clr = global_palette if clr is None else clr
+        figure_kwargs_ = update_defaults_by_kwargs(dict(), figure_kwargs)
+        legend_kwargs_ = update_defaults_by_kwargs(
             dict(title=None, frameon=False), legend_kwargs
         )
-        _catplot_kwargs = update_defaults_by_kwargs(
+        barplot_kwargs_ = update_defaults_by_kwargs(
             dict(
-                kind="bar",
-                legend_out=True,
-                palette=palette,
-                height=10,
-                aspect=0.5,
+                orient="h",
+                linewidth=1,
+                edgecolor="k",
+                saturation=1,
+                palette=clr,
             ),
-            catplot_kwargs,
+            barplot_kwargs,
         )
+        ax, given_ax = self.trainer._plot_action_init_ax(ax, figure_kwargs_)
+        orient = barplot_kwargs_["orient"]
         dfs = []
         if type(metric) == str:
             metric = [metric]
@@ -654,9 +691,9 @@ class ThisWork(TorchModel):
             for met in metric:
                 improved_metrics = {
                     "-".join(m.split("_")[2:]): (
-                        ttest_res[m][met]["base"] - ttest_res[m][met]["improved"]
+                        test_res[m][met]["base"] - test_res[m][met]["improved"]
                     )
-                    / ttest_res[m][met]["base"]
+                    / test_res[m][met]["base"]
                     * 100
                     for m in improve_models
                 }
@@ -665,32 +702,42 @@ class ThisWork(TorchModel):
                     for key in sorted(improved_metrics.keys())
                 }
                 df = pd.DataFrame(improved_metrics).melt()
-                df["class"] = f"{program}\n{model}"
+                df["class"] = f"{program}-{model}"
                 df["hue"] = [met] * len(df)
                 dfs.append(df)
         with warnings.catch_warnings():
             warnings.filterwarnings(action="ignore", category=DeprecationWarning)
-            g = sns.catplot(
+            sns.barplot(
                 data=pd.concat(dfs, ignore_index=True),
                 x="value" if orient == "h" else "class",
                 y="class" if orient == "h" else "value",
                 hue="hue" if len(metric) > 1 else None,
-                orient=orient,
-                **_catplot_kwargs,
+                ax=ax,
+                **barplot_kwargs_,
             )
-        g.legend.remove()
-        g.ax.legend(**_legend_kwargs)
-        (g.ax.set_xlabel if orient == "h" else g.ax.set_ylabel)(
-            f"Improvement of {metric[0] if len(metric) == 1 else 'metrics'} (Percentage)"
-        )
-        (g.ax.set_ylabel if orient == "h" else g.ax.set_xlabel)(None)
-        plt.tight_layout()
-        if save_to is not None:
-            plt.savefig(save_to, dpi=500)
-        plt.show()
-        plt.close()
+        ax.get_legend().remove()
+        ax.legend(**legend_kwargs_)
 
-    def improvement_cv_ttest(
+        return self.trainer._plot_action_after_plot(
+            fig_name=os.path.join(self.trainer.project_root, f"improvement.pdf"),
+            disable=given_ax,
+            ax_or_fig=ax,
+            xlabel=(
+                f"Improvement of {metric[0] if len(metric) == 1 else 'metrics'} (Percentage)"
+                if orient == "h"
+                else None
+            ),
+            ylabel=(
+                f"Improvement of {metric[0] if len(metric) == 1 else 'metrics'} (Percentage)"
+                if orient == "v"
+                else None
+            ),
+            tight_layout=True,
+            save_show_close=save_show_close,
+            savefig_kwargs=savefig_kwargs,
+        )
+
+    def improvement_cv_test(
         self,
         model_names: Union[List[str], str],
         metrics: Union[List[str], str],
@@ -735,13 +782,10 @@ class ThisWork(TorchModel):
                     )
         for model_name in model_names:
             for metric in metrics:
-                res[model_name][metric]["p-value"] = getattr(
-                    stats.ttest_ind(
-                        res[model_name][metric]["base"],
-                        res[model_name][metric]["improved"],
-                    ),
-                    "pvalue",
-                )
+                res[model_name][metric]["p-value"] = stats.mannwhitneyu(
+                    res[model_name][metric]["base"],
+                    res[model_name][metric]["improved"],
+                )[1]
         return res
 
     def inspect_weighted_predictions(self, model_name, **kwargs):

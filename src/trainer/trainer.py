@@ -37,7 +37,9 @@ class FatigueTrainer(Trainer):
         else:
             return material_code.loc[indices, :]
 
-    def select_by_material_code(self, m_code: str, partition: str = "all"):
+    def select_by_material_code(
+        self, m_code: str, partition: str = "all", select_by_value_kwargs: Dict = None
+    ):
         """
         Select samples with the specified material code.
 
@@ -53,8 +55,14 @@ class FatigueTrainer(Trainer):
         indices
             The pandas index where the material code exists.
         """
-        code_df = self.get_material_code(unique=False, partition=partition)
-        return code_df.index[np.where(code_df["Material_Code"] == m_code)[0]]
+        select_by_value_kwargs_ = update_defaults_by_kwargs(
+            dict(partition=partition), select_by_value_kwargs
+        )
+        if "selection" in select_by_value_kwargs_.keys():
+            select_by_value_kwargs_["selection"].update({"Material_Code": m_code})
+        else:
+            select_by_value_kwargs_["selection"] = {"Material_Code": m_code}
+        return self.datamodule.select_by_value(**select_by_value_kwargs_)
 
     def cal_theoretical_pof50(
         self,
@@ -78,7 +86,15 @@ class FatigueTrainer(Trainer):
         )
         return pof50
 
-    def plot_data_split(self, bins: int = 30, percentile: str = "all"):
+    def plot_data_split(
+        self,
+        bins: int = 30,
+        percentile: str = "all",
+        fig=None,
+        savefig_kwargs: Dict = None,
+        save_show_close: bool = True,
+        figure_kwargs: Dict = None,
+    ):
         """
         Visualize how the dataset is split into training/validation/testing datasets.
 
@@ -91,6 +107,10 @@ class FatigueTrainer(Trainer):
             representing the individual percentile of target for each material.
         """
         from matplotlib.gridspec import GridSpec
+
+        figure_kwargs_ = update_defaults_by_kwargs(
+            dict(figsize=(8, 2.5)), figure_kwargs
+        )
 
         train_m_code = list(
             self.get_material_code(unique=True, partition="train")["Material_Code"]
@@ -123,14 +143,19 @@ class FatigueTrainer(Trainer):
                 hist_range = (np.min(all_cycle), np.max(all_cycle))
             else:
                 hist_range = (np.min(cycle), np.max(cycle))
-            all_hist = np.histogram(cycle, bins=bins, range=hist_range)[0]
 
             def get_heat(partition):
                 cycles = all_cycle[
                     self.select_by_material_code(m_code=material, partition=partition)
                 ]
                 partition_cycles[partition].append(cycles)
-                return np.histogram(cycles, range=hist_range, bins=bins)[0] / all_hist
+                if len(cycles) <= 1:
+                    return np.zeros(bins)
+                else:
+                    res = st.gaussian_kde(cycles)(
+                        np.linspace(hist_range[0], hist_range[1], bins)
+                    )
+                    return res / np.max(res)
 
             train_heat[idx, :] = get_heat(partition="train")
             val_heat[idx, :] = get_heat(partition="val")
@@ -139,14 +164,18 @@ class FatigueTrainer(Trainer):
         train_heat[np.isnan(train_heat)] = 0
         val_heat[np.isnan(val_heat)] = 0
         test_heat[np.isnan(test_heat)] = 0
-        fig = plt.figure(figsize=(8, 2.5))
+        fig, given_ax = self._plot_action_init_ax(fig, figure_kwargs_, return_fig=True)
+
         gs = GridSpec(100, 100, figure=fig)
 
         def plot_im(heat, pos, hide_y_ticks=False):
             ax = fig.add_subplot(pos)
             im = ax.imshow(heat, aspect="auto", cmap="Oranges")
+
+            ax.set_ylim([0, length])
+            ax.set_yticks([0, length])
             if hide_y_ticks:
-                ax.set_yticks([])
+                ax.set_yticklabels([])
             ax.set_xlim([-0.5, bins - 0.5])
             ax.set_xticks([0 - 0.5, (bins - 1) / 2, bins - 0.5])
             if percentile == "all":
@@ -165,55 +194,60 @@ class FatigueTrainer(Trainer):
             x = np.linspace(np.min(all_cycle), np.max(all_cycle), 100)
             kde = st.gaussian_kde(np.hstack(heat))(x)
             ax.plot(x, kde, c=plt.get_cmap("Oranges")(200), lw=1)
-            where_max_kde = np.argmax(kde)
+            mean_heat = np.mean(np.hstack(heat))
             ax.plot(
-                np.array([x[where_max_kde]] * 10),
+                np.array([mean_heat] * 10),
                 np.linspace(0, 0.5, 10),
                 "--",
                 color="grey",
                 alpha=0.5,
                 lw=1,
             )
-            ax.text(
-                x[where_max_kde] + 0.1,
-                0.37,
-                f"{x[where_max_kde]:.2f}",
+            ax.set_ylim([0, np.max(kde) * 1.5])
+            ax.set_yticks([0, np.max(kde) * 1.5])
+            ax.set_yticklabels(
+                ["0", str(round(np.max(kde) * 1.5, 2))],
                 fontsize=plt.rcParams["font.size"] * 0.8,
             )
+            ax.text(
+                mean_heat + 0.13,
+                ax.get_ylim()[1] * 0.94,
+                f"Mean: {mean_heat:.2f}",
+                fontsize=plt.rcParams["font.size"] * 0.8,
+                ha="left",
+                va="top",
+            )
             if hide_y_ticks:
-                ax.set_yticks([])
-            else:
-                ax.set_yticks([0, 0.5])
+                ax.set_yticklabels([])
             ax.set_xticks([])
             ax.set_xlim([np.min(all_cycle), np.max(all_cycle)])
-            ax.set_ylim([0, 0.5])
             ax.set_title(name)
 
         plot_kde(
             partition_cycles["train"],
-            gs[:18, 0:30],
+            gs[:17, 0:29],
             name="Training set",
             hide_y_ticks=False,
         )
         plot_kde(
             partition_cycles["val"],
-            gs[:18, 33:63],
+            gs[:17, 34:62],
             name="Validation set",
-            hide_y_ticks=True,
+            hide_y_ticks=False,
         )
         plot_kde(
             partition_cycles["test"],
-            gs[:18, 66:96],
+            gs[:17, 67:95],
             name="Testing set",
-            hide_y_ticks=True,
+            hide_y_ticks=False,
         )
-        plot_im(train_heat, gs[25:, 0:30], hide_y_ticks=False)
-        plot_im(val_heat, gs[25:, 33:63], hide_y_ticks=True)
-        im = plot_im(test_heat, gs[25:, 66:96], hide_y_ticks=True)
+        plot_im(train_heat, gs[26:, 0:29], hide_y_ticks=False)
+        plot_im(val_heat, gs[26:, 34:62], hide_y_ticks=True)
+        im = plot_im(test_heat, gs[26:, 67:95], hide_y_ticks=True)
         # plt.colorbar(mappable=im)
-        cax = fig.add_subplot(gs[50:98, 98:])
+        cax = fig.add_subplot(gs[50:98, 97:])
         cbar = plt.colorbar(cax=cax, mappable=im)
-        cax.set_ylabel("Density")
+        cax.set_ylabel("Normalized density")
         ax = fig.add_subplot(gs[:20, :], frameon=False)
         plt.tick_params(
             labelcolor="none",
@@ -223,7 +257,7 @@ class FatigueTrainer(Trainer):
             left=False,
             right=False,
         )
-        ax.set_ylabel(f"KDE\n")
+        ax.set_ylabel(f"Density\n")
         ax = fig.add_subplot(gs[25:, :], frameon=False)
         plt.tick_params(
             labelcolor="none",
@@ -233,21 +267,24 @@ class FatigueTrainer(Trainer):
             left=False,
             right=False,
         )
-        if percentile == "all":
-            ax.set_xlabel(self.label_name[0])
-        else:
-            ax.set_xlabel(f"Percentile of {self.label_name[0]} for each material")
-        ax.set_ylabel(f"ID of Material")
-        warnings.filterwarnings("ignore", message="Tight layout not applied.")
-        plt.savefig(
-            os.path.join(
+        self._plot_action_after_plot(
+            fig_name=os.path.join(
                 self.project_root,
                 f"{self.datamodule.datasplitter.__class__.__name__}_{percentile}.pdf",
             ),
-            bbox_inches="tight",
-            dpi=1000,
+            disable=False,
+            ax_or_fig=ax,
+            xlabel=(
+                self.label_name[0]
+                if percentile == "all"
+                else f"Percentile of {self.label_name[0]} for each material"
+            ),
+            ylabel=f"No. of Material",
+            tight_layout=True,
+            save_show_close=save_show_close,
+            savefig_kwargs=savefig_kwargs,
         )
-        plt.close()
+        return fig
 
     def plot_multiple_S_N(
         self, m_codes: List[str], hide_plt_show: bool = True, **kwargs
@@ -276,14 +313,7 @@ class FatigueTrainer(Trainer):
         self,
         s_col: str,
         n_col: str,
-        r_col: str,
         m_code: str,
-        r_value: float,
-        f_col: str = None,
-        freq: float = None,
-        load_dir: str = "tension",
-        avg_feature: List[str] = None,
-        ax=None,
         CI: float = 0.95,
         method: str = "statistical",
         verbose: bool = True,
@@ -291,6 +321,17 @@ class FatigueTrainer(Trainer):
         model_name: str = "ThisWork",
         refit: bool = True,
         log_stress: bool = False,
+        plot_pof_area: bool = False,
+        plot_scatter: bool = True,
+        ax=None,
+        train_val_test_color: List = None,
+        select_by_value_kwargs: Dict = None,
+        plot_kwargs: Dict = None,
+        scatter_kwargs: Dict = None,
+        legend_kwargs: Dict = None,
+        figure_kwargs: Dict = None,
+        savefig_kwargs: Dict = None,
+        save_show_close: bool = True,
         **kwargs,
     ):
         """
@@ -302,21 +343,6 @@ class FatigueTrainer(Trainer):
             The name of the stress column.
         n_col
             The name of the log(fatigue life) column.
-        r_col
-            The name of the R-value column.
-        m_code
-            The selected material code.
-        r_value
-            The selected R-value to plot.
-        f_col
-            The name of the frequency column.
-        freq
-            The selected frequency to plot.
-        load_dir
-            "tension" or else. If "tension" is selected, samples with s_col>0 will be selected for evaluation.
-            Otherwise, those with s_col<0 will be selected.
-        avg_feature
-            A list of features to ignore when predicting SN curves by setting their values to their average.
         ax
             A matplotlib Axis instance. If not None, a new figure will be initialized.
         CI
@@ -334,105 +360,45 @@ class FatigueTrainer(Trainer):
             Whether to refit models on bootstrapped datasets. See Trainer._bootstrap_fit.
         log_stress
             Whether to plot the stress in log scale.
+        plot_pof_area
+            Whether to calculate probability of failure shadows.
         **kwargs
             Other arguments for ``Trainer._bootstrap_fit``
         """
-        # Check whether columns exist.
-        if s_col not in self.df.columns:
-            raise Exception(f"{s_col} not in features.")
-        if n_col not in self.label_name:
-            raise Exception(f"{n_col} is not the target.")
+        figure_kwargs_ = update_defaults_by_kwargs(dict(), figure_kwargs)
+        select_by_value_kwargs_ = update_defaults_by_kwargs(
+            dict(), select_by_value_kwargs
+        )
+        legend_kwargs_ = update_defaults_by_kwargs(
+            dict(
+                loc="upper right",
+                markerscale=1.5,
+                handlelength=1,
+                handleheight=0.9,
+                fontsize=plt.rcParams["font.size"] * 0.8,
+            ),
+            legend_kwargs,
+        )
 
         # Find the selected material.
-        m_train_indices = self.select_by_material_code(m_code, partition="train")
-        m_test_indices = self.select_by_material_code(m_code, partition="test")
-        m_val_indices = self.select_by_material_code(m_code, partition="val")
-        original_indices = self.select_by_material_code(m_code, partition="all")
+        m_train_indices = self.select_by_material_code(
+            m_code, partition="train", select_by_value_kwargs=select_by_value_kwargs_
+        )
+        m_test_indices = self.select_by_material_code(
+            m_code, partition="test", select_by_value_kwargs=select_by_value_kwargs_
+        )
+        m_val_indices = self.select_by_material_code(
+            m_code, partition="val", select_by_value_kwargs=select_by_value_kwargs_
+        )
+        original_indices = self.select_by_material_code(
+            m_code, partition="all", select_by_value_kwargs=select_by_value_kwargs_
+        )
+        print(
+            f"Train: {len(m_train_indices)}, val: {len(m_val_indices)}, test: {len(m_test_indices)}"
+        )
 
         if len(original_indices) == 0:
-            raise Exception(f"Material_Code {m_code} not available.")
-
-        sgn = 1 if load_dir == "tension" else -1
-
-        include_f = (
-            f_col is not None and freq is not None and f_col in self.cont_feature_names
-        )
-        get_indices_wo_f = lambda indices, r, f: indices[
-            (self.df.loc[indices, s_col] * sgn > 0)
-            & ((self.df.loc[indices, r_col] - r).__abs__() < 1e-3)
-        ]
-        get_indices_w_f = lambda indices, r, f: indices[
-            (self.df.loc[indices, s_col] * sgn > 0)
-            & ((self.df.loc[indices, r_col] - r).__abs__() < 1e-3)
-            & ((self.df.loc[indices, f_col] - f).__abs__() < 1e-3)
-        ]
-        get_indices_handle = get_indices_w_f if include_f else get_indices_wo_f
-
-        m_train_indices = get_indices_handle(m_train_indices, r_value, freq)
-        m_test_indices = get_indices_handle(m_test_indices, r_value, freq)
-        m_val_indices = get_indices_handle(m_val_indices, r_value, freq)
-
-        # If other parameters are not consistent, raise Warning.
-        stress_unrelated_cols = [
-            name for name in self.cont_feature_names if "Stress" not in name
-        ]
-        other_params = self.df.loc[
-            np.concatenate(
-                [m_train_indices.values, m_test_indices.values, m_val_indices.values]
-            ),
-            stress_unrelated_cols,
-        ].copy()
-        not_unique_cols = [
-            (col, list(other_params[col].value_counts().index))
-            for col in stress_unrelated_cols
-            if len(other_params[col].value_counts()) > 1
-        ]
-        if len(not_unique_cols) != 0:
-            message = (
-                f"More than one values of each stress unrelated column are found {not_unique_cols}. Bootstrapped "
-                f"prediction of SN curves may be incorrect."
-            )
-            if is_notebook():
-                print(message)
-            else:
-                warnings.warn(message, UserWarning)
-        if avg_feature is not None:
-            warnings.warn(
-                f"Some features are set to their average value: {avg_feature}"
-            )
-            processed_df = self.df.copy()
-            for feature in avg_feature:
-                processed_df[feature] = np.mean(processed_df[feature])
-        else:
-            processed_df = self.df.copy()
-
-        # If no training or validation points available, raise an exception.
-        if (
-            len(m_train_indices) == 0
-            and len(m_val_indices) == 0
-            and len(m_test_indices) == 0
-        ):
-            if include_f:
-                r = self.df.loc[original_indices, r_col].values.flatten()
-                f = self.df.loc[original_indices, f_col].values.flatten()
-                unique_fr = set(list(zip(r, f)))
-                available_fr = []
-                for r, f in unique_fr:
-                    if len(get_indices_handle(original_indices, r, f)) > 0:
-                        available_fr.append((r, f))
-                raise Exception(
-                    f"The combination of R-value {r_value} and frequency {freq} is not available. Choose among "
-                    f"{available_fr}."
-                )
-            else:
-                unique_r = np.unique(self.df.loc[original_indices, r_col])
-                available_r = []
-                for r in unique_r:
-                    if len(get_indices_handle(original_indices, r, freq)) > 0:
-                        available_r.append(r)
-                raise Exception(
-                    f"R-value {r_value} is not available. Choose among {available_r}."
-                )
+            raise Exception(f"Selection not available.")
 
         # Extract S and N.
         s_train = self.df.loc[m_train_indices, s_col]
@@ -453,8 +419,6 @@ class FatigueTrainer(Trainer):
         # Determine the prediction range.
         s_min = np.min(all_s) - np.abs(np.max(all_s) - np.min(all_s)) * 0.5
         s_max = np.max(all_s) + np.abs(np.max(all_s) - np.min(all_s)) * 0.5
-        s_min = np.max([s_min, 1e-5]) if sgn > 0 else s_min
-        s_max = s_max if sgn > 0 else np.min([s_max, -1e-5])
 
         # Get bootstrap predictions and confidence intervals from program-model_name
         chosen_indices = (
@@ -464,7 +428,7 @@ class FatigueTrainer(Trainer):
         )
         x_value, mean_pred, ci_left, ci_right = self._bootstrap_fit(
             program=program,
-            df=processed_df.loc[chosen_indices, :],
+            df=self.df.copy().loc[chosen_indices, :],
             derived_data=self.datamodule.get_derived_data_slice(
                 self.derived_data, chosen_indices
             ),
@@ -519,17 +483,19 @@ class FatigueTrainer(Trainer):
 
         def scatter_plot_func(x, y, color, name):
             # Plot training, validation, and testing sets.
-            ax.scatter(
-                x,
-                y,
-                s=20,
-                color=color,
-                marker="o",
-                label=f"{name} dataset",
-                linewidth=0.4,
-                edgecolors="k",
-                zorder=20,
+            scatter_kwargs_ = update_defaults_by_kwargs(
+                dict(
+                    s=20,
+                    color=color,
+                    marker="o",
+                    linewidth=0.4,
+                    edgecolors="k",
+                    label=f"{name} dataset",
+                    zorder=20,
+                ),
+                scatter_kwargs,
             )
+            ax.scatter(x, y, **scatter_kwargs_)
 
         def in_fill_between(x_arr, y_arr, xvals, cl, cr):
             # Calculate the number of points that are in the interval.
@@ -582,21 +548,18 @@ class FatigueTrainer(Trainer):
             # Plot psn
             ax.plot(pred, x_value, "--", color=color, label=name)
 
-        if ax is None:
-            new_ax = True
-            plt.figure()
-            plt.rcParams["font.size"] = 14
-            ax = plt.subplot(111)
-        else:
-            new_ax = False
+        ax, given_ax = self._plot_action_init_ax(ax, figure_kwargs_)
 
         # Plot datasets.
-        scatter_plot_func(n_train, s_train, global_palette[0], "Training")
-        scatter_plot_func(n_val, s_val, global_palette[1], "Validation")
-        scatter_plot_func(n_test, s_test, global_palette[2], "Testing")
+        if train_val_test_color is None:
+            train_val_test_color = global_palette[:3]
+        if plot_scatter:
+            scatter_plot_func(n_train, s_train, train_val_test_color[0], "Training")
+            scatter_plot_func(n_val, s_val, train_val_test_color[1], "Validation")
+            scatter_plot_func(n_test, s_test, train_val_test_color[2], "Testing")
 
         # Plot predictions and intervals.
-        if len(m_train_indices) > 3:
+        if len(m_train_indices) > 3 and plot_pof_area:
             _, ci_left, ci_right, psn_pred = get_interval_psn(
                 s_train.values,
                 n_train.values,
@@ -611,7 +574,9 @@ class FatigueTrainer(Trainer):
                 psn_pred, color=global_palette[1], name=f"{model_name} 5\% PoF"
             )
         else:
-            if not (np.isnan(ci_left).any() or np.isnan(ci_right).any()):
+            if (
+                not (np.isnan(ci_left).any() or np.isnan(ci_right).any())
+            ) and plot_pof_area:
                 interval_plot_func(
                     mean_pred,
                     ci_left,
@@ -620,7 +585,13 @@ class FatigueTrainer(Trainer):
                     f"Bootstrap {model_name} CI {CI*100:.1f}\%",
                 )
             else:
-                ax.plot(mean_pred, x_value, color=global_palette[1], zorder=10)
+                ax.plot(
+                    mean_pred,
+                    x_value,
+                    **update_defaults_by_kwargs(
+                        dict(color=global_palette[1], zorder=10), plot_kwargs
+                    ),
+                )
 
         # Get predictions, intervals and psn for lin-log and log-log SN.
         # lin_pred, lin_ci_left, lin_ci_right, lin_psn_pred = get_interval_psn(
@@ -638,33 +609,26 @@ class FatigueTrainer(Trainer):
         # psn_plot_func(lin_psn_pred, color=global_palette[0], name=f"Lin-log 5\% PoF")
         # psn_plot_func(log_psn_pred, color=global_palette[2], name=f"Log-log 5\% PoF")
 
-        ax.legend(
-            loc="upper right",
-            markerscale=1.5,
-            handlelength=1,
-            handleheight=0.9,
-            fontsize=plt.rcParams["font.size"] * 0.8,
-        )
+        ax.legend(**legend_kwargs_)
         if log_stress:
             ax.set_yscale("log")
-        ax.set_xlabel(n_col)
-        ax.set_ylabel(s_col)
         ax.set_xlim([0, 10])
-        ax.set_title(f"{m_code} R={r_value} CI={CI * 100:.1f}\%")
+        ax.set_title(f"{m_code}")
 
         path = os.path.join(self.project_root, f"SN_curves_{program}_{model_name}")
-        if not os.path.exists(path):
-            os.mkdir(path=path)
-        fig_name = (
-            m_code.replace("/", "_")
-            + f"_r_{r_value}{f'_f_{freq}' if include_f else ''}{f'_refit' if refit else ''}.pdf"
+        return self._plot_action_after_plot(
+            fig_name=os.path.join(
+                path,
+                m_code.replace("/", "_") + ".pdf",
+            ),
+            disable=given_ax,
+            ax_or_fig=ax,
+            xlabel=n_col,
+            ylabel=s_col,
+            tight_layout=False,
+            save_show_close=save_show_close,
+            savefig_kwargs=savefig_kwargs,
         )
-        plt.savefig(path + "/" + fig_name)
-
-        if is_notebook() and new_ax:
-            plt.show()
-        if new_ax:
-            plt.close()
 
     @staticmethod
     def _sn_interval(
