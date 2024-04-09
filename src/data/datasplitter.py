@@ -206,6 +206,24 @@ class StressCycleSplitter(CycleSplitter):
         return np.array(train_indices), np.array(val_indices), np.array(test_indices)
 
 
+class ExtremeCycleSplitter(AbstractSplitter):
+    def _split(self, df, cont_feature_names, cat_feature_names, label_name):
+        cycles = df[label_name].values.flatten()
+        train_val_test = self.train_val_test
+        intsc_test = np.sum(train_val_test[:-1]) * 100
+        test_indices = np.where(cycles >= np.percentile(cycles, intsc_test))[0]
+        train_val_indices = np.setdiff1d(np.arange(len(cycles)), test_indices)
+        train_indices, val_indices = train_test_split(
+            train_val_indices,
+            test_size=train_val_test[1] / np.sum(train_val_test[:-1]),
+            shuffle=True,
+        )
+        np.random.shuffle(train_indices)
+        np.random.shuffle(val_indices)
+        np.random.shuffle(test_indices)
+        return train_indices, val_indices, test_indices
+
+
 mapping = {}
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for name, cls in clsmembers:
