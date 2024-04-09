@@ -25,7 +25,7 @@ class AbstractClusteringModel(AbstractNN):
         self.phy_name = phy_name
         self.cls_head = nn.Sequential(
             get_sequential(
-                [128, 64, 32],
+                [256, 256, 256],
                 n_inputs=hidden_rep_dim,
                 n_outputs=1,
                 act_func=nn.ReLU,
