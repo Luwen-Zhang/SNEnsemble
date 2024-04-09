@@ -14,7 +14,7 @@ cfg = {
     ],
     "categorical_feature_names": ["Resin Type"],
     "feature_types": {},
-    "layers": [512, 256, 128, 64],
+    "layers": [256, 256, 256, 128, 64],
     "data_derivers": [
         [
             "LayUpSequenceDeriver",
