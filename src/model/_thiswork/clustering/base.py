@@ -59,7 +59,7 @@ class AbstractPhy(nn.Module):
 
     @property
     def required_cols_names(self) -> List[str]:
-        return ["Relative Maximum Stress"]
+        return ["Relative Maximum Stress_UNSCALED"]
 
     @property
     def use_fatigue_limit(self):
@@ -106,7 +106,7 @@ class LinLog(AbstractPhy):
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
     ):
-        s = torch.abs(required_cols["Relative Maximum Stress"])
+        s = torch.abs(required_cols["Relative Maximum Stress_UNSCALED"])
         return self._linear(s, x_cluster)
 
 
@@ -116,26 +116,8 @@ class LogLog(AbstractPhy):
         required_cols: Dict[str, torch.Tensor],
         x_cluster: torch.Tensor,
     ):
-        s = torch.abs(required_cols["Relative Maximum Stress"])
-        log_s = _safe_log10(s)
-        return self._linear(log_s, x_cluster)
-
-
-# class LogLogFatigueLimit(AbstractPhy):
-#     def forward(
-#         self,
-#         required_cols: Dict[str, torch.Tensor],
-#         x_cluster: torch.Tensor,
-#     ):
-#         s = torch.clamp(torch.abs(required_cols["Relative Maximum Stress"]), min=1e-8)
-#         s_sw = torch.clamp(s - self.fatigue_limit[x_cluster], min=1e-8)
-#         self.update_fatigue_limit(s, x_cluster)
-#         log_s = torch.log10(s_sw)
-#         return self._linear(log_s, x_cluster)
-#
-#     @property
-#     def use_fatigue_limit(self):
-#         return True
+        s = torch.abs(required_cols["Relative Maximum Stress_UNSCALED"])
+        return self._linear(_safe_log10(s + 1), x_cluster)
 
 
 class Sendeckyj(AbstractPhy):
