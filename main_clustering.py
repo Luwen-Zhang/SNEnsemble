@@ -7,7 +7,11 @@ from tabensemb.utils import Logging
 import os
 import argparse
 
-tabensemb._stream_filters = ["DeprecationWarning", "PossibleUserWarning", "Using batch_size="]
+tabensemb._stream_filters = [
+    "DeprecationWarning",
+    "PossibleUserWarning",
+    "Using batch_size=",
+]
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -45,14 +49,14 @@ models = [
     ThisWork(
         trainer,
         clustering="KMeans",
-        clustering_layer="2L",
-        program="ThisWork_KMeans_2L",
+        clustering_layer="3L",
+        program="ThisWork_KMeans_3L",
     ),
     ThisWork(
-        trainer, clustering="GMM", clustering_layer="2L", program="ThisWork_GMM_2L"
+        trainer, clustering="GMM", clustering_layer="3L", program="ThisWork_GMM_3L"
     ),
     ThisWork(
-        trainer, clustering="BMM", clustering_layer="2L", program="ThisWork_BMM_2L"
+        trainer, clustering="BMM", clustering_layer="3L", program="ThisWork_BMM_3L"
     ),
     ThisWork(
         trainer,
@@ -78,22 +82,22 @@ models = [
     ThisWork(
         trainer,
         clustering="KMeans",
-        clustering_layer="2L",
-        program="ThisWork_KMeans_2L_PCA",
+        clustering_layer="3L",
+        program="ThisWork_KMeans_3L_PCA",
         pca=True,
     ),
     ThisWork(
         trainer,
         clustering="GMM",
-        clustering_layer="2L",
-        program="ThisWork_GMM_2L_PCA",
+        clustering_layer="3L",
+        program="ThisWork_GMM_3L_PCA",
         pca=True,
     ),
     ThisWork(
         trainer,
         clustering="BMM",
-        clustering_layer="2L",
-        program="ThisWork_BMM_2L_PCA",
+        clustering_layer="3L",
+        program="ThisWork_BMM_3L_PCA",
         pca=True,
     ),
 ]

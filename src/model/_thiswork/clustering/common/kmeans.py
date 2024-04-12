@@ -9,7 +9,12 @@ from torch import nn
 import numpy as np
 from typing import List, Union
 import warnings
-from .base import AbstractClustering, AbstractCluster, AbstractMultilayerClustering
+from .base import (
+    AbstractClustering,
+    AbstractCluster,
+    AbstractMultilayerClustering,
+    AbstractSubspaceClustering,
+)
 from src.model._thiswork.pca.incremental_pca import IncrementalPCA
 
 
@@ -229,5 +234,14 @@ class TwolayerKMeans(AbstractMultilayerClustering):
         super(TwolayerKMeans, self).__init__(
             algorithm_class=PCAKMeans,
             first_layer_cluster_class=FirstKMeansCluster,
+            **kwargs,
+        )
+
+
+class MultilayerKMeans(AbstractSubspaceClustering):
+    def __init__(self, n_clusters_ls, **kwargs):
+        super(MultilayerKMeans, self).__init__(
+            algorithm_classes=[PCAKMeans] * len(n_clusters_ls),
+            n_clusters_ls=n_clusters_ls,
             **kwargs,
         )

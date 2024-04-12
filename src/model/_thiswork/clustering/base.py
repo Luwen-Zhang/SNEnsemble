@@ -922,11 +922,39 @@ class AbstractPhyClustering(AbstractNN):
 
     @staticmethod
     def top_clustering_features_idx(datamodule):
-        top_clustering_features = [
-            x for x in ["Frequency", "R-value"] if x in datamodule.cont_feature_names
-        ]
         return np.array(
-            [datamodule.cont_feature_names.index(x) for x in top_clustering_features]
+            list(AbstractPhyClustering.second_clustering_features_idx(datamodule))
+            + list(AbstractPhyClustering.third_clustering_features_idx(datamodule))
+        )
+
+    @staticmethod
+    def first_clustering_features_idx(datamodule) -> np.ndarray:
+        return np.concatenate(
+            (
+                datamodule.get_feature_idx_by_type(
+                    typ="Material", var_type="continuous"
+                ),
+                datamodule.get_feature_idx_by_type(
+                    typ="Specimen", var_type="continuous"
+                ),
+                datamodule.get_feature_idx_by_type(
+                    typ="Property", var_type="continuous"
+                ),
+            )
+        ).astype(int)
+
+    @staticmethod
+    def second_clustering_features_idx(datamodule):
+        clustering_features = ["Frequency"]
+        return np.array(
+            [datamodule.cont_feature_names.index(x) for x in clustering_features]
+        )
+
+    @staticmethod
+    def third_clustering_features_idx(datamodule):
+        clustering_features = ["R-value"]
+        return np.array(
+            [datamodule.cont_feature_names.index(x) for x in clustering_features]
         )
 
 
