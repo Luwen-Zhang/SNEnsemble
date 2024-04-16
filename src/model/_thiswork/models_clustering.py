@@ -2,6 +2,7 @@ from tabensemb.model.base import AbstractNN, get_sequential
 import numpy as np
 import torch
 from torch import nn
+from .bayes_nn.bbp import MCDropout
 
 
 class AbstractClusteringModel(AbstractNN):
@@ -12,6 +13,7 @@ class AbstractClusteringModel(AbstractNN):
         cont_cat_model,
         phy_name,
         dropout=0.0,
+        uncertainty: str = None,
         **kwargs,
     ):
         super(AbstractClusteringModel, self).__init__(datamodule, **kwargs)
@@ -23,18 +25,33 @@ class AbstractClusteringModel(AbstractNN):
             self.n_inputs, self.cont_cat_model
         )
         self.phy_name = phy_name
-        self.cls_head = nn.Sequential(
-            get_sequential(
-                [256, 256, 256],
+        self.uncertainty = uncertainty
+        if uncertainty is not None and uncertainty == "mcd":
+            self.cls_head = MCDropout(
+                layers=[256, 256, 256],
                 n_inputs=hidden_rep_dim,
-                n_outputs=1,
-                act_func=nn.ReLU,
-                dropout=dropout,
-                use_norm=True,
-                norm_type="batch",
-            ),
-            nn.Sigmoid(),
-        )
+                n_outputs=2,  # It is reduced to 1 internally for binary classification
+                train_dropout=dropout,
+                sample_dropout=0.1,
+                type="homo",
+                task="classification",
+                get_sequential_kwargs=dict(
+                    use_norm=False
+                ),  # batchnorm does not work when operating sampled x, so not used for now.
+            )
+        else:
+            self.cls_head = nn.Sequential(
+                get_sequential(
+                    [256, 256, 256],
+                    n_inputs=hidden_rep_dim,
+                    n_outputs=1,
+                    act_func=nn.ReLU,
+                    dropout=dropout,
+                    use_norm=True,
+                    norm_type="batch",
+                ),
+                nn.Sigmoid(),
+            )
         self.cls_head_loss = nn.BCELoss()
         if isinstance(self.cont_cat_model, nn.Module):
             self.set_requires_grad(self.cont_cat_model, requires_grad=False)
@@ -55,8 +72,16 @@ class AbstractClusteringModel(AbstractNN):
             derived_tensors,
             model_name=self.phy_name,
         )
-        # Projection from hidden output to deep learning weights
         dl_weight = self.cls_head(hidden)
+        # Projection from hidden output to deep learning weights
+        if getattr(self, "uncertainty", None) is not None:
+            mu, al_var, var = self.cls_head.predict(
+                hidden, n_samples=100, return_separate_var=True
+            )
+            std = torch.sqrt(var)
+            dl_weight = torch.clamp(dl_weight - std.view(-1, 1), min=1e-8)
+            self.mu = mu
+            self.std = std
         out = phy_pred + torch.mul(dl_weight, dl_pred - phy_pred)
         self.dl_pred = dl_pred
         self.phy_pred = phy_pred

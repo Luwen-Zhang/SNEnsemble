@@ -25,6 +25,7 @@ class ThisWork(TorchModel):
         pca=False,
         clustering="KMeans",
         clustering_layer="1L",
+        uncertainty=None,
         **kwargs,
     ):
         self.reduce_bayes_steps = reduce_bayes_steps
@@ -32,6 +33,7 @@ class ThisWork(TorchModel):
         self.pca = pca
         self.clustering = clustering
         self.clustering_layer = clustering_layer
+        self.uncertainty = uncertainty
         super(ThisWork, self).__init__(*args, **kwargs)
 
     def _get_program_name(self):
@@ -121,6 +123,7 @@ class ThisWork(TorchModel):
                 cont_cat_model=cont_cat_model,
                 clustering_phy_model=clustering_phy_model,
                 phy_name=phy_name,
+                uncertainty=getattr(self, "uncertainty", None),
                 **kwargs,
             )
         else:
