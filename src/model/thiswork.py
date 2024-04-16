@@ -876,35 +876,27 @@ class ThisWork(TorchModel):
         return inspect_dict
 
     def inspect_phy_models(self, model_name, **kwargs):
-        target_attr = ["clustering_phy_model"]
+        target_attr = ["phys", "running_phy_weight"]
         inspect_dict = self.inspect_attr(
             model_name=model_name, attributes=target_attr, to_numpy=False, **kwargs
         )
-        phys = inspect_dict["train"]["clustering_phy_model"].phys
-        phy_weight = (
-            inspect_dict["train"]["clustering_phy_model"]
-            .running_phy_weight.data.detach()
-            .cpu()
-        )
+        phys = inspect_dict["train"]["phys"]
+        phy_weight = inspect_dict["train"]["running_phy_weight"]
         norm_phy_weight = nn.functional.normalize(torch.abs(phy_weight), p=1).numpy()
         return phys, norm_phy_weight
 
     def inspect_clusters(self, model_name, **kwargs):
-        target_attr = ["clustering_phy_model"]
+        target_attr = ["x_cluster"]
         inspect_dict = self.inspect_attr(
             model_name=model_name, attributes=target_attr, **kwargs
         )
         to_cpu = lambda x: x.detach().cpu().numpy()
         if "USER_INPUT" in inspect_dict.keys():
-            return to_cpu(inspect_dict["USER_INPUT"]["clustering_phy_model"].x_cluster)
+            return to_cpu(inspect_dict["USER_INPUT"]["x_cluster"])
         else:
-            cluster_train = to_cpu(
-                inspect_dict["train"]["clustering_phy_model"].x_cluster
-            )
-            cluster_val = to_cpu(inspect_dict["val"]["clustering_phy_model"].x_cluster)
-            cluster_test = to_cpu(
-                inspect_dict["test"]["clustering_phy_model"].x_cluster
-            )
+            cluster_train = to_cpu(inspect_dict["train"]["x_cluster"])
+            cluster_val = to_cpu(inspect_dict["val"]["x_cluster"])
+            cluster_test = to_cpu(inspect_dict["test"]["x_cluster"])
             return cluster_train, cluster_val, cluster_test
 
     def df_with_cluster(self, model_name, save_to: str = None, **kwargs):

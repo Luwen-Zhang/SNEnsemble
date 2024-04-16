@@ -426,7 +426,7 @@ class FatigueTrainer(Trainer):
             if len(m_train_indices) != 0
             else np.append(m_val_indices, m_test_indices)
         )
-        x_value, mean_pred, ci_left, ci_right = self._bootstrap_fit(
+        returned = self._bootstrap_fit(
             program=program,
             df=self.df.copy().loc[chosen_indices, :],
             derived_data=self.datamodule.get_derived_data_slice(
@@ -437,11 +437,15 @@ class FatigueTrainer(Trainer):
             x_max=s_max,
             CI=CI,
             average=False,
-            verbose=verbose,
             model_name=model_name,
             refit=refit if len(m_train_indices) != 0 else False,
             **kwargs,
         )
+        if "inspect_attr_kwargs" in kwargs.keys():
+            x_value, mean_pred, ci_left, ci_right, inspects = returned
+        else:
+            x_value, mean_pred, ci_left, ci_right = returned
+            inspects = None
 
         # Defining a series of utilities.
         def get_interval_psn(s, n, xvals, n_pred_vals=None):
@@ -612,11 +616,11 @@ class FatigueTrainer(Trainer):
         ax.legend(**legend_kwargs_)
         if log_stress:
             ax.set_yscale("log")
-        ax.set_xlim([0, 10])
+        # ax.set_xlim([0, 10])
         ax.set_title(f"{m_code}")
 
         path = os.path.join(self.project_root, f"SN_curves_{program}_{model_name}")
-        return self._plot_action_after_plot(
+        returned =  self._plot_action_after_plot(
             fig_name=os.path.join(
                 path,
                 m_code.replace("/", "_") + ".pdf",
@@ -629,6 +633,7 @@ class FatigueTrainer(Trainer):
             save_show_close=save_show_close,
             savefig_kwargs=savefig_kwargs,
         )
+        return returned if inspects is None else (returned, inspects)
 
     @staticmethod
     def _sn_interval(
