@@ -33,7 +33,13 @@ models = [
     PytorchTabular(trainer),
     WideDeep(trainer),
     AutoGluon(trainer),
-    ThisWork(trainer, pca=False, clustering="KMeans", clustering_layer="3L"),
+    ThisWork(
+        trainer,
+        pca=False,
+        clustering="KMeans",
+        clustering_layer="3L",
+        uncertainty="mcd",
+    ),
 ]
 if limit_batch_size is not None:
     for model in models:
