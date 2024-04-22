@@ -12,7 +12,6 @@ import warnings
 from .base import (
     AbstractClustering,
     AbstractCluster,
-    AbstractMultilayerClustering,
     AbstractSubspaceClustering,
 )
 from src.model._thiswork.pca.incremental_pca import IncrementalPCA
@@ -211,31 +210,6 @@ class PCAKMeans(KMeans):
         if hasattr(self, "pca"):
             x = self.pca(x)
         return super(PCAKMeans, self).forward(x)
-
-
-class FirstKMeansCluster(Cluster):
-    def __init__(
-        self,
-        n_input_outer: int,
-        n_input_inner: int,
-        exp_avg_factor: float = 1.0,
-        **kwargs,
-    ):
-        super(FirstKMeansCluster, self).__init__(
-            n_input=n_input_outer, exp_avg_factor=exp_avg_factor
-        )
-        self.inner_layer = KMeans(
-            exp_avg_factor=exp_avg_factor, n_input=n_input_inner, **kwargs
-        )
-
-
-class TwolayerKMeans(AbstractMultilayerClustering):
-    def __init__(self, **kwargs):
-        super(TwolayerKMeans, self).__init__(
-            algorithm_class=PCAKMeans,
-            first_layer_cluster_class=FirstKMeansCluster,
-            **kwargs,
-        )
 
 
 class MultilayerKMeans(AbstractSubspaceClustering):

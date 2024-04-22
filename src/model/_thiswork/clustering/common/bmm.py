@@ -6,7 +6,7 @@ from .gmm import GMM, Cluster
 import torch
 import warnings
 from src.model._thiswork.pca.incremental_pca import IncrementalPCA
-from .base import AbstractMultilayerClustering, AbstractSubspaceClustering
+from .base import AbstractSubspaceClustering
 import numpy as np
 from typing import List, Union
 from torch import nn
@@ -152,31 +152,6 @@ class PCABMM(BMM):
         if hasattr(self, "pca"):
             x = self.pca(x)
         return super(PCABMM, self).forward(x)
-
-
-class FirstBMMCluster(Cluster):
-    def __init__(
-        self,
-        n_input_outer: int,
-        n_input_inner: int,
-        exp_avg_factor: float = 1.0,
-        **kwargs,
-    ):
-        super(FirstBMMCluster, self).__init__(
-            n_input=n_input_outer, exp_avg_factor=exp_avg_factor
-        )
-        self.inner_layer = BMM(
-            exp_avg_factor=exp_avg_factor, n_input=n_input_inner, **kwargs
-        )
-
-
-class TwolayerBMM(AbstractMultilayerClustering):
-    def __init__(self, **kwargs):
-        super(TwolayerBMM, self).__init__(
-            algorithm_class=PCABMM,
-            first_layer_cluster_class=FirstBMMCluster,
-            **kwargs,
-        )
 
 
 class MultilayerBMM(AbstractSubspaceClustering):

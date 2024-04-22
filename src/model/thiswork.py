@@ -7,9 +7,6 @@ from skopt.space import Integer, Real
 from typing import Union, List, Iterable
 from ._thiswork.clustering.singlelayer import GMMPhy, BMMPhy, KMeansPhy
 from ._thiswork.clustering.multilayer import (
-    TwolayerKMeansPhy,
-    TwolayerBMMPhy,
-    TwolayerGMMPhy,
     MultilayerKMeansPhy,
     MultilayerBMMPhy,
     MultilayerGMMPhy,
@@ -72,7 +69,7 @@ class ThisWork(TorchModel):
             "PHYSICS_" + "_".join(x)
             for x in product(
                 ["NoPCA", "PCA"],
-                ["1L", "2L", "3L"],
+                ["1L", "3L"],
                 ["KMeans", "GMM", "BMM"],
             )
         ]
@@ -82,7 +79,7 @@ class ThisWork(TorchModel):
                 available_names,
                 ["NoWrap", "Wrap"],
                 ["NoPCA", "PCA"],
-                ["1L", "2L", "3L"],
+                ["1L", "3L"],
                 ["KMeans", "GMM", "BMM"],
             )
         ]
@@ -128,23 +125,17 @@ class ThisWork(TorchModel):
             )
         else:
             if "KMeans" in components:
-                phy_class = {
-                    "1L": KMeansPhy,
-                    "2L": TwolayerKMeansPhy,
-                    "3L": MultilayerKMeansPhy,
-                }[self.clustering_layer]
+                phy_class = {"1L": KMeansPhy, "3L": MultilayerKMeansPhy}[
+                    self.clustering_layer
+                ]
             elif "GMM" in components:
-                phy_class = {
-                    "1L": GMMPhy,
-                    "2L": TwolayerGMMPhy,
-                    "3L": MultilayerGMMPhy,
-                }[self.clustering_layer]
+                phy_class = {"1L": GMMPhy, "3L": MultilayerGMMPhy}[
+                    self.clustering_layer
+                ]
             elif "BMM" in components:
-                phy_class = {
-                    "1L": BMMPhy,
-                    "2L": TwolayerBMMPhy,
-                    "3L": MultilayerBMMPhy,
-                }[self.clustering_layer]
+                phy_class = {"1L": BMMPhy, "3L": MultilayerBMMPhy}[
+                    self.clustering_layer
+                ]
             else:
                 raise Exception(f"Clustering algorithm not found.")
 
@@ -178,30 +169,6 @@ class ThisWork(TorchModel):
                 return phy_class(
                     n_pca_dim=n_pca_dim,
                     datamodule=self.datamodule,
-                    on_cpu=True,
-                    **kwargs,
-                )
-            elif "2L" == self.clustering_layer:
-                clustering_features = list(
-                    phy_class.basic_clustering_features_idx(self.datamodule)
-                )
-                top_level_clustering_features = phy_class.top_clustering_features_idx(
-                    self.datamodule
-                )
-                input_2_idx = [
-                    list(clustering_features).index(x)
-                    for x in top_level_clustering_features
-                ]
-                input_1_idx = list(
-                    np.setdiff1d(np.arange(len(clustering_features)), input_2_idx)
-                )
-                return phy_class(
-                    n_pca_dim=n_pca_dim,
-                    datamodule=self.datamodule,
-                    n_input_1=len(input_1_idx),
-                    n_input_2=len(input_2_idx),
-                    input_1_idx=input_1_idx,
-                    input_2_idx=input_2_idx,
                     on_cpu=True,
                     **kwargs,
                 )
@@ -246,23 +213,6 @@ class ThisWork(TorchModel):
                         list(self.trainer.chosen_params.keys()).index("batch_size")
                     ],
                 ]
-            elif "2L" == self.clustering_layer:
-                return [
-                    Integer(
-                        low=1, high=256, prior="uniform", name="n_clusters", dtype=int
-                    ),
-                    Integer(
-                        low=1,
-                        high=32,
-                        prior="uniform",
-                        name="n_clusters_per_cluster",
-                        dtype=int,
-                    ),
-                    Real(low=1e-8, high=1e8, prior="log-uniform", name="l1_penalty"),
-                    self.trainer.SPACE[
-                        list(self.trainer.chosen_params.keys()).index("batch_size")
-                    ],
-                ]
             else:
                 return [
                     Integer(
@@ -297,13 +247,6 @@ class ThisWork(TorchModel):
             if "1L" == self.clustering_layer:
                 return {
                     "n_clusters": 32,
-                    "l1_penalty": 1e-8,
-                    "batch_size": self.trainer.chosen_params["batch_size"],
-                }
-            elif "2L" == self.clustering_layer:
-                return {
-                    "n_clusters": 32,
-                    "n_clusters_per_cluster": 8,
                     "l1_penalty": 1e-8,
                     "batch_size": self.trainer.chosen_params["batch_size"],
                 }
