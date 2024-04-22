@@ -1,25 +1,43 @@
 from tabensemb.utils import *
 from tabensemb.model import TorchModel
 from ._thiswork.models_clustering import *
-from ._thiswork.models_with_seq import *
-from ._thiswork.models_basic import *
-from src.data.dataderiver import TrendDeriver
 from itertools import product
 from scipy import stats
-from skopt.space import Integer
+from skopt.space import Integer, Real
+from typing import Union, List, Iterable
+from ._thiswork.clustering.singlelayer import GMMPhy, BMMPhy, KMeansPhy
+from ._thiswork.clustering.multilayer import (
+    MultilayerKMeansPhy,
+    MultilayerBMMPhy,
+    MultilayerGMMPhy,
+)
 
 
 class ThisWork(TorchModel):
-    def __init__(self, *args, reduce_bayes_steps=False, n_pca_dim=None, **kwargs):
-        super(ThisWork, self).__init__(*args, **kwargs)
+    def __init__(
+        self,
+        *args,
+        reduce_bayes_steps=False,
+        n_pca_dim=None,
+        pca=False,
+        clustering="KMeans",
+        clustering_layer="1L",
+        uncertainty=None,
+        **kwargs,
+    ):
         self.reduce_bayes_steps = reduce_bayes_steps
         self.n_pca_dim = n_pca_dim
+        self.pca = pca
+        self.clustering = clustering
+        self.clustering_layer = clustering_layer
+        self.uncertainty = uncertainty
+        super(ThisWork, self).__init__(*args, **kwargs)
 
     def _get_program_name(self):
         return "ThisWork"
 
     @staticmethod
-    def _get_model_names():
+    def _get_other_model_base_model_names():
         available_names = []
         try:
             from tabensemb.model.autogluon import AutoGluon
@@ -41,141 +59,209 @@ class ThisWork(TorchModel):
             ]
         except:
             pass
+        return available_names
 
-        all_names = [
+    @staticmethod
+    def _get_model_names():
+        available_names = ThisWork._get_other_model_base_model_names()
+
+        physics_names = [
+            "PHYSICS_" + "_".join(x)
+            for x in product(
+                ["NoPCA", "PCA"],
+                ["1L", "3L"],
+                ["KMeans", "GMM", "BMM"],
+            )
+        ]
+        all_names = physics_names + [
             "_".join(x)
             for x in product(
                 available_names,
                 ["NoWrap", "Wrap"],
-                ["1L"],
-                ["NoPCA"],
-                ["KMeans"],
+                ["NoPCA", "PCA"],
+                ["1L", "3L"],
+                ["KMeans", "GMM", "BMM"],
             )
         ]
         for name in all_names.copy():
             components = name.split("_")
-            wrap_invalid = (
-                any([model in components for model in ["TabNet"]])
-                or "AutoGluon" in components
-                or "PytorchTabular_NODE" in name
-            )
-            if "PytorchTabular_TabTransformer" in name:
-                pass
-            if "Wrap" in components and wrap_invalid:
-                all_names.remove(name)
-            elif "NoWrap" in components and not wrap_invalid:
-                all_names.remove(name)
+            if "PHYSICS" not in components:
+                wrap_invalid = (
+                    any([model in components for model in ["TabNet"]])
+                    or "AutoGluon" in components
+                    or "PytorchTabular_NODE" in name
+                )
+                if "PytorchTabular_TabTransformer" in name:
+                    pass
+                if "Wrap" in components and wrap_invalid:
+                    all_names.remove(name)
+                elif "NoWrap" in components and not wrap_invalid:
+                    all_names.remove(name)
         # all_names += ["CatEmbed_Category Embedding_Wrap_1L_NoPCA_KMeans"]
         return all_names
 
     def _new_model(self, model_name, verbose, required_models=None, **kwargs):
-        database = self.trainer.args["database"]
-        if any(
-            [
-                isinstance(deriver, TrendDeriver)
-                for deriver in self.datamodule.dataderivers
-            ]
-        ):
-            phy_category = "trend"
-        else:
-            if "composite" in database:
-                phy_category = "composite"
-            elif "alloy" in database:
-                phy_category = "alloy"
-            else:
-                warnings.warn(
-                    f"Neither `composite` nor `alloy` is in the name of the database `{database}`. "
-                    f"Only parts of the Phy models are used."
-                )
-                phy_category = None
-        fix_kwargs = dict(
-            n_inputs=len(self.datamodule.cont_feature_names),
-            n_outputs=len(self.datamodule.label_name),
-            layers=self.datamodule.args["layers"],
-            cat_num_unique=[len(x) for x in self.trainer.cat_feature_mapping.values()],
-            datamodule=self.datamodule,
-            phy_category=phy_category,
-        )
         components = model_name.split("_")
-        if "Wrap" in components:
-            cont_cat_model = required_models[
-                f"EXTERN_{components[0]}_{components[1]}_WRAP"
-            ]
+        if "PHYSICS" not in components:
+            cls = AbstractClusteringModel
+            if "Wrap" in components:
+                cont_cat_model = required_models[
+                    f"EXTERN_{components[0]}_{components[1]}_WRAP"
+                ]
+            else:
+                cont_cat_model = required_models[
+                    f"EXTERN_{components[0]}_{components[1]}"
+                ]
+            phy_name = f"PHYSICS_{'_'.join(components[-3:])}"
+            clustering_phy_model = required_models[phy_name]
+            return cls(
+                datamodule=self.datamodule,
+                embedding_dim=3,
+                cont_cat_model=cont_cat_model,
+                clustering_phy_model=clustering_phy_model,
+                phy_name=phy_name,
+                uncertainty=getattr(self, "uncertainty", None),
+                **kwargs,
+            )
         else:
-            cont_cat_model = required_models[f"EXTERN_{components[0]}_{components[1]}"]
-        if "1L" in components:
-            cls = Abstract1LClusteringModel
             if "KMeans" in components:
-                phy_class = KMeansPhy
+                phy_class = {"1L": KMeansPhy, "3L": MultilayerKMeansPhy}[
+                    self.clustering_layer
+                ]
             elif "GMM" in components:
-                phy_class = GMMPhy
+                phy_class = {"1L": GMMPhy, "3L": MultilayerGMMPhy}[
+                    self.clustering_layer
+                ]
             elif "BMM" in components:
-                phy_class = BMMPhy
+                phy_class = {"1L": BMMPhy, "3L": MultilayerBMMPhy}[
+                    self.clustering_layer
+                ]
             else:
                 raise Exception(f"Clustering algorithm not found.")
-        else:
-            cls = Abstract2LClusteringModel
-            if "KMeans" in components:
-                phy_class = TwolayerKMeansPhy
-            elif "GMM" in components:
-                phy_class = TwolayerGMMPhy
-            elif "BMM" in components:
-                phy_class = TwolayerBMMPhy
+
+            if "PCA" in components:
+                if "1L" == self.clustering_layer:
+                    feature_idx = phy_class.basic_clustering_features_idx(
+                        self.datamodule
+                    )
+                else:
+                    feature_idx = phy_class.first_clustering_features_idx(
+                        self.datamodule
+                    )
+                if len(feature_idx) > 2:
+                    pca = self.datamodule.pca(feature_idx=feature_idx)
+                    n_pca_dim = (
+                        (
+                            np.where(pca.explained_variance_ratio_.cumsum() < 0.9)[0][
+                                -1
+                            ]
+                            + 1
+                        )
+                        if self.n_pca_dim is None
+                        else self.n_pca_dim
+                    )
+                else:
+                    n_pca_dim = len(feature_idx)
             else:
-                raise Exception(f"Clustering algorithm not found.")
-        if "PCA" in components:
-            if "1L" in components:
-                feature_idx = cls.basic_clustering_features_idx(self.datamodule)
-            else:
-                feature_idx = cls.top_clustering_features_idx(self.datamodule)
-            if len(feature_idx) > 2:
-                pca = self.datamodule.pca(feature_idx=feature_idx)
-                n_pca_dim = (
-                    (np.where(pca.explained_variance_ratio_.cumsum() < 0.9)[0][-1] + 1)
-                    if self.n_pca_dim is None
-                    else self.n_pca_dim
+                n_pca_dim = None
+
+            if "1L" == self.clustering_layer:
+                return phy_class(
+                    n_pca_dim=n_pca_dim,
+                    datamodule=self.datamodule,
+                    on_cpu=True,
+                    **kwargs,
                 )
             else:
-                n_pca_dim = len(feature_idx)
-        else:
-            n_pca_dim = None
-
-        return cls(
-            phy_class=phy_class,
-            **fix_kwargs,
-            embedding_dim=3,
-            n_pca_dim=n_pca_dim,
-            cont_cat_model=cont_cat_model,
-            **kwargs,
-        )
+                clustering_features = list(
+                    phy_class.basic_clustering_features_idx(self.datamodule)
+                )
+                input_idx_1 = [
+                    clustering_features.index(x)
+                    for x in phy_class.first_clustering_features_idx(self.datamodule)
+                ]
+                input_idx_2 = [
+                    clustering_features.index(x)
+                    for x in phy_class.second_clustering_features_idx(self.datamodule)
+                ]
+                input_idx_3 = [
+                    clustering_features.index(x)
+                    for x in phy_class.third_clustering_features_idx(self.datamodule)
+                ]
+                return phy_class(
+                    datamodule=self.datamodule,
+                    n_clusters_ls=[
+                        kwargs["n_clusters_1"],
+                        kwargs["n_clusters_2"],
+                        kwargs["n_clusters_3"],
+                    ],
+                    input_idxs=[input_idx_1, input_idx_2, input_idx_3],
+                    kwargses=[dict(n_pca_dim=n_pca_dim), {}, {}],
+                    on_cpu=True,
+                    **kwargs,
+                )
 
     def _space(self, model_name):
-        components = model_name.split("_")
-        if "1L" in components:
+        if "PHYSICS" in model_name:
+            if "1L" == self.clustering_layer:
+                return [
+                    Integer(
+                        low=1, high=256, prior="uniform", name="n_clusters", dtype=int
+                    ),
+                    Real(low=1e-8, high=1e8, prior="log-uniform", name="l1_penalty"),
+                    self.trainer.SPACE[
+                        list(self.trainer.chosen_params.keys()).index("batch_size")
+                    ],
+                ]
+            else:
+                return [
+                    Integer(
+                        low=1, high=256, prior="uniform", name="n_clusters_1", dtype=int
+                    ),
+                    Integer(
+                        low=1,
+                        high=32,
+                        prior="uniform",
+                        name="n_clusters_2",
+                        dtype=int,
+                    ),
+                    Integer(
+                        low=1,
+                        high=16,
+                        prior="uniform",
+                        name="n_clusters_3",
+                        dtype=int,
+                    ),
+                    Real(low=1e-8, high=1e8, prior="log-uniform", name="l1_penalty"),
+                    self.trainer.SPACE[
+                        list(self.trainer.chosen_params.keys()).index("batch_size")
+                    ],
+                ]
+        else:
             return [
-                Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
-            ] + self.trainer.SPACE
-        elif "2L" in components:
-            return [
-                Integer(low=1, high=64, prior="uniform", name="n_clusters", dtype=int),
-                Integer(
-                    low=1,
-                    high=32,
-                    prior="uniform",
-                    name="n_clusters_per_cluster",
-                    dtype=int,
-                ),
+                Real(low=0, high=0.3, prior="uniform", name="dropout")
             ] + self.trainer.SPACE
 
     def _initial_values(self, model_name):
-        components = model_name.split("_")
-        res = {}
-        if "1L" in components:
-            res = {"n_clusters": 32}
-        elif "2L" in components:
-            res = {"n_clusters": 32, "n_clusters_per_cluster": 8}
-        res.update(self.trainer.chosen_params)
-        return res
+        if "PHYSICS" in model_name:
+            if "1L" == self.clustering_layer:
+                return {
+                    "n_clusters": 32,
+                    "l1_penalty": 1e-8,
+                    "batch_size": self.trainer.chosen_params["batch_size"],
+                }
+            else:
+                return {
+                    "n_clusters_1": 32,
+                    "n_clusters_2": 8,
+                    "n_clusters_3": 8,
+                    "l1_penalty": 1e-8,
+                    "batch_size": self.trainer.chosen_params["batch_size"],
+                }
+        else:
+            res = {"dropout": 0.0}
+            res.update(self.trainer.chosen_params)
+            return res
 
     def _custom_training_params(self, model_name) -> Dict:
         if getattr(self, "reduce_bayes_steps", False):
@@ -184,46 +270,62 @@ class ThisWork(TorchModel):
             return super(ThisWork, self)._custom_training_params(model_name=model_name)
 
     def _conditional_validity(self, model_name: str) -> bool:
-        components = model_name.split("_")
-        if "2L" in components:
-            datamodule = getattr(self, "datamodule", self.trainer.datamodule)
-            top_level_clustering_features = (
-                AbstractClusteringModel.top_clustering_features_idx(datamodule)
-            )
-            if len(top_level_clustering_features) == 0:
-                return False
-        if (
-            components[0] not in self.trainer.modelbases_names
-            or components[1]
-            not in self.trainer.get_modelbase(program=components[0]).get_model_names()
-        ):
+        if self.pca and "NoPCA" in model_name:
             return False
-        return True
+        if not self.pca and "NoPCA" not in model_name and "PCA" in model_name:
+            return False
+        if self.clustering not in model_name:
+            return False
+        if self.clustering_layer not in model_name:
+            return False
+        if "PHYSICS" not in model_name:
+            components = model_name.split("_")
+            if (
+                components[0] not in self.trainer.modelbases_names
+                or components[1]
+                not in self.trainer.get_modelbase(
+                    program=components[0]
+                ).get_model_names()
+            ):
+                return False
+            return True
+        else:
+            return True
 
     def required_models(self, model_name: str) -> Union[List[str], None]:
         components = model_name.split("_")
-        if "Wrap" in components:
-            models = [f"EXTERN_{components[0]}_{components[1]}_WRAP"]
+        if "PHYSICS" not in model_name:
+            if "Wrap" in components:
+                models = [f"EXTERN_{components[0]}_{components[1]}_WRAP"]
+            else:
+                models = [f"EXTERN_{components[0]}_{components[1]}"]
+            models += [f"PHYSICS_{'_'.join(components[-3:])}"]
+            return models
         else:
-            models = [f"EXTERN_{components[0]}_{components[1]}"]
-        return models
+            return None
 
-    def _prepare_custom_datamodule(self, model_name):
+    def _prepare_custom_datamodule(self, model_name, warm_start=False):
         from tabensemb.data import DataModule
 
         base = self.trainer.datamodule
-        datamodule = DataModule(config=self.trainer.datamodule.args, initialize=False)
-        datamodule.set_data_imputer("MeanImputer")
-        datamodule.set_data_derivers(
-            [
-                ("UnscaledDataDeriver", {"derived_name": "Unscaled"}),
-                # (
-                #     "TrendDeriver",
-                #     {"stacked": False, "derived_name": "pdp", "plot": True},
-                # ),
-            ],
-        )
-        datamodule.set_data_processors([("StandardScaler", {})])
+        if not warm_start or not hasattr(self, "datamodule"):
+            datamodule = DataModule(
+                config=self.trainer.datamodule.args, initialize=False
+            )
+            datamodule.set_data_imputer("MeanImputer")
+            datamodule.set_data_derivers(
+                [
+                    ("UnscaledDataDeriver", {"derived_name": "Unscaled"}),
+                    # (
+                    #     "TrendDeriver",
+                    #     {"stacked": False, "derived_name": "pdp", "plot": True},
+                    # ),
+                ],
+            )
+            datamodule.set_data_processors([("StandardScaler", {})])
+            warm_start = False
+        else:
+            datamodule = self.datamodule
         datamodule.set_data(
             base.df,
             cont_feature_names=base.cont_feature_names,
@@ -233,6 +335,7 @@ class ThisWork(TorchModel):
             val_indices=base.val_indices,
             test_indices=base.test_indices,
             verbose=False,
+            warm_start=warm_start,
         )
         tmp_derived_data = base.derived_data.copy()
         tmp_derived_data.update(datamodule.derived_data)
@@ -265,13 +368,13 @@ class ThisWork(TorchModel):
         )
         improved_measure = improved[["Program", "Model"]].copy()
         if cv_path is not None:
-            ttest_res = self.improvement_cv_ttest(
+            test_res = self.improvement_cv_test(
                 model_names=list(improved["Model"]),
                 metrics=list(base.columns[2:]),
                 cv_path=cv_path,
             )
         else:
-            ttest_res = None
+            test_res = None
         for idx, model in enumerate(improved["Model"]):
             components = model.split("_")
             modelbase = components[0]
@@ -296,18 +399,18 @@ class ThisWork(TorchModel):
                 improved_measure.loc[idx, f"{metric} % Improvement"] = (
                     higher_better * (improved_metric - base_metric) / base_metric
                 ) * 100
-                if ttest_res is not None:
+                if test_res is not None:
                     improved_measure.loc[
                         idx, f"{metric} Improvement p-value"
-                    ] = ttest_res[model][metric]["p-value"]
+                    ] = test_res[model][metric]["p-value"]
         improved_measure.sort_values(
             by="Testing RMSE % Improvement",
             ascending=False,
             inplace=True,
             ignore_index=True,
         )
-        if ttest_res is not None:
-            return improved_measure, ttest_res
+        if test_res is not None:
+            return improved_measure, test_res
         else:
             return improved_measure
 
@@ -402,19 +505,20 @@ class ThisWork(TorchModel):
         palette=None,
         catplot_kwargs=None,
     ):
-        _catplot_kwargs = dict(
-            legend_out=True,
-            sharex=False,
-            sharey=False,
-            palette=palette,
-            flierprops={"marker": "o"},
-            fliersize=2,
-            dodge=False,
-            height=2,
-            aspect=1,
+        _catplot_kwargs = update_defaults_by_kwargs(
+            dict(
+                legend_out=True,
+                sharex=False,
+                sharey=False,
+                palette=palette,
+                flierprops={"marker": "o"},
+                fliersize=2,
+                dodge=False,
+                height=2,
+                aspect=1,
+            ),
+            catplot_kwargs,
         )
-        if catplot_kwargs is not None:
-            _catplot_kwargs.update(catplot_kwargs)
         dfs = []
         title_dict = {"% Improvement ranking": {}, "Leaderboard ranking": {}}
         for idx, category in enumerate(method_ranking.keys()):
@@ -461,110 +565,200 @@ class ThisWork(TorchModel):
         plt.show()
         plt.close()
 
-    def plot_improvement(
+    def plot_compare(
         self,
         leaderboard,
         improved_measure,
-        ttest_res,
+        test_res,
         metric,
-        save_to=None,
-        palette=None,
-        figsize_kwargs=None,
-        catplot_kwargs=None,
+        p_symbol_map_func,
+        clr=None,
+        ax=None,
+        p_cap_width=0.4,
+        p_cap_height=0.05,
+        p_pos_y=0.3,
+        p_text_up_pos_y=0.28,
+        p_text_kwargs=None,
+        save_show_close=True,
+        figure_kwargs=None,
+        boxplot_kwargs=None,
         legend_kwargs=None,
-        adjust_kwargs=None,
+        savefig_kwargs=None,
     ):
         leaderboard = leaderboard[leaderboard["Program"] != self.program]
         model_names = improved_measure["Model"]
-        if palette is None:
-            palette = sns.color_palette(global_palette)
-        _figsize_kwargs = dict(
-            max_col=5, width_per_item=1.6, height_per_item=1.6, max_width=5
+        clr = global_palette if clr is None else clr
+        legend_kwargs_ = update_defaults_by_kwargs(
+            dict(title=None, frameon=False), legend_kwargs
         )
-        if figsize_kwargs is not None:
-            _figsize_kwargs.update(figsize_kwargs)
-        figsize, width, height = get_figsize(n=len(leaderboard), **_figsize_kwargs)
-        _legend_kwargs = dict(bbox_to_anchor=(0.85, 0.075), ncol=4)
-        if legend_kwargs is not None:
-            _legend_kwargs.update(legend_kwargs)
-        _adjust_kwargs = dict(bottom=0.15)
-        if adjust_kwargs is not None:
-            _adjust_kwargs.update(adjust_kwargs)
-        _catplot_kwargs = dict(
-            legend_out=True,
-            sharex=False,
-            sharey=False,
-            palette=palette,
-            flierprops={"marker": "o"},
-            fliersize=2,
-            dodge=False,
-            height=figsize[1] / height,
-            aspect=0.4,
+        figure_kwargs_ = update_defaults_by_kwargs(dict(), figure_kwargs)
+        boxplot_kwargs_ = update_defaults_by_kwargs(
+            dict(
+                orient="h",
+                linewidth=1,
+                fliersize=2,
+                flierprops={"marker": "o"},
+                palette=clr,
+                saturation=1,
+            ),
+            boxplot_kwargs,
         )
-        if catplot_kwargs is not None:
-            _catplot_kwargs.update(catplot_kwargs)
+        p_text_kwargs_ = update_defaults_by_kwargs(dict(), p_text_kwargs)
+        ax, given_ax = self.trainer._plot_action_init_ax(ax, figure_kwargs_)
+        orient = boxplot_kwargs_["orient"]
         dfs = []
-        title_dict = {row: {} for row in range(height)}
+        p_values = {}
         for idx, (program, model) in enumerate(
             zip(leaderboard["Program"], leaderboard["Model"])
         ):
-            col = idx % width
-            row = idx // width
-            title_dict[row][col] = f"{program}\n{model}"
             improve_models = [m for m in model_names if f"{program}_{model}" in m]
             if len(improve_models) == 0:
                 continue
             base_metrics = {
-                "Base model": ttest_res[improve_models[0]][metric]["base"],
+                "Base model": test_res[improve_models[0]][metric]["base"],
             }
             improved_metrics = {
-                "-".join(m.split("_")[2:]): ttest_res[m][metric]["improved"]
+                "-".join(m.split("_")[2:]): test_res[m][metric]["improved"]
                 for m in improve_models
             }
+            if len(improve_models) == 1:
+                p_values[idx] = test_res[improve_models[0]][metric]["p-value"]
             improved_metrics = {
                 key: improved_metrics[key] for key in sorted(improved_metrics.keys())
             }
             base_metrics.update(improved_metrics)
-            # Remove outliers that are too far away (greater than Q3+3IQR) for better plotting.
-            for key in base_metrics.keys():
-                vals = base_metrics[key]
-                q1 = np.quantile(vals, 0.25)
-                q3 = np.quantile(vals, 0.75)
-                iqr = q3 - q1
-                vals[vals > q3 + 3 * iqr] = np.nan
-                base_metrics[key] = vals
             df = pd.DataFrame(base_metrics).melt()
-            df["col"] = col
-            df["row"] = row
+            df["class"] = f"{program}-{model}"
+            df["hue"] = [x if x == "Base model" else "Proposed" for x in df["variable"]]
             dfs.append(df)
         with warnings.catch_warnings():
             warnings.filterwarnings(action="ignore", category=DeprecationWarning)
-            g = sns.catplot(
-                kind="box",
+            sns.boxplot(
                 data=pd.concat(dfs, ignore_index=True),
-                col="col",
-                row="row",
-                x="variable",
-                y="value",
-                hue="variable",
-                **_catplot_kwargs,
+                x="value" if orient == "h" else "class",
+                y="class" if orient == "h" else "value",
+                hue="hue",  # "variable"
+                ax=ax,
+                **boxplot_kwargs_,
             )
-        g.add_legend(**_legend_kwargs)
-        for (row_key, col_key), ax in g.axes_dict.items():
-            if row_key in title_dict.keys() and col_key in title_dict[row_key].keys():
-                ax.set_title(title_dict[row_key][col_key], fontsize=10)
-            else:
-                ax.set_title(None)
-                ax.set_axis_off()
-        plt.setp(g.axes, xticks=[], xlabel="", ylabel="")
-        plt.tight_layout()
-        plt.subplots_adjust(**_adjust_kwargs)
-        if save_to is not None:
-            plt.savefig(save_to, dpi=500)
-        plt.show()
-        plt.close()
+        ax.get_legend().remove()
+        ax.legend(**legend_kwargs_)
+        for idx, p_val in p_values.items():
+            x1, x2 = idx - p_cap_width / 2, idx + p_cap_width / 2
+            y1, y2 = p_pos_y + p_cap_height, p_pos_y
+            ax.plot([x1, x1, x2, x2], [y1, y2, y2, y1], lw=0.5, c="k")
+            ax.text(
+                (x1 + x2) / 2,
+                p_text_up_pos_y,
+                p_symbol_map_func(p_val),
+                ha="center",
+                va="top",
+                **p_text_kwargs_,
+            )
 
-    def improvement_cv_ttest(
+        return self.trainer._plot_action_after_plot(
+            fig_name=os.path.join(self.trainer.project_root, f"compare.pdf"),
+            disable=given_ax,
+            ax_or_fig=ax,
+            xlabel=metric if orient == "h" else None,
+            ylabel=metric if orient == "v" else None,
+            tight_layout=True,
+            save_show_close=save_show_close,
+            savefig_kwargs=savefig_kwargs,
+        )
+
+    def plot_improvement(
+        self,
+        leaderboard,
+        improved_measure,
+        test_res,
+        metric,
+        clr=None,
+        save_show_close=True,
+        ax=None,
+        figure_kwargs=None,
+        barplot_kwargs=None,
+        legend_kwargs=None,
+        savefig_kwargs=None,
+    ):
+        leaderboard = leaderboard[leaderboard["Program"] != self.program]
+        model_names = improved_measure["Model"]
+        clr = global_palette if clr is None else clr
+        figure_kwargs_ = update_defaults_by_kwargs(dict(), figure_kwargs)
+        legend_kwargs_ = update_defaults_by_kwargs(
+            dict(title=None, frameon=False), legend_kwargs
+        )
+        barplot_kwargs_ = update_defaults_by_kwargs(
+            dict(
+                orient="h",
+                linewidth=1,
+                edgecolor="k",
+                saturation=1,
+                palette=clr,
+            ),
+            barplot_kwargs,
+        )
+        ax, given_ax = self.trainer._plot_action_init_ax(ax, figure_kwargs_)
+        orient = barplot_kwargs_["orient"]
+        dfs = []
+        if type(metric) == str:
+            metric = [metric]
+        for idx, (program, model) in enumerate(
+            zip(leaderboard["Program"], leaderboard["Model"])
+        ):
+            improve_models = [m for m in model_names if f"{program}_{model}" in m]
+            if len(improve_models) == 0:
+                continue
+            for met in metric:
+                improved_metrics = {
+                    "-".join(m.split("_")[2:]): (
+                        test_res[m][met]["base"] - test_res[m][met]["improved"]
+                    )
+                    / test_res[m][met]["base"]
+                    * 100
+                    for m in improve_models
+                }
+                improved_metrics = {
+                    key: improved_metrics[key]
+                    for key in sorted(improved_metrics.keys())
+                }
+                df = pd.DataFrame(improved_metrics).melt()
+                df["class"] = f"{program}-{model}"
+                df["hue"] = [met] * len(df)
+                dfs.append(df)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action="ignore", category=DeprecationWarning)
+            sns.barplot(
+                data=pd.concat(dfs, ignore_index=True),
+                x="value" if orient == "h" else "class",
+                y="class" if orient == "h" else "value",
+                hue="hue" if len(metric) > 1 else None,
+                ax=ax,
+                **barplot_kwargs_,
+            )
+        ax.get_legend().remove()
+        ax.legend(**legend_kwargs_)
+
+        return self.trainer._plot_action_after_plot(
+            fig_name=os.path.join(self.trainer.project_root, f"improvement.pdf"),
+            disable=given_ax,
+            ax_or_fig=ax,
+            xlabel=(
+                f"Improvement of {metric[0] if len(metric) == 1 else 'metrics'} (Percentage)"
+                if orient == "h"
+                else None
+            ),
+            ylabel=(
+                f"Improvement of {metric[0] if len(metric) == 1 else 'metrics'} (Percentage)"
+                if orient == "v"
+                else None
+            ),
+            tight_layout=True,
+            save_show_close=save_show_close,
+            savefig_kwargs=savefig_kwargs,
+        )
+
+    def improvement_cv_test(
         self,
         model_names: Union[List[str], str],
         metrics: Union[List[str], str],
@@ -609,59 +803,46 @@ class ThisWork(TorchModel):
                     )
         for model_name in model_names:
             for metric in metrics:
-                res[model_name][metric]["p-value"] = getattr(
-                    stats.ttest_ind(
-                        res[model_name][metric]["base"],
-                        res[model_name][metric]["improved"],
-                    ),
-                    "pvalue",
-                )
+                res[model_name][metric]["p-value"] = stats.mannwhitneyu(
+                    res[model_name][metric]["base"],
+                    res[model_name][metric]["improved"],
+                )[1]
         return res
 
     def inspect_weighted_predictions(self, model_name, **kwargs):
         model = self.model[model_name]
-        target_attr = ["dl_weight", "dl_pred", "phy_pred"]
+        target_attr = ["dl_weight", "dl_pred", "phy_pred", "std", "mu"]
         if not hasattr(model, "dl_weight"):
             raise Exception(
                 f"The model does not have the attribute `dl_weight`. Is it trained?"
             )
-        if hasattr(model, "uncertain_dl_weight"):
-            target_attr += ["uncertain_dl_weight", "mu", "std"]
         inspect_dict = self.inspect_attr(
             model_name=model_name, attributes=target_attr, **kwargs
         )
         return inspect_dict
 
     def inspect_phy_models(self, model_name, **kwargs):
-        target_attr = ["clustering_phy_model"]
+        target_attr = ["phys", "running_phy_weight"]
         inspect_dict = self.inspect_attr(
             model_name=model_name, attributes=target_attr, to_numpy=False, **kwargs
         )
-        phys = inspect_dict["train"]["clustering_phy_model"].phys
-        phy_weight = (
-            inspect_dict["train"]["clustering_phy_model"]
-            .running_phy_weight.data.detach()
-            .cpu()
-        )
+        phys = inspect_dict["train"]["phys"]
+        phy_weight = inspect_dict["train"]["running_phy_weight"]
         norm_phy_weight = nn.functional.normalize(torch.abs(phy_weight), p=1).numpy()
         return phys, norm_phy_weight
 
     def inspect_clusters(self, model_name, **kwargs):
-        target_attr = ["clustering_phy_model"]
+        target_attr = ["x_cluster"]
         inspect_dict = self.inspect_attr(
             model_name=model_name, attributes=target_attr, **kwargs
         )
         to_cpu = lambda x: x.detach().cpu().numpy()
         if "USER_INPUT" in inspect_dict.keys():
-            return to_cpu(inspect_dict["USER_INPUT"]["clustering_phy_model"].x_cluster)
+            return to_cpu(inspect_dict["USER_INPUT"]["x_cluster"])
         else:
-            cluster_train = to_cpu(
-                inspect_dict["train"]["clustering_phy_model"].x_cluster
-            )
-            cluster_val = to_cpu(inspect_dict["val"]["clustering_phy_model"].x_cluster)
-            cluster_test = to_cpu(
-                inspect_dict["test"]["clustering_phy_model"].x_cluster
-            )
+            cluster_train = to_cpu(inspect_dict["train"]["x_cluster"])
+            cluster_val = to_cpu(inspect_dict["val"]["x_cluster"])
+            cluster_test = to_cpu(inspect_dict["test"]["x_cluster"])
             return cluster_train, cluster_val, cluster_test
 
     def df_with_cluster(self, model_name, save_to: str = None, **kwargs):
@@ -696,72 +877,6 @@ class ThisWork(TorchModel):
         ax.set_title("Weights of physical models")
         cax = fig.add_subplot(gs[50:78, 98:])
         plt.colorbar(mappable=im, cax=cax)
-        plt.tight_layout()
-        if save_to is not None:
-            plt.savefig(save_to, dpi=500)
-        plt.show()
-        plt.close()
-
-    def plot_uncertain_dl_weight(self, inspect_dict, save_to=None):
-        import matplotlib.ticker as ticker
-
-        def plot_once(dl_weight, mu, std, title, ax):
-            sorted_idx = np.argsort(dl_weight.flatten())
-            x = np.arange(1, len(dl_weight) + 1)
-            ax.scatter(
-                x,
-                dl_weight[sorted_idx],
-                c="#D81159",
-                label="Truth",
-            )
-            ax.errorbar(
-                x,
-                mu[sorted_idx],
-                yerr=std[sorted_idx],
-                fmt="co",
-                mfc="#0496FF",
-                mec="#0496FF",
-                ecolor="#0496FF",
-                # capsize=5,
-                label="GPR prediction (±std)",
-            )
-            ax.legend(fontsize="x-small", loc="upper left")
-            ax.set_title(title)
-            ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
-            ax.set_xlim([0.5, len(dl_weight) + 1.5])
-            ax.set_ylim([0, 1])
-
-        def plot_part(part_dict, title, ax):
-            dl_weight, mu, std = (
-                part_dict["dl_weight"],
-                part_dict["mu"],
-                part_dict["std"],
-            )
-            plot_once(dl_weight, mu, std, title, ax)
-
-        if "USER_INPUT" in inspect_dict.keys():
-            fig = plt.figure(figsize=(4, 4))
-            ax = plt.subplot(111)
-            plot_part(inspect_dict["USER_INPUT"], "Investigated set", ax)
-        else:
-            fig = plt.figure(figsize=(12, 4))
-            ax = plt.subplot(131)
-            plot_part(inspect_dict["train"], "Training set", ax)
-            ax = plt.subplot(132)
-            plot_part(inspect_dict["val"], "Validation set", ax)
-            ax = plt.subplot(133)
-            plot_part(inspect_dict["test"], "Testing set", ax)
-            ax = fig.add_subplot(111, frameon=False)
-            plt.tick_params(
-                labelcolor="none",
-                which="both",
-                top=False,
-                bottom=False,
-                left=False,
-                right=False,
-            )
-        ax.set_ylabel("Deep learning weight")
-        ax.set_xlabel("Indices of data points (sorted by the target value)")
         plt.tight_layout()
         if save_to is not None:
             plt.savefig(save_to, dpi=500)

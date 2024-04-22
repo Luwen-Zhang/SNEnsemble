@@ -248,7 +248,7 @@ class AbstractBNN(nn.Module):
             self.on_train_epoch_start(X, y)
             for x, y_hat in loader:
                 self.optimizer.zero_grad()
-                total_loss = self._train_step(
+                _, total_loss = self._train_step(
                     x, y_hat, n_samples=n_samples, n_batches=n_batches
                 )
                 total_loss.backward()
@@ -266,7 +266,7 @@ class AbstractBNN(nn.Module):
                 samples = preds
 
         if self.task == "classification" and self.n_outputs > 1:
-            exp_samples = torch.exp(samples)
+            exp_samples = torch.exp(samples)  # The output is log-softmax-ed,
             mean = torch.argmax(torch.mean(exp_samples, dim=0), dim=-1)
             epistemic_var = torch.var(exp_samples, dim=0, unbiased=False)[
                 torch.arange(mean.shape[0]), mean
@@ -419,7 +419,7 @@ class BayesByBackprop(AbstractBNN):
         if self.verbose:
             self.fit_loss_epoch += fit_loss_step.item() * x.shape[0]
             self.kl_loss_epoch += kl_loss_step.item() * x.shape[0]
-        return total_loss
+        return output, total_loss
 
     def _predict_step(self, X, n_samples):
         sample_x = X.unsqueeze(0).repeat(n_samples, 1, 1)
@@ -454,6 +454,7 @@ class MCDropout(AbstractBNN):
         layers,
         train_dropout=1e-9,
         sample_dropout=0.1,
+        get_sequential_kwargs=None,
         **kwargs,
     ):
         super(MCDropout, self).__init__(
@@ -465,14 +466,17 @@ class MCDropout(AbstractBNN):
         # network with two hidden and one output layer
         if train_dropout == 0.0:
             train_dropout = 1e-9
+        if get_sequential_kwargs is None:
+            get_sequential_kwargs = {}
+        default_sequential_kwargs = dict(use_norm=False, act_func=nn.ReLU)
+        default_sequential_kwargs.update(get_sequential_kwargs)
         self.layers = get_sequential(
             layers=layers,
             n_inputs=n_inputs,
             n_outputs=2 * self.n_outputs if self.type == "hete" else self.n_outputs,
-            use_norm=False,
             dropout=train_dropout,
-            act_func=nn.ReLU,
             adaptive_dropout=True,
+            **default_sequential_kwargs,
         )
 
     def forward(self, x):
@@ -489,7 +493,7 @@ class MCDropout(AbstractBNN):
         fit_loss_step = self.get_sample_fitness_loss(output.unsqueeze(0), y)
         if self.verbose:
             self.fit_loss_epoch += fit_loss_step * x.shape[0]
-        return fit_loss_step
+        return output, fit_loss_step
 
     def _predict_step(self, X, n_samples):
         sample_x = X.unsqueeze(0).repeat(n_samples, 1, 1)
@@ -516,7 +520,7 @@ class MCDropout(AbstractBNN):
 
 
 if __name__ == "__main__":
-    from src.model._thiswork.gp.base import (
+    from utils import (
         get_test_case_1d,
         plot_mu_var_1d,
         get_test_case_2d,
@@ -525,12 +529,18 @@ if __name__ == "__main__":
         get_cls_test_case_2d,
     )
 
-    device = "cpu"
+    device = "cuda"
     X, y, grid = get_test_case_1d(100, grid_low=-3, grid_high=3, noise=0.2)
     torch.manual_seed(0)
     start = time.time()
     net = BayesByBackprop(
-        n_inputs=1, n_outputs=1, n_layers=2, n_hidden=20, on_cpu=False, type="homo"
+        n_inputs=1,
+        n_outputs=1,
+        n_layers=2,
+        n_hidden=20,
+        on_cpu=False,
+        local_reparam=True,
+        type="homo",
     )
     X = X.to(device)
     y = y.to(device)

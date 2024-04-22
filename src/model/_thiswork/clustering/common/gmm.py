@@ -1,13 +1,19 @@
 """
 This is a modification of sklearn.mixture.GaussianMixture for pytorch.
 """
+
 import torch
 from torch import nn
 import numpy as np
 from typing import List, Union
 import warnings
 from .kmeans import KMeans
-from .base import AbstractCluster, AbstractClustering, AbstractMultilayerClustering
+from .base import AbstractCluster, AbstractClustering
+from .base import (
+    AbstractCluster,
+    AbstractClustering,
+    AbstractSubspaceClustering,
+)
 from src.model._thiswork.pca.incremental_pca import IncrementalPCA
 
 
@@ -301,26 +307,10 @@ class PCAGMM(GMM):
         return super(PCAGMM, self).forward(x)
 
 
-class FirstGMMCluster(Cluster):
-    def __init__(
-        self,
-        n_input_outer: int,
-        n_input_inner: int,
-        exp_avg_factor: float = 1.0,
-        **kwargs,
-    ):
-        super(FirstGMMCluster, self).__init__(
-            n_input=n_input_outer, exp_avg_factor=exp_avg_factor
-        )
-        self.inner_layer = GMM(
-            exp_avg_factor=exp_avg_factor, n_input=n_input_inner, **kwargs
-        )
-
-
-class TwolayerGMM(AbstractMultilayerClustering):
-    def __init__(self, **kwargs):
-        super(TwolayerGMM, self).__init__(
-            algorithm_class=PCAGMM,
-            first_layer_cluster_class=FirstGMMCluster,
+class MultilayerGMM(AbstractSubspaceClustering):
+    def __init__(self, n_clusters_ls, **kwargs):
+        super(MultilayerGMM, self).__init__(
+            algorithm_classes=[PCAGMM] * len(n_clusters_ls),
+            n_clusters_ls=n_clusters_ls,
             **kwargs,
         )

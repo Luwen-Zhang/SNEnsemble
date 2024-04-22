@@ -1,18 +1,24 @@
 import torch
 from src.trainer import FatigueTrainer
 from src.model import *
+import tabensemb
 from tabensemb.model import *
 from tabensemb.utils import Logging
 import os
 import argparse
 
+tabensemb._stream_filters = ["DeprecationWarning", "Using batch_size="]
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "--reduce_bayes_steps", dest="reduce_bayes_steps", action="store_true"
+    "--limit_batch_size",
+    type=int,
+    required=False,
+    default=None,
 )
-parser.set_defaults(**{"reduce_bayes_steps": False})
 args = parser.parse_known_args()[0]
-reduce_bayes_steps = args.reduce_bayes_steps
+limit_batch_size = args.limit_batch_size
+
 
 log = Logging()
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -27,8 +33,17 @@ models = [
     PytorchTabular(trainer),
     WideDeep(trainer),
     AutoGluon(trainer),
-    ThisWork(trainer, reduce_bayes_steps=reduce_bayes_steps),
+    ThisWork(
+        trainer,
+        pca=False,
+        clustering="KMeans",
+        clustering_layer="3L",
+        uncertainty="mcd",
+    ),
 ]
+if limit_batch_size is not None:
+    for model in models:
+        model.limit_batch_size = limit_batch_size
 trainer.add_modelbases(models)
 trainer.get_leaderboard(cross_validation=10, split_type="random")
 log.exit()
