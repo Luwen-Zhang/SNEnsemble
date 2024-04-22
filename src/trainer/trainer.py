@@ -494,7 +494,7 @@ class FatigueTrainer(Trainer):
                     marker="o",
                     linewidth=0.4,
                     edgecolors="k",
-                    label=f"{name} dataset",
+                    label=f"{name} set",
                     zorder=20,
                 ),
                 scatter_kwargs,
@@ -620,7 +620,7 @@ class FatigueTrainer(Trainer):
         ax.set_title(f"{m_code}")
 
         path = os.path.join(self.project_root, f"SN_curves_{program}_{model_name}")
-        returned =  self._plot_action_after_plot(
+        returned = self._plot_action_after_plot(
             fig_name=os.path.join(
                 path,
                 m_code.replace("/", "_") + ".pdf",

@@ -400,9 +400,9 @@ class ThisWork(TorchModel):
                     higher_better * (improved_metric - base_metric) / base_metric
                 ) * 100
                 if test_res is not None:
-                    improved_measure.loc[idx, f"{metric} Improvement p-value"] = (
-                        test_res[model][metric]["p-value"]
-                    )
+                    improved_measure.loc[
+                        idx, f"{metric} Improvement p-value"
+                    ] = test_res[model][metric]["p-value"]
         improved_measure.sort_values(
             by="Testing RMSE % Improvement",
             ascending=False,
@@ -811,7 +811,7 @@ class ThisWork(TorchModel):
 
     def inspect_weighted_predictions(self, model_name, **kwargs):
         model = self.model[model_name]
-        target_attr = ["dl_weight", "dl_pred", "phy_pred"]
+        target_attr = ["dl_weight", "dl_pred", "phy_pred", "std", "mu"]
         if not hasattr(model, "dl_weight"):
             raise Exception(
                 f"The model does not have the attribute `dl_weight`. Is it trained?"

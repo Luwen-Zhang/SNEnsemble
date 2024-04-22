@@ -266,7 +266,7 @@ class AbstractBNN(nn.Module):
                 samples = preds
 
         if self.task == "classification" and self.n_outputs > 1:
-            exp_samples = torch.exp(samples)
+            exp_samples = torch.exp(samples)  # The output is log-softmax-ed,
             mean = torch.argmax(torch.mean(exp_samples, dim=0), dim=-1)
             epistemic_var = torch.var(exp_samples, dim=0, unbiased=False)[
                 torch.arange(mean.shape[0]), mean
