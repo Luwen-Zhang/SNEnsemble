@@ -16,8 +16,12 @@ parser.add_argument(
     required=False,
     default=None,
 )
+parser.add_argument("--nowrap", dest="nowrap", action="store_true")
+parser.set_defaults(nowrap=False)
+
 args = parser.parse_known_args()[0]
 limit_batch_size = args.limit_batch_size
+nowrap = args.nowrap
 
 
 log = Logging()
@@ -39,6 +43,7 @@ models = [
         clustering="KMeans",
         clustering_layer="3L",
         uncertainty="mcd",
+        wrap=not nowrap,
     ),
 ]
 if limit_batch_size is not None:

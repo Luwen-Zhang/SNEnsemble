@@ -23,6 +23,7 @@ class ThisWork(TorchModel):
         clustering="KMeans",
         clustering_layer="1L",
         uncertainty=None,
+        wrap=True,
         **kwargs,
     ):
         self.reduce_bayes_steps = reduce_bayes_steps
@@ -31,6 +32,7 @@ class ThisWork(TorchModel):
         self.clustering = clustering
         self.clustering_layer = clustering_layer
         self.uncertainty = uncertainty
+        self.wrap = wrap
         super(ThisWork, self).__init__(*args, **kwargs)
 
     def _get_program_name(self):
@@ -83,20 +85,6 @@ class ThisWork(TorchModel):
                 ["KMeans", "GMM", "BMM"],
             )
         ]
-        for name in all_names.copy():
-            components = name.split("_")
-            if "PHYSICS" not in components:
-                wrap_invalid = (
-                    any([model in components for model in ["TabNet"]])
-                    or "AutoGluon" in components
-                    or "PytorchTabular_NODE" in name
-                )
-                if "PytorchTabular_TabTransformer" in name:
-                    pass
-                if "Wrap" in components and wrap_invalid:
-                    all_names.remove(name)
-                elif "NoWrap" in components and not wrap_invalid:
-                    all_names.remove(name)
         # all_names += ["CatEmbed_Category Embedding_Wrap_1L_NoPCA_KMeans"]
         return all_names
 
@@ -270,6 +258,23 @@ class ThisWork(TorchModel):
             return super(ThisWork, self)._custom_training_params(model_name=model_name)
 
     def _conditional_validity(self, model_name: str) -> bool:
+        components = model_name.split("_")
+        if "PHYSICS" not in components:
+            wrap_invalid = (
+                any([model in components for model in ["TabNet"]])
+                or "AutoGluon" in components
+                or "PytorchTabular_NODE" in model_name
+            )
+            # if "PytorchTabular_TabTransformer" in model_name:
+            #     pass
+            if getattr(self, "wrap", True):
+                if "Wrap" in components and wrap_invalid:
+                    return False
+                elif "NoWrap" in components and not wrap_invalid:
+                    return False
+            else:
+                if "Wrap" in components:
+                    return False
         if self.pca and "NoPCA" in model_name:
             return False
         if not self.pca and "NoPCA" not in model_name and "PCA" in model_name:
@@ -400,9 +405,9 @@ class ThisWork(TorchModel):
                     higher_better * (improved_metric - base_metric) / base_metric
                 ) * 100
                 if test_res is not None:
-                    improved_measure.loc[
-                        idx, f"{metric} Improvement p-value"
-                    ] = test_res[model][metric]["p-value"]
+                    improved_measure.loc[idx, f"{metric} Improvement p-value"] = (
+                        test_res[model][metric]["p-value"]
+                    )
         improved_measure.sort_values(
             by="Testing RMSE % Improvement",
             ascending=False,
