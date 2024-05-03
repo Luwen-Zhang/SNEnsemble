@@ -8,7 +8,7 @@ This work is built on our developed open-source tabular prediction benchmark pla
 
 Note that the requirements change from time to time in `tabular_ensemble`. To reproduce our dependencies:
 
-* Install python 3.10.12. We use Anaconda to manage the environment.
+* Install python 3.10.12. 
 * Install `torch==1.13.1` following [pytorch's guide](https://pytorch.org/get-started/previous-versions/). We use CUDA 11.6 for our work.
 
 * Install requirements
@@ -29,7 +29,7 @@ Bash scripts `run.sh` gives the commands to run experiments using `main.py`, `ma
 
 The notebook `analysis.ipynb` depicts codes for our analysis (mostly visualizations).
 
-To analyze our results, you should download checkpoint files (around 40 GB) from this link (**Update after acceptance**). Don't hesitate to contact us if the link is invalid.
+To analyze our results, you should download checkpoint files (around 50 GB) from this link (**Update after acceptance**). Don't hesitate to contact us if the link is invalid.
 
 ## Directory tree
 
@@ -72,7 +72,13 @@ Here is the file tree of this repository and explanations of each folder/file.
 │   │   ├── 2024-04-16-22-37-18-0_composite-I1 clusters C622	# main_clustering.py
 │   │   ├── 2024-04-16-23-10-09-0_composite A811 mcd analysis	# main_for_analysis.py
 │   │   ├── 2024-04-17-09-22-24-0_composite C811 mcd analysis	# main_for_analysis.py
-│   │   └── 2024-04-20-20-06-36-0_composite B811 mcd analysis	# main_for_analysis.py
+│   │   ├── 2024-04-20-20-06-36-0_composite B811 mcd analysis	# main_for_analysis.py
+│   │   ├── 2024-04-17-09-55-16-0_composite_no_relative_stress A622 # main_no_relative_stress.py
+│   │   ├── 2024-04-19-04-09-12-0_composite_no_relative_stress B622 # main_no_relative_stress.py
+│   │   ├── 2024-04-20-16-02-23-0_composite_no_relative_stress C622 # main_no_relative_stress.py
+│   │   ├── 2024-04-29-21-01-40-0_composite-I2 nowrap A622 		# main.py --nowrap
+│   │   ├── 2024-04-29-21-01-40-0_composite nowrap B622 		# main.py --nowrap
+│   │   └── 2024-04-29-21-01-40-0_composite-I1 nowrap C622 		# main.py --nowrap
 │   └── composite_database_layup_modulus_03302024	# main_layup.py
 │       └── 2024-04-03-22-49-46-0_modulus
 ├── requirements.txt	# Frozen dependencies
@@ -165,5 +171,4 @@ Permission is granted to use this work in the following ways:
 Disclaimer:  The database is supplied without any warranty, stated or implied. In particular, no claim is made that it is accurate, complete, or suitable for any purpose.  Use it at your own risk.
 ```
 
-## 
 
