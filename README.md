@@ -45,13 +45,14 @@ Here is the file tree of this repository and explanations of each folder/file.
 │   └── modulus.py						# Ultilize lay-up information
 ├── continue_previous.py				# Continue accidentally terminated tasks.
 ├── data								# Data files and descriptions.
+│   ├── merge_data						# Scripts to merge four databases
+│   ├── Tables2Table					# Scripts to pre-process Upwind and OptiMat
 │   ├── 2019_SNL_MSU_DOE_Composite-Materials-Database_Wind_29pt0.xlsx
 │   ├── composite_database_03222024.csv
 │   ├── composite_database_03222024_with_extended_information.xlsx
 │   ├── composite_database_layup_modulus_03302024.csv
 │   ├── info_03222024.csv
-│   ├── Optidat UPWIND 28_3_2017.xls
-│   └── README.md						# Please read this file before using the data
+│   └── Optidat UPWIND 28_3_2017.xls
 ├── main_clustering.py		# Compare different clustering methods in the framework
 ├── main_for_analysis.py	# Run experiments once with a 8:1:1 ratio
 ├── main_layup.py			# Ultilize lay-up information
@@ -111,11 +112,15 @@ We run our experiments on Siyuan-1 cluster supported by the Center for High Perf
 
 Results are analyzed on a personal computer with Ubuntu 18.04, Intel Core i9-11900K, Nvidia RTX 3090. 
 
+## Merging data
+
+Scripts we use to process databases and obtain the merged dataset are all included in the `data` folder.  
+
+In `data/merge_data/mlfatigue_data` , `SNL_MSU_DOE_raw.xlsx` and `FACT_raw.xlsx` are manually copied from original files of OptiDat and SNL/MSU/DOE. `Upwind_combine.xlsx` and `OptiMat_combine.xlsx` are obtained using another released tool named [`Tables2Table`](https://github.com/LuoXueling/Tables2Table), which is also contained in `data/Tables2Table`  for convenience. In `data/Tables2Table`, `OptiMat.xlsx` and `Upwind.xlsx` are manually copied from original files of OptiDat. In both these two folders, the `src` subfolder contains corresponding scripts to process datasets. 
+
 ## Citation
 
 If you find our work useful in your research, please consider citing us as (**Update after acceptance**)
-
-
 
 ## Data copyright
 
@@ -170,5 +175,4 @@ Permission is granted to use this work in the following ways:
 
 Disclaimer:  The database is supplied without any warranty, stated or implied. In particular, no claim is made that it is accurate, complete, or suitable for any purpose.  Use it at your own risk.
 ```
-
 
