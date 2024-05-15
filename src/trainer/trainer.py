@@ -279,7 +279,7 @@ class FatigueTrainer(Trainer):
                 if percentile == "all"
                 else f"Percentile of {self.label_name[0]} for each material"
             ),
-            ylabel=f"No. of Material",
+            ylabel=f"Resin-fiber combinations",
             tight_layout=True,
             save_show_close=save_show_close,
             savefig_kwargs=savefig_kwargs,
