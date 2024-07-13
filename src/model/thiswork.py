@@ -24,6 +24,7 @@ class ThisWork(TorchModel):
         clustering_layer="3L",
         uncertainty=None,
         wrap=True,
+        classifier_use_raw=False,
         **kwargs,
     ):
         self.reduce_bayes_steps = reduce_bayes_steps
@@ -33,6 +34,7 @@ class ThisWork(TorchModel):
         self.clustering_layer = clustering_layer
         self.uncertainty = uncertainty
         self.wrap = wrap
+        self.classifier_use_raw = classifier_use_raw
         super(ThisWork, self).__init__(*args, **kwargs)
 
     def _get_program_name(self):
@@ -109,6 +111,7 @@ class ThisWork(TorchModel):
                 clustering_phy_model=clustering_phy_model,
                 phy_name=phy_name,
                 uncertainty=getattr(self, "uncertainty", None),
+                classifier_use_raw=getattr(self, "classifier_use_raw", False),
                 **kwargs,
             )
         else:

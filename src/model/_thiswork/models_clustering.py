@@ -14,6 +14,7 @@ class AbstractClusteringModel(AbstractNN):
         phy_name,
         dropout=0.0,
         uncertainty: str = None,
+        classifier_use_raw: bool = False,
         **kwargs,
     ):
         super(AbstractClusteringModel, self).__init__(datamodule, **kwargs)
@@ -26,10 +27,13 @@ class AbstractClusteringModel(AbstractNN):
         )
         self.phy_name = phy_name
         self.uncertainty = uncertainty
+        self.classifier_use_raw = classifier_use_raw
         if uncertainty is not None and uncertainty == "mcd":
             self.cls_head = MCDropout(
                 layers=[256, 256, 256],
-                n_inputs=hidden_rep_dim,
+                n_inputs=(
+                    hidden_rep_dim if not self.classifier_use_raw else self.n_inputs
+                ),
                 n_outputs=2,  # It is reduced to 1 internally for binary classification
                 train_dropout=dropout,
                 sample_dropout=0.1,
@@ -43,7 +47,9 @@ class AbstractClusteringModel(AbstractNN):
             self.cls_head = nn.Sequential(
                 get_sequential(
                     [256, 256, 256],
-                    n_inputs=hidden_rep_dim,
+                    n_inputs=(
+                        hidden_rep_dim if not self.classifier_use_raw else self.n_inputs
+                    ),
                     n_outputs=1,
                     act_func=nn.ReLU,
                     dropout=dropout,
@@ -61,10 +67,13 @@ class AbstractClusteringModel(AbstractNN):
     def _forward(self, x, derived_tensors):
         # Prediction of deep learning models.
         dl_pred = self.call_required_model(self.cont_cat_model, x, derived_tensors)
-        if self.use_hidden_rep:
-            hidden = self.get_hidden_state(self.cont_cat_model, x, derived_tensors)
+        if getattr(self, "classifier_use_raw", False):
+            hidden = x
         else:
-            hidden = torch.concat([x, dl_pred], dim=1)
+            if self.use_hidden_rep:
+                hidden = self.get_hidden_state(self.cont_cat_model, x, derived_tensors)
+            else:
+                hidden = torch.concat([x, dl_pred], dim=1)
         # Prediction of physical models
         phy_pred = self.call_required_model(
             self.clustering_phy_model,
