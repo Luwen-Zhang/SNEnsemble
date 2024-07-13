@@ -21,7 +21,7 @@ class ThisWork(TorchModel):
         n_pca_dim=None,
         pca=False,
         clustering="KMeans",
-        clustering_layer="1L",
+        clustering_layer="3L",
         uncertainty=None,
         wrap=True,
         **kwargs,
