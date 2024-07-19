@@ -29,11 +29,11 @@ Bash scripts `run.sh` gives the commands to run experiments using `main.py`, `ma
 
 The notebook `analysis.ipynb` depicts codes for our analysis (mostly visualizations).
 
-To analyze our results, you should download checkpoint files (around 50 GB) from this link (**Update after acceptance**). Don't hesitate to contact us if the link is invalid.
+To analyze our results, you should download checkpoint files (around 50 GB) from this link (**Update after acceptance**). Don't hesitate to contact us if the link is invalid. One can check the `analysis.ipynb` to see what folders listed in the following directory tree (under `output`) are needed for specific analysis. 
 
 ## Directory tree
 
-Here is the file tree of this repository and explanations of each folder/file.
+Here is the file tree of this repository and explanations of each folder/file. Under the output folder, comments of each subfolder indicate specific commands in `run.sh` used to generate these checkpoints and information.
 
 ```
 .
@@ -64,22 +64,25 @@ Here is the file tree of this repository and explanations of each folder/file.
 │   ├── composite_database_03222024		# Results of experiments
 │   │   ├── 2024-04-12-09-34-02-0_composite C316 mcd 	# main.py
 │   │   ├── 2024-04-12-19-02-45-0_composite A622 mcd	# main.py
-│   │   ├── 2024-04-12-19-03-01-0_composite B316 mcd	# main.py
+│   │   ├── 2024-07-16-07-50-38-0_composite B316 mcd	# main.py
 │   │   ├── 2024-04-12-19-04-14-0_composite A316 mcd	# main.py
 │   │   ├── 2024-04-12-21-32-11-0_composite C622 mcd	# main.py
-│   │   ├── 2024-04-12-21-32-11-0_composite-I1 B622 mcd	# main.py
+│   │   ├── 2024-07-14-00-05-14-0_composite B622 mcd	# main.py
 │   │   ├── 2024-04-16-22-25-12-0_composite clusters A622	# main_clustering.py
-│   │   ├── 2024-04-16-22-37-18-0_composite clusters B622	# main_clustering.py
+│   │   ├── 2024-07-14-00-08-13-0_composite clusters B622	# main_clustering.py
 │   │   ├── 2024-04-16-22-37-18-0_composite-I1 clusters C622	# main_clustering.py
 │   │   ├── 2024-04-16-23-10-09-0_composite A811 mcd analysis	# main_for_analysis.py
 │   │   ├── 2024-04-17-09-22-24-0_composite C811 mcd analysis	# main_for_analysis.py
-│   │   ├── 2024-04-20-20-06-36-0_composite B811 mcd analysis	# main_for_analysis.py
+│   │   ├── 2024-07-15-21-31-48-0_composite B811 mcd analysis	# main_for_analysis.py
 │   │   ├── 2024-04-17-09-55-16-0_composite_no_relative_stress A622 # main_no_relative_stress.py
-│   │   ├── 2024-04-19-04-09-12-0_composite_no_relative_stress B622 # main_no_relative_stress.py
+│   │   ├── 2024-07-16-04-07-45-0_composite_no_relative_stress B622 # main_no_relative_stress.py
 │   │   ├── 2024-04-20-16-02-23-0_composite_no_relative_stress C622 # main_no_relative_stress.py
 │   │   ├── 2024-04-29-21-01-40-0_composite-I2 nowrap A622 		# main.py --nowrap
-│   │   ├── 2024-04-29-21-01-40-0_composite nowrap B622 		# main.py --nowrap
-│   │   └── 2024-04-29-21-01-40-0_composite-I1 nowrap C622 		# main.py --nowrap
+│   │   ├── 2024-07-14-00-08-06-0_composite nowrap B622 		# main.py --nowrap
+│   │   ├── 2024-04-29-21-01-40-0_composite-I1 nowrap C622 		# main.py --nowrap
+│   │   ├── 2024-06-25-23-49-03-0_composite-I1 A622 useraw		# main.py --use_raw
+│   │   ├── 2024-07-17-01-01-03-0_composite B622 useraw			# main.py --use_raw
+│   │   └── 2024-06-25-23-49-03-0_composite-I1-I1 C622 useraw	# main.py --use_raw
 │   └── composite_database_layup_modulus_03302024	# main_layup.py
 │       └── 2024-04-03-22-49-46-0_modulus
 ├── requirements.txt	# Frozen dependencies
@@ -108,7 +111,7 @@ Here is the file tree of this repository and explanations of each folder/file.
 
 ## Our environment
 
-We run our experiments on Siyuan-1 cluster supported by the Center for High Performance Computing at Shanghai Jiao Tong University (with Nvidia A100 40GB GPU). The environment and configurations of each experiment can be seen in `log.txt` in each output folder. Results might differ on different devices/environments due to minor differences caused by devices and major differences caused by Bayesian hyperparameter optimizations. 
+We run our experiments on Siyuan-1 cluster supported by the Center for High Performance Computing at Shanghai Jiao Tong University (with Nvidia A100 40GB GPU), or one RTX 3090 24GB GPU. The environment and configurations of each experiment can be seen in `log.txt` in each output folder. Results might differ on different devices/environments due to minor differences caused by devices and Bayesian hyperparameter optimizations, but our conclusions are identical among devices. 
 
 Results are analyzed on a personal computer with Ubuntu 18.04, Intel Core i9-11900K, Nvidia RTX 3090. 
 
