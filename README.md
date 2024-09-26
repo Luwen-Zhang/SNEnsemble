@@ -17,7 +17,7 @@ Note that the requirements change from time to time in `tabular_ensemble`. To re
 pip install -r requirements.txt
 ```
 
-* Install  [`tabular_ensemble`](https://github.com/LuoXueling/tabular_ensemble). Most of its dependencies are satisfied.
+* Run  [`pip install tabular_ensemble==0.2`](https://github.com/LuoXueling/tabular_ensemble). Most of its dependencies are satisfied.
 
 ## Usage
 
