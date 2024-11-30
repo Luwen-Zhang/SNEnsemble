@@ -1,10 +1,10 @@
 # ENSEMBLE
 
-It is the repository for the article *ENSEMBLE: Ensembling empirical models and machine learning exemplified by fatigue life extrapolation of fiber-reinforced composites* (**Update after acceptance**).
+It is the repository for the article (**Update after acceptance**).
 
 ## Requirements
 
-This work is built on our developed open-source tabular prediction benchmark platform [`tabular_ensemble`](https://github.com/LuoXueling/tabular_ensemble). 
+This work is built on our developed open-source tabular prediction benchmark platform `tabular_ensemble`. 
 
 Note that the requirements change from time to time in `tabular_ensemble`. To reproduce our dependencies:
 
@@ -17,19 +17,19 @@ Note that the requirements change from time to time in `tabular_ensemble`. To re
 pip install -r requirements.txt
 ```
 
-* Run  [`pip install tabular_ensemble==0.2`](https://github.com/LuoXueling/tabular_ensemble). Most of its dependencies are satisfied.
+* Run  `pip install tabular_ensemble==0.2`. Most of its dependencies are satisfied.
 
 ## Usage
 
 * Running experiments
 
-Bash scripts `run.sh` gives the commands to run experiments using `main.py`, `main_clustering.py`, `main_for_analysis.py`, and `main_layup.py`. Note that each command in `run.sh` may cost several days to excecute (1-4 days in our environment). They are both CPU and GPU consuming.
+The bash script `run.sh` lists the commands to run experiments using `main.py`, `main_clustering.py`, `main_for_analysis.py`, and `main_layup.py`. Note that each command in `run.sh` may cost several days to excecute (1-4 days in our environment). They are both CPU and GPU consuming.
 
 * Analyze results
 
 The notebook `analysis.ipynb` depicts codes for our analysis (mostly visualizations).
 
-To analyze our results, you should download checkpoint files (around 50 GB) from this link (**Update after acceptance**). Don't hesitate to contact us if the link is invalid. One can check the `analysis.ipynb` to see what folders listed in the following directory tree (under `output`) are needed for specific analysis. 
+To analyze our results, you should download checkpoint files (around 25 GB) from [this link](https://doi.org/10.5281/zenodo.13858982). Don't hesitate to contact us if the link is invalid. One can check the `analysis.ipynb` to see what folders listed in the following directory tree (under `output`) are needed for specific analysis. 
 
 ## Directory tree
 
@@ -115,23 +115,27 @@ We run our experiments on Siyuan-1 cluster supported by the Center for High Perf
 
 Results are analyzed on a personal computer with Ubuntu 18.04, Intel Core i9-11900K, Nvidia RTX 3090. 
 
-## Merging data
+## Fatigue dataset
 
+We reformat and merge fatigue testing records from SNL/MSU/DOE, OptiMat, UPWIND, and FACT databases into a single database with careful considerations, including filtering invalid entries, rename variables, fix improper calculations in the records, to obtain clean and consistent data to fit machine learning usages. 
 Scripts we use to process databases and obtain the merged dataset are all included in the `data` folder.  
 
-In `data/merge_data/mlfatigue_data` , `SNL_MSU_DOE_raw.xlsx` and `FACT_raw.xlsx` are manually copied from original files of OptiDat and SNL/MSU/DOE. `Upwind_combine.xlsx` and `OptiMat_combine.xlsx` are obtained using another released tool named [`Tables2Table`](https://github.com/LuoXueling/Tables2Table), which is also contained in `data/Tables2Table`  for convenience. In `data/Tables2Table`, `OptiMat.xlsx` and `Upwind.xlsx` are manually copied from original files of OptiDat. In both these two folders, the `src` subfolder contains corresponding scripts to process datasets. 
+In `data/merge_data/mlfatigue_data` , `SNL_MSU_DOE_raw.xlsx` and `FACT_raw.xlsx` are manually copied from original files of OptiDat and SNL/MSU/DOE. `Upwind_combine.xlsx` and `OptiMat_combine.xlsx` are obtained using another tool named `Tables2Table` contained in `data/Tables2Table` . In `data/Tables2Table`, `OptiMat.xlsx` and `Upwind.xlsx` are manually copied from original files of OptiDat. In both these two folders, the `src` subfolder contains corresponding scripts to process datasets. 
+
+Units of features are unified; entries of numerical features that contain characters that are not units are considered as empty; names of categories of categorical features are made consistent; a column named `Material_Code` representing different laminates (See definitions in the following paragraph) is generated to distinguish different resin material, fiber material, lay-up, specimen geometry, etc. and to match fatigue data and static test data of each laminate; entries of some correlated features, especially minimum stress, maximum stress, and R-value, are filled if missing using their relationships and are corrected if conflicts exist such as a positive maximum stress with an R-value greater than 1; lay-up information recorded in a specialized terminology in the composite laminate literature such as $[[0/\pm45]_\mathrm{S}/90]_\mathrm{S}$ is translated in a sequential form using a developed recursive algorithm. 
+
+The column named `Material_Code` that distinguish different laminates is defined as followed: For the SNL/MSU/DOE dataset, laminates are distinguished by the combination of two columns, namely "Material" (a general identification of lay-up, fibers, and resin) and "Lay-up". For the OptiMat dataset (see our released repository), laminates are defined by three columns ("Plate", "Geometry", and "Laminate"), all of which are identifications of fibers, resin, specimen, and lay-up sequences. For the Upwind dataset (see our released repository), they are defined by two columns ("plate" and "geometry"), both of which are identification codes defined internally in the dataset. For the FACT dataset (see our released repository), they are defined by "material" (resin type) and "laminate" (lay-up). 
+
+We emphasize that both strain-controlled and stress-controlled data points are included and cannot be clearly distinguished, which is a deficiency of this dataset. SNL/MSU/DOE and Upwind did not clearly record the control mode for every data point. A total of 68 certainly strain-controlled data points in FACT and OptiMat databases also recorded corresponding stress levels. Additionally, waveform recorded only in a small portion of points is also ambiguous in databases. These two categorical features, i.e., waveform selected from \{Sinusoidal, Triangular\} and control mode selected from \{Load, Displacement\}, are not used due to a high absence ratio but are recorded in the released data file. 
+
+We leave the original file of OptiDat (containing the latter three datasets) in the folder. For the original file of SNL/MSU/DOE, please visit [this link](https://energy.sandia.gov/programs/renewable-energy/wind-power/rotor-innovation/rotor-reliability/mhk-materials-database/). Any derived database should be directly based on the original files instead of our merged database. We are not responsible for the accuracy of the testing records.
+
+We acknowledge Montana State University and Mr. Sibrand Raijmaekers for the databases.
 
 ## Citation
 
 If you find our work useful in your research, please consider citing us as (**Update after acceptance**)
 
-## Data copyright
-
-We reformat and merge fatigue testing records from SNL/MSU/DOE, OptiMat, UPWIND, and FACT databases into a single database with careful considerations, including filtering invalid entries, rename variables, fix improper calculations in the records, to obtain clean and consistent data to fit machine learning usages. 
-
-We leave the original file of OptiDat (containing the latter three datasets) in the folder. For the original file of SNL/MSU/DOE, please visit [this link](https://energy.sandia.gov/programs/renewable-energy/wind-power/rotor-innovation/rotor-reliability/mhk-materials-database/). Any derived database should be directly based on the original files instead of our merged database. We are not responsible for the accuracy of the testing records.
-
-We acknowledge Montana State University and Mr. Sibrand Raijmaekers for the databases.
 
 Following are copyright contents from the original databases.
 
