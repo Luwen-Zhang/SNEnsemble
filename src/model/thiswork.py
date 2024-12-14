@@ -651,7 +651,7 @@ class ThisWork(TorchModel):
             )
         ax.get_legend().remove()
         ax.legend(**legend_kwargs_)
-        for idx, p_val in p_values.items():
+        for idx, p_val in enumerate(p_values.values()):
             x1, x2 = idx - p_cap_width / 2, idx + p_cap_width / 2
             y1, y2 = p_pos_y + p_cap_height, p_pos_y
             ax.plot([x1, x1, x2, x2], [y1, y2, y2, y1], lw=0.5, c="k")
