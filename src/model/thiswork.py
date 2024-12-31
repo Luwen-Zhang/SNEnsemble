@@ -580,8 +580,10 @@ class ThisWork(TorchModel):
         test_res,
         metric,
         p_symbol_map_func,
+        box_or_bar="box",
         clr=None,
         ax=None,
+        show_p=True,
         p_cap_width=0.4,
         p_cap_height=0.05,
         p_pos_y=0.3,
@@ -590,6 +592,7 @@ class ThisWork(TorchModel):
         save_show_close=True,
         figure_kwargs=None,
         boxplot_kwargs=None,
+        barplot_kwargs=None,
         legend_kwargs=None,
         savefig_kwargs=None,
     ):
@@ -610,6 +613,16 @@ class ThisWork(TorchModel):
                 saturation=1,
             ),
             boxplot_kwargs,
+        )
+        barplot_kwargs_ = update_defaults_by_kwargs(
+            dict(
+                orient="h",
+                linewidth=1,
+                edgecolor="k",
+                saturation=1,
+                palette=clr,
+            ),
+            barplot_kwargs,
         )
         p_text_kwargs_ = update_defaults_by_kwargs(dict(), p_text_kwargs)
         ax, given_ax = self.trainer._plot_action_init_ax(ax, figure_kwargs_)
@@ -641,28 +654,39 @@ class ThisWork(TorchModel):
             dfs.append(df)
         with warnings.catch_warnings():
             warnings.filterwarnings(action="ignore", category=DeprecationWarning)
-            sns.boxplot(
-                data=pd.concat(dfs, ignore_index=True),
-                x="value" if orient == "h" else "class",
-                y="class" if orient == "h" else "value",
-                hue="hue",  # "variable"
-                ax=ax,
-                **boxplot_kwargs_,
-            )
+            if box_or_bar == "box":
+                sns.boxplot(
+                    data=pd.concat(dfs, ignore_index=True),
+                    x="value" if orient == "h" else "class",
+                    y="class" if orient == "h" else "value",
+                    hue="hue",  # "variable"
+                    ax=ax,
+                    **boxplot_kwargs_,
+                )
+            else:
+                sns.barplot(
+                    data=pd.concat(dfs, ignore_index=True),
+                    x="value" if orient == "h" else "class",
+                    y="class" if orient == "h" else "value",
+                    hue="hue",
+                    ax=ax,
+                    **barplot_kwargs_,
+                )
         ax.get_legend().remove()
         ax.legend(**legend_kwargs_)
-        for idx, p_val in enumerate(p_values.values()):
-            x1, x2 = idx - p_cap_width / 2, idx + p_cap_width / 2
-            y1, y2 = p_pos_y + p_cap_height, p_pos_y
-            ax.plot([x1, x1, x2, x2], [y1, y2, y2, y1], lw=0.5, c="k")
-            ax.text(
-                (x1 + x2) / 2,
-                p_text_up_pos_y,
-                p_symbol_map_func(p_val),
-                ha="center",
-                va="top",
-                **p_text_kwargs_,
-            )
+        if show_p:
+            for idx, p_val in enumerate(p_values.values()):
+                x1, x2 = idx - p_cap_width / 2, idx + p_cap_width / 2
+                y1, y2 = p_pos_y + p_cap_height, p_pos_y
+                ax.plot([x1, x1, x2, x2], [y1, y2, y2, y1], lw=0.5, c="k")
+                ax.text(
+                    (x1 + x2) / 2,
+                    p_text_up_pos_y,
+                    p_symbol_map_func(p_val),
+                    ha="center",
+                    va="top",
+                    **p_text_kwargs_,
+                )
 
         return self.trainer._plot_action_after_plot(
             fig_name=os.path.join(self.trainer.project_root, f"compare.pdf"),
