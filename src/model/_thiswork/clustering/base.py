@@ -282,7 +282,7 @@ class KimZhang(AbstractPhy):
     def formula(s, s_ut, log_alpha, beta):
         return (
             -beta * _safe_log10(s_ut)
-            - log_alpha
+            - log_alpha  # It's originally a constant coupled with beta, but it's fine to simplify.
             - _safe_log10(beta - 1)
             + _safe_log10(_safe_pow(s, 1 - beta) - 1)
         )
@@ -405,7 +405,10 @@ class Poursatip(AbstractPhy):
     def formula(s_a, s_max, r, log_alpha, beta, gamma):
         return (
             log_alpha
-            - beta * _safe_log10(s_a)
+            - beta
+            * _safe_log10(
+                s_a
+            )  # it's originally 2 s_a, but the 2 can be combined with log_alpha
             + gamma * _safe_log10((1 - r) / (1 + r))
             + _safe_log10(1 - s_max)
         )

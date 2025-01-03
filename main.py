@@ -16,9 +16,15 @@ parser.add_argument(
     required=False,
     default=None,
 )
+parser.add_argument("--nowrap", dest="nowrap", action="store_true")
+parser.add_argument("--use_raw", dest="use_raw", action="store_true")
+parser.set_defaults(nowrap=False)
+parser.set_defaults(use_raw=False)
+
 args = parser.parse_known_args()[0]
 limit_batch_size = args.limit_batch_size
-
+nowrap = args.nowrap
+use_raw = args.use_raw
 
 log = Logging()
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -39,6 +45,8 @@ models = [
         clustering="KMeans",
         clustering_layer="3L",
         uncertainty="mcd",
+        wrap=not nowrap,
+        classifier_use_raw=use_raw,
     ),
 ]
 if limit_batch_size is not None:

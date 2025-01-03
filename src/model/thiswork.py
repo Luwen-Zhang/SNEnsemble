@@ -21,8 +21,10 @@ class ThisWork(TorchModel):
         n_pca_dim=None,
         pca=False,
         clustering="KMeans",
-        clustering_layer="1L",
+        clustering_layer="3L",
         uncertainty=None,
+        wrap=True,
+        classifier_use_raw=False,
         **kwargs,
     ):
         self.reduce_bayes_steps = reduce_bayes_steps
@@ -31,6 +33,8 @@ class ThisWork(TorchModel):
         self.clustering = clustering
         self.clustering_layer = clustering_layer
         self.uncertainty = uncertainty
+        self.wrap = wrap
+        self.classifier_use_raw = classifier_use_raw
         super(ThisWork, self).__init__(*args, **kwargs)
 
     def _get_program_name(self):
@@ -83,20 +87,6 @@ class ThisWork(TorchModel):
                 ["KMeans", "GMM", "BMM"],
             )
         ]
-        for name in all_names.copy():
-            components = name.split("_")
-            if "PHYSICS" not in components:
-                wrap_invalid = (
-                    any([model in components for model in ["TabNet"]])
-                    or "AutoGluon" in components
-                    or "PytorchTabular_NODE" in name
-                )
-                if "PytorchTabular_TabTransformer" in name:
-                    pass
-                if "Wrap" in components and wrap_invalid:
-                    all_names.remove(name)
-                elif "NoWrap" in components and not wrap_invalid:
-                    all_names.remove(name)
         # all_names += ["CatEmbed_Category Embedding_Wrap_1L_NoPCA_KMeans"]
         return all_names
 
@@ -121,6 +111,7 @@ class ThisWork(TorchModel):
                 clustering_phy_model=clustering_phy_model,
                 phy_name=phy_name,
                 uncertainty=getattr(self, "uncertainty", None),
+                classifier_use_raw=getattr(self, "classifier_use_raw", False),
                 **kwargs,
             )
         else:
@@ -270,6 +261,23 @@ class ThisWork(TorchModel):
             return super(ThisWork, self)._custom_training_params(model_name=model_name)
 
     def _conditional_validity(self, model_name: str) -> bool:
+        components = model_name.split("_")
+        if "PHYSICS" not in components:
+            wrap_invalid = (
+                any([model in components for model in ["TabNet"]])
+                or "AutoGluon" in components
+                or "PytorchTabular_NODE" in model_name
+            )
+            # if "PytorchTabular_TabTransformer" in model_name:
+            #     pass
+            if getattr(self, "wrap", True):
+                if "Wrap" in components and wrap_invalid:
+                    return False
+                elif "NoWrap" in components and not wrap_invalid:
+                    return False
+            else:
+                if "Wrap" in components:
+                    return False
         if self.pca and "NoPCA" in model_name:
             return False
         if not self.pca and "NoPCA" not in model_name and "PCA" in model_name:
@@ -400,9 +408,9 @@ class ThisWork(TorchModel):
                     higher_better * (improved_metric - base_metric) / base_metric
                 ) * 100
                 if test_res is not None:
-                    improved_measure.loc[
-                        idx, f"{metric} Improvement p-value"
-                    ] = test_res[model][metric]["p-value"]
+                    improved_measure.loc[idx, f"{metric} Improvement p-value"] = (
+                        test_res[model][metric]["p-value"]
+                    )
         improved_measure.sort_values(
             by="Testing RMSE % Improvement",
             ascending=False,
@@ -572,8 +580,10 @@ class ThisWork(TorchModel):
         test_res,
         metric,
         p_symbol_map_func,
+        box_or_bar="box",
         clr=None,
         ax=None,
+        show_p=True,
         p_cap_width=0.4,
         p_cap_height=0.05,
         p_pos_y=0.3,
@@ -582,6 +592,7 @@ class ThisWork(TorchModel):
         save_show_close=True,
         figure_kwargs=None,
         boxplot_kwargs=None,
+        barplot_kwargs=None,
         legend_kwargs=None,
         savefig_kwargs=None,
     ):
@@ -602,6 +613,16 @@ class ThisWork(TorchModel):
                 saturation=1,
             ),
             boxplot_kwargs,
+        )
+        barplot_kwargs_ = update_defaults_by_kwargs(
+            dict(
+                orient="h",
+                linewidth=1,
+                edgecolor="k",
+                saturation=1,
+                palette=clr,
+            ),
+            barplot_kwargs,
         )
         p_text_kwargs_ = update_defaults_by_kwargs(dict(), p_text_kwargs)
         ax, given_ax = self.trainer._plot_action_init_ax(ax, figure_kwargs_)
@@ -633,28 +654,39 @@ class ThisWork(TorchModel):
             dfs.append(df)
         with warnings.catch_warnings():
             warnings.filterwarnings(action="ignore", category=DeprecationWarning)
-            sns.boxplot(
-                data=pd.concat(dfs, ignore_index=True),
-                x="value" if orient == "h" else "class",
-                y="class" if orient == "h" else "value",
-                hue="hue",  # "variable"
-                ax=ax,
-                **boxplot_kwargs_,
-            )
+            if box_or_bar == "box":
+                sns.boxplot(
+                    data=pd.concat(dfs, ignore_index=True),
+                    x="value" if orient == "h" else "class",
+                    y="class" if orient == "h" else "value",
+                    hue="hue",  # "variable"
+                    ax=ax,
+                    **boxplot_kwargs_,
+                )
+            else:
+                sns.barplot(
+                    data=pd.concat(dfs, ignore_index=True),
+                    x="value" if orient == "h" else "class",
+                    y="class" if orient == "h" else "value",
+                    hue="hue",
+                    ax=ax,
+                    **barplot_kwargs_,
+                )
         ax.get_legend().remove()
         ax.legend(**legend_kwargs_)
-        for idx, p_val in p_values.items():
-            x1, x2 = idx - p_cap_width / 2, idx + p_cap_width / 2
-            y1, y2 = p_pos_y + p_cap_height, p_pos_y
-            ax.plot([x1, x1, x2, x2], [y1, y2, y2, y1], lw=0.5, c="k")
-            ax.text(
-                (x1 + x2) / 2,
-                p_text_up_pos_y,
-                p_symbol_map_func(p_val),
-                ha="center",
-                va="top",
-                **p_text_kwargs_,
-            )
+        if show_p:
+            for idx, p_val in enumerate(p_values.values()):
+                x1, x2 = idx - p_cap_width / 2, idx + p_cap_width / 2
+                y1, y2 = p_pos_y + p_cap_height, p_pos_y
+                ax.plot([x1, x1, x2, x2], [y1, y2, y2, y1], lw=0.5, c="k")
+                ax.text(
+                    (x1 + x2) / 2,
+                    p_text_up_pos_y,
+                    p_symbol_map_func(p_val),
+                    ha="center",
+                    va="top",
+                    **p_text_kwargs_,
+                )
 
         return self.trainer._plot_action_after_plot(
             fig_name=os.path.join(self.trainer.project_root, f"compare.pdf"),
