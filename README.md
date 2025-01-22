@@ -1,4 +1,4 @@
-# ENSEMBLE
+# SNEnsemble
 
 It is the repository for the article (**Update after acceptance**).
 
