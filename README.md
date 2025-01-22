@@ -17,7 +17,7 @@ Note that the requirements change from time to time in `tabular_ensemble`. To re
 pip install -r requirements.txt
 ```
 
-* Run  `pip install tabular_ensemble==0.3`. Most of its dependencies are satisfied.
+* Run  `pip install tabensemb==0.3`. Most of its dependencies are satisfied.
 
 ## Usage
 
