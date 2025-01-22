@@ -1,10 +1,10 @@
 # SNEnsemble
 
-It is the repository for the article (**Update after acceptance**).
+It is the repository for the article *Physics-informed ensemble learning for robustly extrapolating and revealing fatigue life of composites*, authored by Xue-Ling Luo, Chen-Cheng Lyu, and Lu-wen Zhang.
 
 ## Requirements
 
-This work is built on our developed open-source tabular prediction benchmark platform `tabular_ensemble`. 
+This work is built on our developed open-source tabular prediction benchmark platform [`tabular_ensemble`](https://github.com/Luwen-Zhang/tabular_ensemble). 
 
 Note that the requirements change from time to time in `tabular_ensemble`. To reproduce our dependencies:
 
@@ -17,7 +17,7 @@ Note that the requirements change from time to time in `tabular_ensemble`. To re
 pip install -r requirements.txt
 ```
 
-* Run  `pip install tabular_ensemble==0.2`. Most of its dependencies are satisfied.
+* Run  `pip install tabular_ensemble==0.3`. Most of its dependencies are satisfied.
 
 ## Usage
 
