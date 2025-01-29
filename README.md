@@ -1,6 +1,6 @@
 # SNEnsemble
 
-It is the repository for the article *Physics-informed ensemble learning for robustly extrapolating and revealing fatigue life of composites*, authored by Xue-Ling Luo, Chen-Cheng Lyu, and Lu-wen Zhang.
+It is the repository for the article *Physics-informed ensemble learning for robustly extrapolating and revealing fatigue life of composites*, authored by Xue-Ling Luo, Chen-Cheng Lyu, and Lu-Wen Zhang.
 
 ## Requirements
 
